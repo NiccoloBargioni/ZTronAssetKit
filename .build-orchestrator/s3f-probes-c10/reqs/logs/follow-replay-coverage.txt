@@ -1,0 +1,6 @@
+159:  159|      1|                self.reinstate(transfer)
+161:  161|      2|                self.replayJoin(join)
+162:  162|    540|            case .relane(let transfer, let epoch, let before):
+166:  166|      0|                self.relane(transfer, from: before)
+168:  168|      1|                self.replayEdge(transfer, epoch: epoch)
+327:  327|      0|            self.reroute(join.token, interest: JobInterest(lane: join.lane, kind: join.kind, assets: [join.asset]), asset: join.asset, from: transfer)

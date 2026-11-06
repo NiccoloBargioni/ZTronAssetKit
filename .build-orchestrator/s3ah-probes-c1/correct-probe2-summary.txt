@@ -1,0 +1,3 @@
+C1 S3AH-1 parser agreement: 14760 decodes, missing diagnostics 0, mismatches 0: []
+✔ Test "C1: streaming parser (raw and fully escaped) agrees with violations(of:) on every enumerated path" passed after 0.761 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.761 seconds.

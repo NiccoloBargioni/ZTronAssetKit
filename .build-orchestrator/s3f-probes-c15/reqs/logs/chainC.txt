@@ -1,0 +1,7 @@
+sim start 18:54:21 { 11.71 17.24 16.42 }
+sim exit 0 19:00:33 { 23.66 41.38 31.55 }
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+tsan start 19:00:33
+tsan exit 1 19:12:09
+t64 exit 0 warnings=0

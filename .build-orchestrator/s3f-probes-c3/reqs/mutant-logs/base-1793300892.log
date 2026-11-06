@@ -1,0 +1,20 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[1 / 2] ZTronAssetAppleHostedTests-product
+[1 / 3] ZTronAssetStorageTests-product
+[2 / 6] ZTronAssetSyncTests-product
+[4 / 8] ZTronAssetSyncTests-product
+[9 / 11] ZTronAssetSyncTests-product
+[11 / 11] ZTronAssetSyncTests-product
+Build complete! (11,55 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" started.
+◇ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" started.
+PROBE-W1 between follow turns: owed visits 444, downloading [], starts since the apply 0, of replaced content 0: []
+PROBE-W1 after the follow: outcome complete true, starts since the apply 2, of replaced content 0
+✔ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" passed after 0.375 seconds.
+✔ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" passed after 0.376 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.376 seconds.

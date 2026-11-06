@@ -1,0 +1,30 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:176:9: Expectation failed: outcome.throttleAtArrival != nil
+↳ the 429 throttles the origin for prefetch work (visit-first): nil
+↳ outcome.throttleAtArrival != nil → false
+↳   outcome.throttleAtArrival → nil
+✘ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:177:9: Expectation failed: (try? outcome.p.get())?.byteSize == 1_000_000
+↳ P is served by C's retry once the throttle ends (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 1_000_000 → <not evaluated>
+✘ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ U, re-routed onto C's throttled job at Y's commit, is answered serverUnavailable (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" with 2 test cases failed after 2.517 seconds with 3 issues.
+↳ /// A 429 during an owed follow does not count the interest a job publishing at the apply holds: Y's publication is
+↳ /// held before v3's apply, so a visit-first follow passed Y, U stayed on it, and C was prefetch work. C's 429 with
+↳ /// Retry-After 60 s throttled the origin for 60 s, Y's commit re-routed U onto C's parked job (answered
+↳ /// `serverUnavailable`, the wait above the user's), and C's retry served P. Counting every interest of a job that
+↳ /// publishes decided C on the user lane (`.exhausted`): nothing throttled, and P answered `serverUnavailable`.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.517 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.517 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,43 @@
+--- Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift	2026-10-29 11:16:02
++++ .build-verify-s3b-c1-correct/pkg/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift	2026-10-29 12:10:38
+@@ -32,6 +32,7 @@
+         // to the last, no commit, adoption report or `close()` captures a half-applied manifest, and the writes run
+         // to the end whatever happens meanwhile (nothing below throws until the commit).
+         self.state.core.applyGate.writing = true
++        self.state.core.countedReleases.removeAll()
+         if !unchanged {
+             // REENTRANCY: b-7 (proposed) — `applyDiff` yields between chunks behind the fence; each write re-reads
+             // the record it changes.
+@@ -272,6 +273,7 @@
+         self.releaseReference(key, dooming: .unreferenced)
+         if wasLive, case .doomed? = self.state.core.blobTable[key] {
+             self.state.eviction.releasedBytes = self.state.eviction.releasedBytes.addingSaturating(bytes)
++            self.state.core.countedReleases[key] = bytes
+         }
+     }
+ 
+@@ -353,7 +355,13 @@
+             self.state.core.blobBytes[key] = size
+             self.state.core.orphans[key] = nil
+         } else {
++            let rescuing: Bool
++            if case .doomed? = self.state.core.blobTable[key] { rescuing = true } else { rescuing = false }
+             _ = self.gainReferenceInPlace(key)
++            if rescuing, let counted = self.state.core.countedReleases.removeValue(forKey: key) {
++                // The bytes re-enter usedBytes: take back what this apply counted for them.
++                self.state.eviction.releasedBytes -= counted
++            }
+         }
+         let previous = record.referencedBlob
+         record.residency = .present(blob: key, byteSize: size, integrity: record.entry.checksum == key.hash ? .verified : .unverified)
+--- Sources/ZTronAssetStorage/Store/StoreCoreState.swift	2026-10-29 10:54:24
++++ .build-verify-s3b-c1-correct/pkg/Sources/ZTronAssetStorage/Store/StoreCoreState.swift	2026-10-29 12:10:38
+@@ -172,6 +172,8 @@
+     var manifestRevision: UInt64 = 0
+     /// Serialises `apply` and `admit`, which yield between chunks (C2, proposed REENTRANCY row b-7).
+     var applyGate = ApplyGate()
++    /// VERIFIER PROTOTYPE: blobs whose doom this apply/admit counted toward releasedBytes, with the bytes.
++    var countedReleases: [BlobKey: Int64] = [:]
+ }
+ 
+ /// The gate that lets one `apply` or `admit` run at a time, and the commit fence of `apply`'s writes.

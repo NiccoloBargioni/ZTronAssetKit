@@ -1,0 +1,35 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[12 / 12] ZTronAssetKitBenchmarks-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[18 / 18] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[21 / 21] ZTronAssetSyncTests-product
+Build complete! (5,97 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine commands" started.
+◇ Test "R-SYN-16: a maintenance step that throws fails the maintenance with the mapped error and the next one runs" started.
+✘ Test "R-SYN-16: a maintenance step that throws fails the maintenance with the mapped error and the next one runs" recorded an issue at EngineMaintenanceStepTests.swift:140:9: Expectation failed: failed == .failure(.storageUnavailable(.ioFailure))
+↳ failure(ZTronAssetModel.AssetError.shutDown)
+↳ failed == .failure(.storageUnavailable(.ioFailure)) → false
+↳   failed → failure(ZTronAssetModel.AssetError.shutDown)
+↳     failure → .shutDown
+↳   .failure(.storageUnavailable(.ioFailure)) → failure(ZTronAssetModel.AssetError.storageUnavailable(ZTronAssetModel.StorageUnavailableReason.ioFailure))
+↳     failure → .storageUnavailable(ZTronAssetModel.StorageUnavailableReason.ioFailure)
+↳       storageUnavailable → .ioFailure
+✘ Test "R-SYN-16: a maintenance step that throws fails the maintenance with the mapped error and the next one runs" failed after 0.013 seconds with 1 issue.
+↳ /// A maintenance step that throws (the staging listing fails with EIO) ends the maintenance with that error mapped to
+↳ /// the public error; no report is announced, and the next maintenance runs normally.
+✘ Suite "Engine commands" failed after 0.014 seconds with 1 issue.
+↳ /// The engine's commands: refresh, availability, leases, pins, purge, memory pressure, background events and
+↳ /// diagnostics (R-SYN-9, R-SYN-10, R-CAR-8, R-CLN-4, R-CLN-6, R-CLN-11, R-NET-3, R-OBS-2, R-OBS-3).
+✘ Test run with 1 test in 1 suite failed after 0.014 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

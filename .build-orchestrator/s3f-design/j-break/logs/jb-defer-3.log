@@ -1,0 +1,44 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "JBreakProbes" started.
+◇ Test "PROBE-J-HELD-RETICKET" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-J-HELD-RETICKET" started.
+PROBE-J-HELD-RETICKET followVisitedFirst mid: (owed: true, c: nil, n: Optional((ZTronAssetSync.JobState.queued, 6)), k: Optional((ZTronAssetSync.JobState.queued, 4)))
+PROBE-J-HELD-RETICKET followVisitedFirst tickets: (n: Optional(6), k: Optional(4))
+PROBE-J-HELD-RETICKET followVisitedFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ac/ac0dba8573f9b15c28052820ccc6c08ded1580f7b644430ebf1ffc698088917e.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-J-HELD-RETICKET" started.
+PROBE-J-HELD-RETICKET sweepFollowsFirst mid: (owed: true, c: nil, n: Optional((ZTronAssetSync.JobState.queued, 6)), k: Optional((ZTronAssetSync.JobState.queued, 4)))
+PROBE-J-HELD-RETICKET sweepFollowsFirst tickets: (n: Optional(6), k: Optional(8))
+PROBE-J-HELD-RETICKET sweepFollowsFirst K: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/61/61f5ca9fe6c5bfa66883e1cc042d41bc41fe2480a77509be8baf5e5f5857ff93.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-J-HELD-RETICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:362:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ K, queued before N was created, is served first (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "PROBE-J-HELD-RETICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:365:25: Issue recorded
+↳ A (N's waiter) gets the shortage (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/61/61f5ca9fe6c5bfa66883e1cc042d41bc41fe2480a77509be8baf5e5f5857ff93.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-J-HELD-RETICKET" with 2 test cases failed after 1.326 seconds with 2 issues.
+↳ /// K (3 MB, user) waits queued for the one slot from before the apply; A's job C behind it. v3 moves A to N (3 MB).
+↳ /// The follow's second turn visits C and creates N (a later ticket than K), and its pass is still owed. Event-first, the
+↳ /// slot frees while the follow is owed: D1's pump holds K at its queue's head (`waitsForFollow`, `requeueAtHead`),
+↳ /// which gives K a fresh ticket, later than N's; both then park `awaitingSpace`, and the reclaim's sweep, which orders
+↳ /// by ticket, serves N before K. Visit-first, the slot frees after the follow: K keeps its ticket and is served first.
+✘ Suite "JBreakProbes" failed after 1.326 seconds with 2 issues.
+↳ /// Judge (break lens) probes for the s3f sweep/follow designs D1 "defer", D2 "budget", D3 "root". Scratch; never committed.
+↳ ///
+↳ /// Each probe runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit that changes what the event's
+↳ /// decision reads. The reference is the visit-first answer.
+↳ ///
+↳ /// - PROBE-J-FAIL-REROUTE: a transient failure of a moved id's holder C arrives while the follow owes the visit that
+↳ ///   abandons another download D. `countFailedAttempt` brings C's visit forward (`followBeforeActing`), out of the follow's
+↳ ///   order: C's waiter is re-routed onto P (parked `insufficientSpace`) and re-checked beside D's doomed bytes.
+↳ /// - PROBE-J-FAIL-TICKET: the same out-of-order visit creates the new content N2 of the failing holder before N1, whose
+↳ ///   holder the follow visits first, so N2 takes the room visit-first gives N1 (FOLLOW-ORDER through a failure).
+↳ /// - PROBE-J-ENOSPC-DROPPED: an ENOSPC of a job whose only id the apply dropped (`holdsMovedID` does not count dropped
+↳ ///   ids, so `followBeforeActing` does nothing): its verdict parks it and fail-fasts the waiter with insufficientSpace
+↳ ///   where visit-first answers `.notFound`.
+↳ /// - PROBE-J-SHUTDOWN-DEFERRED: a user request, a join to a job parked `insufficientSpace` and a free-space read made
+↳ ///   while the follow is owed, then shutdown: every waiter is answered `.shutDown` and shutdown returns.
+✘ Test run with 1 test in 1 suite failed after 1.327 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

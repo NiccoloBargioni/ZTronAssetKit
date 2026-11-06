@@ -1,0 +1,161 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC14CorrectProbes" started.
+◇ Suite "VerifyC13CorrectProbesRerun" started.
+◇ Test "PROBE-C14C-STAMP-BREAKER" started.
+◇ Test "PROBE-C13-PURGE-JOIN" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13-PURGE-JOIN" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, slots → 2 to "PROBE-C14C-STAMP-BREAKER" started.
+PROBE-C14C-STAMP-BREAKER followVisitedFirst slots=2 afterApply=(n: Optional(ZTronAssetSync.JobState.queued), stamped: false)
+PROBE-C14C-STAMP-BREAKER followVisitedFirst slots=2 breakerClosed=(n: Optional(ZTronAssetSync.JobState.downloading), stamped: false)
+PROBE-C14C-STAMP-BREAKER followVisitedFirst slots=2 atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), alarm: false)
+PROBE-C13-PURGE-JOIN followVisitedFirst before purge: (owed: false, pending: true, job: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C13-PURGE-JOIN followVisitedFirst purge: success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 0))
+PROBE-C13-PURGE-JOIN followVisitedFirst after drain: (pending: false, job: nil, interest: false) starts 1 -> 1
+PROBE-C13-PURGE-JOIN followVisitedFirst zz-m present after purge and drain: false
+PROBE-C13-PURGE-JOIN followVisitedFirst violations: []
+◇ Test case passing 2 arguments visit → .followVisitedFirst, slots → 3 to "PROBE-C14C-STAMP-BREAKER" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13-PURGE-JOIN" started.
+PROBE-C14C-STAMP-BREAKER followVisitedFirst slots=3 afterApply=(n: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))), stamped: false)
+PROBE-C14C-STAMP-BREAKER followVisitedFirst slots=3 breakerClosed=(n: Optional(ZTronAssetSync.JobState.downloading), stamped: false)
+PROBE-C14C-STAMP-BREAKER followVisitedFirst slots=3 atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), alarm: false)
+PROBE-C13-PURGE-JOIN sweepFollowsFirst before purge: (owed: true, pending: true, job: nil)
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, slots → 2 to "PROBE-C14C-STAMP-BREAKER" started.
+PROBE-C13-PURGE-JOIN sweepFollowsFirst purge: success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 0))
+PROBE-C13-PURGE-JOIN sweepFollowsFirst after drain: (pending: false, job: nil, interest: false) starts 0 -> 0
+PROBE-C13-PURGE-JOIN sweepFollowsFirst zz-m present after purge and drain: false
+PROBE-C13-PURGE-JOIN sweepFollowsFirst violations: []
+✔ Test "PROBE-C13-PURGE-JOIN" with 2 test cases passed after 0.482 seconds.
+◇ Test "PROBE-C13-STAMP-NO-SLOT" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13-STAMP-NO-SLOT" started.
+PROBE-C14C-STAMP-BREAKER sweepFollowsFirst slots=2 afterApply=(n: nil, stamped: false)
+PROBE-C14C-STAMP-BREAKER sweepFollowsFirst slots=2 breakerClosed=(n: nil, stamped: false)
+PROBE-C14C-STAMP-BREAKER sweepFollowsFirst slots=2 atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), alarm: false)
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, slots → 3 to "PROBE-C14C-STAMP-BREAKER" started.
+PROBE-C13-STAMP-NO-SLOT followVisitedFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: false, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C13-STAMP-NO-SLOT followVisitedFirst k=success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a5/a55b02029562b8867886cde2fcb9136bbcdc40b27615a80efb8430b2932b83fc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/75/753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) kStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13-STAMP-NO-SLOT" started.
+PROBE-C14C-STAMP-BREAKER sweepFollowsFirst slots=3 afterApply=(n: nil, stamped: false)
+PROBE-C14C-STAMP-BREAKER sweepFollowsFirst slots=3 breakerClosed=(n: nil, stamped: false)
+PROBE-C14C-STAMP-BREAKER sweepFollowsFirst slots=3 atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), alarm: false)
+✔ Test "PROBE-C14C-STAMP-BREAKER" with 4 test cases passed after 0.911 seconds.
+◇ Test "PROBE-C14C-MARK-TWO-APPLIES" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14C-MARK-TWO-APPLIES" started.
+PROBE-C13-STAMP-NO-SLOT sweepFollowsFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: true, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C13-STAMP-NO-SLOT sweepFollowsFirst k=success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a5/a55b02029562b8867886cde2fcb9136bbcdc40b27615a80efb8430b2932b83fc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/75/753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) kStarts=1
+✔ Test "PROBE-C13-STAMP-NO-SLOT" with 2 test cases passed after 0.649 seconds.
+◇ Test "PROBE-C13-EXHAUST-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13-EXHAUST-LANE" started.
+PROBE-C13-EXHAUST-LANE followVisitedFirst right after the 429: (throttle: nil, c: nil)
+PROBE-C13-EXHAUST-LANE followVisitedFirst after the drain: (throttle: nil, c: nil)
+PROBE-C13-EXHAUST-LANE followVisitedFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+PROBE-C13-EXHAUST-LANE followVisitedFirst violations: []
+PROBE-C14C-MARK-TWO-APPLIES followVisitedFirst after v4's follow: (c: Optional(ZTronAssetSync.JobState.verifying), mark: Optional(ZTronAssetSync.PassedPublication.publishingAtApply), assets: Optional([zz-a, zz-c]))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13-EXHAUST-LANE" started.
+PROBE-C14C-MARK-TWO-APPLIES followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7b/7beacfed8434ec105a580c320473c06e094fadc9298cb6b4d322e082dcee25d1.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) c=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14C-MARK-TWO-APPLIES" started.
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst right after the 429: (throttle: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst after the drain: (throttle: nil, c: nil)
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst violations: []
+✔ Test "PROBE-C13-EXHAUST-LANE" with 2 test cases passed after 0.630 seconds.
+✔ Suite "VerifyC13CorrectProbesRerun" passed after 1.762 seconds.
+PROBE-C14C-MARK-TWO-APPLIES sweepFollowsFirst after v3's pass: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), mark: Optional(ZTronAssetSync.PassedPublication.publishedAfterApply))
+PROBE-C14C-MARK-TWO-APPLIES sweepFollowsFirst after v4's follow: (c: Optional(ZTronAssetSync.JobState.verifying), mark: Optional(ZTronAssetSync.PassedPublication.publishedAfterApply), assets: Optional([zz-a, zz-b, zz-c]))
+PROBE-C14C-MARK-TWO-APPLIES sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7b/7beacfed8434ec105a580c320473c06e094fadc9298cb6b4d322e082dcee25d1.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) c=success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6580fbf8744233f5197258bed0a09caeda9c5836a7a0d2c1d71283cb37692c51.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C14C-MARK-TWO-APPLIES" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14CorrectProbes.swift:209:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ PROBE-C14C-MARK-TWO-APPLIES: zz-c's user gets C's integrity failure: v4's follow passed C, publishing, in both orders (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6580fbf8744233f5197258bed0a09caeda9c5836a7a0d2c1d71283cb37692c51.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6580fbf8744233f5197258bed0a09caeda9c5836a7a0d2c1d71283cb37692c51.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6580fbf8744233f5197258bed0a09caeda9c5836a7a0d2c1d71283cb37692c51.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6580fbf8744233f5197258bed0a09caeda9c5836a7a0d2c1d71283cb37692c51.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6580fbf8744233f5197258bed0a09caeda9c5836a7a0d2c1d71283cb37692c51.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "PROBE-C14C-MARK-TWO-APPLIES" with 2 test cases failed after 1.103 seconds with 1 issue.
+↳ /// PROBE-C14C-MARK-TWO-APPLIES: one publication passed by two applies' follows. C (100 kB, the content of zz-a, zz-b,
+↳ /// zz-c, a user waiter each) begins to publish after v3's apply (which moves zz-b to N); v4, applied while that same
+↳ /// publication still verifies, moves zz-c to N2. C's bytes then fail their checksum.
+↳ /// Visit-first: v3's visit moved B onto N while C downloaded (B served N); v4's follow passed C, publishing, so zz-c
+↳ /// stayed on C and its user got C's `integrityFailure`, as A did.
+↳ /// Behind v3's barrier, v3's pass marks C `publishedAfterApply`; v4's pass keeps the mark; at the failure
+↳ /// `followPassedPublication` moves every id the copy lists elsewhere, zz-c included.
+◇ Test "PROBE-C14C-PASSED-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14C-PASSED-LANE" started.
+PROBE-C14C-PASSED-LANE followVisitedFirst before the 429: (owed: false, y: Optional(ZTronAssetSync.JobState.downloading), cLane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14C-PASSED-LANE followVisitedFirst right after the 429: (throttle: nil, c: nil)
+PROBE-C14C-PASSED-LANE followVisitedFirst after the drain: (throttle: nil, c: nil, y: Optional(ZTronAssetSync.JobState.downloading), mark: nil)
+PROBE-C14C-PASSED-LANE followVisitedFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) q=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/27/274c608650ae324318dd60f6d2f0b02e04bd54888d424a8b2de952c139908810.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14C-PASSED-LANE" started.
+PROBE-C14C-PASSED-LANE sweepFollowsFirst pre-hold: (store: false, y: Optional(ZTronAssetSync.JobState.downloading), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst after Y's release: (y: Optional(ZTronAssetSync.JobState.verifying), store: false, owed: true) heldUnits=0
+PROBE-C14C-PASSED-LANE sweepFollowsFirst before the 429: (owed: true, y: Optional(ZTronAssetSync.JobState.verifying), cLane: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst right after the 429: (throttle: Optional(60.0), c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst after the drain: (throttle: Optional(60.0), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.throttled(until: 61000000000ns))), y: Optional(ZTronAssetSync.JobState.verifying), mark: Optional(ZTronAssetSync.PassedPublication.publishedAfterApply))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bcf8d976c1acd364832b2b30237babe134f0b67bf5334f87f2de5a4a03c5767d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bcf8d976c1acd364832b2b30237babe134f0b67bf5334f87f2de5a4a03c5767d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) q=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/27/274c608650ae324318dd60f6d2f0b02e04bd54888d424a8b2de952c139908810.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✘ Test "PROBE-C14C-PASSED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14CorrectProbes.swift:309:9: Expectation failed: atArrival.throttle == nil
+↳ PROBE-C14C-PASSED-LANE: the 429 beyond the user lane's cap throttles nothing (visit-first .exhausted): (throttle: Optional(60.0), c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+↳ atArrival.throttle == nil → false
+↳   atArrival.throttle → 60.0
+↳     some → 60.0
+✘ Test "PROBE-C14C-PASSED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14CorrectProbes.swift:312:25: Issue recorded
+↳ PROBE-C14C-PASSED-LANE: P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bcf8d976c1acd364832b2b30237babe134f0b67bf5334f87f2de5a4a03c5767d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C14C-PASSED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14CorrectProbes.swift:316:25: Issue recorded
+↳ U is answered serverUnavailable (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bcf8d976c1acd364832b2b30237babe134f0b67bf5334f87f2de5a4a03c5767d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C14C-PASSED-LANE" with 2 test cases failed after 0.824 seconds with 3 issues.
+↳ /// PROBE-C14C-PASSED-LANE (RR-1's remainder, cycle 14): a 429 while a job that publishes, but downloaded at the apply,
+↳ /// holds the moved user interest. Interactive `maxRetryAfter` 30 s, background 3,600 s. C (1 MB, zz-b) runs for P, a
+↳ /// prefetch waiter; Y (100 kB, zz-u) runs for U, a user waiter; v3 moves zz-u onto C's content. Visit-first, v3's
+↳ /// visit superseded Y while it downloaded and moved U onto C, so C was user work: its 429 with Retry-After 60 s was
+↳ /// `.exhausted` (no throttle), C failed `.nextRun`, P and U were answered `serverUnavailable(60)`. Behind the barrier Y
+↳ /// verifies when C's 429 arrives; `followedLane(C)` skips publishing jobs, so C is prefetch work.
+✘ Suite "VerifyC14CorrectProbes" failed after 2.839 seconds with 4 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 14, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`); every expectation is the visit-first outcome.
+✘ Test run with 6 tests in 2 suites failed after 2.839 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

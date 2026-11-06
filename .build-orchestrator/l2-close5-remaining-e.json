@@ -1,0 +1,18 @@
+[
+ {
+  "lens": "both",
+  "blocking": false,
+  "area": "correctness / sourceCopyBytes accounting (R-CLN-9). The behaviour is proven; whether it is a defect depends on which text governs.",
+  "location": "Sources/ZTronAssetAppleHosted/AppleSourceState.swift:242-251 (finishRelease records only successful removals) and :259-261 (sourceCopyPacks = adoptedPacks \u222a releasedInProcess); Sources/ZTronAssetAppleHosted/AppleHostedRemoteSource.swift:127-145",
+  "problem": "Take a media pack that holds no adopted entry, for example one whose only entry the retention scope excludes. If its planned removal fails with an error other than packNotFound, the pack stays installed but adds nothing to sourceCopyBytes(). It stays hidden for as long as the removal keeps failing. The removal is retried at every reclaim and reported in ReclaimReport.failed. I proved this with my own probe against HEAD (PROBE-C5-3, failRemove(.system)): `released=[] failed=[\"ZTronExtras\"] installed=true sourceCopyBytes=0 size=8`. This is the same class as VC3-E: by this cycle's reading of R-CLN-9/ADR-027 ('bytes the OS still holds'), the OS keeps bytes that the report does not show. It is consistent with the Model contract wording ('for content the store adopted') and with the cycle 3/5 ruling, which only extended counting to released packs. It is bounded (a reporting figure only, no loop, no data loss), so I rate it non-blocking.",
+  "fix": "Either (a) also count the packs the last survey settled whose removal has not succeeded: keep `lastSettled = survey.settled` in planRelease and return `adoptedPacks \u222a releasedInProcess \u222a lastSettled` from sourceCopyPacks(). Add a test where failRemove(.system) on an excluded-only pack expects sourceCopyBytes == installedBytes, keeping the sum saturating. Or (b) record in E-11 that an excluded-only pack whose release fails is not counted until it is released, and add this to the ADR-027 amendment request so the orchestrator confirms the narrower reading."
+ },
+ {
+  "lens": "both",
+  "blocking": false,
+  "area": "decision record precision (request to the orchestrator)",
+  "location": "docs/adr-drafts/e.md:504-510 (DECISIONS ADR-027 request, item (b))",
+  "problem": "Item (b) says double residency lasts 'from an on-demand re-download after release until the next catalog generation'. The code, and the new test at Tests/ZTronAssetAppleHostedTests/PackReleaseTests.swift:373 ('A new catalog digest alone removes nothing: the pack counts until a reclaim of that generation releases it'), keep the pack installed and counted until a reclaim in a later generation releases it, not until the next digest appears. E-10's Consequence (e.md:220-224) and the \u00a76.6 request already use the precise wording. Only this item does not.",
+  "fix": "In item (b), replace 'until the next catalog generation' with 'until a reclaim in a later catalog generation releases it'. This is a doc-only change in WP-E's own draft."
+ }
+]

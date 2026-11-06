@@ -1,0 +1,9 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC2Correct probes" started.
+◇ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" started.
+PROBE-W1b: complete true, starts since the apply 4, of replaced content 0
+✔ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" passed after 1.599 seconds.
+✔ Suite "VerifyC2Correct probes" passed after 1.599 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.599 seconds.

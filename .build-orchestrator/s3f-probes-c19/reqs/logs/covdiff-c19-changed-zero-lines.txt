@@ -1,0 +1,21 @@
+# covdiff.py output (cycle-19 changed lines, git diff -U0 4b1c3a6..HEAD, with a zero count; llvm-cov show over the --quick coverage run's default.profdata of 21:53), copied from this verifier's session transcript
+Sources/ZTronAssetSync/Engine/EngineCommands.swift: changed 28 lines, zero-count changed lines 6
+   1724: violations.append("interest \(token.rawValue) in \(transfer) at \(interest.lane), its token's lane being \(lan
+   1725: }
+   2051: violations.append("\(self.state.inboundOnto.count) jobs count owed moves onto them, \(onto.count) with moves o
+   2052: }
+   2055: violations.append("\(stranded.count) publications wait for owed moves that nothing owes")
+   2056: }
+Sources/ZTronAssetSync/Engine/EngineDispatch.swift: changed 11 lines, zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineFailures.swift: changed 121 lines, zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineFollow.swift: changed 179 lines, zero-count changed lines 1
+   1249: return nil
+Sources/ZTronAssetSync/Engine/EngineJobs.swift: changed 13 lines, zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineMoves.swift: changed 227 lines, zero-count changed lines 6
+   54: return nil
+   87: }
+   203: continue
+   206: continue
+   222: self.relane(holder, from: progress.lane)
+   223: }
+Sources/ZTronAssetSync/Engine/EngineState.swift: changed 13 lines, zero-count changed lines 0

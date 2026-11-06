@@ -1,0 +1,38 @@
+Building for production...
+[Computing dependencies]
+[Constructing description]
+[Pre-planning 1 / 240]
+[Planning deferred tasks]
+[1 / 97]
+[47 / 97]
+[48 / 98] ZTronAssetModel
+[58 / 136]
+[59 / 136]
+[61 / 136]
+[67 / 136]
+[69 / 136]
+[72 / 136]
+[73 / 136]
+[74 / 136]
+[75 / 136]
+[76 / 136]
+[78 / 136]
+[79 / 136]
+[82 / 136]
+[83 / 136]
+[84 / 136]
+[85 / 136]
+[86 / 136]
+[87 / 136] ZTronAssetModel
+[96 / 139] ZTronAssetTransport
+[105 / 148]
+[106 / 148]
+[108 / 148] ZTronAssetAppleHosted
+[114 / 148] ZTronAssetTransport
+[120 / 148] ZTronAssetStorage
+[128 / 150] ZTronAssetTestSupport
+[132 / 152] ZTronAssetTestSupport
+[138 / 152] ZTronAssetSync
+[145 / 153] ZTronAssetKit
+[147 / 154] ZTronAssetKit
+Build complete! (176,69 s)

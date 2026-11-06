@@ -1,0 +1,13 @@
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.83% (1444/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.41% (8120/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 94.11% (10422/11074) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.60% (26934/27882) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.63% max=3.0% OK
+COVERAGE: PASS

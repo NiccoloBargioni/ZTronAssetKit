@@ -1,0 +1,56 @@
+over half: 55 of 718
+ 55.5%  133.12s /4min 09:00:21-09:02:34 load 16.0-48.7 mean 34.3 >30 62% tsan-pair2A.jsonl: R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject du
+ 55.4%  132.85s /4min 09:00:21-09:02:33 load 16.0-48.7 mean 34.3 >30 62% tsan-pair2B.jsonl: R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject du
+ 55.0%   32.99s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its
+ 54.7%   32.83s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has en
+ 54.7%   32.79s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-16: a heal whose re-download fails ends, and the engine forgets it
+ 54.5%   32.69s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-STO-13: the prior-art files the last migration batch adopted reach the readers' snapshot with
+ 54.5%   32.67s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-8: a metadata-only manifest change completes the run and writes the stamp
+ 54.4%   32.67s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-6: a store failure while a run applies its manifest fails the run with the store's error 
+ 54.2%   32.53s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-6: a run does not download an asset the store holds present after the engine dropped its 
+ 54.0%   32.42s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-6: a run whose claim parked for space the ledger admits once a job in flight ended withou
+ 54.0%   32.41s /1min 09:00:19-09:00:52 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-6: a run whose claim parked for space loses the room the ledger gained to a job ranked ah
+ 53.9%   32.35s /1min 09:00:20-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2B.jsonl: R-SYN-5: no transfer starts before a 429's Retry-After elapses on ManualTimeSource
+ 53.3%   32.01s /1min 09:00:21-09:00:53 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-6: a run does not download an asset the store holds present after the engine dropped its 
+ 53.3%   31.98s /1min 09:00:21-09:00:53 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its
+ 53.2%   31.91s /1min 09:00:21-09:00:53 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has en
+ 53.1%   31.88s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-9: the stamp is stored in the index and written only after a complete run
+ 53.1%   31.86s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-11: a job waiting for space that nothing will reclaim is re-checked on a fresh free-space
+ 53.1%   31.86s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled
+ 52.9%   31.73s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2A.jsonl: R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled
+ 52.9%   31.72s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-16: a heal whose re-download fails ends, and the engine forgets it
+ 52.8%   31.68s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-10: ensureAvailable's apply announces pruned ids and stops their jobs, as a run's apply d
+ 52.7%   31.65s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-STO-11: shutdown while the migration waits for a job's adoption of the last claimed prior-art
+ 52.6%   31.55s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-STO-13: the prior-art files the last migration batch adopted reach the readers' snapshot with
+ 52.5%   31.53s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-8: a metadata-only manifest change completes the run and writes the stamp
+ 52.5%   31.51s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-6: a store failure while a run applies its manifest fails the run with the store's error 
+ 52.5%   31.51s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-5: a prefetch blocked by an open breaker starts when the cooldown ends, and its success c
+ 52.5%   31.48s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2A.jsonl: R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm'
+ 52.4%   31.41s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2A.jsonl: R-SYN-10: ensureAvailable downloads a member that an apply evicted before it threw
+ 52.3%   31.41s /1min 09:00:19-09:00:51 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2A.jsonl: R-MAN-2: an undecodable manifest fails the run with serverUnavailable and leaves the applied ma
+ 52.3%   31.40s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-5: no transfer starts before a 429's Retry-After elapses on ManualTimeSource
+ 52.1%   31.25s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-6: a run whose claim parked for space the ledger admits once a job in flight ended withou
+ 52.1%   31.24s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-6: a run whose claim parked for space loses the room the ledger gained to a job ranked ah
+ 52.0%   31.21s /1min 09:00:19-09:00:50 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-10: ensureAvailable downloads a member that an apply evicted before it threw
+ 52.0%   31.20s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a
+ 51.8%   31.08s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-10: ensureAvailable during a bulk sync never fails with storageUnavailable because of con
+ 51.8%   31.08s /1min 09:00:19-09:00:50 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2A.jsonl: R-SYN-6: a run's held manifest probe is let go when its fetch finds the origin throttled, so th
+ 51.6%   30.96s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-5: a prefetch blocked by an open breaker starts when the cooldown ends, and its success c
+ 51.6%   30.94s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-9: a launch run starts only when the stamp is missing or the app version changed
+ 51.6%   30.94s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-CLN-4: pins reach the store and a pinned asset is never evicted
+ 51.5%   30.92s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-12: clientShutDown is the last event every subscriber receives
+ 51.5%   30.88s /1min 09:00:19-09:00:50 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm'
+ 51.5%   30.87s /1min 09:00:20-09:00:51 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2B.jsonl: R-SYN-6: a run whose last working claim ends after the breaker's cooldown but before the alarm'
+ 51.2%   30.74s /1min 09:00:21-09:00:51 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-9: the stamp is stored in the index and written only after a complete run
+ 51.1%   30.69s /1min 09:00:21-09:00:51 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-SYN-6: a run whose last working claim ends after the breaker's cooldown but before the alarm'
+ 50.8%   30.48s /1min 09:00:19-09:00:50 load 14.8-24.8 mean 19.9 >30 0% tsan-pair2B.jsonl: R-NET-1: the engine completes a sync against FakeRemoteSource with no network
+ 50.8%   30.45s /1min 09:00:21-09:00:51 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-STO-11: shutdown while the migration waits for a job's adoption of the last claimed prior-art
+ 50.7%   30.45s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2B.jsonl: R-SYN-9: a launch run starts only when the stamp is missing or the app version changed
+ 50.6%   30.35s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2B.jsonl: R-SYN-10: ensureAvailable during a bulk sync never fails with storageUnavailable because of con
+ 50.6%   30.34s /1min 09:00:21-09:00:52 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2B.jsonl: R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a
+ 50.5%   90.96s /3min 09:00:19-09:01:50 load 14.8-41.0 mean 28.0 >30 42% tsan-pair2B.jsonl: R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits
+ 50.4%   30.22s /1min 09:00:21-09:00:51 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2B.jsonl: R-CLN-4: pins reach the store and a pinned asset is never evicted
+ 50.3%   30.20s /1min 09:00:19-09:00:49 load 14.8-24.1 mean 19.1 >30 0% tsan-pair2B.jsonl: R-SYN-6: a run does not download an asset another interest committed after its plan, and counts
+ 50.3%   30.18s /1min 09:00:21-09:00:51 load 16.0-24.8 mean 20.7 >30 0% tsan-pair2A.jsonl: R-CLN-5: every URL handed out stays readable for at least the grace window
+ 50.1%   90.14s /3min 09:00:21-09:01:51 load 16.0-41.0 mean 28.7 >30 44% tsan-pair2A.jsonl: R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits
+ 50.0%   90.05s /3min 09:00:21-09:01:51 load 16.0-41.0 mean 28.7 >30 44% tsan-pair2B.jsonl: R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instea

@@ -1,0 +1,29 @@
+S3-STAB-01 independent confirmation (confirm-stability agent). Worktree at s3-base (b5796ba); logs in /Users/admin/Documents/ZTronAssetKit/.build-s3-confirm-stability.
+Runner: run-direct.sh (this directory; own TMPDIR/worktree). Loads are 1/5/15-min load averages.
+
+== Replay probe S3-STAB-01.swift (unchanged from the hunter's), debug, load ~24 (probes-debug.log):
+with 1 argument stop → cancelled at S3StabilityLegacyProbes.swift:81:9
+with 1 argument stop → closed at S3StabilityLegacyProbes.swift:81:9
+(no issue at :54, :55 or :83: the replay's own preconditions and the product property hold)
+
+== Replay under TSan, 5 repetitions, load ~16 (probes-tsan.log): failing line counts
+  10 S3StabilityLegacyProbes.swift:81
+   5 S3StabilityPollProbes.swift:127
+   5 S3StabilityPollProbes.swift:59
+   5 S3StabilityPollProbes.swift:92
+   5 S3StabilityPollProbes.swift:95
+
+== Unchanged test, debug (no TSan), --repetitions 500 x 2 cases, load ~22 (p4-unfixed-debug.log):
+case starts: 1002  issues: 15
+  10 stop → cancelled at LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2
+   5 stop → closed at LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2
+  15 ↳   listings() → 3
+
+== Unchanged test, TSan, --repetitions 200 x 2 cases, load ~17 (p4-unfixed-tsan.log):
+case starts: 402  issues: 19  TSan reports: 0
+  19 ↳   listings() → 3
+
+== With S3-STAB-01-fix-a.diff (identical to the hunter's), debug, --repetitions 500 x 2, load ~22 (p4-fixa-debug.log):
+case starts: 1002  issues: 0
+== With fix (a), TSan, --repetitions 300 x 2, load ~18-20 (p4-fixa-tsan.log):
+case starts: 602  issues: 0  TSan reports: 0

@@ -1,0 +1,33 @@
+✔ Test run with 104 tests in 14 suites passed after 0.436 seconds.
+::: OK   tests
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+release-build start 21:22:46 load averages: 16.08 14.65 39.94
+release-build exit=0 Build complete! (69,76 s) 21:23:58
+storage-run1 start 21:23:58 load averages: 21.86 16.91 38.81
+storage-run1 exit=0 ✔ Test run with 484 tests in 64 suites passed after 235.741 seconds. 21:29:05 load averages: 10.17 14.83 31.43
+storage-run2 start 21:29:05 load averages: 10.17 14.83 31.43
+storage-run2 exit=0 ✔ Test run with 484 tests in 64 suites passed after 224.756 seconds. 21:32:52 load averages: 10.77 13.58 27.07
+storage-run3 start 21:32:52 load averages: 10.77 13.58 27.07
+storage-run3 exit=0 ✔ Test run with 484 tests in 64 suites passed after 271.686 seconds. 21:37:26 load averages: 19.22 16.18 24.44
+coverage start 21:37:26 load averages: 18.80 16.15 24.37
+coverage-run exit=0 ✔ Test run with 151 tests in 16 suites passed after 0.876 seconds.|✔ Test run with 351 tests in 52 suites passed after 20.713 seconds.|✔ Test run with 484 tests in 64 suites passed after 376.973 seconds.|✔ Test run with 84 tests in 18 suites passed after 62.970 seconds.|✔ Test run with 85 tests in 11 suites passed after 2.605 seconds.|✔ Test run with 71 tests in 10 suites passed after 0.345 seconds.|✔ Test run with 104 tests in 14 suites passed after 0.428 seconds.| 21:47:10 load averages: 6.11 18.44 23.59
+llvm-cov exit=0 bundles=8
+covgate exit=0
+chain1 done 21:47:10
+tsan start 21:47:17 load averages: 5.78 18.17 23.46
+tsan exit=1 ✘ Test run with 484 tests in 64 suites failed after 883.440 seconds with 1 issue. reports=0 22:03:42 load averages: 4.25 10.66 17.90
+ios-build start 22:03:42
+ios-build exit=0 errors=0 warnings=0 22:03:55
+sim start 22:03:55 load averages: 5.01 10.61 17.79
+sim exit=0 ** TEST SUCCEEDED ** 22:11:55 load averages: 31.00 74.59 56.18
+xcresult .build-verify-s3c-c2-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.29_22-03-59-+0100.xcresult exit=0
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+sim shutdown exit=149
+bench start 22:11:58 load averages: 30.04 73.67 55.96
+bench exit=1 ✘ Test run with 35 tests in 8 suites failed after 474.216 seconds with 3 issues.| 22:23:00 load averages: 13.34 22.21 34.56
+chain2 done 22:23:00
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" recorded an issue at LoopbackHTTPServerTests.swift:400:6: Time limit was exceeded: 60.000 seconds
+◇ Test case passing 1 argument slice → bin=absent prev=committed tmp=absent to "R-STO-5: legacy phase 1's commit before open()'s barrier keeps the newest durable generation and counts only what a file holds, for every initial index disk, fault and crash" started.
+R-CLN-7 powerLossDropUnsynced, purge half: 80 crash points, 0 stamped then lost a blob

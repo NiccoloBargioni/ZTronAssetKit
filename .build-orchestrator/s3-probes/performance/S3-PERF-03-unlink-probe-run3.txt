@@ -1,0 +1,9 @@
+load average 44.8 84.1 96.2; root /Users/admin/Documents/ZTronAssetKit/.build-s3-performance/tmp/p13
+control: usleep(3ms) 4.29ms v0 i1; F_FULLFSYNC(1MiB dirty) 7.29ms v4 i0; usleep(3ms) 4.97ms v0 i1; F_FULLFSYNC(1MiB dirty) 5.78ms v3 i0; usleep(3ms) 4.90ms v0 i1; F_FULLFSYNC(1MiB dirty) 6.41ms v2 i1; usleep(3ms) 3.89ms v0 i1; F_FULLFSYNC(1MiB dirty) 4.99ms v4 i1; usleep(3ms) 3.40ms v0 i1; F_FULLFSYNC(1MiB dirty) 10.71ms v4 i0
+load average at end 44.8 84.1 96.2
+load average 44.8 84.1 96.2; root /Users/admin/Documents/ZTronAssetKit/.build-s3-performance/tmp/p13
+H4-fresh-fanout-sorted-userInteractive: n=10000 total 524 ms; p50 0.046 p99 0.086 p99.9 1.107 max 4.65 ms; >1ms 11 >2ms 8 >4ms 4; stalls blocked(vol,low cpu) 0 preempted(invol only) 8; stall gap p50 12 ms
+   first stalls: 2.3@11ms(cpu 0.10,v0,i1) 4.5@23ms(cpu 0.11,v0,i2) 2.3@34ms(cpu 0.07,v0,i1) 4.6@87ms(cpu 0.13,v0,i3) 2.5@91ms(cpu 0.07,v0,i1) 4.7@146ms(cpu 0.12,v0,i1) 4.6@215ms(cpu 0.13,v0,i1) 2.6@220ms(cpu 0.11,v0,i1)
+H5-settled-fanout-sorted-userInteractive: n=10000 total 527 ms; p50 0.047 p99 0.081 p99.9 0.949 max 6.53 ms; >1ms 10 >2ms 6 >4ms 4; stalls blocked(vol,low cpu) 0 preempted(invol only) 6; stall gap p50 49 ms
+   first stalls: 4.2@37ms(cpu 0.10,v0,i1) 3.9@80ms(cpu 0.14,v0,i3) 3.9@125ms(cpu 0.12,v0,i2) 4.1@175ms(cpu 0.16,v0,i3) 4.2@224ms(cpu 0.12,v0,i2) 6.5@297ms(cpu 0.16,v0,i3)
+load average at end 41.8 82.8 95.6

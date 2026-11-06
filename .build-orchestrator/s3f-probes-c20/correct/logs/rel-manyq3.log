@@ -1,0 +1,43 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20Correct" started.
+◇ Test "PROBE-C20C-MANY-MOVES" started.
+PROBE-C20C-MANY-MOVES count=10000 moves=1 run 0: publishing 1; H ids after v3 10000; owed moves after v4 1 (off H 1); longest follow turn 8.36 ms (thread CPU 8.36 ms); violations []; turns [follow 8.36ms cpu 8.36ms E0->0 H9999, follow 1.28ms cpu 1.28ms E0->0 H9999]
+PROBE-C20C-MANY-MOVES count=10000 moves=1 run 1: publishing 1; H ids after v3 10000; owed moves after v4 1 (off H 1); longest follow turn 8.43 ms (thread CPU 8.44 ms); violations []; turns [follow 8.43ms cpu 8.44ms E0->0 H9999, follow 1.26ms cpu 1.26ms E0->0 H9999]
+PROBE-C20C-MANY-MOVES count=10000 moves=1 run 2: publishing 1; H ids after v3 10000; owed moves after v4 1 (off H 1); longest follow turn 8.22 ms (thread CPU 8.22 ms); violations []; turns [follow 8.22ms cpu 8.22ms E0->0 H9999, follow 1.27ms cpu 1.27ms E0->0 H9999]
+PROBE-C20C-MANY-MOVES count=10000 moves=1: longest follow turn per run [8.356708, 8.433792, 8.220167] ms, best 8.220167 ms; thread CPU per run [8.35775, 8.435, 8.22125] ms; load { 3.45 5.71 97.60 }
+PROBE-C20C-MANY-MOVES count=10000 moves=16 run 0: publishing 16; H ids after v3 10000; owed moves after v4 16 (off H 16); longest follow turn 79.55 ms (thread CPU 79.52 ms); violations []; turns [follow 79.55ms cpu 79.52ms E0->0 H9984, follow 1.28ms cpu 1.28ms E0->0 H9984]
+PROBE-C20C-MANY-MOVES count=10000 moves=16 run 1: publishing 16; H ids after v3 10000; owed moves after v4 16 (off H 16); longest follow turn 82.77 ms (thread CPU 81.92 ms); violations []; turns [follow 82.77ms cpu 81.92ms E0->0 H9984, follow 1.65ms cpu 1.56ms E0->0 H9984]
+PROBE-C20C-MANY-MOVES count=10000 moves=16 run 2: publishing 16; H ids after v3 10000; owed moves after v4 16 (off H 16); longest follow turn 79.95 ms (thread CPU 79.89 ms); violations []; turns [follow 79.95ms cpu 79.89ms E0->0 H9984, follow 1.31ms cpu 1.31ms E0->0 H9984]
+PROBE-C20C-MANY-MOVES count=10000 moves=16: longest follow turn per run [79.554875, 82.77075, 79.947542] ms, best 79.554875 ms; thread CPU per run [79.522208, 81.921, 79.889125] ms; load { 3.45 5.71 97.60 }
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:439:13: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ PROBE-C20C-MANY-MOVES moves=16: every follow turn at most C2's 10 ms: [79.554875, 82.77075, 79.947542]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 79.554875
+PROBE-C20C-MANY-MOVES count=10000 moves=64 run 0: publishing 64; H ids after v3 10000; owed moves after v4 64 (off H 64); longest follow turn 305.56 ms (thread CPU 305.55 ms); violations []; turns [follow 305.56ms cpu 305.55ms E0->0 H9936, follow 1.30ms cpu 1.30ms E0->0 H9936]
+PROBE-C20C-MANY-MOVES count=10000 moves=64 run 1: publishing 64; H ids after v3 10000; owed moves after v4 64 (off H 64); longest follow turn 305.45 ms (thread CPU 305.36 ms); violations []; turns [follow 305.45ms cpu 305.36ms E0->0 H9936, follow 1.36ms cpu 1.36ms E0->0 H9936]
+PROBE-C20C-MANY-MOVES count=10000 moves=64 run 2: publishing 64; H ids after v3 10000; owed moves after v4 64 (off H 64); longest follow turn 304.79 ms (thread CPU 304.79 ms); violations []; turns [follow 304.79ms cpu 304.79ms E0->0 H9936, follow 1.31ms cpu 1.31ms E0->0 H9936]
+PROBE-C20C-MANY-MOVES count=10000 moves=64: longest follow turn per run [305.555667, 305.4495, 304.78525] ms, best 304.78525 ms; thread CPU per run [305.553833, 305.35975, 304.786625] ms; load { 3.45 5.71 97.60 }
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:439:13: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ PROBE-C20C-MANY-MOVES moves=64: every follow turn at most C2's 10 ms: [305.555667, 305.4495, 304.78525]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 304.78525
+✘ Test "PROBE-C20C-MANY-MOVES" failed after 3.698 seconds with 2 issues.
+✘ Suite "VerifyC20Correct" failed after 3.698 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 20, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C20C-DEFER-BEHIND: a follow's visit that moves ids onto a job whose exit verdict waits defers each join behind
+↳ /// that verdict (`deferBehindVerdict`), which scans the waiting events back to the verdict (`lastIndex`) and inserts the
+↳ /// join right after it (an O(E) shift), once per id: a turn of `followIDsPerTurn` ids costs O(ids x E), and E grows by
+↳ /// one per join deferred. Shape: T (zz-t0, zz-t1, 16 B, a user waiter each) downloads; H, `count` prefetch members of one
+↳ /// group sharing 16 B, downloads. v3 moves zz-t1 to a content of its own (T holds a moved id); T's attempt times out, so
+↳ /// its verdict waits (`waits`). v4 maps every H member to T's content: H's visit, over the follow's held turns, moves
+↳ /// 512 ids a turn onto T, each behind T's waiting verdict. Each held follow or drain turn is timed inside the actor.
+↳ /// The control (`waits == false`) leaves T downloading, so the same joins land on T in place.
+↳ ///
+↳ /// PROBE-C20C-DRAIN-BOUND-ALL: the cycle-19 PROBE-C19C-DRAIN-BOUND shape, with the drain's follow-up turns held and
+↳ /// counted as well as the follow's (the cycle-19 probe counted the follow's turns and the drain turn only).
+✘ Test run with 1 test in 1 suite failed after 3.698 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

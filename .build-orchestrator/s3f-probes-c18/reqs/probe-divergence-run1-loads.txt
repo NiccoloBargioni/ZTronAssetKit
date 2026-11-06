@@ -1,0 +1,4 @@
+08:09:39 build start load={ 11.19 12.28 13.33 }
+08:15:49 build exit 0 load={ 119.88 57.89 31.68 }
+08:15:49 run start load={ 119.88 57.89 31.68 } phase=coverage
+08:16:04 run exit 0 load={ 95.76 55.58 31.32 } phase=coverage

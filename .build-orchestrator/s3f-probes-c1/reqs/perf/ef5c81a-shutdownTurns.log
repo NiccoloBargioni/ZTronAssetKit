@@ -1,0 +1,104 @@
+load before: 13:51  up 4 days,  2:15, 2 users, load averages: 7.90 25.86 81.45
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[33 / 265] ZTronAssetSyncTests-product
+[119 / 265]
+[120 / 266] ZTronAssetModel
+[130 / 304]
+[133 / 304]
+[139 / 304]
+[141 / 304]
+[145 / 304]
+[148 / 304]
+[154 / 304]
+[156 / 304]
+[157 / 304]
+[159 / 304] ZTronAssetModel
+[168 / 307] ZTronAssetStorage
+[178 / 316]
+[180 / 316] ZTronAssetAppleHosted
+[186 / 316] ZTronAssetTransport
+[192 / 316] ZTronAssetStorage
+[200 / 318] ZTronAssetSync
+[204 / 320] ZTronAssetTestSupport
+[222 / 324] ZTronAssetTransportTests-product
+[227 / 330]
+[232 / 330] ZTronAssetSync
+[242 / 332] ZTronAssetKit
+[246 / 334] ZTronAssetKit
+[262 / 337] ZTronAssetKitBenchmarks-product
+[267 / 340] ZTronAssetKit-product
+[270 / 340] ZTronAssetAppleHostedTests-product
+[274 / 340] ZTronAssetAppleHostedTests-product
+[277 / 340] ZTronAssetTransportTests-product
+[282 / 340] ZTronAssetTransportTests-product
+[284 / 340] ZTronAssetTransportTests-product
+[286 / 340] ZTronAssetCompatibilityTests-product
+[291 / 340] ZTronAssetCompatibilityTests-product
+[293 / 340] ZTronAssetCompatibilityTests-product
+[295 / 340] ZTronAssetModelTests-product
+[300 / 340] ZTronAssetModelTests-product
+[302 / 340] ZTronAssetModelTests-product
+[304 / 340] ZTronAssetKitBenchmarks-product
+[309 / 340] ZTronAssetKitBenchmarks-product
+[311 / 340] ZTronAssetKitBenchmarks-product
+[313 / 340] ZTronAssetKitTests-product
+[318 / 340] ZTronAssetKitTests-product
+[320 / 340] ZTronAssetKitTests-product
+[322 / 340] ZTronAssetSyncTests-product
+[327 / 340] ZTronAssetSyncTests-product
+[329 / 340] ZTronAssetSyncTests-product
+[331 / 340] ZTronAssetStorageTests-product
+[336 / 340] ZTronAssetStorageTests-product
+[338 / 340] ZTronAssetStorageTests-product
+Build complete! (222,94 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" started.
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 22.500708 ms (budgets 50.0 ms median, 10.0 ms best); runs [18.971125, 26.408416, 22.500708]; at 1,000: 2.521292 ms; the group without waiters: [17.185083, 13.053959, 12.019042]
+✘ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" recorded an issue at BenchSync.swift:250:13: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+↳ [18.971125, 26.408416, 22.500708]
+↳ (runs.min() ?? .infinity) <= Self.c2Budget → false
+↳   (runs.min() ?? .infinity) → 18.971125
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" recorded an issue at BenchSync.swift:251:13: Expectation failed: (groupOnly.min() ?? .infinity) <= Self.c2Budget
+↳ group only: [17.185083, 13.053959, 12.019042]
+↳ (groupOnly.min() ?? .infinity) <= Self.c2Budget → false
+↳   (groupOnly.min() ?? .infinity) → 12.019042
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" failed after 6.457 seconds with 2 issues.
+↳ /// C2 at SPEC §6's reference scale when the engine shuts down (Stage 3, S3-PERF-01): under a 10,000-member
+↳ /// prefetch group (three run, the others wait in the queue) and 10,000 user-initiated `resolve` callers waiting on
+↳ /// its members, the shutdown's first turn sorted the job table twice to cancel handles, answered every waiter and
+↳ /// group and freed the job table in one actor turn (17 to 22 ms). The same path retires the engine of a store
+↳ /// whose root vanished while the app runs. Production's dispatch executors (the store's units off the actors).
+↳ /// Medians of three against P-9, the best of the three against C2, after a warm-up; the 1,000 figure gives the
+↳ /// ratio, and the group alone (no waiters) is measured too.
+✘ Suite "SyncBenchmarks" failed after 6.457 seconds with 2 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+✘ Suite ZTronAssetKitBenchmarks failed after 6.457 seconds with 2 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 1 test in 2 suites failed after 6.457 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+exit=1 load after: 13:55  up 4 days,  2:19, 2 users, load averages: 202.08 103.60 99.59

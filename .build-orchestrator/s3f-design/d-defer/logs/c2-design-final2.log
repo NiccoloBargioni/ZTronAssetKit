@@ -1,0 +1,27 @@
+load before: { 3.33 4.36 8.02 }
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyDC2Probe" started.
+◇ Test "VERIFY-D-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" started.
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 744, changeEvery 2, handles 1
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-D-C2 10,000 members, changeEvery 20, 1 handle(s): runs [5.651459, 5.665, 5.647167] ms, best 5.647167 ms; follow+deferred wall [86.944125, 86.547333, 87.0705] ms
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-D-C2 10,000 members, changeEvery 20, 2 handle(s): runs [5.672041, 5.704791, 5.703084] ms, best 5.672041 ms; follow+deferred wall [91.455333, 88.83475, 97.470584] ms
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-D-C2 10,000 members, changeEvery 1, 1 handle(s): runs [3.067, 2.97875, 2.998334] ms, best 2.97875 ms; follow+deferred wall [76.83, 65.864792, 67.952875] ms
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-D-C2 10,000 members, changeEvery 1, 2 handle(s): runs [3.9445, 3.930791, 3.936541] ms, best 3.930791 ms; follow+deferred wall [102.987792, 104.257125, 104.053209] ms
+✔ Test "VERIFY-D-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" passed after 14.668 seconds.
+✔ Suite "VerifyDC2Probe" passed after 14.668 seconds.
+✔ Test run with 1 test in 1 suite passed after 14.668 seconds.
+load after: { 2.95 4.22 7.91 }

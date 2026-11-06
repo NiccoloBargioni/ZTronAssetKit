@@ -1,0 +1,74 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC13CorrectProbes" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C13-PURGE-JOIN" started.
+◇ Test "PROBE-C13R-STAMP-BREAKER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13-PURGE-JOIN" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13R-STAMP-BREAKER" started.
+DBGP followVisitedFirst afterApply=(owed: false, n: Optional(ZTronAssetSync.JobState.queued))
+DBGP followVisitedFirst atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+DBGP followVisitedFirst violations=[]
+PROBE-C13-PURGE-JOIN followVisitedFirst before purge: (owed: false, pending: true, job: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C13-PURGE-JOIN followVisitedFirst purge: success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 0))
+PROBE-C13-PURGE-JOIN followVisitedFirst after drain: (pending: false, job: nil, interest: false) starts 1 -> 1
+PROBE-C13-PURGE-JOIN followVisitedFirst zz-m present after purge and drain: false
+PROBE-C13-PURGE-JOIN followVisitedFirst violations: []
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13R-STAMP-BREAKER" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13-PURGE-JOIN" started.
+DBGP sweepFollowsFirst afterApply=(owed: true, n: nil)
+DBGP sweepFollowsFirst atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+DBGP sweepFollowsFirst violations=[]
+✔ Test "PROBE-C13R-STAMP-BREAKER" with 2 test cases passed after 0.935 seconds.
+◇ Test "PROBE-C14R-PASSED-LANE-BARRIER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-LANE-BARRIER" started.
+PROBE-C13-PURGE-JOIN sweepFollowsFirst before purge: (owed: true, pending: true, job: nil)
+PROBE-C13-PURGE-JOIN sweepFollowsFirst purge: success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 0))
+PROBE-C13-PURGE-JOIN sweepFollowsFirst after drain: (pending: false, job: nil, interest: false) starts 0 -> 0
+PROBE-C13-PURGE-JOIN sweepFollowsFirst zz-m present after purge and drain: false
+PROBE-C13-PURGE-JOIN sweepFollowsFirst violations: []
+✔ Test "PROBE-C13-PURGE-JOIN" with 2 test cases passed after 1.384 seconds.
+◇ Test "PROBE-C13-STAMP-NO-SLOT" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13-STAMP-NO-SLOT" started.
+PROBE-C13-STAMP-NO-SLOT followVisitedFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: false, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C13-STAMP-NO-SLOT followVisitedFirst k=success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a5/a55b02029562b8867886cde2fcb9136bbcdc40b27615a80efb8430b2932b83fc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/75/753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) kStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13-STAMP-NO-SLOT" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false before the 429: (barrier: false, y: nil, yMark: nil, cInterests: Optional(2), lane: Optional(Optional(ZTronAssetModel.AssetPriority.userInitiated)))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-LANE-BARRIER" started.
+PROBE-C13-STAMP-NO-SLOT sweepFollowsFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: true, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C13-STAMP-NO-SLOT sweepFollowsFirst k=success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a5/a55b02029562b8867886cde2fcb9136bbcdc40b27615a80efb8430b2932b83fc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/75/753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) kStarts=1
+✔ Test "PROBE-C13-STAMP-NO-SLOT" with 2 test cases passed after 2.800 seconds.
+◇ Test "PROBE-C13-EXHAUST-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13-EXHAUST-LANE" started.
+PROBE-C13-EXHAUST-LANE followVisitedFirst right after the 429: (throttle: nil, c: nil)
+PROBE-C13-EXHAUST-LANE followVisitedFirst after the drain: (throttle: nil, c: nil)
+PROBE-C13-EXHAUST-LANE followVisitedFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+PROBE-C13-EXHAUST-LANE followVisitedFirst violations: []
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13-EXHAUST-LANE" started.
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst right after the 429: (throttle: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst after the drain: (throttle: nil, c: nil)
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+PROBE-C13-EXHAUST-LANE sweepFollowsFirst violations: []
+✔ Test "PROBE-C13-EXHAUST-LANE" with 2 test cases passed after 2.593 seconds.
+✔ Suite "VerifyC13CorrectProbes" passed after 6.779 seconds.
+✘ Test "PROBE-C14R-PASSED-LANE-BARRIER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14ReqsProbes.swift:108:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-C14R-PASSED-LANE-BARRIER" with 2 test cases failed after 191.059 seconds with 1 issue.
+◇ Test "PROBE-C14R-PASSED-LANE-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-LANE-AFTER" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true before the 429: (barrier: false, y: nil, yMark: nil, cInterests: Optional(2), lane: Optional(Optional(ZTronAssetModel.AssetPriority.userInitiated)))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-LANE-AFTER" started.
+✘ Test "PROBE-C14R-PASSED-LANE-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14ReqsProbes.swift:114:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-C14R-PASSED-LANE-AFTER" with 2 test cases failed after 191.999 seconds with 1 issue.
+✘ Suite "Engine follow barrier (F-28)" failed after 383.995 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 6 tests in 2 suites failed after 383.996 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

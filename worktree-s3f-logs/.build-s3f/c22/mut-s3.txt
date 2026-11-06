@@ -1,0 +1,20 @@
+start 03:36 rev 5f7db46 load { 4.72 5.81 6.10 }
+sync diff: none
+a1-replaced-false run1: ✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue. | SubscriberQueueBatchTests.swift:18:9 | load { 10.11 7.04 6.53 }
+a1-replaced-false run2: ✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue. | SubscriberQueueBatchTests.swift:18:9 | load { 10.11 7.04 6.53 }
+a1-replaced-true run1: ✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue. | SubscriberQueueBatchTests.swift:17:9 | load { 9.38 6.94 6.50 }
+a1-replaced-true run2: ✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue. | SubscriberQueueBatchTests.swift:17:9 | load { 9.38 6.94 6.50 }
+a1-no-isprogress run1: ✘ Test run with 1 test in 1 suite failed after 0.002 seconds with 2 issues. | SubscriberQueueBatchTests.swift:20:9, SubscriberQueueBatchTests.swift:21:9 | load { 8.79 6.86 6.48 }
+a1-no-isprogress run2: ✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 2 issues. | SubscriberQueueBatchTests.swift:20:9, SubscriberQueueBatchTests.swift:21:9 | load { 8.32 6.80 6.45 }
+a3-no-handoff run1: ✘ Test run with 1 test in 1 suite failed after 0.062 seconds with 3 issues. | SubscriberQueueBatchTests.swift:142:9 | load { 7.98 6.75 6.44 }
+a3-no-handoff run2: ✘ Test run with 1 test in 1 suite failed after 0.062 seconds with 3 issues. | SubscriberQueueBatchTests.swift:142:9 | load { 7.98 6.75 6.44 }
+a3-coalesced-never run1: ✘ Test run with 1 test in 1 suite failed after 1.482 seconds with 2 issues. | EngineCommitBatchTests.swift:96:9 | load { 7.06 6.59 6.39 }
+a3-coalesced-never run2: ✘ Test run with 1 test in 1 suite failed after 1.487 seconds with 2 issues. | EngineCommitBatchTests.swift:96:9 | load { 7.06 6.59 6.39 }
+a3-coalesced-always run1: ✘ Test run with 1 test in 1 suite failed after 1.480 seconds with 2 issues. | EngineCommitBatchTests.swift:96:9 | load { 6.13 6.41 6.32 }
+a3-coalesced-always run2: ✘ Test run with 1 test in 1 suite failed after 1.482 seconds with 2 issues. | EngineCommitBatchTests.swift:96:9 | load { 6.13 6.41 6.32 }
+a3-coalesced-flipped run1: ✘ Test run with 1 test in 1 suite failed after 1.501 seconds with 2 issues. | EngineCommitBatchTests.swift:96:9 | load { 5.82 6.33 6.30 }
+a3-coalesced-flipped run2: ✘ Test run with 1 test in 1 suite failed after 1.551 seconds with 2 issues. | EngineCommitBatchTests.swift:96:9 | load { 5.82 6.33 6.30 }
+c3-allbound-true run1: ✘ Test run with 1 test in 1 suite failed after 0.860 seconds with 2 issues. | EngineCommitWindowTests.swift:65:9 | load { 5.59 6.27 6.28 }
+c3-allbound-true run2: ✘ Test run with 1 test in 1 suite failed after 0.915 seconds with 2 issues. | EngineCommitWindowTests.swift:65:9 | load { 5.30 6.20 6.25 }
+revert diff: none
+end 03:38 load { 5.30 6.20 6.25 }

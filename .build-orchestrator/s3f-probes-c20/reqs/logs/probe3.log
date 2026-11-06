@@ -1,0 +1,57 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "VerifyC20ReqsC2Probes" started.
+◇ Test "PROBE-C20R-DEFER-BEHIND-C2" started.
+PROBE-C20R-DEFER-BEHIND-C2 warm-up 1,000: applyWait 4.16 turnsWait 5.13 turns 3 max 5.12 top ["#0=5.12 ms (E 1001)", "#1=2.09 ms (E 489)", "#2=1.85 ms (E 0)"] maxE 1001 joinsAtFollowEnd 489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 1.96 2.57 39.86
+PROBE-C20R-DEFER-BEHIND-C2 10,000 run 0: applyWait 7.07 turnsWait 36.58 turns 38 max 36.58 top ["#17=36.58 ms (E 9729)", "#16=34.55 ms (E 9217)", "#15=32.55 ms (E 8705)"] maxE 9729 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 1.96 2.57 39.86 -> 1.96 2.56 39.63
+PROBE-C20R-DEFER-BEHIND-C2 10,000 run 1: applyWait 7.35 turnsWait 39.79 turns 38 max 39.78 top ["#17=39.78 ms (E 9729)", "#16=37.11 ms (E 9217)", "#15=34.30 ms (E 8705)"] maxE 9729 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-DEFER-BEHIND-C2 10,000 run 2: applyWait 7.17 turnsWait 36.53 turns 38 max 36.52 top ["#17=36.52 ms (E 9729)", "#16=34.59 ms (E 9217)", "#15=32.64 ms (E 8705)"] maxE 9729 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-DEFER-BEHIND-C2 best heartbeat 36.525084 ms, best longest held turn 36.520875 ms (c2Budget 10.0)
+✘ Test "PROBE-C20R-DEFER-BEHIND-C2" recorded an issue at VerifyC20ReqsC2Probes.swift:295:13: Expectation failed: runs.allSatisfy { $0.verdictWaited && $0.joinsAtFollowEnd >= 10_000 }
+↳ setup: [applyWait 7.07 turnsWait 36.58 turns 38 max 36.58 top ["#17=36.58 ms (E 9729)", "#16=34.55 ms (E 9217)", "#15=32.55 ms (E 8705)"] maxE 9729 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound), applyWait 7.35 turnsWait 39.79 turns 38 max 39.78 top ["#17=39.78 ms (E 9729)", "#16=37.11 ms (E 9217)", "#15=34.30 ms (E 8705)"] maxE 9729 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound), applyWait 7.17 turnsWait 36.53 turns 38 max 36.52 top ["#17=36.52 ms (E 9729)", "#16=34.59 ms (E 9217)", "#15=32.64 ms (E 8705)"] maxE 9729 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound)]
+↳ runs.allSatisfy { $0.verdictWaited && $0.joinsAtFollowEnd >= 10_000 } → <not evaluated>
+✘ Test "PROBE-C20R-DEFER-BEHIND-C2" recorded an issue at VerifyC20ReqsC2Probes.swift:296:13: Expectation failed: bestTurn <= SyncBenchmarks.c2Budget
+↳ longest held turn 36.520875 ms
+↳ bestTurn <= SyncBenchmarks.c2Budget → false
+↳   bestTurn → 36.520875
+↳   SyncBenchmarks.c2Budget → 10.0
+✘ Test "PROBE-C20R-DEFER-BEHIND-C2" failed after 2.700 seconds with 2 issues.
+◇ Test "PROBE-C20R-PARTIAL-MOVE-C2" started.
+◇ Test case passing 1 argument users → false to "PROBE-C20R-PARTIAL-MOVE-C2" started.
+PROBE-C20R-PARTIAL-MOVE-C2 users false 10,000 moved 500 run 0: (wait: 8.563916, before: 10000, interests: 1, onO: 501, onH: 9500) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-C2 users false 10,000 moved 500 run 1: (wait: 8.530167, before: 10000, interests: 1, onO: 501, onH: 9500) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-C2 users false 10,000 moved 500 run 2: (wait: 8.47575, before: 10000, interests: 1, onO: 501, onH: 9500) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-C2 users false: waits [8.563916, 8.530167, 8.47575] best 8.47575 ms (c2Budget 10.0)
+◇ Test case passing 1 argument users → true to "PROBE-C20R-PARTIAL-MOVE-C2" started.
+PROBE-C20R-PARTIAL-MOVE-C2 users true 10,000 moved 500 run 0: (wait: 9.414375, before: 10000, interests: 10000, onO: 501, onH: 9500) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-C2 users true 10,000 moved 500 run 1: (wait: 9.286083, before: 10000, interests: 10000, onO: 501, onH: 9500) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-C2 users true 10,000 moved 500 run 2: (wait: 9.50275, before: 10000, interests: 10000, onO: 501, onH: 9500) load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-C2 users true: waits [9.414375, 9.286083, 9.50275] best 9.286083 ms (c2Budget 10.0)
+✔ Test "PROBE-C20R-PARTIAL-MOVE-C2" with 2 test cases passed after 1.716 seconds.
+◇ Test "PROBE-C20R-PARTIAL-MOVE-TURNS" started.
+◇ Test case passing 1 argument users → false to "PROBE-C20R-PARTIAL-MOVE-TURNS" started.
+PROBE-C20R-PARTIAL-MOVE-TURNS users false 10,000 moved 500 run 0: applyWait 8.74 ms, 0 held turns, top [], onO 501 onH 9500 load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-TURNS users false 10,000 moved 500 run 1: applyWait 8.38 ms, 0 held turns, top [], onO 501 onH 9500 load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-TURNS users false 10,000 moved 500 run 2: applyWait 8.45 ms, 0 held turns, top [], onO 501 onH 9500 load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-TURNS users false: longest [8.743333, 8.384417, 8.452792] best 8.384417 ms (c2Budget 10.0)
+◇ Test case passing 1 argument users → true to "PROBE-C20R-PARTIAL-MOVE-TURNS" started.
+PROBE-C20R-PARTIAL-MOVE-TURNS users true 10,000 moved 500 run 0: applyWait 9.77 ms, 0 held turns, top [], onO 501 onH 9500 load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-TURNS users true 10,000 moved 500 run 1: applyWait 9.39 ms, 0 held turns, top [], onO 501 onH 9500 load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-TURNS users true 10,000 moved 500 run 2: applyWait 9.32 ms, 0 held turns, top [], onO 501 onH 9500 load 1.96 2.56 39.63 -> 1.96 2.56 39.63
+PROBE-C20R-PARTIAL-MOVE-TURNS users true: longest [9.771292, 9.394583, 9.31525] best 9.31525 ms (c2Budget 10.0)
+✔ Test "PROBE-C20R-PARTIAL-MOVE-TURNS" with 2 test cases passed after 1.349 seconds.
+✘ Suite "VerifyC20ReqsC2Probes" failed after 5.767 seconds with 2 issues.
+✘ Suite ZTronAssetKitBenchmarks failed after 5.767 seconds with 2 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 3 tests in 2 suites failed after 5.767 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

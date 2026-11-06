@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+index 4b26f4a..08db2ec 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+@@ -76,7 +76,7 @@ extension SyncEngine {
+     /// The slots user-initiated work may take: every slot, or `interactiveConcurrencyAtCritical` at `.critical`.
+     private var userCap: Int {
+         if self.state.conditions?.power.thermal == .critical {
+-            return max(1, self.configuration.power.interactiveConcurrencyAtCritical)
++            return self.tuning.maxConcurrentTransfers // MUTANT S3-CONF-04
+         }
+         return self.tuning.maxConcurrentTransfers
+     }

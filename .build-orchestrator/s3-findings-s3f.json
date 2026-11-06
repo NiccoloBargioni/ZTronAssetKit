@@ -1,0 +1,833 @@
+[
+ {
+  "blocking": true,
+  "area": "BLOCKING S3F-1",
+  "location": "Sources/ZTronAssetSync/Engine/EngineConditions.swift:97 (`edge = satisfied && (previous.map {\u2026} ?? false)`); Sources/ZTronAssetSync/Engine/EngineDispatch.swift:475 (user lane dispatched while `state.conditions == nil`); Sources/ZTronAssetSync/Engine/EngineFailures.swift:84-90 (offline \u2192 failed(.whenOnline) unless an edge passed during the attempt)",
+  "problem": "S3-CONC-04: An idle engine has no watcher and no conditions, because `reconcileIdle` sets `state.conditions = nil`. When work arrives, the watcher is spawned. User-initiated jobs are dispatched before it delivers its first reading, while other lanes wait for one. If that attempt fails `.offline` before the first reading arrives, `edgePassed` is false and the job becomes `failed(.whenOnline)`. Fail-fast answers the waiter `.offline`, but any other interest keeps the job: a prefetch group, a run claim or `ensureAvailable`. The first reading then reports a satisfied path. `apply` treats a first reading (`previous == nil`) as never an edge, so nothing re-queues the job. It waits for a second network edge that a steady network never sends, with no timer and no polling, until a user request or a later run revives it. Real-world window: a -1009 failure, then the network is back before NWPathMonitor's first callback. The window is narrow, but the stuck state is permanent.",
+  "fix": "A satisfied FIRST conditions reading counts as an edge for work that failed offline while no reading existed (`EngineConditions.swift:97`, `EngineFailures.swift:84-90`; the hunter's option 1 or 2). Both probes become regression tests; propose the note beside PROBE-C9C-3's rule in ARCHITECTURE \u00a77.6.",
+  "detail": {
+   "id": "S3-CONC-04",
+   "kind": "hunt",
+   "lens": "concurrency",
+   "location": "Sources/ZTronAssetSync/Engine/EngineConditions.swift:97 (`edge = satisfied && (previous.map {\u2026} ?? false)`); Sources/ZTronAssetSync/Engine/EngineDispatch.swift:475 (user lane dispatched while `state.conditions == nil`); Sources/ZTronAssetSync/Engine/EngineFailures.swift:84-90 (offline \u2192 failed(.whenOnline) unless an edge passed during the attempt)",
+   "requirements": "R-SYN-13 (MUST), R-SYN-14 (watcher torn down at idle sets conditions to nil), H-5",
+   "problem": "An idle engine has no watcher and no conditions, because `reconcileIdle` sets `state.conditions = nil`. When work arrives, the watcher is spawned. User-initiated jobs are dispatched before it delivers its first reading, while other lanes wait for one. If that attempt fails `.offline` before the first reading arrives, `edgePassed` is false and the job becomes `failed(.whenOnline)`. Fail-fast answers the waiter `.offline`, but any other interest keeps the job: a prefetch group, a run claim or `ensureAvailable`. The first reading then reports a satisfied path. `apply` treats a first reading (`previous == nil`) as never an edge, so nothing re-queues the job. It waits for a second network edge that a steady network never sends, with no timer and no polling, until a user request or a later run revives it. Real-world window: a -1009 failure, then the network is back before NWPathMonitor's first callback. The window is narrow, but the stuck state is permanent.",
+   "evidence": ".build-orchestrator/s3-probes/concurrency/S3-CONC-04.swift (suite S3OfflineRetryProbeTests, GatedConditionsSource holds the post-idle observation), S3-CONC-04.log: `Expectation failed: after != .failed(.whenOnline) \u21b3 the path is satisfied, yet the asset waits for another edge: Optional(JobState.failed(RetryDisposition.whenOnline))` and `\u21b3 a retry was started or queued: starts 1, state Optional(...failed(...whenOnline))`. The earlier expectations of the probe all passed (waiter answered `.offline`; job `failed(.whenOnline)` held by the group). Run 09:13, load avg 174.",
+   "repro": "cp .build-orchestrator/s3-probes/concurrency/S3-CONC-04.swift <wt>/Tests/ZTronAssetSyncTests/Engine/S3ConcurrencyProbeTests.swift; swift test --scratch-path /Users/admin/Documents/ZTronAssetKit/.build-s3-concurrency --skip Benchmarks --filter 'ZTronAssetSyncTests.S3OfflineRetryProbeTests'",
+   "fix": "Count a satisfied first reading as an edge for work that failed offline while no reading existed. Option 1: in `apply`, use `previous.map { \u2026 } ?? true` for the edge, so `owedOnEdge` jobs re-queue and `networkEdgeSerial` advances. It is a no-op when nothing failed, and a pending run waiting for an edge keeps the watcher alive. Option 2: in the `.offline` branch, when `state.conditions == nil`, mark the job owed on the first satisfied reading. Keep the probe as the regression test, and record the choice next to PROBE-C9C-3's rule in ARCHITECTURE \u00a77.6.",
+   "confirmer": {
+    "id": "S3-CONC-04",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "f",
+    "reason": "Reproduced (09:53): the job stays `failed(.whenOnline)` with starts 1 after a satisfied first reading. I added two tests to rule out a timing artifact (confirm-concurrency/S3-CONC-04-confirm.swift, 09:58, load 17.5). Both pass, which confirms the defect state:\n(a) The job stays failed with 1 start after the engine is quiescent (armedTimers 0, scheduledDeadlines 0, watcher kept) and after a further reading of the same network. Only a real down-then-up edge retries it (starts 2).\n(b) Control: the same sequence with an unsatisfied first reading followed by a satisfied one is retried. The only difference is the first-reading rule `previous.map{\u2026} ?? false` (EngineConditions.swift:91).\n\nCode path checked:\n- `gate` (EngineDispatch.swift:475) dispatches user work while `conditions == nil`.\n- The `.offline` branch (EngineFailures.swift:84-90) sees no edge passed and marks the job failed.\n- `hasWork` keeps the watcher alive for the held job, so nothing else re-queues it.\n\nThere is a recorded decision: L4-C10-12 ('the first conditions element is never an edge', Not changed, citing F-16/L4-R3). It does not cover this case. That verifier's own text (.build-orchestrator/l4-close10-remaining-f.json) considered only the order where the element is applied before the failure. It judged 'not a liveness defect for a waiter' and states 'I did not build a probe for a group member'.\n\nThis finding covers what that record left out: the failure comes before any reading, and a non-waiter interest (group, run claim, ensureAvailable) keeps the job until some later network change. Both precedents allow exactly one bounded retry in an ambiguous case:\n- F-16 grants runs one debounced retry for 'its first element was not in yet'.\n- PROBE-C9C-3 retries a job once when an edge passed during the attempt.\nJobs get zero retries in the nil-to-satisfied case. A one-shot retry is not polling, so R-SYN-13's MUST (retry when the path becomes satisfied) is broken in a case the record did not consider.\n\nThe real-world window is narrow: the device is offline at the attempt and the path comes back before NWPathMonitor's first callback. A user request revives the asset, and nothing hangs or is lost. Under the strict bar, though, proven plus a MUST break makes it blocking.\n\nOwner is WP-F."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3F-2",
+  "location": "Tests/ZTronAssetSyncTests/Engine/EngineModelTests.swift:21 (.timeLimit(.minutes(1))); near misses: EngineLegacyMigrationTransferTests.swift:433, :453, :711; EngineRegressionCycle16Tests.swift:31; EngineGroupClaimTests.swift:387; Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 (WP-H)",
+  "problem": "S3-STAB-03: randomOperations runs 10,000 seeded operations against the real engine, store and fakes, then drives the clock up to 8,192 advances, all inside one test with a 1-minute time limit. Its wall time scales with TSan and with host load. Non-TSan runs took 7.4, 31.8, 11.5 and 13.8 s. TSan run 2, at load ~45-70, took 40.8 s. Alone under TSan it takes ~15 s per repetition. TSan run 1, with the Sync process at load ~175-190, took 87.0 s, so Swift Testing recorded the time-limit issue and the Sync target failed (1304/1305). The body ignores cancellation, so the test went on to 87 s; the only issue recorded was the time limit, and no invariant failed. The same TSan run put six more 1-minute tests near the limit. R-STO-11 user-initiated prefetch beside a running migration (20 launches): 58.8 s. R-STO-11 ensureAvailable beside a running migration (20 launches): 58.5 s. Loopback 'start racing stop' (400 real NWListener rounds): 57.3 s, and 54.1 s even at load ~45 in TSan run 2. R-SYN-6 parked claim: 52.6 s. R-SYN-14 hot-loop observation window (2,000 rounds): 51.9 s. R-CAR-4 give-up of more than releasesPerTurn claims: 43.2 s. These are not hangs: the limit is a hang guard sized below what these workloads need under TSan on this host.",
+  "fix": "Apply S3-R4 to `EngineModelTests.randomOperations` (`:21`) and the near misses (`EngineLegacyMigrationTransferTests.swift:433`, `:453`, `:711`; `EngineRegressionCycle16Tests.swift:31`; `EngineGroupClaimTests.swift:387`): measure each under TSan (alone, and with a second TSan process running, as two verifiers do), make steps cheaper where possible, raise a guard only with measurements, and make the model loop check `Task.isCancelled` per operation.",
+  "detail": {
+   "id": "S3-STAB-03",
+   "kind": "hunt",
+   "lens": "stability",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineModelTests.swift:21 (.timeLimit(.minutes(1))); near misses: EngineLegacyMigrationTransferTests.swift:433, :453, :711; EngineRegressionCycle16Tests.swift:31; EngineGroupClaimTests.swift:387; Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 (WP-H)",
+   "requirements": "SPEC 7.1 Q-3 (full suite clean under TSan), Q-5 (zero flakes; a test that fails under load is a flake), 7.2",
+   "problem": "randomOperations runs 10,000 seeded operations against the real engine, store and fakes, then drives the clock up to 8,192 advances, all inside one test with a 1-minute time limit. Its wall time scales with TSan and with host load. Non-TSan runs took 7.4, 31.8, 11.5 and 13.8 s. TSan run 2, at load ~45-70, took 40.8 s. Alone under TSan it takes ~15 s per repetition. TSan run 1, with the Sync process at load ~175-190, took 87.0 s, so Swift Testing recorded the time-limit issue and the Sync target failed (1304/1305). The body ignores cancellation, so the test went on to 87 s; the only issue recorded was the time limit, and no invariant failed. The same TSan run put six more 1-minute tests near the limit. R-STO-11 user-initiated prefetch beside a running migration (20 launches): 58.8 s. R-STO-11 ensureAvailable beside a running migration (20 launches): 58.5 s. Loopback 'start racing stop' (400 real NWListener rounds): 57.3 s, and 54.1 s even at load ~45 in TSan run 2. R-SYN-6 parked claim: 52.6 s. R-SYN-14 hot-loop observation window (2,000 rounds): 51.9 s. R-CAR-4 give-up of more than releasesPerTurn claims: 43.2 s. These are not hangs: the limit is a hang guard sized below what these workloads need under TSan on this host.",
+   "evidence": ".build-orchestrator/s3-probes/stability/S3-STAB-03-evidence.txt and runs-and-loads.txt. tsan-1 (whole package, started at load 192.09/196.10/113.96): `\u2718 Test \"R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant\" recorded an issue at EngineModelTests.swift:21:6: Time limit was exceeded: 60.000 seconds`, then `failed after 87.009 seconds with 1 issue` and `\u2718 Test run with 351 tests in 52 suites failed after 114.022 seconds with 1 issue.` Per-run seconds: full-1..4 = 7.419 / 31.784 / 11.481 / 13.814; tsan-1 = 87.009; tsan-2 = 40.821. The evidence file has the table for the six near misses.",
+   "repro": "`swift test --scratch-path <tsan> --sanitize=thread --skip Benchmarks` (or `--filter ZTronAssetSyncTests`) on a host at load \u2273150 on 8 cores. It passes at load ~45-70 (40.8 s), so the outcome is load-dependent.",
+   "fix": "Size the hang guards for TSan on a loaded host. Use .timeLimit(.minutes(5)) for randomOperations and \u2265 .minutes(3) for the near-miss tests, following the precedents EngineGateModelTests (.minutes(3)) and stalledSubscriberIsBounded (.minutes(4)). Optionally make randomOperations check Task.isCancelled per operation so a timed-out run ends at once. Raising a time limit changes no assertion (G3). The alternative, cutting each test's work under TSan, changes what the test covers and needs a ruling.",
+   "confirmer": {
+    "id": "S3-STAB-03",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "f",
+    "reason": "I reproduced it at a much milder load than the hunter's ~190. I ran ZTronAssetSyncTests whole under TSan (TSan build of s3-base, run via run-direct.sh). Alone, at load 18-22, it passed, but R-SYN-2 `randomOperations` took 49.7 s against its 60 s limit (83 %). Two Sync TSan processes at once (what two agents running the TSan gate together do; load ~20 rising to ~30-32) both failed. Each recorded `EngineModelTests.swift:21:6: Time limit was exceeded: 60.000 seconds`, with R-SYN-2 at 66.8 s and 67.7 s and the run ending `351 tests in 52 suites failed \u2026 with 1 issue`. The time limit was the only issue, so no invariant failed, and the body has no cancellation check (none in EngineModelTests.swift), which is why it ran past the limit. In the same runs the near misses were R-STO-11 prefetch/ensureAvailable beside a migration (46.7-47.5 s), R-SYN-6 parked claim (38-39 s) and R-CAR-4 (29.5-29.8 s). I did not measure the WP-H Loopback 'start racing stop' test. So the required TSan gate (Q-3, tests.tsan=true) fails, load-dependently, on this shared host (8 cores, up to 4 agents): a flake under Q-5, and blocking. SPEC 7.2's text says .timeLimit(.minutes(1)), but there is an accepted precedent for raising a limit with a record (DECISIONS L4-R8: R-SYN-12 went to 4 minutes; EngineGateModelTests uses .minutes(3)). The fix should be recorded the same way, and adding a per-operation Task.isCancelled exit is worthwhile. The primary location is WP-F (Tests/ZTronAssetSyncTests/**); the Loopback near miss is WP-H (Tests/ZTronAssetStorageTests/TestSupport/**). Evidence: confirm-stability/S3-STAB-03-results.txt."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3F-3",
+  "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:470-473 (recordSkippedFailures, integrity branch)",
+  "problem": "S3-CONF-03: recordSkippedFailures turns a planned skip `.failedUntilEntryChanges` into a per-asset run failure. The `.failed(.notFound)` branch is covered. The integrity branch (`error = .integrityFailure; failureClass = .integrity`) has 0 executions in the whole suite (coverage). If that branch is mutated to `continue`, a run over an asset that reached maxIntegrityAttempts ends `.complete`. The stamp is then written and the sync is no longer due, although an asset is permanently failed. All R-SYN-6, R-INT-3 and R-SYN-9 tests still pass under that mutant.",
+  "fix": "Test a run over a record failed at the integrity cap (`EngineRuns.swift:471-473`, count 0): the run must not end `.complete` and must not write the sync stamp; the dropping mutant must fail it.",
+  "detail": {
+   "id": "S3-CONF-03",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:470-473 (recordSkippedFailures, integrity branch)",
+   "requirements": "R-SYN-6, R-INT-3 (and the 'no stale synced claim' of R-CLN-7), CLAUDE.md G4",
+   "problem": "recordSkippedFailures turns a planned skip `.failedUntilEntryChanges` into a per-asset run failure. The `.failed(.notFound)` branch is covered. The integrity branch (`error = .integrityFailure; failureClass = .integrity`) has 0 executions in the whole suite (coverage). If that branch is mutated to `continue`, a run over an asset that reached maxIntegrityAttempts ends `.complete`. The stamp is then written and the sync is no longer due, although an asset is permanently failed. All R-SYN-6, R-INT-3 and R-SYN-9 tests still pass under that mutant.",
+   "evidence": "Mutant .build-orchestrator/s3-probes/conformance/S3-CONF-03.mutant.diff. With it applied: '\u2714 Test run with 85 tests in 11 suites passed' (Kit) and '71 tests \u2026 passed' (compatibility); in the Sync run of 354 tests, all 351 existing ones passed. Only the probe failed (evidence-mutants-02-03-04.txt): 'S3ConformanceProbeTests.swift:61:25: Issue recorded \u21b3 a run over a failed asset ended .complete(ZTronAssetModel.SyncReport(runID: run-2, \u2026 skippedCount: 1 \u2026'. The probe passes on s3-base (evidence-probes-on-s3-base.txt). Coverage: EngineRuns.swift:471-473 has a count of 0 (coverage-uncovered-storage-sync-kit.txt).",
+   "repro": "Copy S3-CONF-03.swift into Tests/ZTronAssetSyncTests/Engine/S3ConformanceProbeTests.swift, then: git apply .build-orchestrator/s3-probes/conformance/S3-CONF-03.mutant.diff && swift test --scratch-path <scratch> --skip Benchmarks --filter 'ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests'",
+   "fix": "Commit the test 'R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it' from the probe file. No production change is needed.",
+   "confirmer": {
+    "id": "S3-CONF-03",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "f",
+    "reason": "Reproduced. The probe passes on s3-base. With the mutant applied, all 351 existing Sync, 85 Kit and 71 Compatibility tests still pass and only the probe fails ('a run over a failed asset ended .complete'). My own coverage run shows EngineRuns.swift:471-473 at 0. Consequence, from EngineRuns.swift:271-284: when `run.failures` is empty the run returns `.complete` and calls `markSynced`, so the sync stamp is written. sync.md:957 says the stamp is written only for a complete run, so that a partial sync is retried (prior-art parity). The mutant therefore lets a run end `.complete` with no per-asset failure, and stamped, while an in-scope asset is permanently failed. That breaks R-SYN-6's per-asset partial-success report at the default configuration, and no R-SYN-6 or R-INT-3 test detects it. Under G4 and SPEC \u00a77.4 I rate it blocking. The production code is correct; the fix is to commit the probe's test."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3F-4",
+  "location": "Sources/ZTronAssetSync/Engine/EngineLifecycle.swift:470 (performShutdown; job-table sorts at :493 and :580; resumeEverything :516-602); reached mid-session from Sources/ZTronAssetKit/Facade/ClientLifecycle.swift:206",
+  "problem": "S3-PERF-01: performShutdown's first turn does all the teardown synchronously. It sorts the whole 10,000-entry job table twice (66-character TransferID strings) only to cancel handles, although only in-flight jobs have one. It resumes every waiter continuation (10,000) and every group, then drops the job table and every parked index, which deallocates 10,000 Job values. All of this happens in one actor turn on a cooperative-pool thread. With only the 10,000-member group (no waiters) the turn is still 10.6-13.5 ms. The same path runs while the app is live, when ClientLifecycle.performReopen retires the old engine after a rootVanished. R-SYN-4's handle release had the same one-turn shape and was already fixed (15 ms down to 4 ms); shutdown was not.",
+  "fix": "Engine shutdown holds the actor 17\u201322 ms at 10,000 (`EngineLifecycle.swift:470`, sorts at :493 and :580, `resumeEverything` :516-602), also on the mid-session rootVanished reopen path: bound it per turn (S3-R5; the hunter's three steps are a good start) and add a `BenchSync` C2 benchmark beside `handleReleaseTurns`.",
+  "detail": {
+   "id": "S3-PERF-01",
+   "kind": "hunt",
+   "lens": "performance",
+   "location": "Sources/ZTronAssetSync/Engine/EngineLifecycle.swift:470 (performShutdown; job-table sorts at :493 and :580; resumeEverything :516-602); reached mid-session from Sources/ZTronAssetKit/Facade/ClientLifecycle.swift:206",
+   "requirements": "CLAUDE.md C2; SPEC 4.2 (cooperative pool <= ~10 ms at a stretch); SPEC 6 reference N = 10,000; R-SYN-15; P-9 (heartbeat context)",
+   "problem": "performShutdown's first turn does all the teardown synchronously. It sorts the whole 10,000-entry job table twice (66-character TransferID strings) only to cancel handles, although only in-flight jobs have one. It resumes every waiter continuation (10,000) and every group, then drops the job table and every parked index, which deallocates 10,000 Job values. All of this happens in one actor turn on a cooperative-pool thread. With only the 10,000-member group (no waiters) the turn is still 10.6-13.5 ms. The same path runs while the app is live, when ClientLifecycle.performReopen retires the old engine after a rootVanished. R-SYN-4's handle release had the same one-turn shape and was already fixed (15 ms down to 4 ms); shutdown was not.",
+   "evidence": ".build-orchestrator/s3-probes/performance/S3-PERF-01-S3PerfShutdownProbe.swift (test shutdownTurns), outputs in S3-PERF-01-output.txt, loads in README-loads.txt. Release run, load 14.5: 'C2 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 17.6755 ms ... runs [17.6755, 17.01125, 20.275375]; at 1,000: 1.255584 ms ...; the 10,000-member group without waiters: 12.767625 ms'. Failing line: 'S3PerfShutdownProbe.swift:29:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget'. Same run, same fixture: the existing control 'R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 4.108041 ms ... runs [3.979583, 4.139542, 4.108041]' passes. With production DispatchBlockingExecutors (dispatchBench) the best run was 18.957 ms. Other release runs: best 18.73, 19.66 and 21.24 ms. Debug: best 51.1 ms.",
+   "repro": "git worktree add --detach <wt> s3-base; cp S3-PERF-01-S3PerfShutdownProbe.swift <wt>/Tests/ZTronAssetKitBenchmarks/S3PerfShutdownProbe.swift; cd <wt>; swift test -c release -Xswiftc -enable-testing --scratch-path <scratch> --filter 'shutdownTurns|handleReleaseTurns'",
+   "fix": "Bound the teardown per turn:\n1. Cancel handles over state.inFlight (or the active jobs) instead of sorting all jobs, twice.\n2. Move the drained continuation tables out of state and resume them in bounded batches (for example 512, as readmissionsPerTurn does) in owned follow-up turns while lifecycle == .shuttingDown. CheckedContinuation is Sendable, so an owned task off the actor can resume them in chunks.\n3. Hand the retired job table and parked sets to that task, so they are deallocated off the actor.\nCommit the probe as a SyncBenchmarks C2 benchmark next to handleReleaseTurns.",
+   "confirmer": {
+    "id": "S3-PERF-01",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "f",
+    "reason": "Reproduced against s3-base in release. The unmodified probe failed at the same expectation (S3PerfShutdownProbe.swift:30, best of three <= 10 ms) at load 37.8 to 71.5. Results: runs [20.37, 19.65, 21.18] ms; at 1,000: 1.79 ms; group without waiters: 14.27 ms. The R-SYN-4 handle-release control passed in the same run (4.42 to 4.98 ms), so the heartbeat method can pass.\n\nTo rule out preemption or load noise, I timed performShutdown's first synchronous turn directly in a throwaway worktree, measuring wall time and thread CPU time:\n- 10,000 jobs with 10,000 waiters: 19.18, 19.73 and 19.68 ms. Thread CPU equalled wall time, so it is on-CPU work. Of that, the sorted job-table cancel took 6.4 to 6.8 ms and resumeEverything 12.8 to 13.2 ms.\n- 10,000 jobs, no waiters: 13.48 to 17.99 ms of CPU.\n\nCode at s3-base matches the cited lines: performShutdown :470, sorts :493 and :580, resumeEverything :516, and ClientLifecycle.performReopen :206, which shuts down the old engine mid-session.\n\nNo recorded decision exempts shutdown. ADR-052 R8's C2 exception covers only the single-blob eviction. The fixture (a 10,000-member prefetch group, 10,000 user-initiated waiters, production DispatchBlockingExecutors) is the same scale as the existing R-SYN-4 and R-SYN-5 C2 benchmarks; no test seam is used on the measured path.\n\nIt breaks C2 at the 10,000 reference scale, so it is blocking. The owner is WP-F (Sources/ZTronAssetSync/**, ARCHITECTURE 1.2)."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3F-5",
+  "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:419 (followApplied), called from applied() at :360; the same full sorted walk at :489 (releaseSystemReattachments) and :823 (finishRun)",
+  "problem": "S3-PERF-02: applied() always ends with followApplied() in the same turn. That function sorts every key of the job table, then reads every job. For each job it copies the Job value out of the dictionary, filters its assets against the applied manifest and calls checkRunSettled. This happens even when the apply moved nothing for those jobs. A 10,000-member prefetch group (AssetClient.prefetch) that is waiting in the queue therefore makes every sync that applies a manifest (here, one added entry) hold the actor past C2. This is not an artifact of InlineBlockingExecutor: the probe uses production DispatchBlockingExecutors, so the manifest decode and the store's units run off the actor.",
+  "fix": "Applying a manifest under a 10,000-member prefetch group holds the actor 17\u201319 ms (`followApplied`, `EngineRuns.swift:419`, about 10\u201312 ms with a 3.6 ms key sort): make the follow proportional to what the apply changed or chunk it; give the same treatment to `finishRun`'s (:823) and `releaseSystemReattachments`' (:489) full sorted walks; `BenchSync` C2 benchmark.",
+  "detail": {
+   "id": "S3-PERF-02",
+   "kind": "hunt",
+   "lens": "performance",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:419 (followApplied), called from applied() at :360; the same full sorted walk at :489 (releaseSystemReattachments) and :823 (finishRun)",
+   "requirements": "CLAUDE.md C2; SPEC 4.2; SPEC 6 reference N = 10,000; R-SYN-1/R-SYN-4 (jobs follow the applied manifest)",
+   "problem": "applied() always ends with followApplied() in the same turn. That function sorts every key of the job table, then reads every job. For each job it copies the Job value out of the dictionary, filters its assets against the applied manifest and calls checkRunSettled. This happens even when the apply moved nothing for those jobs. A 10,000-member prefetch group (AssetClient.prefetch) that is waiting in the queue therefore makes every sync that applies a manifest (here, one added entry) hold the actor past C2. This is not an artifact of InlineBlockingExecutor: the probe uses production DispatchBlockingExecutors, so the manifest decode and the store's units run off the actor.",
+   "evidence": ".build-orchestrator/s3-probes/performance/S3-PERF-02-S3PerfShutdownProbe.swift (test refreshUnderGroupTurns, helper followAppliedMilliseconds), output in S3-PERF-02-output.txt. Release, load 50.8 to 47.7: 'S3-PERF diagnostic at 10000 jobs: followApplied() alone 10.442 ms (of which sorting the job table's keys 2.920834 ms)'; repeated as 9.99 and 10.42 ms; 0.86 ms at 1,000 jobs. 'C2 refresh under a 10,000-member prefetch group: longest actor wait 17.196041 ms ... runs [19.428083, 16.943084, 17.196041]'. Failing line: 'S3PerfShutdownProbe.swift:87:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget'. Earlier runs: best 17.28 ms (inline executors, load 38) and 19.10 ms (dispatch executors, load 32).",
+   "repro": "cp S3-PERF-02-S3PerfShutdownProbe.swift <wt>/Tests/ZTronAssetKitBenchmarks/S3PerfShutdownProbe.swift; swift test -c release -Xswiftc -enable-testing --scratch-path <scratch> --filter refreshUnderGroupTurns",
+   "fix": "Make the follow proportional to what the apply changed. The ApplyReport (contentChanged, pruned, evicted, relocations) and the engine's copy-versus-manifest diff already name the moved ids. Map them to their jobs through an id-to-transfer index, and sort only that subset to keep the order deterministic. Return early when the applied transferIDs of every job's assets are unchanged. Otherwise chunk the pass across follow-up turns as readmit does. Apply the same treatment to finishRun's and releaseSystemReattachments' full sorted walks. Commit the probe as a SyncBenchmarks C2 benchmark.",
+   "confirmer": {
+    "id": "S3-PERF-02",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "f",
+    "reason": "Reproduced in release against s3-base at load 63 to 65. The probe failed at S3PerfShutdownProbe.swift:87 with runs [59.1, 21.4, 26.1] ms. The followApplied() diagnostic measured 12.2 to 12.8 ms at 10,000 jobs (the key sort 3.6 ms) and 1.13 ms at 1,000.\n\nPlanning runs off the actor (EngineRuns:321 planner, C2 comment in EngineLifecycle), so the long turn is not the planner. Instrumenting the call to applied() in EngineCatchUp (the turn after the store's apply resumes) gave a single on-actor stretch of 13.75, 17.69 and 17.13 ms, with thread CPU equal to wall time. That is on-CPU work, not preemption.\n\nThe code matches: applied() :360 calls followApplied() :386 in the same turn; followApplied :419 sorts and walks every job even when nothing moved. The full sorted walks in releaseSystemReattachments :489 and finishRun :823 also exist.\n\nThe probe uses production DispatchBlockingExecutors and the public sync(.force) path. No recorded decision covers it. A sync that applies a manifest while a 10,000-member AssetClient.prefetch group is queued therefore holds the engine's actor over C2's 10 ms at the reference scale, so it is blocking. My load was higher than the hunter's (whose followApplied figure was about 10 ms at load 50), but on-CPU time of 13.7 ms or more cannot be explained by scheduling. The owner is WP-F."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-6",
+  "location": "Sources/ZTronAssetSync/Engine/SubscriberQueue.swift:117-123 (progress slot replaced in place, keeps its first position); Sources/ZTronAssetSync/Engine/EngineEvents.swift:79-91 (retireProgress retires only .transfer slots from subscriber queues)",
+  "problem": "S3-CONC-03: A progress slot that is still undelivered is replaced in place and keeps the queue position of its first occurrence. At run end, `retireProgress(.run)` clears only the trailing emission. It does not retire the undelivered `.run` slot from subscriber queues, unlike transfer keys, which retire with their transfer. So for a subscriber that has not read run 1's progress, run 2's first `syncProgress` lands in that old slot, ahead of `syncFinished(run1)` and `syncStarted(run2)`. A UI that hides its bar on syncFinished or resets it on syncStarted shows run 2's progress, then hides or resets it, and gets no later progress if none follows. No event is lost and the bound holds. Only the order is wrong, and it contradicts the queue's documented delivery order.",
+  "fix": "Event order for a lagging subscriber: run N's `syncFinished` precedes run N+1's `syncStarted` and `syncProgress` for every subscriber (`SubscriberQueue.publish` reuses an undelivered `.run` progress slot in place; `EngineEvents.swift:70-79` retires only `.transfer` slots). Both probes become tests.",
+  "detail": {
+   "id": "S3-CONC-03",
+   "kind": "hunt",
+   "lens": "concurrency",
+   "location": "Sources/ZTronAssetSync/Engine/SubscriberQueue.swift:117-123 (progress slot replaced in place, keeps its first position); Sources/ZTronAssetSync/Engine/EngineEvents.swift:79-91 (retireProgress retires only .transfer slots from subscriber queues)",
+   "requirements": "R-SYN-12, H-9, ADR-023; SubscriberQueue's own documented contract ('Delivery order is the publication order of each slot's latest occurrence')",
+   "problem": "A progress slot that is still undelivered is replaced in place and keeps the queue position of its first occurrence. At run end, `retireProgress(.run)` clears only the trailing emission. It does not retire the undelivered `.run` slot from subscriber queues, unlike transfer keys, which retire with their transfer. So for a subscriber that has not read run 1's progress, run 2's first `syncProgress` lands in that old slot, ahead of `syncFinished(run1)` and `syncStarted(run2)`. A UI that hides its bar on syncFinished or resets it on syncStarted shows run 2's progress, then hides or resets it, and gets no later progress if none follows. No event is lost and the bound holds. Only the order is wrong, and it contradicts the queue's documented delivery order.",
+   "evidence": ".build-orchestrator/s3-probes/concurrency/S3-CONC-03.swift, S3-CONC-03.log. Engine level, test engineDeliversStartBeforeProgress: `Expectation failed: started < progress \u21b3 run 2's syncProgress at 3 precedes its syncStarted at 4: [\"client\", \"conditions\", \"snapshot\", \"run\", \"runStarted\", \"runFinished\", \"clientEnd\"]`. Unit level, test queueDeliversStartBeforeProgress: delivered `[syncProgress(run-2), syncFinished(run-1), syncStarted(run-2)]` (run 09:10, load avg 309)",
+   "repro": "cp .build-orchestrator/s3-probes/concurrency/S3-CONC-03.swift <wt>/Tests/ZTronAssetSyncTests/Engine/S3ConcurrencyProbeTests.swift; swift test --scratch-path /Users/admin/Documents/ZTronAssetKit/.build-s3-concurrency --skip Benchmarks --filter 'ZTronAssetSyncTests.S3EngineEventProbeTests'",
+   "fix": "Retire the run's progress key with its run, as a transfer's is. In `retireProgress(.run)`, call `subscribers[key]?.retire(.run)` for every subscriber, since `syncFinished` supersedes the undelivered progress. Then run 2's progress gets a fresh slot behind `syncStarted(run2)`. Alternatively, move a replaced progress slot to the tail, as the struct's doc says; that also changes the existing `subscriberQueueOrder` expectation, which is not a CDN test. Either way, make the SubscriberQueue doc match the behaviour and keep both probes.",
+   "confirmer": {
+    "id": "S3-CONC-03",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "f",
+    "reason": "Both probes reproduced (09:53):\n- Unit: delivered order is [syncProgress(run-2), syncFinished(run-1), syncStarted(run-2)].\n- Engine: run 2's syncProgress is at index 3 and its syncStarted at index 4.\n\nCause, checked in the code: `SubscriberQueue.publish` replaces an undelivered progress slot in place, so it keeps its first sequence. `retireProgress` (EngineEvents.swift:70-79) retires only `.transfer` slots from subscriber queues, never `.run`. Run 2's first progress therefore reuses run 1's old queue position.\n\nKeeping position on in-place replacement is deliberate: EngineUnitTests `subscriberQueueOrder` pins it ('progress first: it kept its position'). The SubscriberQueue doc line ('publication order of each slot's latest occurrence') is inaccurate.\n\nNo recorded decision covers the run key. ADR-023 retires only transfer keys.\n\nNon-blocking:\n- The public AssetEvent contract promises publication order only for terminal events.\n- R-SYN-12's MUST clauses all hold: newest-wins, the bound, and no terminal event dropped.\n- No event is lost. The effect is a transient UI ordering glitch for a lagging subscriber.\n\nOwner is WP-F."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-7",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:77-82 (userCap); Sources/ZTronAssetSync/Engine/EngineConditions.swift:72-110 (apply never trims running user work)",
+  "problem": "S3-CONF-04: There are two parts. (a) The cap path, EngineDispatch.swift:79, has 0 executions in the suite. A mutant returning maxConcurrentTransfers survives every Sync, Kit and compatibility test. (b) The real defect: when the engine goes idle, the watcher stops and the conditions are set to nil (R-SYN-14). The next user-initiated burst is dispatched optimistically with no thermal cap, by design in sync.md \u00a711.1. When the first element then reports .critical, apply() never trims the extra running user transfers. ADR-036 promises 'one user-initiated transfer at .critical', and S2-29 is recorded as enforced, but neither record considered this window. It is not a SPEC MUST (R-SYN-7's thermal clause binds bulk work), so it is non-blocking.",
+  "fix": "(a) Test `interactiveConcurrencyAtCritical` (ADR-036; `EngineDispatch.swift:79`, count 0). (b) is the documented design: record only.",
+  "detail": {
+   "id": "S3-CONF-04",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:77-82 (userCap); Sources/ZTronAssetSync/Engine/EngineConditions.swift:72-110 (apply never trims running user work)",
+   "requirements": "R-SYN-7 (thermal state), ADR-036, ARCHITECTURE \u00a712 sync-2 S2-29 ('interactiveConcurrencyAtCritical enforced'), CLAUDE.md G4",
+   "problem": "There are two parts. (a) The cap path, EngineDispatch.swift:79, has 0 executions in the suite. A mutant returning maxConcurrentTransfers survives every Sync, Kit and compatibility test. (b) The real defect: when the engine goes idle, the watcher stops and the conditions are set to nil (R-SYN-14). The next user-initiated burst is dispatched optimistically with no thermal cap, by design in sync.md \u00a711.1. When the first element then reports .critical, apply() never trims the extra running user transfers. ADR-036 promises 'one user-initiated transfer at .critical', and S2-29 is recorded as enforced, but neither record considered this window. It is not a SPEC MUST (R-SYN-7's thermal clause binds bulk work), so it is non-blocking.",
+   "evidence": "The mutant S3-CONF-04.mutant.diff survives the full Sync suite (351 tests), Kit (85) and compatibility (71). Probe (a) fails under it: 'S3ConformanceProbeTests.swift:130:9: Expectation failed: state.running == \u2026 interactiveConcurrencyAtCritical' (evidence-mutants-04-05.txt), and passes on s3-base. Probe (b) uses a gated conditions source and fails on s3-base, deterministically 5/5: 'S3ConformanceProbeTests.swift:170:9 \u21b3 running at .critical: 3 \u21b3 state.running \u2192 3 \u21b3 harness.configuration.power.interactiveConcurrencyAtCritical \u2192 1'. Before the source was gated, an ungated version of (b) depended on timing (it passed once inside the full Sync run), which is why the committed version gates it.",
+   "repro": "Copy S3-CONF-04.swift into Tests/ZTronAssetSyncTests/Engine/, then: swift test --scratch-path <scratch> --skip Benchmarks --filter S3ConformanceEngineProbeTests (fails on s3-base). With git apply S3-CONF-04.mutant.diff, test (a) fails as well.",
+   "fix": "In apply(_:), when thermal reaches .critical, preempt or pause the running user-initiated transfers beyond max(1, interactiveConcurrencyAtCritical), as preemptForUser does, and re-queue them. Alternatively, record the optimistic window in ADR-036 and amend S2-29. Then commit both probes.",
+   "confirmer": {
+    "id": "S3-CONF-04",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "f",
+    "reason": "Part (a) is confirmed. EngineDispatch.swift:79 has a count of 0. The mutant survives all 351 existing Sync tests, 85 Kit and 71 Compatibility, and probe (a) catches it while passing on base. Part (b) reproduces deterministically, 6 failures out of 6 (3 running at .critical against a cap of 1). The gated conditions source is a legitimate DeviceConditionsSource, not a misused seam. However, (b) is the documented design. sync.md \u00a711.1 says user-initiated work proceeds optimistically until the first conditions element arrives. \u00a711.3 says 'userInitiated transfers are never paused by policy'. ADR-036's cap of one transfer at .critical applies at dispatch. The hunter's claim that no record considered this window is therefore inaccurate. R-SYN-7's thermal clause binds bulk work, so this is not a MUST issue. Non-blocking: commit probe (a), and either record the window in ADR-036 and S2-29 or trim running user transfers at .critical."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-8",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:540-541 (appleAccessBlock, expensive branch), used by EngineManifest.swift:165-166",
+  "problem": "S3-CONF-02: For the Apple tier the engine decides `allowsUpdateCheck` from appleAccessBlock(access(for: .bulk)). The expensive-network branch has 0 executions. For transfers it is shadowed by LaneAdmission, which makes a mutant there equivalent. For the manifest update check nothing else gates it. The R-SYN-7 Apple test (EngineConditionsTests.swift:95) covers only Low Data Mode. With bulkOnExpensive = false (not the default), a mutant that ignores expensive lets the catalog pack update check run over cellular, and every test passes.",
+  "fix": "Test the Apple-tier catalog update check on an expensive network, not only under Low Data Mode (`EngineDispatch.swift:541`).",
+  "detail": {
+   "id": "S3-CONF-02",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:540-541 (appleAccessBlock, expensive branch), used by EngineManifest.swift:165-166",
+   "requirements": "R-SYN-7 (expensive networks), E-17, CLAUDE.md G4",
+   "problem": "For the Apple tier the engine decides `allowsUpdateCheck` from appleAccessBlock(access(for: .bulk)). The expensive-network branch has 0 executions. For transfers it is shadowed by LaneAdmission, which makes a mutant there equivalent. For the manifest update check nothing else gates it. The R-SYN-7 Apple test (EngineConditionsTests.swift:95) covers only Low Data Mode. With bulkOnExpensive = false (not the default), a mutant that ignores expensive lets the catalog pack update check run over cellular, and every test passes.",
+   "evidence": "With S3-CONF-02.mutant.diff applied, all 351 existing Sync tests, 85 Kit tests and 71 compatibility tests pass. The probe fails: 'S3ConformanceProbeTests.swift:28:9: Expectation failed: request.allowsUpdateCheck == false \u21b3 request.allowsUpdateCheck \u2192 true' (evidence-mutants-02-03-04.txt). The probe passes on s3-base. Coverage: EngineDispatch.swift:541 has a count of 0.",
+   "repro": "Copy S3-CONF-02.swift into Tests/ZTronAssetSyncTests/Engine/, then: git apply S3-CONF-02.mutant.diff && swift test --scratch-path <scratch> --skip Benchmarks --filter 'ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests'",
+   "fix": "Commit 'R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids'.",
+   "confirmer": {
+    "id": "S3-CONF-02",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "f",
+    "reason": "Reproduced. EngineDispatch.swift:541 has a count of 0. The mutant survives all existing Sync, Kit and Compatibility tests, and only the probe catches it (allowsUpdateCheck \u2192 true); the probe passes on base. The R-SYN-7 Apple-tier test (EngineConditionsTests.swift:95) checks only the Low Data Mode branch, although its name and E-17's obligation cover NetworkAccess in general. I rate it non-blocking: the defect needs a non-default policy (bulkOnExpensive = false), affects only the Apple tier (iOS 26+), and the function's other branch is tested. It is borderline, because the test name claims more than it verifies. Fix: commit the probe."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-9",
+  "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:727-728 (unreachableError, .circuitOpen)",
+  "problem": "S3-CONF-05: ensureAvailable over an incomplete scope while a breaker is open answers through unreachableError. The auth case maps to authRejected(.confirmed), and that line has 0 executions. A mutant that answers serverUnavailable for every breaker survives all tests. The UI would then show 'try later' for a revoked key. resolve's mapping is tested (EngineFailurePathTests.swift:121); ensureAvailable's is not.",
+  "fix": "Test `ensureAvailable`'s mapping of an open auth breaker to `authRejected(.confirmed)` (`EngineCommands.swift:728`).",
+  "detail": {
+   "id": "S3-CONF-05",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:727-728 (unreachableError, .circuitOpen)",
+   "requirements": "R-CAR-7, R-NET-6, R-SYN-10",
+   "problem": "ensureAvailable over an incomplete scope while a breaker is open answers through unreachableError. The auth case maps to authRejected(.confirmed), and that line has 0 executions. A mutant that answers serverUnavailable for every breaker survives all tests. The UI would then show 'try later' for a revoked key. resolve's mapping is tested (EngineFailurePathTests.swift:121); ensureAvailable's is not.",
+   "evidence": "With S3-CONF-05.mutant.diff applied (together with -04), all 351 existing Sync tests, 85 Kit tests and 71 compatibility tests pass. The probe fails: 'S3ConformanceProbeTests.swift:87:9: Expectation failed: result == .failure(.authRejected(.confirmed))' (evidence-mutants-04-05.txt). The probe passes on s3-base.",
+   "repro": "Copy S3-CONF-05.swift into Tests/ZTronAssetSyncTests/Engine/, then: git apply S3-CONF-05.mutant.diff && swift test --scratch-path <scratch> --skip Benchmarks --filter 'ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests'",
+   "fix": "Commit 'R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets'.",
+   "confirmer": {
+    "id": "S3-CONF-05",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "f",
+    "reason": "Reproduced. EngineCommands.swift:728 has a count of 0. The mutant survives all existing Sync, Kit and Compatibility tests, and only the probe catches it (the result is serverUnavailable instead of authRejected(.confirmed)); the probe passes on base. Non-blocking: the mutant still returns a typed, UI-mappable error, only of the wrong class, so R-CAR-7's contract holds. It has no state or data consequence, and resolve's equivalent mapping is already tested (EngineFailurePathTests:121). Fix: commit the probe."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-10",
+  "location": "Sync: EngineDispatch.swift:1109-1114, EngineFailures.swift:75-76, EngineEvents.swift:128-129, EngineCommands.swift:1054-1065 and 1081-1092, EngineRuns.swift:992-1004 and 1034-1037, EngineReadmission.swift:128-147. Storage: AssetStore+Apply.swift:206-210. Kit: ClientLifecycle.swift:246-253 and 508-515, AssetClient.swift:148-149",
+  "problem": "S3-CONF-08: Line coverage of the macOS debug run: Storage 97.37% (8336 lines, 219 missed), Sync 93.49% (9219 lines, 600 missed), Kit 97.83% (1476 lines, 32 missed), total 95.99%. Besides S3-CONF-02 through -06, these regions run in no test, so any mutant there survives:\n- The engine's handling of a publication the store refuses (unknownAsset, notPresent, assetFailed, unverifiedRejected), which is the engine path of R-INT-5 under allowUnverifiedAssets = false: a resolve downloads and is rejected only at publish.\n- An uncommanded `.cancelled(.byClient)` re-queueing its job (ARCHITECTURE \u00a77.6, T7/T13).\n- The progress replay for a subscriber that joins mid-run (R-SYN-12 replay).\n- Maintenance exhausting its budget between steps, and a maintenance step that throws, followed by storeMutationFailed (R-SYN-16, L4-R5).\n- Pending-run gate re-arming for conditions, breaker and throttle.\n- Stale edge and origin readmissions.\n- An apply that adds an id over a detached record (it releases that record's blob and refreshes the snapshot entry).\n- Kit follower and group-registration races, and withAsset's 'root vanished after every reopen'.\nThe rest of the uncovered lines are guards: shutDown, notOpen, cancelled.",
+  "fix": "For each uncovered region the conformance hunter listed in Sync (and the Sync-owned ones among Storage/Kit, which are not yours: report those `other-wp:`), add a behaviour test through real APIs or a documented seam where reachable; record the rest as ARCHITECTURE \u00a714 candidates.",
+  "detail": {
+   "id": "S3-CONF-08",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sync: EngineDispatch.swift:1109-1114, EngineFailures.swift:75-76, EngineEvents.swift:128-129, EngineCommands.swift:1054-1065 and 1081-1092, EngineRuns.swift:992-1004 and 1034-1037, EngineReadmission.swift:128-147. Storage: AssetStore+Apply.swift:206-210. Kit: ClientLifecycle.swift:246-253 and 508-515, AssetClient.swift:148-149",
+   "requirements": "R-INT-5, R-NET-6, R-SYN-12, R-SYN-16, R-SYN-13, R-CLN-1, R-CAR-8, Q-2 (coverage is a floor, not the goal)",
+   "problem": "Line coverage of the macOS debug run: Storage 97.37% (8336 lines, 219 missed), Sync 93.49% (9219 lines, 600 missed), Kit 97.83% (1476 lines, 32 missed), total 95.99%. Besides S3-CONF-02 through -06, these regions run in no test, so any mutant there survives:\n- The engine's handling of a publication the store refuses (unknownAsset, notPresent, assetFailed, unverifiedRejected), which is the engine path of R-INT-5 under allowUnverifiedAssets = false: a resolve downloads and is rejected only at publish.\n- An uncommanded `.cancelled(.byClient)` re-queueing its job (ARCHITECTURE \u00a77.6, T7/T13).\n- The progress replay for a subscriber that joins mid-run (R-SYN-12 replay).\n- Maintenance exhausting its budget between steps, and a maintenance step that throws, followed by storeMutationFailed (R-SYN-16, L4-R5).\n- Pending-run gate re-arming for conditions, breaker and throttle.\n- Stale edge and origin readmissions.\n- An apply that adds an id over a detached record (it releases that record's blob and refreshes the snapshot entry).\n- Kit follower and group-registration races, and withAsset's 'root vanished after every reopen'.\nThe rest of the uncovered lines are guards: shutDown, notOpen, cancelled.",
+   "evidence": ".build-orchestrator/s3-probes/conformance/coverage-uncovered-storage-sync-kit.txt lists each region with a count of 0 and its source text. coverage-per-file.txt has the per-file line coverage. Both come from `swift test --enable-code-coverage --skip Benchmarks` on s3-base: all 7 targets passed (Storage 459, Sync 351, Model 84, Kit 85, Compatibility 71, AppleHosted 104, Transport 151) in 6:34 at a load average of about 100. Report command: `xcrun llvm-cov report <7 test bundles> -instr-profile=out/Products/Debug/codecov/default.profdata -ignore-filename-regex='(/Tests/|/Sources/ZTronAssetTestSupport/|DerivedSources)'`.",
+   "repro": "swift test --scratch-path <scratch> --enable-code-coverage --skip Benchmarks; then xcrun llvm-cov show over the 7 .xctest bundles under <scratch>/out/Products/Debug with codecov/default.profdata",
+   "fix": "Add a behaviour test for each region in the owning work package (F for Sync, B for AssetStore+Apply, G for Kit), ranked by risk. First the R-INT-5 engine path (decide whether a strict policy should refuse before downloading), then the uncommanded cancel and the subscriber replay.",
+   "confirmer": {
+    "id": "S3-CONF-08",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "f",
+    "reason": "Confirmed by my own coverage run on s3-base without the probes, over Storage, Sync, Kit and Compatibility (459, 351, 85 and 71 tests, all passed). All 17 sampled regions have a count of 0: EngineDispatch 1109-1113, EngineFailures 75-76, EngineEvents 128-129, EngineCommands 1054-1056 and 1081-1092, EngineRuns 992-1004 and 1034-1037, EngineReadmission 128-129 and 141-147, AssetStore+Apply 206-209, ClientLifecycle 246-248, 253 and 508-515, and AssetClient 148-149. They are robustness, guard and race paths, and none is shown to break a MUST. The R-INT-5 engine path only wastes a download that the store then refuses. Non-blocking. Ownership is split: F for Sync, B for AssetStore+Apply:206-210, G for the Kit regions."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-11",
+  "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:187",
+  "problem": "M-N-09: Ignore promotion bulk to prefetch of a queued job",
+  "fix": "Tests that kill each surviving mutant (S3-R3), with the scenarios the mutation agent described: promotion of a queued job to prefetch and to the user lane (`EngineJobs.swift:187`), the backoff ceiling doubling per attempt, the breaker's ratio boundary (3 of 6 at 0.5 opens), `Retry-After` exactly at `maxRetryAfter`, and a later shorter 429 that must not shorten the origin throttle.",
+  "detail": {
+   "id": "M-N-09",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:187",
+   "requirements": "R-SYN-3 (a request at a higher lane promotes the shared job; sync-1 S1-06)",
+   "problem": "Ignore promotion bulk to prefetch of a queued job",
+   "missing_test": "SURVIVED. Missing test: with maxConcurrentTransfers 1, a bulk job A running (held) and bulk jobs B and C queued. awaitAsset(C, lane: .prefetch) joins C's queued job, promoting bulk to prefetch. When A ends, C must start before B (starts == [A, C, ...]). File: Tests/ZTronAssetSyncTests/Engine/EngineLaneTests.swift.",
+   "notes": "relane for a queued job: `after != before || isUser` became `after < before || isUser`, so a promotion that is not to the user lane is never re-queued into the higher lane's queue and the job keeps its bulk rank. Existing promotion tests only cover running (downloading) jobs. All 7 targets pass (Sync 351, Kit 85, Compat 71, Storage 459, Model 84, Transport 151, Apple 104). Candidate test: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-09-candidate-test.swift. It passes on s3-base and fails on this mutant.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-09.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-11",
+  "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:187",
+  "problem": "M-N-12: Ignore any promotion of a queued job (including to the user lane)",
+  "fix": "Tests that kill each surviving mutant (S3-R3), with the scenarios the mutation agent described: promotion of a queued job to prefetch and to the user lane (`EngineJobs.swift:187`), the backoff ceiling doubling per attempt, the breaker's ratio boundary (3 of 6 at 0.5 opens), `Retry-After` exactly at `maxRetryAfter`, and a later shorter 429 that must not shorten the origin throttle.",
+  "detail": {
+   "id": "M-N-12",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:187",
+   "requirements": "R-SYN-3 / R-NET-10 (promotion of a queued shared job)",
+   "problem": "Ignore any promotion of a queued job (including to the user lane)",
+   "missing_test": "SURVIVED. Missing test: same scenario as M-N-09 with awaitAsset(C, lane: .userInitiated) while A runs and B, C are queued bulk jobs; C must start before B. File: Tests/ZTronAssetSyncTests/Engine/EngineLaneTests.swift.",
+   "notes": "relane for a queued job: `after != before || isUser` became `after < before`. A queued bulk job that a user-initiated waiter joins stays in the bulk queue. Survives all 7 targets, Benchmarks skipped. Candidate: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-12-candidate-test.swift (same file as M-N-09's). It passes on s3-base and fails on this mutant. A user-lane promotion that is invisible to every test is the more serious of the two survivors.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-12.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-11",
+  "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:211",
+  "problem": "M-N-14: Drop a backoff step (ceiling grows one step late)",
+  "fix": "Tests that kill each surviving mutant (S3-R3), with the scenarios the mutation agent described: promotion of a queued job to prefetch and to the user lane (`EngineJobs.swift:187`), the backoff ceiling doubling per attempt, the breaker's ratio boundary (3 of 6 at 0.5 opens), `Retry-After` exactly at `maxRetryAfter`, and a later shorter 429 that must not shorten the origin throttle.",
+  "detail": {
+   "id": "M-N-14",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:211",
+   "requirements": "R-SYN-5 (exponential backoff with full jitter)",
+   "problem": "Drop a backoff step (ceiling grows one step late)",
+   "missing_test": "SURVIVED. Missing test: for attempts 2 to 6 under RetryPolicy.background, over 200 keys with a fixed seed, the largest draw must exceed the previous attempt's ceiling and not exceed this attempt's ceiling, so the ceiling doubles per attempt. File: Tests/ZTronAssetSyncTests/SyncContractTests.swift, inside or beside backoffIsKeyedFullJitter.",
+   "notes": "exponent = max(attempt - 1, 1) - 1 makes attempts 1 and 2 share the same ceiling and shifts every later one down a step. The existing test asserts only delay >= 0 && delay <= ceiling (an upper bound), so any slower backoff passes. Survives all 7 targets. Candidate: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-14-candidate-test.swift. It passes on s3-base and fails on this mutant.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-14.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-11",
+  "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:~471",
+  "problem": "M-N-16: 5xx breaker: error ratio boundary (>= becomes >)",
+  "fix": "Tests that kill each surviving mutant (S3-R3), with the scenarios the mutation agent described: promotion of a queued job to prefetch and to the user lane (`EngineJobs.swift:187`), the backoff ceiling doubling per attempt, the breaker's ratio boundary (3 of 6 at 0.5 opens), `Retry-After` exactly at `maxRetryAfter`, and a later shorter 429 that must not shorten the origin throttle.",
+  "detail": {
+   "id": "M-N-16",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:~471",
+   "requirements": "R-SYN-5 (trip after sustained 5xx at serverErrorRatio)",
+   "problem": "5xx breaker: error ratio boundary (>= becomes >)",
+   "missing_test": "SURVIVED. Missing test: default CircuitBreakerPolicy (window 20, minimum 5 samples, ratio 0.5). Record 3 object successes, then 2 server-error failures: still closed (2 of 5 is 0.4). A 3rd failure (3 of 6 is exactly 0.5) must open the breaker with cooldown 30 s. File: Tests/ZTronAssetSyncTests/Engine/EngineSupportTests.swift, beside serverBreakerCycle.",
+   "notes": "Double(errors) >= ratio * samples became >. Existing tests only use a window of 100 percent failures. Survives Sync 351, Kit 85, Compat 71. Model and Storage targets cannot reach this code. Candidate: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-16-candidate-test.swift. It passes on s3-base and fails on this mutant.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-16.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-11",
+  "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:208",
+  "problem": "M-N-20: Retry-After exactly equal to maxRetryAfter is deferred (> becomes >=)",
+  "fix": "Tests that kill each surviving mutant (S3-R3), with the scenarios the mutation agent described: promotion of a queued job to prefetch and to the user lane (`EngineJobs.swift:187`), the backoff ceiling doubling per attempt, the breaker's ratio boundary (3 of 6 at 0.5 opens), `Retry-After` exactly at `maxRetryAfter`, and a later shorter 429 that must not shorten the origin throttle.",
+  "detail": {
+   "id": "M-N-20",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:208",
+   "requirements": "R-SYN-5 (a Retry-After above maxRetryAfter defers to the next run)",
+   "problem": "Retry-After exactly equal to maxRetryAfter is deferred (> becomes >=)",
+   "missing_test": "SURVIVED. Missing test: Backoff.delay(attempt: 1, retryAfter: policy.maxRetryAfter, ...) must be non-nil and >= maxRetryAfter, while maxRetryAfter + 1 must be nil. File: Tests/ZTronAssetSyncTests/SyncContractTests.swift, in backoffIsKeyedFullJitter. An engine-level counterpart is also missing in EngineRecoveryTests.swift (a 503 or 429 with Retry-After equal to the limit).",
+   "notes": "The existing test checks only the value one above the limit. Survives Sync 351, Kit 85, Compat 71. Model and Storage targets cannot reach this code. Candidate: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-20-candidate-test.swift. It passes on s3-base and fails on this mutant.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-20.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-11",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:317",
+  "problem": "M-N-39: A later 429 with a shorter Retry-After shortens the origin throttle",
+  "fix": "Tests that kill each surviving mutant (S3-R3), with the scenarios the mutation agent described: promotion of a queued job to prefetch and to the user lane (`EngineJobs.swift:187`), the backoff ceiling doubling per attempt, the breaker's ratio boundary (3 of 6 at 0.5 opens), `Retry-After` exactly at `maxRetryAfter`, and a later shorter 429 that must not shorten the origin throttle.",
+  "detail": {
+   "id": "M-N-39",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:317",
+   "requirements": "R-SYN-5 / ARCHITECTURE section 7.6 (origin-wide throttle until the clamped deadline; a later 429 only extends it)",
+   "problem": "A later 429 with a shorter Retry-After shortens the origin throttle",
+   "missing_test": "SURVIVED. Missing test: two on-demand entries p and q in one prefetch group. p's first attempt fails with throttled retryAfter 60 s, q's with 10 s. Once both jobs are blocked, the throttle deadline (harness.time.nextDeadline) must be throttledAt + 60 s, and advancing 10 s must not restart either transfer. File: Tests/ZTronAssetSyncTests/Engine/EngineRecoveryTests.swift, beside throttledPrefetchResumesAtDeadline.",
+   "notes": "`end = max(previous ?? .zero, until)` became `end = until`. Existing tests cover a shorter manifest 429 (EngineRegressionCycle15Tests) and an extending transfer 429 (Cycle16/17), but not a shorter transfer 429. Survives Sync 351, Kit 85, Compat 71. Model and Storage targets cannot reach this code. Candidate: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-39-candidate-test.swift. It passes on s3-base and fails on this mutant (it relies on p's 429 being handled first, which is the order the fake source and queue produce).",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-39.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-12",
+  "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:89-90 (reserve, then assign) with the comment 'before the run is in place'",
+  "problem": "S3-B-064: L4-R24(1): reserveManifestProbe() runs before state.run = run, so condition observers can see a half-started run inside startRun (test seams only); move it after the assignment and before spawn (F-42: reserving after spawn fails the start-turn test) and add an observer-side invariantViolations() assertion",
+  "fix": "The four proven backlog bugs, each failing test first: L4-R24(1) `reserveManifestProbe()` after `state.run = run` and before `spawn` (F-42), with an observer-side `invariantViolations()` assertion; L4-R24(4) a re-join that changes lane or comes from user work keeps its queue position as the lanes' rules say; L5-R16 a claim inherits the held lane's retry policy, so a claim-only job is not failed on its first failed attempt; L5-R22(4) `invariantViolations()` flags a large give-up's leftover claims only while its Release holds members or pending interests, plus the E2-shape test.",
+  "detail": {
+   "id": "S3-B-064",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:89-90 (reserve, then assign) with the comment 'before the run is in place'",
+   "problem": "L4-R24(1): reserveManifestProbe() runs before state.run = run, so condition observers can see a half-started run inside startRun (test seams only); move it after the assignment and before spawn (F-42: reserving after spawn fails the start-turn test) and add an observer-side invariantViolations() assertion",
+   "category": "proven-open-bug",
+   "sources": [
+    "ADR-053 Assignments (L4-R24(1))",
+    "l4-rulings.md L4-R24(1)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-12",
+  "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:131,179,257",
+  "problem": "S3-B-065: L4-R24(4): a re-join that changes lane, or comes from user work, still goes to the back of the queue through relane",
+  "fix": "The four proven backlog bugs, each failing test first: L4-R24(1) `reserveManifestProbe()` after `state.run = run` and before `spawn` (F-42), with an observer-side `invariantViolations()` assertion; L4-R24(4) a re-join that changes lane or comes from user work keeps its queue position as the lanes' rules say; L5-R16 a claim inherits the held lane's retry policy, so a claim-only job is not failed on its first failed attempt; L5-R22(4) `invariantViolations()` flags a large give-up's leftover claims only while its Release holds members or pending interests, plus the E2-shape test.",
+  "detail": {
+   "id": "S3-B-065",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:131,179,257",
+   "problem": "L4-R24(4): a re-join that changes lane, or comes from user work, still goes to the back of the queue through relane",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-053 Assignments (L4-R24(4))",
+    "l4-rulings.md L4-R24(4)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-12",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift unchanged since l5-merged (HEAD adds only docs and a workflow)",
+  "problem": "S3-B-081: L5-R16 (accepted for Level 5): a job only a claim keeps ends on its first failed attempt as failed(.nextRun) with a spurious assetFailed and the successor's join starts a fresh transfer; a claim should inherit the held lane's retry policy",
+  "fix": "The four proven backlog bugs, each failing test first: L4-R24(1) `reserveManifestProbe()` after `state.run = run` and before `spawn` (F-42), with an observer-side `invariantViolations()` assertion; L4-R24(4) a re-join that changes lane or comes from user work keeps its queue position as the lanes' rules say; L5-R16 a claim inherits the held lane's retry policy, so a claim-only job is not failed on its first failed attempt; L5-R22(4) `invariantViolations()` flags a large give-up's leftover claims only while its Release holds members or pending interests, plus the E2-shape test.",
+  "detail": {
+   "id": "S3-B-081",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift unchanged since l5-merged (HEAD adds only docs and a workflow)",
+   "problem": "L5-R16 (accepted for Level 5): a job only a claim keeps ends on its first failed attempt as failed(.nextRun) with a spurious assetFailed and the successor's join starts a fresh transfer; a claim should inherit the held lane's retry policy",
+   "category": "proven-open-bug",
+   "sources": [
+    "ADR-054 Assignments (Stage 3 (1))",
+    "l5-rulings.md L5-R16",
+    "g.md L5-C1-05"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-12",
+  "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:1788-1790 flags every registered token in releasing; no production caller",
+  "problem": "S3-B-082: L5-R22(4): invariantViolations() reports a large give-up's leftover claims (a registered token in releasing) as 'released and registered'; flag it only while its Release holds members or pending interests, and add the E2-shape test",
+  "fix": "The four proven backlog bugs, each failing test first: L4-R24(1) `reserveManifestProbe()` after `state.run = run` and before `spawn` (F-42), with an observer-side `invariantViolations()` assertion; L4-R24(4) a re-join that changes lane or comes from user work keeps its queue position as the lanes' rules say; L5-R16 a claim inherits the held lane's retry policy, so a claim-only job is not failed on its first failed attempt; L5-R22(4) `invariantViolations()` flags a large give-up's leftover claims only while its Release holds members or pending interests, plus the E2-shape test.",
+  "detail": {
+   "id": "S3-B-082",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:1788-1790 flags every registered token in releasing; no production caller",
+   "problem": "L5-R22(4): invariantViolations() reports a large give-up's leftover claims (a registered token in releasing) as 'released and registered'; flag it only while its Release holds members or pending interests, and add the E2-shape test",
+   "category": "proven-open-bug",
+   "sources": [
+    "ADR-054 Merge rulings (4); Assignments (5)",
+    "l5-rulings.md L5-R22(4)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-13",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchSync.swift:328 holds only the baseline test",
+  "problem": "S3-B-063: L4-R22: a chain of half-open probes ending without a verdict re-admits every parked job on each exit, so the total is quadratic (1,000 parked 2.6-3.6 s; 10,000 about 161 s; every turn stays within C2); lazy re-admission with an ordered index (O(log n) per exit) and a new bound on the total are assigned to Stage 3 (battery, SPEC goal 4)",
+  "fix": "L4-R22: lazy re-admission with an ordered index (O(log n) per probe exit) so a chain of half-open probes is no longer quadratic in the parked jobs; pin it structurally (re-admission work per exit) and extend `BenchSync.swift:328` to 10,000 parked members under C2.",
+  "detail": {
+   "id": "S3-B-063",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchSync.swift:328 holds only the baseline test",
+   "problem": "L4-R22: a chain of half-open probes ending without a verdict re-admits every parked job on each exit, so the total is quadratic (1,000 parked 2.6-3.6 s; 10,000 about 161 s; every turn stays within C2); lazy re-admission with an ordered index (O(log n) per exit) and a new bound on the total are assigned to Stage 3 (battery, SPEC goal 4)",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-053 Assignments (Stage 3 hardening)",
+    "l4-rulings.md L4-R22",
+    "f.md F-41"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-14",
+  "location": "docs/ARCHITECTURE.md:749,755,759,760,763 say 'not written'; grep over Tests/ finds none of the names",
+  "problem": "S3-B-068: Sync-1 regression names not written at the level-4 merge: S1-01 (two: 'R-SYN-4: a job whose last interest left during verification is not retried after an integrity failure' and 'R-SYN-2: a stale commit with no interests removes the job and frees its pipeline slot'), S1-07, S1-11, S1-12 and S1-15's run form",
+  "fix": "Write the \u00a712 regression tests with the names ARCHITECTURE \u00a712.3/\u00a712.4 give: S1-01 (both), S1-07, S1-11, S1-12, S1-15's run form, S2-09, S2-10, S2-01's `ensureAvailable` form, S1-09's replaced-alarm and replaced-watcher halves, and an engine-side assertion of R-SYN-15's join-before-close order (mutants M5/M6 must fail it). A test that fails is a bug: commit it failing, then fix.",
+  "detail": {
+   "id": "S3-B-068",
+   "kind": "backlog",
+   "location": "docs/ARCHITECTURE.md:749,755,759,760,763 say 'not written'; grep over Tests/ finds none of the names",
+   "problem": "Sync-1 regression names not written at the level-4 merge: S1-01 (two: 'R-SYN-4: a job whose last interest left during verification is not retried after an integrity failure' and 'R-SYN-2: a stale commit with no interests removes the job and frees its pipeline slot'), S1-07, S1-11, S1-12 and S1-15's run form",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Assignments (\u00a712 names)",
+    "l4-rulings.md L4-R25",
+    "ARCHITECTURE \u00a712.3"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-14",
+  "location": "docs/ARCHITECTURE.md:769,777,778; no such test names in Tests/",
+  "problem": "S3-B-069: Sync-2 regression names not written: S2-09 ('R-SYN-11: committed bytes stay in the headroom ledger so the reserve is never crossed'), S2-10 ('R-SYN-3: a user-initiated job starts while bulk work fills the verify and commit pipeline') and the ensureAvailable form of S2-01 ('R-SYN-10: ensureAvailable completes after a breaker recovers from an abandoned probe', a critical finding)",
+  "fix": "Write the \u00a712 regression tests with the names ARCHITECTURE \u00a712.3/\u00a712.4 give: S1-01 (both), S1-07, S1-11, S1-12, S1-15's run form, S2-09, S2-10, S2-01's `ensureAvailable` form, S1-09's replaced-alarm and replaced-watcher halves, and an engine-side assertion of R-SYN-15's join-before-close order (mutants M5/M6 must fail it). A test that fails is a bug: commit it failing, then fix.",
+  "detail": {
+   "id": "S3-B-069",
+   "kind": "backlog",
+   "location": "docs/ARCHITECTURE.md:769,777,778; no such test names in Tests/",
+   "problem": "Sync-2 regression names not written: S2-09 ('R-SYN-11: committed bytes stay in the headroom ledger so the reserve is never crossed'), S2-10 ('R-SYN-3: a user-initiated job starts while bulk work fills the verify and commit pipeline') and the ensureAvailable form of S2-01 ('R-SYN-10: ensureAvailable completes after a breaker recovers from an abandoned probe', a critical finding)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Assignments (\u00a712 names)",
+    "ARCHITECTURE \u00a712.4"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-14",
+  "location": "docs/ARCHITECTURE.md:757; model invariant unfiredDeadline only catches part",
+  "problem": "S3-B-070: S1-09's replaced-alarm and replaced-watcher halves have no test of their own, and there is no engine-side assertion for R-SYN-15's join-before-close order (mutants M5/M6 pass because close() drains)",
+  "fix": "Write the \u00a712 regression tests with the names ARCHITECTURE \u00a712.3/\u00a712.4 give: S1-01 (both), S1-07, S1-11, S1-12, S1-15's run form, S2-09, S2-10, S2-01's `ensureAvailable` form, S1-09's replaced-alarm and replaced-watcher halves, and an engine-side assertion of R-SYN-15's join-before-close order (mutants M5/M6 must fail it). A test that fails is a bug: commit it failing, then fix.",
+  "detail": {
+   "id": "S3-B-070",
+   "kind": "backlog",
+   "location": "docs/ARCHITECTURE.md:757; model invariant unfiredDeadline only catches part",
+   "problem": "S1-09's replaced-alarm and replaced-watcher halves have no test of their own, and there is no engine-side assertion for R-SYN-15's join-before-close order (mutants M5/M6 pass because close() drains)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Assignments (\u00a712 names; engine-side assertion)",
+    "ARCHITECTURE \u00a712.3 S1-09"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-15",
+  "location": "estimates only",
+  "problem": "S3-B-077: C2 turns that are linear and unmeasured at 10,000 members: the first turn of each re-admission event (collect and sort, a few ms), registerGroup's de-duplication and sort (about 3 ms), retries that fall due together in one fireDue, and shutdown",
+  "fix": "Measure, as `BenchSync` C2 benchmarks at 10,000: the first turn of each re-admission event, `registerGroup`'s de-duplication and sort, retries falling due together in one `fireDue`, and the 10,000-id prune announcement. Any turn over 10 ms is fixed under S3-R5.",
+  "detail": {
+   "id": "S3-B-077",
+   "kind": "backlog",
+   "location": "estimates only",
+   "problem": "C2 turns that are linear and unmeasured at 10,000 members: the first turn of each re-admission event (collect and sort, a few ms), registerGroup's de-duplication and sort (about 3 ms), retries that fall due together in one fireDue, and shutdown",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-28, F-29"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-15",
+  "location": "estimate only",
+  "problem": "S3-B-078: The 10,000-id prune announcement takes about 3.5 ms in one turn and is estimated, not measured, at about 35 ms at maxEntries (F-20)",
+  "fix": "Measure, as `BenchSync` C2 benchmarks at 10,000: the first turn of each re-admission event, `registerGroup`'s de-duplication and sort, retries falling due together in one `fireDue`, and the 10,000-id prune announcement. Any turn over 10 ms is fixed under S3-R5.",
+  "detail": {
+   "id": "S3-B-078",
+   "kind": "backlog",
+   "location": "estimate only",
+   "problem": "The 10,000-id prune announcement takes about 3.5 ms in one turn and is estimated, not measured, at about 35 ms at maxEntries (F-20)",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-20"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-16",
+  "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:363 still says about 1 us",
+  "problem": "S3-B-084: releasesPerTurn's doc estimates about 1 us per removal while WP-G's probe measured about 8.5 us per retirement (a 512-member turn 4.30-4.60 ms); every chunked turn measured stays within C2, so the doc awaits a re-measurement",
+  "fix": "Comment fixes: `releasesPerTurn`'s cost estimate (`EngineCommands.swift:363`, re-measure) and the REENTRANCY comment at `EngineDispatch.swift:743-744` (the lifecycle, epoch and attempt re-checks before `remote.transfer`).",
+  "detail": {
+   "id": "S3-B-084",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:363 still says about 1 us",
+   "problem": "releasesPerTurn's doc estimates about 1 us per removal while WP-G's probe measured about 8.5 us per retirement (a 512-member turn 4.30-4.60 ms); every chunked turn measured stays within C2, so the doc awaits a re-measurement",
+   "category": "documentation",
+   "sources": [
+    "ADR-054 Assignments (WP-F / Stage 3 notes)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3F-16",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:743-744 text unchanged",
+  "problem": "S3-B-085: EngineDispatch.swift:743-744's REENTRANCY comment is incomplete since L5K-R25: the lifecycle, the epoch and the attempt are also re-checked before remote.transfer (:750-763)",
+  "fix": "Comment fixes: `releasesPerTurn`'s cost estimate (`EngineCommands.swift:363`, re-measure) and the REENTRANCY comment at `EngineDispatch.swift:743-744` (the lifecycle, epoch and attempt re-checks before `remote.transfer`).",
+  "detail": {
+   "id": "S3-B-085",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:743-744 text unchanged",
+   "problem": "EngineDispatch.swift:743-744's REENTRANCY comment is incomplete since L5K-R25: the lifecycle, the epoch and the attempt are also re-checked before remote.transfer (:750-763)",
+   "category": "documentation",
+   "sources": [
+    "ADR-055 Assignments (comments only)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "confirmed at merge (L4-R26); needs a device test",
+  "problem": "S3-B-066: ENOSPC with a pending reclaim waits 'awaitingSpace', counted against the retry budget with no timed backoff, so attempts can run back to back (PROBE-C6R-1: 2 starts in 0.0 s); F-27(c)'s backoff deadline is not taken and may be revisited if a device test shows churn",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-066",
+   "kind": "backlog",
+   "location": "confirmed at merge (L4-R26); needs a device test",
+   "problem": "ENOSPC with a pending reclaim waits 'awaitingSpace', counted against the retry budget with no timed backoff, so attempts can run back to back (PROBE-C6R-1: 2 starts in 0.0 s); F-27(c)'s backoff deadline is not taken and may be revisited if a device test shows churn",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-053 Assignments; Acknowledged (3); Open",
+    "f.md F-27, F-28",
+    "l4-rulings.md L4-R4"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "confirmed at merge",
+  "problem": "S3-B-067: A job that fits alone but not behind the jobs admitted ahead of it stays parked insufficientSpace until a later free-space read when that job ends without committing (other parked jobs wait for the next read; runs re-check at settlement)",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-067",
+   "kind": "backlog",
+   "location": "confirmed at merge",
+   "problem": "A job that fits alone but not behind the jobs admitted ahead of it stays parked insufficientSpace until a later free-space read when that job ends without committing (other parked jobs wait for the next read; runs re-check at settlement)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-053 Acknowledged at merge (5)",
+    "f.md F-28, F-38"
+   ],
+   "proposed": "none"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "by construction; no seam inside the window",
+  "problem": "S3-B-071: Binding-ledger windows without a deterministic probe: the resolve-registration and prefetch-join ledger checks (mutants M-RESOLVEREG and M-JOIN pass the suite; they now cost only a job and a read), the ledger's invalidation after a store mutation that throws (shown for a failed index commit only), and the followStoreView / ledgerForgets guards pinned at function level only",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-071",
+   "kind": "backlog",
+   "location": "by construction; no seam inside the window",
+   "problem": "Binding-ledger windows without a deterministic probe: the resolve-registration and prefetch-join ledger checks (mutants M-RESOLVEREG and M-JOIN pass the suite; they now cost only a job and a read), the ledger's invalidation after a store mutation that throws (shown for a failed index commit only), and the followStoreView / ledgerForgets guards pinned at function level only",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-14, F-23, F-24"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "by reading only; no probe produced it",
+  "problem": "S3-B-072: A 404 job's waiters for an id bound during recordFailure's await are answered notFound (resolveAll with .failed(.notFound)) while the store serves it; a caller that asks again is answered from the store",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-072",
+   "kind": "backlog",
+   "location": "by reading only; no probe produced it",
+   "problem": "A 404 job's waiters for an id bound during recordFailure's await are answered notFound (resolveAll with .failed(.notFound)) while the store serves it; a caller that asks again is answered from the store",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-14, F-32"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "unproven; recorded residue",
+  "problem": "S3-B-073: A holder gained between blobHolders and the quarantine is neither announced nor healed (f-12)",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-073",
+   "kind": "backlog",
+   "location": "unproven; recorded residue",
+   "problem": "A holder gained between blobHolders and the quarantine is neither announced nor healed (f-12)",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-23, f-12"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "the seam stands in; the fix does not depend on priorities",
+  "problem": "S3-B-074: Two committed applies followed out of order: the real-priority form (a higher-priority continuation overtaking on a busy actor) is covered only by a test seam (takeApplyTurn, f-13)",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-074",
+   "kind": "backlog",
+   "location": "the seam stands in; the fix does not depend on priorities",
+   "problem": "Two committed applies followed out of order: the real-priority form (a higher-priority continuation overtaking on a busy actor) is covered only by a test seam (takeApplyTurn, f-13)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-14, F-25"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "no seam arms a deadline inside the read",
+  "problem": "S3-B-075: Space interleavings pinned by no test: two alarm runs whose store work overlaps (storeWorkRuns), a settlement read racing a newly armed store deadline (the 'continue' after spaceWakeExpected), a purge's reaper against the engine's alarm on a busy actor, and bytes reclaimed by maintenance re-checked only at the next deadline or read",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-075",
+   "kind": "backlog",
+   "location": "no seam arms a deadline inside the read",
+   "problem": "Space interleavings pinned by no test: two alarm runs whose store work overlaps (storeWorkRuns), a settlement read racing a newly armed store deadline (the 'continue' after spaceWakeExpected), a purge's reaper against the engine's alarm on a busy actor, and bytes reclaimed by maintenance re-checked only at the next deadline or read",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-14, F-25, F-26, F-27"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "by construction, not produced",
+  "problem": "S3-B-076: joinGroup's branch for a manifest copy that changes between two join batches of a prefetch group is uncovered (count 0); it needs a seam inside the join",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-076",
+   "kind": "backlog",
+   "location": "by construction, not produced",
+   "problem": "joinGroup's branch for a manifest copy that changes between two join batches of a prefetch group is uncovered (count 0); it needs a seam inside the join",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-28"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "documented in ARCHITECTURE \u00a714",
+  "problem": "S3-B-079: Engine test fidelity gaps: the model tests have no liveness phase (ALARM-STUCK passes at its seed, F-34), six F-40 site changes have no reachable difference and no test (the gate model's outcome kinds were not extended, F-41), and the harness priority floor no longer reproduces production's utility/default QoS gap",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-079",
+   "kind": "backlog",
+   "location": "documented in ARCHITECTURE \u00a714",
+   "problem": "Engine test fidelity gaps: the model tests have no liveness phase (ALARM-STUCK passes at its seed, F-34), six F-40 site changes have no reachable difference and no test (the gate model's outcome kinds were not extended, F-41), and the harness priority floor no longer reproduces production's utility/default QoS gap",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-33, F-34, F-41"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "no probe produced them",
+  "problem": "S3-B-080: Shutdown-time races hardened but not produced: a 404 whose presence reads overlap shutdown, a transfer request after shutdown began, and a completion racing the engine's cancel when a kept drained file is discarded (by reading only)",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-080",
+   "kind": "backlog",
+   "location": "no probe produced them",
+   "problem": "Shutdown-time races hardened but not produced: a 404 whose presence reads overlap shutdown, a transfer request after shutdown began, and a completion racing the engine's cancel when a kept drained file is discarded (by reading only)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Not verified",
+    "f.md F-14, F-32"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "no running engine reaches the give-up",
+  "problem": "S3-B-083: G-13's 'no give-up after a running join's read' invariant is argued, not tested, and the merge of a large give-up into a later large release has no test; a claimed-only job's failure path and a claim naming the content its member had when claimed (a changed member is protected again only once its join reaches it) are shown by reading only",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-083",
+   "kind": "backlog",
+   "location": "no running engine reaches the give-up",
+   "problem": "G-13's 'no give-up after a running join's read' invariant is argued, not tested, and the merge of a large give-up into a later large release has no test; a claimed-only job's failure path and a claim naming the content its member had when claimed (a changed member is protected again only once its join reaches it) are shown by reading only",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-054 Assignments (WP-F / Stage 3 notes); Not verified",
+    "g.md G-13, Not verified here"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "recorded in ADR-055 and ARCHITECTURE \u00a714",
+  "problem": "S3-B-086: L5K-R25's next-id fallback in the answer site (EnginePresence) is defensive and unpinned: no seam reaches its second iteration",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-086",
+   "kind": "backlog",
+   "location": "recorded in ADR-055 and ARCHITECTURE \u00a714",
+   "problem": "L5K-R25's next-id fallback in the answer site (EnginePresence) is defensive and unpinned: no seam reaches its second iteration",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-055 Merge rulings (5), Accepted exceptions",
+    "l5k-rulings.md L5K-R27(5)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3F-17",
+  "location": "documented; no supported host has one cooperative thread",
+  "problem": "S3-B-087: L5K-R2 test-determinism class: engine and migration tests reach their races by scheduling (the L5K-R17 test does not assert its premise; 'one adoption per file' is reached in almost every macOS launch), and the L5K-R21 tests' gated planner blocks one cooperative thread (a single-thread host would deadlock)",
+  "fix": "Record the status of each (unproven or without a seam); write a test only where a real seam now reaches it.",
+  "detail": {
+   "id": "S3-B-087",
+   "kind": "backlog",
+   "location": "documented; no supported host has one cooperative thread",
+   "problem": "L5K-R2 test-determinism class: engine and migration tests reach their races by scheduling (the L5K-R17 test does not assert its premise; 'one adoption per file' is reached in almost every macOS launch), and the L5K-R21 tests' gated planner blocks one cooperative thread (a single-thread host would deadlock)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-055 Not verified",
+    "l5k-close1-remaining-k.json [1],[3]",
+    "l5k-close3-remaining-k.json [3]",
+    "k.md Not verified here"
+   ],
+   "proposed": "test"
+  }
+ }
+]

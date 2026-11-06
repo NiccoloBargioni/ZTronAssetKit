@@ -1,0 +1,59 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 5] ZTronAssetSyncTests-product
+[4 / 7] ZTronAssetSyncTests-product
+[9 / 11] ZTronAssetSyncTests-product
+[11 / 11] ZTronAssetModelTests-product
+Build complete! (4,59 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "DesignD3Probes" started.
+◇ Test "PROBE-D3-READ-PROMOTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D3-READ-PROMOTE" started.
+PROBE-D3-READ-PROMOTE followVisitedFirst decided: (owed: false, p: Optional(ZTronAssetSync.JobState.downloading), room: Optional(5999997))
+PROBE-D3-READ-PROMOTE followVisitedFirst A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D3-READ-PROMOTE" started.
+PROBE-D3-READ-PROMOTE sweepFollowsFirst decided: (owed: true, p: Optional(ZTronAssetSync.JobState.downloading), room: Optional(5999981))
+PROBE-D3-READ-PROMOTE sweepFollowsFirst A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ad/ad756d1c14ec415b202669f4955dc346354f3563586b734a8fd58315ce0cfb1f.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D3-READ-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:373:25: Issue recorded
+↳ A's visit precedes the read visit-first, so A gets the shortage of the room before it: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ad/ad756d1c14ec415b202669f4955dc346354f3563586b734a8fd58315ce0cfb1f.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D3-READ-PROMOTE" with 2 test cases failed after 0.869 seconds with 1 issue.
+◇ Test "PROBE-D3-TICKET" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D3-TICKET" started.
+PROBE-D3-TICKET followVisitedFirst tickets: (n: Optional(4), k: Optional(5))
+PROBE-D3-TICKET followVisitedFirst A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/4a/4abb30b261be91a1e660ae9bec01ab8f21fbb1696e8889ff6284a2ddeecc9f58.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | K: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D3-TICKET" started.
+PROBE-D3-TICKET sweepFollowsFirst tickets: (n: Optional(5), k: Optional(4))
+PROBE-D3-TICKET sweepFollowsFirst A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000)) | K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c6/c656c4b70dd8729477fa67810ac4e0a70264bf703073fef7a0651c32eb328b4e.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D3-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:422:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(nBytes.count)
+↳ A (waiting since before the apply) is served from N: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+↳ (try? aResult.get())?.byteSize == Int64(nBytes.count) → <not evaluated>
+✘ Test "PROBE-D3-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:423:9: Expectation failed: (try? kResult.get()) == nil
+↳ K (requested after the apply) gets the shortage: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c6/c656c4b70dd8729477fa67810ac4e0a70264bf703073fef7a0651c32eb328b4e.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ (try? kResult.get()) == nil → <not evaluated>
+✘ Test "PROBE-D3-TICKET" with 2 test cases failed after 0.943 seconds with 2 issues.
+✘ Suite "DesignD3Probes" failed after 1.814 seconds with 3 issues.
+↳ /// Design D3 ("root") probes for the s3f sweep/follow visit-order class. Scratch; never committed as is.
+↳ ///
+↳ /// Every probe runs in both visit orders (`LaneDropVisit`): `.followVisitedFirst` releases the bounded follow's held turns
+↳ /// and waits for its end before the decision under test; `.sweepFollowsFirst` makes the decision while the follow still
+↳ /// owes the visit that changes what the decision reads. The criterion is the verifiers': the answers must not depend
+↳ /// on the order.
+↳ ///
+↳ /// - PROBE-D3-PUMP-ABANDON: a user request made while the follow owes the visit that abandons a download holding the
+↳ ///   room. The pump gates the request against the room with the doomed download's bytes still in flight.
+↳ /// - PROBE-D3-PUMP-PROMOTE: the pump (no space sweep involved) starts prefetch work R while the follow owes the visit that
+↳ ///   moves a user waiter onto the queued prefetch job P, so P is gated after R as prefetch work.
+↳ /// - PROBE-D3-PUMP-STALLED-USER: a freed slot goes to prefetch work X while a user queue whose head waits for the follow
+↳ ///   holds user work Z behind it (`hasQueuedUser` counts only the head), so X takes the room Z gets visit-first.
+↳ /// - PROBE-D3-JOIN-ABANDON: a user request joins a job parked `insufficientSpace` while the follow owes the visit that
+↳ ///   abandons the download holding the room: the join's re-check (`relane`, `failFastJoiner`) answers a shortage.
+↳ /// - PROBE-D3-READ-PROMOTE: a free-space read (and its sweep) lands while the follow owes the visit that moves a user
+↳ ///   waiter onto a job parked `insufficientSpace`; the visit's re-check then reads the new room.
+↳ /// - PROBE-D3-TICKET: a user request made while the follow owes the visit that creates another user waiter's new-content
+↳ ///   job takes an earlier ticket than that job, so the reclaim's sweep serves the later request first.
+✘ Test run with 2 tests in 1 suite failed after 1.814 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

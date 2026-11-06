@@ -1,0 +1,35 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 6] ZTronAssetSync
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (6,47 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine events" started.
+◇ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" started.
+✘ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" recorded an issue at EngineEventOrderTests.swift:80:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" recorded an issue at EngineEventOrderTests.swift:110:9: Expectation failed: started != nil && replayedProgress != nil
+↳ [ZTronAssetModel.AssetEvent.snapshotChanged(generation: 2), ZTronAssetModel.AssetEvent.conditionsChanged(ZTronAssetModel.DeviceConditions(network: ZTronAssetModel.NetworkConditions(satisfied: true, expensive: false, constrained: false), power: ZTronAssetModel.PowerConditions(lowPowerMode: false, thermal: ZTronAssetModel.ThermalLevel.nominal))), ZTronAssetModel.AssetEvent.syncStarted(run-1, ZTronAssetModel.SyncTrigger.launch)]
+↳ started != nil && replayedProgress != nil → false
+↳   started != nil → true
+↳   replayedProgress != nil → false
+✘ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" recorded an issue at EngineEventOrderTests.swift:116:9: Expectation failed: await EngineHarness.value(of: run).completeReport?.fetched == 2
+↳ await EngineHarness.value(of: run).completeReport?.fetched == 2 → <not evaluated>
+✘ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" failed after 64.027 seconds with 3 issues.
+↳ /// A subscriber that registers while a run is in progress is first given the run's `syncStarted` and then the run's
+↳ /// latest `syncProgress`, the one the rate limit last saw (sync.md §10.5, R-SYN-12's replay), so a progress bar
+↳ /// opened mid-run starts from the run's state instead of waiting for its next event.
+✘ Suite "Engine events" failed after 64.027 seconds with 3 issues.
+↳ /// Event broadcast and backpressure (R-SYN-12, H-9, ADR-023).
+✘ Test run with 1 test in 1 suite failed after 64.027 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

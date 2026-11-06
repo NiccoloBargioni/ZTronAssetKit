@@ -1,0 +1,17 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyJPileup" started.
+◇ Test "VERIFY-J-PILEUP: the follow's turns and the end-of-follow pile-up hold the actor at most C2's 10 ms per turn" started.
+VERIFY-J-PILEUP-LATENCY 1000 members: the owed follow (after the apply's turn) ended 0.01277225 seconds after its release; admissions waited that long
+VERIFY-J-PILEUP 1000: jobs still queued after the window: 0
+VERIFY-J-PILEUP-LATENCY 10000 members: the owed follow (after the apply's turn) ended 0.147887791 seconds after its release; admissions waited that long
+VERIFY-J-PILEUP 10000: jobs still queued after the window: 0
+VERIFY-J-PILEUP-LATENCY 10000 members: the owed follow (after the apply's turn) ended 0.142532125 seconds after its release; admissions waited that long
+VERIFY-J-PILEUP 10000: jobs still queued after the window: 0
+VERIFY-J-PILEUP-LATENCY 10000 members: the owed follow (after the apply's turn) ended 0.146434708 seconds after its release; admissions waited that long
+VERIFY-J-PILEUP 10000: jobs still queued after the window: 0
+VERIFY-J-PILEUP 10,000 members + 10,000 joined during the follow: runs [4.412209, 3.971833, 3.8415] ms, best 3.8415 ms
+✔ Test "VERIFY-J-PILEUP: the follow's turns and the end-of-follow pile-up hold the actor at most C2's 10 ms per turn" passed after 2.411 seconds.
+✔ Suite "VerifyJPileup" passed after 2.411 seconds.
+✔ Test run with 1 test in 1 suite passed after 2.411 seconds.

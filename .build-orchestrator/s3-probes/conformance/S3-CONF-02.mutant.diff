@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+index 4b26f4a..6cafae1 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+@@ -537,7 +537,7 @@ extension SyncEngine {
+         guard let conditions = self.state.conditions, conditions.network.satisfied else {
+             return .offline
+         }
+-        if conditions.network.expensive, !access.allowsExpensive || !access.allowsCellular {
++        if conditions.network.expensive, conditions.network.constrained, !access.allowsExpensive || !access.allowsCellular { // MUTANT S3-CONF-02
+             return .policy(.expensiveNetwork)
+         }
+         if conditions.network.constrained, !access.allowsConstrained {

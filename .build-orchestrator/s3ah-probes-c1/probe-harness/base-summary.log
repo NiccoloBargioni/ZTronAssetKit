@@ -1,0 +1,6 @@
+✘ Test "S3-SECU-03: a fresh, non-canonical staging name is collected as foreign (real StagingCollection.garbage)" with 4 test cases failed after 0.002 seconds with 4 issues.
+✘ Test "S3-SECU-02: every listed form is refused by both, the controls accepted by both" with 16 test cases failed after 0.002 seconds with 13 issues.
+S3AH probe: decoder accepted 34610 of 60000 seeded paths; transport refused 20 of them
+✘ Test "S3-SECU-02: over 60,000 seeded paths (Unicode prepend and combining marks included) every decoder-accepted path yields a URL from the real RemoteURL.make" failed after 0.369 seconds with 1 issue.
+✘ Test run with 4 tests in 1 suite failed after 0.369 seconds with 18 issues.
+exit 1

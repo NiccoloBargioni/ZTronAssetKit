@@ -1,0 +1,13 @@
+storage1 start 21:22:01 load averages: 14.21 14.08 41.12
+storage1 exit=0 end 21:27:31 load averages: 9.96 15.86 33.68
+fail-lines 0
+storage2 start 21:27:31 load averages: 9.96 15.86 33.68
+storage2 exit=0 end 21:31:18 load averages: 7.87 13.21 28.49
+fail-lines 0
+storage3 start 21:31:18 load averages: 7.87 13.21 28.49
+storage3 exit=0 end 21:35:04 load averages: 8.36 12.41 24.74
+fail-lines 0
+tsan start 21:35:04 load averages: 8.36 12.41 24.74
+tsan exit=1 end 21:56:27 load averages: 6.85 19.72 23.89
+tsan-reports 0 fail-lines 4
+DONE

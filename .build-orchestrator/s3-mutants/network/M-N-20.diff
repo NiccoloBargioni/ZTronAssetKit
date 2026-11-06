@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..5601e93 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -205,7 +205,7 @@ package enum Backoff {
+         seed: UInt64,
+         key: UInt64
+     ) -> TimeInterval? {
+-        if let retryAfter, retryAfter > policy.maxRetryAfter {
++        if let retryAfter, retryAfter >= policy.maxRetryAfter {
+             return nil
+         }
+         let exponent = Double(max(attempt, 1) - 1)

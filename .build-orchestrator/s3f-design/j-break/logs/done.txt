@@ -1,0 +1,23 @@
+PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job
+PROBE-C7-RANK-PARK: a parked-branch job re-queued on its new lane is not admitted ahead of a user job
+PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work
+PROBE-C7R-GAIN-AHEAD
+PROBE-C8-DROPPED-KEEP: a job whose user lane comes from a dropped id is judged at its prefetch place
+PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume
+PROBE-C8-DROPPED: a job whose only id the copy dropped is not admitted ahead of a user job
+PROBE-C8-RANK-ADMIT
+PROBE-C8-RANK-PARK
+PROBE-C8-RANK-PROMOTE
+PROBE-C8R-INFLIGHT-PROMOTE
+PROBE-D-ENOSPC
+PROBE-D-JOIN-FREED
+PROBE-D-PUMP-FREED
+PROBE-D-PUMP-PROMOTE
+PROBE-D-REFOLLOW
+PROBE-D-SHUTDOWN
+PROBE-D3-JOIN-ABANDON
+PROBE-D3-PUMP-ABANDON
+PROBE-D3-PUMP-PROMOTE
+PROBE-D3-PUMP-STALLED-USER
+PROBE-D3-READ-PROMOTE
+PROBE-D3-TICKET

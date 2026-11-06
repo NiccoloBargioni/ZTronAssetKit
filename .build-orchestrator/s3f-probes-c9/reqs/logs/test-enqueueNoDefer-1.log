@@ -1,0 +1,24 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+✘ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:573:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(nBytes.count)
+↳ A (waiting since before the apply) is served from N: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+↳ (try? aResult.get())?.byteSize == Int64(nBytes.count) → <not evaluated>
+✘ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:574:9: Expectation failed: (try? kResult.get()) == nil
+↳ K (requested after the apply) gets the shortage: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c6/c656c4b70dd8729477fa67810ac4e0a70264bf703073fef7a0651c32eb328b4e.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ (try? kResult.get()) == nil → <not evaluated>
+✘ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" with 2 test cases failed after 1.158 seconds with 2 issues.
+↳ /// A user request made while the follow owes the visit that creates another user waiter's new-content job queues
+↳ /// after that job: A (C, 5 MB) waits `awaitingSpace` for 4 MB of a pruned blob with 2 MB of room; v3 moves A to N
+↳ /// (3 MB) while the follow owes C's visit, and K (3 MB) is requested for user work. Visited first, N's job exists
+↳ /// before K's request and takes the earlier ticket: the reclaim (5 MB of room) serves N, and K gets the shortage.
+↳ /// Requested first, K took the earlier ticket and the reclaim served K (PROBE-D3-TICKET).
+✘ Suite "Engine runs" failed after 1.159 seconds with 2 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 1.159 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

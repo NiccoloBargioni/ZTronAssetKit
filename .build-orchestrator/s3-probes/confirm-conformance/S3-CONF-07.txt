@@ -1,0 +1,8 @@
+# Confirmer run on s3-base (b5796ba) in a detached worktree; probes copied from .build-orchestrator/s3-probes/conformance/ unchanged
+◇ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" started.
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" recorded an issue at S3ConformanceFallbackProbeTests.swift:32:9: Expectation failed: started.isEmpty
+↳ an .mp4 was downloaded at [ZTronAssetModel.AssetPriority.userInitiated] for an image request
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" failed after 0.009 seconds with 1 issue.
+↳ /// fallback chain's `fetch` resolves first and checks the extension afterwards (R-CAR-2 "identical observable
+# also failed in each of the 5 mutant runs (6/6 deterministic)
+# Recorded deviation: docs/adr-drafts/k.md:353 (K-11: 'an on-demand resolve that downloads before its candidate check (as AssetFallbackChain.fetch; the prior art checked the manifest entry first)'), accepted in docs/DECISIONS.md:488 (ADR-055: 'K-11 ... accepted and pinned'), docs/MIGRATION.md:220 ('an on-demand resolve downloads before its extension check')

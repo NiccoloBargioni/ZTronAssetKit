@@ -1,0 +1,3 @@
+load before: 11:21:40 { 2.77 10.65 14.81 }
+load after: 11:21:54 { 5.37 10.96 14.87 }
+TEST budget c2-r1-VerifyC8C2Probe-budget exit 1 in 14 s

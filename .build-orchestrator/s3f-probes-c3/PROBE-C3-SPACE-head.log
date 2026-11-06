@@ -1,0 +1,10 @@
+◇ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" started.
+PROBE-C3-SPACE setup: the old job is Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))
+PROBE-C3-SPACE before the reap: (listed: true, oldState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), unfollowed: false, owed: true); room above reserve 1000003, pending 300
+PROBE-C3-SPACE after the reap: (oldState: nil, owed: true, waiting: true)
+PROBE-C3-SPACE answer: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 1000303)); room above reserve now 1000340
+✘ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" recorded an issue at VerifyC3CorrectProbes.swift:294:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-SPACE FAIL: the waiter of a listed id was answered failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 1000303))
+✘ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" failed after 0.693 seconds with 1 issue.
+↳ /// PROBE-C3-SPACE: a listed id's replaced content parked `awaitingSpace` (pending reclaim) when the apply lands; before
+✘ Test run with 1 test in 1 suite failed after 0.693 seconds with 1 issue.

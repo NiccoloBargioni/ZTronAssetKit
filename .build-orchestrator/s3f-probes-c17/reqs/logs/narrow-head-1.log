@@ -1,0 +1,16 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC17ReqsProbes" started.
+◇ Test "PROBE-C17R-NARROWED-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17R-NARROWED-REROUTE" started.
+PROBE-C17R-NARROWED followVisitedFirst after v5's turn: (owed: false, c: "nil", n: "nil")
+PROBE-C17R-NARROWED followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) nDownloadingAfterBarrier=false
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17R-NARROWED-REROUTE" started.
+PROBE-C17R-NARROWED sweepFollowsFirst at publish: (owed: true, reroute: Optional(Set([zz-b])))
+PROBE-C17R-NARROWED sweepFollowsFirst at the deferral: (owed: true, end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 4, deferredAfter: Optional(4), movedBefore: Set([]))), reroute: Optional(Set([])))
+PROBE-C17R-NARROWED sweepFollowsFirst after v5's turn: (owed: false, c: "nil", n: "nil")
+PROBE-C17R-NARROWED sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) nDownloadingAfterBarrier=false
+✔ Test "PROBE-C17R-NARROWED-REROUTE" with 2 test cases passed after 1.532 seconds.
+✔ Suite "VerifyC17ReqsProbes" passed after 1.533 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.533 seconds.

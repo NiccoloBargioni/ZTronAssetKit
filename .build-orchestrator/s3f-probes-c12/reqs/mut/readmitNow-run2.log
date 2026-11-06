@@ -1,0 +1,36 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+✔ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" with 2 test cases passed after 1.428 seconds.
+◇ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+↳ N, queued at P's visit, starts before the members the follow-up re-queues (visit-first): [c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d, c-d2d5570fbc4b2bea8b5dd91e820a443881d9f7573a11d5c58fadacb46b1fdfc1, c-9bcd875fffc66f4c6075b53db6794f5f2a2cbd88301931abcd4bba7a1a6332c4]
+↳ started.first == n.transferID → false
+↳   started.first → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d
+↳     some → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d
+↳       rawValue → "c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d"
+↳   n.transferID → c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb
+↳     rawValue → "c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb"
+✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" with 2 test cases failed after 3.476 seconds with 1 issue.
+↳ /// A re-admission follow-up turn that runs while the follow owes a visit re-queues the jobs the visits leave, behind
+↳ /// the places the visits give: a prefetch group of `readmissionsPerTurn` + 8 members (zz-m…, then P at zz-p, last)
+↳ /// goes offline, its running members failing `whenOnline` and the others parking offline. The network returns: one
+↳ /// turn re-queues `readmissionsPerTurn` members, which download, and owes the last 8 in the pump's order, P among
+↳ /// them, to a follow-up turn the hold keeps waiting. v3 moves zz-p to new content N. Visited first,
+↳ /// the visit moved P's interest onto N, queued at the apply, and the follow-up then re-queued the other 7 behind it,
+↳ /// so N starts before them. Re-admitted before the visit, the 7 took their places ahead of N (P, re-queued with them,
+↳ /// left the queue at its visit).
+✘ Suite "Engine follow barrier (F-28)" failed after 4.905 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 4.905 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

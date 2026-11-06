@@ -1,0 +1,45 @@
+22:13:09 byIdentifierTargetDrop: build exit 0 load { 26.66 21.11 29.23 }
+22:13:21 byIdentifierTargetDrop: run1 exit 1 load { 24.81 20.89 29.06 }
+22:13:21     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16,
+22:13:21     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:21     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:21     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:21     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:21     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:21     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:21     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, i
+22:13:21     ✘ Test run with 1 test in 1 suite failed after 8.284 seconds with 2 issues.
+22:13:32 byIdentifierTargetDrop: run2 exit 1 load { 24.65 20.99 29.00 }
+22:13:32     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16,
+22:13:32     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:32     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:32     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:32     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:32     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:32     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:32     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, i
+22:13:32     ✘ Test run with 1 test in 1 suite failed after 8.272 seconds with 2 issues.
+22:13:32 byIdentifierTargetDrop: reverted; sources diff: none
+22:13:41 byIdentifierLookupDrop: build exit 0 load { 26.30 21.46 29.07 }
+22:13:51 byIdentifierLookupDrop: run1 exit 1 load { 27.28 21.83 29.11 }
+22:13:51     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16,
+22:13:51     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:51     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:51     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:51     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:51     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:51     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:51     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, i
+22:13:51     ✘ Test run with 1 test in 1 suite failed after 6.281 seconds with 2 issues.
+22:13:59 byIdentifierLookupDrop: run2 exit 1 load { 29.72 22.57 29.29 }
+22:13:59     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16,
+22:13:59     PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:59     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:59     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:59     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, 
+22:13:59     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: []
+22:13:59     ✘ Test "PROBE-C19R-LEGACY-TARGET" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at VerifyC19ReqsLegacyProbes.swift:94:13: Expectation failed: atWalk
+22:13:59     PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, i
+22:13:59     ✘ Test run with 1 test in 1 suite failed after 5.192 seconds with 2 issues.
+22:13:59 byIdentifierLookupDrop: reverted; sources diff: none
+22:14:08 clean rebuild exit 0

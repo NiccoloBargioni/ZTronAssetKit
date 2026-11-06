@@ -1,0 +1,8 @@
+PROBE-C22C-SHUTDOWN-BUCKET-RACE round 1 serve=false: after the set-up O failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)) interests 1, O requests 1; after v4 O verifying holding 11 interests 11, O requests 2; at the end O requests 2; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+PROBE-C22C-SHUTDOWN-BUCKET-RACE round 1 serve=true: after the set-up O failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)) interests 1, O requests 1; after v4 O verifying holding 11 interests 11, O requests 2; at the end O requests 2; zz-o ok(20 B); members ["ok(20 B)"] x10
+PROBE-C22C-SHUTDOWN-BUCKET-RACE round 2 serve=false: after the set-up O failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)) interests 1, O requests 1; after v4 O gone, O requests 2; at the end O requests 2; zz-o ok(20 B); members ["ok(20 B)"] x10
+✘ Test "PROBE-C22C-SHUTDOWN-BUCKET-RACE" recorded an issue at VerifyC22CorrectProbes.swift:517:21: Expectation failed: oAnswer == "failed(shutDown)" && answers.allSatisfy { $0 == "failed(shutDown)" }
+PROBE-C22C-SHUTDOWN-BUCKET-RACE round 2 serve=true: after the set-up O failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)) interests 1, O requests 1; after v4 O gone, O requests 2; at the end O requests 2; zz-o ok(20 B); members ["ok(20 B)"] x10
+✘ Test "PROBE-C22C-SHUTDOWN-BUCKET-RACE" failed after 4.100 seconds with 1 issue.
+✘ Suite "Engine follow barrier (F-28)" failed after 4.100 seconds with 1 issue.
+✘ Test run with 1 test in 1 suite failed after 4.100 seconds with 1 issue.

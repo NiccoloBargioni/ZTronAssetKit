@@ -1,0 +1,16 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15R-SPACE-EPOCH" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-SPACE-EPOCH" started.
+PROBE-C15R-SPACE-EPOCH followVisitedFirst after the drain: (c: nil, lastError: nil)
+PROBE-C15R-SPACE-EPOCH followVisitedFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-SPACE-EPOCH" started.
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst before the ENOSPC: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), found: false)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst after the ENOSPC: (waits: false, c: Optional(ZTronAssetSync.JobState.downloading), epoch: Optional(611))
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst after the drain: (c: Optional(ZTronAssetSync.JobState.verifying), lastError: nil)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C15R-SPACE-EPOCH" with 2 test cases passed after 5.117 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 5.118 seconds.
+✔ Test run with 1 test in 1 suite passed after 5.118 seconds.

@@ -1,0 +1,32 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:271:9: Expectation failed: throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(61000000000ns)
+↳ throttleAtArrival == nil → false
+↳   throttleAtArrival → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+✘ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/db/db3592c1033a0fb743d80e0a22368a6d494ae96d7c45358ef75a2f8da77dcc0f.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" with 2 test cases failed after 2.817 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane a waiting join gives the content a later apply moved its id
+↳ /// to: C (1 MB, zz-b) downloads for P, a prefetch waiter. While v3's follow is owed, U requests zz-u (Y's content);
+↳ /// then v4, applied while v3's follow still owes its visits, moves zz-u onto C's content; then C gets a 429 with
+↳ /// Retry-After 60 s (above the user lane's 30 s cap). Visited first, U's request created Y, and v4's visit superseded
+↳ /// Y and moved U onto C, so C was user work at the 429: nothing was throttled, C failed, and P and U were answered
+↳ /// `serverUnavailable`. Behind the barrier U's join waits with Y's entry, and the drain re-routes it to the content
+↳ /// the copy lists (`replayJoin`). Read at the join's own entry, the joins walk of `followedLane` did not count it:
+↳ /// C was prefetch work, the origin was throttled for 60 s and C's retry served P.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.817 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.817 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

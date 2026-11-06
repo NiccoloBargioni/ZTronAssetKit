@@ -1,0 +1,16 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "JBreakProbes" started.
+◇ Test "PROBE-J-HELD-RETICKET" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-J-HELD-RETICKET" started.
+PROBE-J-HELD-RETICKET followVisitedFirst mid: (owed: true, c: nil, n: Optional((ZTronAssetSync.JobState.queued, 6)), k: Optional((ZTronAssetSync.JobState.queued, 4)))
+PROBE-J-HELD-RETICKET followVisitedFirst tickets: (n: Optional(6), k: Optional(4))
+PROBE-J-HELD-RETICKET followVisitedFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ac/ac0dba8573f9b15c28052820ccc6c08ded1580f7b644430ebf1ffc698088917e.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-J-HELD-RETICKET" started.
+PROBE-J-HELD-RETICKET sweepFollowsFirst mid: (owed: true, c: nil, n: Optional((ZTronAssetSync.JobState.queued, 6)), k: Optional((ZTronAssetSync.JobState.queued, 4)))
+PROBE-J-HELD-RETICKET sweepFollowsFirst tickets: (n: Optional(6), k: Optional(4))
+PROBE-J-HELD-RETICKET sweepFollowsFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ac/ac0dba8573f9b15c28052820ccc6c08ded1580f7b644430ebf1ffc698088917e.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+✔ Test "PROBE-J-HELD-RETICKET" with 2 test cases passed after 1.322 seconds.
+✔ Suite "JBreakProbes" passed after 1.323 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.323 seconds.

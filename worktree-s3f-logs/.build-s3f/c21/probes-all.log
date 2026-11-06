@@ -1,0 +1,123 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 4] ZTronAssetModel
+Build complete! (0,40 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: a request's waiting join, whose publishing job a later apply passed, follows the copy as the commit re-routes the job's interests (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join, whose publishing job a later apply passed, follows the copy as the commit re-routes the job's interests (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join, whose publishing job a later apply passed, follows the copy as the commit re-routes the job's interests (F-28)" started.
+✔ Test "R-SYN-6: a request's waiting join, whose publishing job a later apply passed, follows the copy as the commit re-routes the job's interests (F-28)" with 2 test cases passed after 1.035 seconds.
+◇ Test "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+✘ Test "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaterApplyProbeTests.swift:89:9: Expectation failed: w == .failure(.integrityFailure)
+↳ W, which joined X before v4 (visit-first), gets X's integrity failure: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/40/4067f4104ddeb532c154d800cc424caf3924e0af21a25c321497ab00ccd7dfd9.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ w == .failure(.integrityFailure) → false
+↳   w → success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/40/4067f4104ddeb532c154d800cc424caf3924e0af21a25c321497ab00ccd7dfd9.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/40/4067f4104ddeb532c154d800cc424caf3924e0af21a25c321497ab00ccd7dfd9.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-a
+↳         rawValue → "zz-a"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/40/4067f4104ddeb532c154d800cc424caf3924e0af21a25c321497ab00ccd7dfd9.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/40/4067f4104ddeb532c154d800cc424caf3924e0af21a25c321497ab00ccd7dfd9.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 20
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" with 2 test cases failed after 1.069 seconds with 1 issue.
+↳ /// The join gap with X's publication failing its integrity check, W and V prefetch waiters.
+◇ Test "R-SYN-6: the visit after a verdict joins a moved id behind a verdict that waits later in the queue, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the visit after a verdict joins a moved id behind a verdict that waits later in the queue, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the visit after a verdict joins a moved id behind a verdict that waits later in the queue, as visited first (F-28)" started.
+✘ Test "R-SYN-6: the visit after a verdict joins a moved id behind a verdict that waits later in the queue, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaterApplyProbeTests.swift:154:9: Expectation failed: (try? mResult.get())?.byteSize == Int64(j2Bytes.count)
+↳ zz-m, moved by v4 after J2's 404 (visit-first), is fetched by a new job of J2's content: failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? mResult.get())?.byteSize == Int64(j2Bytes.count) → <not evaluated>
+✘ Test "R-SYN-6: the visit after a verdict joins a moved id behind a verdict that waits later in the queue, as visited first (F-28)" with 2 test cases failed after 1.174 seconds with 1 issue.
+↳ /// J1 (zz-m) and J2 (zz-n) download for prefetch waiters while v3's follow is owed; J1's attempt fails transiently
+↳ /// and J2's gets a 404, both verdicts waiting. v4 then maps zz-m to J2's content. Swept first, the drain gives J1's
+↳ /// verdict, whose visit (`followAfterVerdict`) joins zz-m at once onto J2 (`EngineJobs.swift:117` defers only a
+↳ /// visit's join, `inFollowVisit`), and J2's 404, later in the queue, answers it. Visited first, J2's 404 answered zz-n
+↳ /// and ended J2 before v4, whose visit of J1 made a new job of J2's content for zz-m, which fetched it.
+◇ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+✘ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaterApplyProbeTests.swift:229:9: Expectation failed: report?.fetched == 1 && report?.failures.isEmpty == true
+↳ the run fetches zz-a with T's content (visit-first): .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 1, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4201, unchangedCount: 1, fetchBytes: 20, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-a, error: ZTronAssetModel.AssetError.cancelled, failureClass: ZTronAssetModel.FailureClass.transient)]))
+↳ report?.fetched == 1 && report?.failures.isEmpty == true → false
+↳   report?.fetched == 1 → false
+↳   report?.failures.isEmpty == true → <not evaluated>
+✘ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" with 2 test cases failed after 1.047 seconds with 1 issue.
+↳ /// `critic-defer-bucket.md`'s T-RUN shape (R1, A3): a forced sync's run has its last claim, zz-a, on O (content o),
+↳ /// held downloading; T (zz-t, content t) downloads for a prefetch waiter. v3's follow is then owed, and T's attempt
+↳ /// gets a 404: its verdict waits. v4 maps zz-a to content t: the follow's visit of O re-routes the run's claim onto T
+↳ /// (`reroute`), its join behind T's waiting verdict, and the drain's one batch holds both events. While T's verdict
+↳ /// replays the barrier reads down, and the run check it makes (`checkRunSettled`) finds the claim on a job that does
+↳ /// not hold the run's interest (the orphan pass). A run starts only once a free-space read's sweep has ended an owed
+↳ /// follow (`sweepSpaceParked`), so the run's own first claims never wait behind an earlier verdict; this shape moves
+↳ /// a claim instead. Visited first, T's 404 answered zz-t and ended T before v4, whose visit of O made a new job of
+↳ /// content t for zz-a, which fetched it.
+◇ Test "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" started.
+✘ Test "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaterApplyProbeTests.swift:289:9: Expectation failed: report?.fetched == 1
+↳ the run fetches zz-o2 with T's content (visit-first): .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 2, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4200, unchangedCount: 1, fetchBytes: 36, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-t1, error: ZTronAssetModel.AssetError.notFound, failureClass: ZTronAssetModel.FailureClass.notFound)]))
+↳ report?.fetched == 1 → false
+↳   report?.fetched → 0
+↳     some → 0
+↳     some → 1
+✘ Test "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" with 2 test cases failed after 1.046 seconds with 1 issue.
+↳ /// A forced sync's run fetches zz-t1 (content t, job T) and zz-o2 (content o, job O), both held downloading. v3's
+↳ /// follow is then owed, and T's attempt gets a 404: its verdict waits. v4 maps zz-o2 to content t: the follow's
+↳ /// visit of O re-routes the run's claim on zz-o2 onto T (`reroute`), its join behind T's waiting verdict. The drain
+↳ /// gives T's verdict, which answers the run for T (`recordRunOutcome` empties T's claims, `EngineRuns.swift:519`), and
+↳ /// the join behind it may then find no claim (`stillWants`; `critic-defer-bucket.md`'s residual risks). Visited
+↳ /// first, T's 404 failed zz-t1 and ended T before v4, whose visit of O made a new job of content t for zz-o2, which
+↳ /// fetched it.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.373 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 5 tests in 1 suite failed after 5.373 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

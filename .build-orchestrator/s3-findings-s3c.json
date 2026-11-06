@@ -1,0 +1,549 @@
+[
+ {
+  "blocking": true,
+  "area": "BLOCKING S3C-1",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift:417-426 (poll), :446 (oracle)",
+  "problem": "S3-STAB-01: The poll's condition `listings()` is a synchronous read of the fake volume's log: it copies the log, then filters every operation through `standardizedFileURL`, which is slow under TSan. The held-unit read comes after it, as a separate hop to the SteppedBlockingExecutor actor. Losing timeline, checked against SteppedBlockingExecutor.swift:30-46 and :60-62. (1) Round k: listings()==0, heldUnits.first==R (phase 4's root listing), release(R). release only resumes R's gate; R's work() runs later on the executor actor. (2) Round k+1 reads listings()==0, because R has not run yet. (3) R runs and records the root listing; the store resumes and submits phase 4's next listing U2, which is held. (4) Round k+1 then reads heldUnits==[U2] and releases it, so U2's listing runs. (5) Round k+2 sees listings()==2>0 and returns. requireHeldUnits(atLeast:1) now holds U3. (6) The stop (cancel or close) plus releaseAll runs U3, so listings()==3 and the `#expect(listings() == 2)` at :446 fails. The product is correct: in the replay, exactly one listing (the unit in flight) runs after the stop (`listings() == atStop + 1` holds). Only the test's oracle depends on the schedule. This reproduces the cycle-5 verifier's diagnosis in ADR-055 / L5K-R27 (2).",
+  "fix": "CLASS RULING (the check-then-act poll). Enumerate EVERY poll in `Tests/ZTronAssetStorageTests` (all files, not only the listed sites) that releases a `SteppedBlockingExecutor` held unit after reading a condition; list each in the draft. Convert all to one helper: read `heldUnits` first, then the condition, and release only a unit read before a false condition (fix (a), verified by the confirmer, `confirm-stability/S3-STAB-01-fix-a.diff`). Put the helper in a NEW file under `Tests/ZTronAssetStorageTests/Cleanup/` as an `extension CorePoll` (`Core/CoreHarness.swift` is WP-B's), pinned by a deterministic test of exactly the race (a condition that captures its value and then waits for the next held unit). A site in a WP-B `Core/` test file is authorised for this conversion only, test code only. Show each converted test passing in at least 200 repetitions in debug and 20 under TSan, and `LegacyEdgeTests.phaseFourStopsListing` in 50 fresh TSan launches.",
+  "detail": {
+   "id": "S3-STAB-01",
+   "kind": "hunt",
+   "lens": "stability",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift:417-426 (poll), :446 (oracle)",
+   "requirements": "SPEC 7.1 Q-5 (zero flakes over full_run_repeats), Q-3 (suite clean under TSan), 7.2; R-STO-11 test integrity (CLAUDE.md G4)",
+   "problem": "The poll's condition `listings()` is a synchronous read of the fake volume's log: it copies the log, then filters every operation through `standardizedFileURL`, which is slow under TSan. The held-unit read comes after it, as a separate hop to the SteppedBlockingExecutor actor. Losing timeline, checked against SteppedBlockingExecutor.swift:30-46 and :60-62. (1) Round k: listings()==0, heldUnits.first==R (phase 4's root listing), release(R). release only resumes R's gate; R's work() runs later on the executor actor. (2) Round k+1 reads listings()==0, because R has not run yet. (3) R runs and records the root listing; the store resumes and submits phase 4's next listing U2, which is held. (4) Round k+1 then reads heldUnits==[U2] and releases it, so U2's listing runs. (5) Round k+2 sees listings()==2>0 and returns. requireHeldUnits(atLeast:1) now holds U3. (6) The stop (cancel or close) plus releaseAll runs U3, so listings()==3 and the `#expect(listings() == 2)` at :446 fails. The product is correct: in the replay, exactly one listing (the unit in flight) runs after the stop (`listings() == atStop + 1` holds). Only the test's oracle depends on the schedule. This reproduces the cycle-5 verifier's diagnosis in ADR-055 / L5K-R27 (2).",
+   "evidence": ".build-orchestrator/s3-probes/stability/S3-STAB-01-evidence.txt, S3-STAB-01.swift (deterministic replay), S3-STAB-01-fix-a.diff, runs-and-loads.txt. Unfixed test under TSan (Swift Testing --repetitions): 3 of 40 case runs failed at load ~75, and 3 of 200 at load ~32-35, each with `LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2` / `\u21b3 listings() \u2192 3`. Unfixed without TSan: 1 of 200 at load ~74, so it also flakes in the plain suite. With fix (a): 0 of 400 under TSan (load ~30-33) and 0 of 400 in debug (load ~40). The replay fails deterministically, 2/2 in debug and 10/10 under TSan: `S3StabilityLegacyProbes.swift:81:9: Expectation failed: listings() == 2 \u2026 listings() \u2192 3`. Its product-property line (:83, `listings() == atStop + 1`) passes. In the four full runs and the two TSan runs this test passed: 6 launches, 12 case runs.",
+   "repro": "From a worktree at s3-base with S3-STAB-01.swift added under Tests/ZTronAssetStorageTests/Cleanup/: `swift test --scratch-path <scratch> --skip Benchmarks --filter S3StabilityLegacyProbes` gives a deterministic failure. Rate on the unchanged test: `swift test --scratch-path <tsan> --sanitize=thread --skip Benchmarks --filter 'LegacyEdgeTests/phaseFourStopsListing'` once to build, then `bash run-direct.sh <tsan> ZTronAssetStorageTests <log> --filter phaseFourStopsListing --repetitions 100`. run-direct.sh is in the probes directory: it runs swiftpm-testing-helper with DYLD_INSERT_LIBRARIES set to the TSan runtime and takes no SwiftPM lock.",
+   "fix": "Apply S3-STAB-01-fix-a.diff: read `metadata.heldUnits.first` before `listings()` inside the poll, and release only that unit. A unit held while no phase-4 listing has run cannot follow the root's listing, so the poll never releases a second phase-4 unit. Verified 0/400 under TSan and 0/400 in debug, against 6/240 TSan and 1/200 debug unfixed. Fix (b) from ADR-055 is also sound: capture `atStop = listings()` after `requireHeldUnits(atLeast: 1)` and assert `listings() == atStop + 1`. Commit the fixed test. The replay probe pins the old poll order and is evidence only; it must not be committed.",
+   "confirmer": {
+    "id": "S3-STAB-01",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "c",
+    "reason": "I reproduced this in my own worktree at s3-base (b5796ba), and the timeline matches the code. In the poll at LegacyEdgeTests.swift:417-426, `listings()` is a synchronous read of the fake volume's log. The held-unit read comes after it, as a separate hop to SteppedBlockingExecutor. `release` (SteppedBlockingExecutor.swift:58-60) only resumes the gate; `work()` runs later on the executor actor (:44). So one round can release phase 4's second listing unit. The unchanged test failed 15 of ~1000 case runs in debug without TSan (load ~22) and 19 of ~400 under TSan (load ~17). Every failure was `LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2` / `listings() \u2192 3`, with 0 TSan reports. The deterministic replay S3-STAB-01.swift failed at :81 in both cases in debug and 10/10 under TSan. Its preconditions (:54, :55) and the product-property line (:83, `listings() == atStop + 1`) passed, so the product is correct and the oracle depends on the schedule. Fix (a) (the diff I applied is identical to the hunter's) gave 0 of ~1000 in debug and 0 of ~600 under TSan at the same loads, which is significant against 15/1000 and 19/400. The record does not accept this: ADR-055 / L5K-R27 (2) lists it as an open item to make deterministic before Stage 5's --full. It breaks Q-5 (zero flakes) and Q-3, so it is blocking. The file is under Tests/ZTronAssetStorageTests/Cleanup/**, owned by WP-C (ARCHITECTURE 1.2, L3). Evidence: .build-orchestrator/s3-probes/confirm-stability/S3-STAB-01-results.txt, S3-STAB-01.swift, S3-STAB-01-fix-a.diff, run-direct.sh."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3C-1",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/EvictionTests.swift:64-72, :118-126, :235-243, :553-561, :615-623; EvictionOverlapTests.swift:103-111; IdempotencyTests.swift:140-148; GarbageCollectionTests.swift:308-316 (cancelDuringSecondRemoval, used at :372), :588-596 (also :516-524, where the extra release only changes which interleaving noPhantomDoom covers)",
+  "problem": "S3-STAB-02: Each poll evaluates `if <condition> { return \u2026 }; if let unit = await executor.heldUnits.first { release(unit) }`. The condition is a synchronous read of the fake volume, or a hop to the store actor through `harness.record`/`state`. A round whose condition read predates the run of the unit released by the previous round, and whose `heldUnits` read follows that unit's run and the store's submission of its next unit, releases that next unit. That is the S3-STAB-01 timeline with a different condition. The unit released is the one the test means to hold. In chunkYieldRevalidates it is eviction's between-chunk yield, so y2 and y3 are evicted before the test reads y2 and leases y3. In chunkCountsRecords and in the tests at :553/:615 it is again the chunk yield, so firstChunk includes a second chunk. In evictionDuringReusingPublication it is the placement unit, so the publication ends and `requireHeldUnits` then waits out the time limit. In EvictionOverlapTests it is the first-chunk yield, so the plan no longer lists o2 and o3. In cancelledCollection(.stagingGC) it is the second removal: the third removal is submitted before the cancel, the collection removes all three files and returns success. In cancelDuringSecondRemoval it is the second removal unit, so `exists(second)` fails. In sweepChunksReleaseActor it is the sweep's chunk yield, so planted[1] is doomed. PurgeTests.untilPurgeReturnsOrWaits (:376-391) already reads `heldUnits` before its condition, which closes the window.",
+  "fix": "CLASS RULING (the check-then-act poll). Enumerate EVERY poll in `Tests/ZTronAssetStorageTests` (all files, not only the listed sites) that releases a `SteppedBlockingExecutor` held unit after reading a condition; list each in the draft. Convert all to one helper: read `heldUnits` first, then the condition, and release only a unit read before a false condition (fix (a), verified by the confirmer, `confirm-stability/S3-STAB-01-fix-a.diff`). Put the helper in a NEW file under `Tests/ZTronAssetStorageTests/Cleanup/` as an `extension CorePoll` (`Core/CoreHarness.swift` is WP-B's), pinned by a deterministic test of exactly the race (a condition that captures its value and then waits for the next held unit). A site in a WP-B `Core/` test file is authorised for this conversion only, test code only. Show each converted test passing in at least 200 repetitions in debug and 20 under TSan, and `LegacyEdgeTests.phaseFourStopsListing` in 50 fresh TSan launches.",
+  "detail": {
+   "id": "S3-STAB-02",
+   "kind": "hunt",
+   "lens": "stability",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/EvictionTests.swift:64-72, :118-126, :235-243, :553-561, :615-623; EvictionOverlapTests.swift:103-111; IdempotencyTests.swift:140-148; GarbageCollectionTests.swift:308-316 (cancelDuringSecondRemoval, used at :372), :588-596 (also :516-524, where the extra release only changes which interleaving noPhantomDoom covers)",
+   "requirements": "SPEC 7.1 Q-5, Q-3, 7.2; tests of R-CLN-2, R-CLN-4, R-CLN-12 (CLAUDE.md G4: their oracles hold only under one schedule)",
+   "problem": "Each poll evaluates `if <condition> { return \u2026 }; if let unit = await executor.heldUnits.first { release(unit) }`. The condition is a synchronous read of the fake volume, or a hop to the store actor through `harness.record`/`state`. A round whose condition read predates the run of the unit released by the previous round, and whose `heldUnits` read follows that unit's run and the store's submission of its next unit, releases that next unit. That is the S3-STAB-01 timeline with a different condition. The unit released is the one the test means to hold. In chunkYieldRevalidates it is eviction's between-chunk yield, so y2 and y3 are evicted before the test reads y2 and leases y3. In chunkCountsRecords and in the tests at :553/:615 it is again the chunk yield, so firstChunk includes a second chunk. In evictionDuringReusingPublication it is the placement unit, so the publication ends and `requireHeldUnits` then waits out the time limit. In EvictionOverlapTests it is the first-chunk yield, so the plan no longer lists o2 and o3. In cancelledCollection(.stagingGC) it is the second removal: the third removal is submitted before the cancel, the collection removes all three files and returns success. In cancelDuringSecondRemoval it is the second removal unit, so `exists(second)` fails. In sweepChunksReleaseActor it is the sweep's chunk yield, so planted[1] is doomed. PurgeTests.untilPurgeReturnsOrWaits (:376-391) already reads `heldUnits` before its condition, which closes the window.",
+   "evidence": ".build-orchestrator/s3-probes/stability/S3-STAB-02.swift (deterministic replays of three representative sites; each waits where the poll races, then runs the original oracle unchanged) and S3-STAB-02-evidence.txt. The replays fail in debug and 5/5 under TSan. `S3StabilityPollProbes.swift:59:9: Expectation failed: await harness.isPresent(assets[2].id, at: assets[2].key)` (\"nothing after the chunk is marked yet\"). `S3StabilityPollProbes.swift:92:9: Expectation failed: an error was expected but none was thrown and \"CleanupResult(bytesFreed: 150, filesRemoved: 3, bytesDeferred: 0)\" was returned`. `:95:9: \u2026 !remaining.isEmpty \u2192 false`. `S3StabilityPollProbes.swift:127:9: Expectation failed: !held.isEmpty && table[planted[0]] != nil && table[planted[1]] == nil \u2026 \u2192 false`. Observed rate on the unchanged originals: 0 issues in 200 TSan repetitions of each of the 22 tests in these suites, at load ~75-80. Their conditions are cheap reads or store-actor hops, so the read-to-hop window is far narrower than phaseFourStopsListing's whole-log filter. The interleaving is legal, but nobody has observed it yet.",
+   "repro": "Add S3-STAB-02.swift under Tests/ZTronAssetStorageTests/Cleanup/ in a worktree at s3-base, then run `swift test --scratch-path <scratch> --skip Benchmarks --filter S3StabilityPollProbes` (deterministic: 3 tests, 4 issues). Rate on the originals: `bash run-direct.sh <tsan> ZTronAssetStorageTests <log> --filter 'chunkYieldRevalidates|chunkCountsRecords|evictionDuringReusingPublication|EvictionOverlapTests|cancelledCollection|sweepChunksReleaseActor|GarbageCollectionTests' --repetitions 200`.",
+   "fix": "Apply the same transformation as S3-STAB-01 at every listed site: read `heldUnits` first, then the condition, and release only a unit read before a false condition. Where the poll returns `!heldUnits.isEmpty` once the condition holds, re-read the held units after the condition. Better, factor all eleven polls (S3-STAB-01 included) into one CorePoll helper, e.g. `CorePoll.release(_ executor:, until:)`. Pin it with a deterministic test whose condition captures its value and then waits for the next held unit (`requireHeldUnits`), which is exactly the race, and assert the helper did not release that unit. The replays encode the old poll order and are evidence only; do not commit them.",
+   "confirmer": {
+    "id": "S3-STAB-02",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "c",
+    "reason": "This is stronger than the hunter's evidence: two of the listed sites failed naturally in the unchanged originals, with exactly the predicted symptoms. (1) Debug, --repetitions 1000 over the 11 listed tests (load ~20-22): `EvictionTests.chunkYieldRevalidates` failed once. Issues: EvictionTests.swift:73 `isPresent(assets[2]\u2026)`, :75 `location(for: y2) != nil`, and :50 `Caught error: .notPresent(y3)`. So y2 and y3 were evicted before the test read y2 and leased y3. (2) TSan, --repetitions 400 (load ~17-20): `EvictionOverlapTests.applyPlanAtChunkYield` failed twice at EvictionOverlapTests.swift:114 with `plan.victims \u2192 [o4, o5]` instead of `[o2, o3]`; 0 TSan reports. The three deterministic replays (S3-STAB-02.swift) fail at :59, :92/:95 and :127 in debug and 5/5 under TSan; losingRound's stale-read precondition (:33) holds. I read every listed site; each has the same shape: a condition read, then a separate hop for `heldUnits.first` or `heldUnits.isEmpty`, then a release. In IdempotencyTests.cancelledCollection the second half is `heldUnits.isEmpty` followed by `releaseNext()`, two separate hops, so the fix must release a unit read before the condition, not call releaseNext. I agree that :516-524 only changes which interleaving is covered. The fix (read held units before the condition) is sound by the same monotonicity argument as S3-STAB-01, because the store changes the state before it submits the next unit. I did not measure it here, since the rate is about 1 in 1,000-2,000. It is a flake under Q-5/Q-3, and the oracles hold only under one schedule (G4), so it is blocking. The files are under Tests/ZTronAssetStorageTests/Cleanup/**, owned by WP-C. A shared poll helper in Core/CoreHarness.swift would be outside WP-C's files; the per-site fix stays within them. Evidence: confirm-stability/S3-STAB-02-results.txt, S3-STAB-02.swift."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3C-1",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift:417-446 still polls as described; the reqs verifier's fixes (a) or (b) were not applied",
+  "problem": "S3-B-034: TSan flake in LegacyEdgeTests 'R-STO-11: phase 4 stops listing the legacy tree after the unit in flight once the caller cancels or the store closes': the poll releases heldUnits.first and then reads listings(), a check-then-act race in the test; it fails about 1 fresh TSan launch in 4-5 (listings() is 3) and must be deterministic before Stage 5's --full",
+  "fix": "CLASS RULING (the check-then-act poll). Enumerate EVERY poll in `Tests/ZTronAssetStorageTests` (all files, not only the listed sites) that releases a `SteppedBlockingExecutor` held unit after reading a condition; list each in the draft. Convert all to one helper: read `heldUnits` first, then the condition, and release only a unit read before a false condition (fix (a), verified by the confirmer, `confirm-stability/S3-STAB-01-fix-a.diff`). Put the helper in a NEW file under `Tests/ZTronAssetStorageTests/Cleanup/` as an `extension CorePoll` (`Core/CoreHarness.swift` is WP-B's), pinned by a deterministic test of exactly the race (a condition that captures its value and then waits for the next held unit). A site in a WP-B `Core/` test file is authorised for this conversion only, test code only. Show each converted test passing in at least 200 repetitions in debug and 20 under TSan, and `LegacyEdgeTests.phaseFourStopsListing` in 50 fresh TSan launches.",
+  "detail": {
+   "id": "S3-B-034",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift:417-446 still polls as described; the reqs verifier's fixes (a) or (b) were not applied",
+   "problem": "TSan flake in LegacyEdgeTests 'R-STO-11: phase 4 stops listing the legacy tree after the unit in flight once the caller cancels or the store closes': the poll releases heldUnits.first and then reads listings(), a check-then-act race in the test; it fails about 1 fresh TSan launch in 4-5 (listings() is 3) and must be deterministic before Stage 5's --full",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-055 Merge rulings (2); Assignments (Stage 3 (2))",
+    "l5k-rulings.md L5K-R27(2)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3C-2",
+  "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:266 evict(...) removes every holder in one turn; recorded, not asserted, in BenchCleanup",
+  "problem": "S3-B-025: R8: evicting or purging one blob that more than about 6,500 ids share holds the actor 15.4-16.6 ms in one turn at 10,000 holders, the only WP-C stretch over 10 ms at the reference scale",
+  "fix": "C2 at the reference scale: evicting or purging one blob shared by 10,000 ids holds the actor 15.4\u201316.6 ms in one turn (`Eviction/QuotaEviction.swift:266`). Chunk one blob's holders across owned turns (S3-R5) and make `BenchCleanup.swift`'s C2 benchmark assert the 10,000-holders-per-blob case (today it only records it).",
+  "detail": {
+   "id": "S3-B-025",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:266 evict(...) removes every holder in one turn; recorded, not asserted, in BenchCleanup",
+   "problem": "R8: evicting or purging one blob that more than about 6,500 ids share holds the actor 15.4-16.6 ms in one turn at 10,000 holders, the only WP-C stretch over 10 ms at the reference scale",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-052 Assignments (Stage 3 (2))",
+    "l3-rulings.md R8",
+    "c.md C-22 cycle 7",
+    "l3-close8-verify-c.json [2],[11]"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-3",
+  "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:268",
+  "problem": "M-S-07: AssetStore.evict no longer re-checks leases at apply time (single layer removed)",
+  "fix": "R-CLN-5: (M-S-07) apply skips a planned victim leased after the plan even when its access stamp would not stop it (the lease guard at `QuotaEviction.swift:268` must be reached, so the test must not rely on `acquireLease` bumping `lastAccess`); (M-S-08) the eviction dry run (`evictionPlan`, `EvictionOrder.swift:207`) neither names nor counts a leased blob. Kill both mutants (S3-R3).",
+  "detail": {
+   "id": "M-S-07",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:268",
+   "requirements": "R-CLN-5 (eviction never removes a leased asset)",
+   "problem": "AssetStore.evict no longer re-checks leases at apply time (single layer removed)",
+   "missing_test": "SURVIVED: ZTronAssetStorageTests 459/459, ZTronAssetSyncTests 351/351, ZTronAssetCompatibilityTests 71/71 all pass. MISSING TEST (belongs in Tests/ZTronAssetStorageTests/Cleanup/LeaseTests.swift or EvictionTests.swift): 'R-CLN-5: apply skips a planned victim that was leased after the plan, without any access stamp to hide behind'. Policy deletionGrace 0 and minimumResidency 0, frozen ManualTimeSource: open, apply a one-asset manifest, publish, plan = evictionPlan(toFree: 1), acquireLease(id), then apply(manifest, eviction: plan); expect report.evicted is empty and the asset is still present. Verified: passes on clean tree, fails on this mutant (probe file M-S-07_08_11_17_20-survivor-probe-tests.swift, test applySkipsLeasedVictim).",
+   "notes": "Defence in depth masks the mutant: acquireLease bumps lastAccess to now, so evict's 'not accessed since the selection' guard (stillEvictable) refuses the victim before the lease guard is reached. The lease guard is observable only when the lease lands at the instant of the last access (zero residency and a frozen clock); existing tests (EvictionTests chunkYieldRevalidates, protectedAssetsStay) never reach it. Real-clock reachability is a sub-microsecond window, so the severity is low, but the guard is untested.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/storage/M-S-07.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-3",
+  "location": "Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift:207",
+  "problem": "M-S-08: EvictionOrder.Ranking no longer excludes leased blobs (dry-run plan names and counts them)",
+  "fix": "R-CLN-5: (M-S-07) apply skips a planned victim leased after the plan even when its access stamp would not stop it (the lease guard at `QuotaEviction.swift:268` must be reached, so the test must not rely on `acquireLease` bumping `lastAccess`); (M-S-08) the eviction dry run (`evictionPlan`, `EvictionOrder.swift:207`) neither names nor counts a leased blob. Kill both mutants (S3-R3).",
+  "detail": {
+   "id": "M-S-08",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift:207",
+   "requirements": "R-CLN-5 / R-SYN-11 (eviction and its dry run never include a leased asset)",
+   "problem": "EvictionOrder.Ranking no longer excludes leased blobs (dry-run plan names and counts them)",
+   "missing_test": "SURVIVED: ZTronAssetStorageTests 459/459, ZTronAssetSyncTests 351/351, ZTronAssetKitTests 85/85, ZTronAssetCompatibilityTests 71/71 all pass. MISSING TEST (Tests/ZTronAssetStorageTests/Cleanup/LeaseTests.swift or EvictionOrderTests.swift): 'R-CLN-5: the eviction dry run neither names a leased asset nor counts its bytes'. Seed a 300-byte leased asset and a 100-byte plain asset, acquireLease on the first, advance past the residency window; expect evictionPlan(toFree: 1) victims == [plain] with bytes == 100, and evictionPlan(toFree: 101) == nil. Verified: passes clean, fails on the mutant (probe test dryRunSkipsLeased).",
+   "notes": "No test calls evictionPlan with a lease held. The maintenance run (evictIfNeeded) is still protected by evict's own lease guard, which is why EvictionTests protectedAssetsStay passes; only the synchronous dry run that sync's apply(eviction:) relies on is wrong (it over-reports freeable bytes, so a plan 'succeeds' that cannot free the space). M-S-09 shows that removing both layers is caught.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/storage/M-S-08.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-4",
+  "location": "Sources/ZTronAssetStorage/Cleanup/OrphanCollection.swift:236",
+  "problem": "M-S-20: Orphan GC compares the age with 0 instead of orphanGrace (grace ignored)",
+  "fix": "R-CLN-2: an orphan younger than the orphan grace is kept, and one exactly at the grace is handled as the code's documented boundary says (`Cleanup/OrphanCollection.swift:236`): plant orphans with 0 < age < grace and age == grace. Kill the mutant.",
+  "detail": {
+   "id": "M-S-20",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetStorage/Cleanup/OrphanCollection.swift:236",
+   "requirements": "R-CLN-2 (orphans removed only after a grace period)",
+   "problem": "Orphan GC compares the age with 0 instead of orphanGrace (grace ignored)",
+   "missing_test": "SURVIVED: ZTronAssetStorageTests 459/459, ZTronAssetSyncTests 351/351, ZTronAssetKitTests 85/85, ZTronAssetCompatibilityTests 71/71 all pass. MISSING TEST (Tests/ZTronAssetStorageTests/Cleanup/GarbageCollectionTests.swift): 'R-CLN-2: an orphan younger than the orphan grace is kept even when it is not brand new'. Plant an unreferenced blob, advance 1,800 s (half of orphanGrace 3,600), expect collectGarbage to return CleanupResult() and the blob not doomed; advance 1,801 s more and expect it doomed (bytesFreed == size). Verified: passes clean, fails on the mutant (probe test orphanInsideGrace).",
+   "notes": "orphanGC plants its 'young' control blob AFTER the clock advance, so its age is exactly 0 and 'age > 0' is false; the test never has an orphan with 0 < age < grace, nor one at exactly the grace. A real regression here would delete just-published, not yet committed blobs on the next GC.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/storage/M-S-20.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-5",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyOnDemandRaceTests.swift:46-47, 91-92, 128-129, 163-164, 251-252, 289-290, 329-330, 424-426, 497, 500",
+  "problem": "S3-STAB-04: These tests await `.task.value` (or `.result`) of unstructured tasks running product calls, with no prior cancellation-aware 'ended' wait. Swift Testing's time limit cancels only the test's own task, and cancellation does not reach the awaited unstructured task. If a product wait ever lost its resume, the test would record 'Time limit was exceeded' and the test process would never exit, so verify.sh would hang rather than report. closeResumesAWaitingAsker (:203-207) and closeWhileTheBatchWaits (:371-375) already use `CorePoll.until(\"\u2026ended\") { await LegacyRace.ended(...) }` first (L5K-R25). The same exposure exists suite-wide: there are about 408 direct `.value` joins in Tests/. No lost resume exists today: every run passed.",
+  "fix": "`LegacyOnDemandRaceTests`: every direct `.task.value` / `.result` join (:46-47, :91-92, :128-129, :163-164, :252, :289-290, :329-330) is preceded by a 'both calls ended' poll that ends on cancellation, so a lost resume fails at the time limit instead of hanging the run (L5K-R27 (1)).",
+  "detail": {
+   "id": "S3-STAB-04",
+   "kind": "hunt",
+   "lens": "stability",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyOnDemandRaceTests.swift:46-47, 91-92, 128-129, 163-164, 251-252, 289-290, 329-330, 424-426, 497, 500",
+   "requirements": "SPEC 7.2 (.timeLimit so a deadlock fails instead of hanging)",
+   "problem": "These tests await `.task.value` (or `.result`) of unstructured tasks running product calls, with no prior cancellation-aware 'ended' wait. Swift Testing's time limit cancels only the test's own task, and cancellation does not reach the awaited unstructured task. If a product wait ever lost its resume, the test would record 'Time limit was exceeded' and the test process would never exit, so verify.sh would hang rather than report. closeResumesAWaitingAsker (:203-207) and closeWhileTheBatchWaits (:371-375) already use `CorePoll.until(\"\u2026ended\") { await LegacyRace.ended(...) }` first (L5K-R25). The same exposure exists suite-wide: there are about 408 direct `.value` joins in Tests/. No lost resume exists today: every run passed.",
+   "evidence": ".build-orchestrator/s3-probes/stability/S3-STAB-04-hangprobe/ (a minimal package: one test with .timeLimit(.minutes(1)) joins a Task whose actor wait is never resumed) and S3-STAB-04-evidence.txt. `\u2718 Test \"join of an unstructured task after a lost resume\" recorded an issue at HangProbeTests.swift:5:2: Time limit was exceeded: 60.000 seconds`. No end-of-run line followed. Watchdog: `STILL RUNNING after 180s: killing scoped processes`.",
+   "repro": "`swift test --scratch-path <dir>/.build` in S3-STAB-04-hangprobe, run with a watchdog. The process is still alive at 180 s.",
+   "fix": "Before reading results, wait with `try await CorePoll.until(\"the calls ended\") { await LegacyRace.ended(<finished flags>) }` at each listed site, as L5K-R25 did for the two close tests. Then read `.task.value` or `.result`. A lost resume then fails at the limit and the run goes on.",
+   "confirmer": {
+    "id": "S3-STAB-04",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "c",
+    "reason": "I confirmed the mechanism with the hunter's minimal package, built in my scratch. Run directly under a pty with a scoped watchdog, the bundle printed `\u2718 Test \"join of an unstructured task after a lost resume\" recorded an issue at HangProbeTests.swift:5:2: Time limit was exceeded: 60.000 seconds`. No end-of-run line followed, and the helper was still alive at 120 s; the watchdog killed only its own children. Run through swift test with a 150 s watchdog, it was also still running when killed. I checked the cited LegacyOnDemandRaceTests sites (46-47, 91-92, 128-129, 163-164, 251-252, 289-290, 329-330, 424-426, 497, 500). They join `.task.value`/`.result` directly, with no prior `CorePoll.until { LegacyRace.ended(...) }`, unlike :203-207 and :371-375. Non-blocking, as the hunter rated it. No lost resume exists today (these tests pass in every run), so nothing leaks and no gate fails. A regression would still be detected, but as a hang rather than a failure: a robustness gap against SPEC 7.2's 'fails instead of hanging', already recorded as backlog item ADR-055 / L5K-R27 (1). The file is in Tests/ZTronAssetStorageTests/Cleanup/**, owned by WP-C. Evidence: confirm-stability/S3-STAB-04-results.txt, S3-STAB-04-hangprobe/, S3-STAB-04-watchdog.sh, S3-STAB-04-hang-direct.sh."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-5",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyOnDemandRaceTests.swift; closeWhileTheBatchWaits (:342) and closeResumesAWaitingAsker (:175) already poll (:203, :371)",
+  "problem": "S3-B-042: LegacyOnDemandRaceTests: waiterTakesOverACancelledProcessing and the other tracked-call reads (.task.value at :46-47, :91-92, :128-129, :163-164, :252, :289-290, :329-330) are not preceded by a 'both calls ended' CorePoll, so a lost resume hangs past the time limit (mutant M8 ran over 5 minutes)",
+  "fix": "`LegacyOnDemandRaceTests`: every direct `.task.value` / `.result` join (:46-47, :91-92, :128-129, :163-164, :252, :289-290, :329-330) is preceded by a 'both calls ended' poll that ends on cancellation, so a lost resume fails at the time limit instead of hanging the run (L5K-R27 (1)).",
+  "detail": {
+   "id": "S3-B-042",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/LegacyOnDemandRaceTests.swift; closeWhileTheBatchWaits (:342) and closeResumesAWaitingAsker (:175) already poll (:203, :371)",
+   "problem": "LegacyOnDemandRaceTests: waiterTakesOverACancelledProcessing and the other tracked-call reads (.task.value at :46-47, :91-92, :128-129, :163-164, :252, :289-290, :329-330) are not preceded by a 'both calls ended' CorePoll, so a lost resume hangs past the time limit (mutant M8 ran over 5 minutes)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-055 Assignments (Stage 3 (1))",
+    "l5k-rulings.md L5K-R27(1)",
+    "l5k-close4-remaining-k.json L5K-C4-12"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-6",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/OracleTests.swift:204",
+  "problem": "S3-CRAS-02: OracleTests never calls runDueWork(), settleDeletions() or reapDeletable(). open(), close() and apply() never reap (checked). Evicted and removed blobs are therefore doomed but never unlinked in any lifetime: the 'evict' and 'remove' steps model only the index half, and no crash ever lands inside a deletion unit. The comment at line 204 says the doomed blob 'waits for a relaunch or the reaper', but neither ever comes. As a result the shipped oracle passes with every deletion-protocol mutant: C (reaper ignores the commit blocker), F (no acknowledged snapshot needed) and S (no grace). Those mutants are killed only by targeted unit tests (StoreDeletionTests, LeaseTests, StoreRecoveryTests), so the requirement is still covered elsewhere.",
+  "fix": "The model-based oracle (`OracleTests`) must include deletion work (settle/reap) in its operation sequences so blobs are really unlinked, with I-3 asserted after every step; the confirmer's mutant Z (a `fatalError` in `BlobDeletionUnit.run`) must fail it.",
+  "detail": {
+   "id": "S3-CRAS-02",
+   "kind": "hunt",
+   "lens": "crash",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/OracleTests.swift:204",
+   "requirements": "R-STO-5, SPEC 7.3 'Model-based: random operation sequences (store, relocate, remove, evict, crash + reopen) ... I-1\u2026I-5 asserted after every step', I-3, H-2",
+   "problem": "OracleTests never calls runDueWork(), settleDeletions() or reapDeletable(). open(), close() and apply() never reap (checked). Evicted and removed blobs are therefore doomed but never unlinked in any lifetime: the 'evict' and 'remove' steps model only the index half, and no crash ever lands inside a deletion unit. The comment at line 204 says the doomed blob 'waits for a relaunch or the reaper', but neither ever comes. As a result the shipped oracle passes with every deletion-protocol mutant: C (reaper ignores the commit blocker), F (no acknowledged snapshot needed) and S (no grace). Those mutants are killed only by targeted unit tests (StoreDeletionTests, LeaseTests, StoreRecoveryTests), so the requirement is still covered elsewhere.",
+   "evidence": ".build-orchestrator/s3-probes/crash/S3-CRAS-02-run.txt: 'OracleTests.swift calls to runDueWork/settleDeletions/reapDeletable: 0'; 'mutant C: shipped OracleTests issues: 0', 'mutant F: ... 0', 'mutant S: ... 0' (mutants A, B and I do fail it). The probe S3-CRAS-02-S3OracleReapProbe.swift runs the same 16 seeds with an audited reap between random steps and after every relaunch: 'S3 oracle with reaping, seed 1: 40 steps, 10 lifetimes, 6 unlinks' ... 'seed 16: ... 3 unlinks'; 'Test run with 99 tests in 12 suites passed after 31.627 seconds' (baseline, load ~50).",
+   "repro": "grep -c 'runDueWork(\\|settleDeletions(\\|reapDeletable(' Tests/ZTronAssetStorageTests/Cleanup/OracleTests.swift  # 0; then copy S3OracleReapProbe.swift and S3AuditSink.swift into Tests/ZTronAssetStorageTests/S3Crash and run swift test --skip Benchmarks --filter ZTronAssetStorageTests.S3OracleReapProbe",
+   "fix": "Add a reap step to the oracle, as in S3OracleReapProbe: settleDeletions between random steps and after every relaunch, with S3AuditSink's I-3 check at every unlink. To make the oracle catch C, F and S as well, also draw a sink that sometimes does not acknowledge (ScriptedSnapshotSink .ignore) and commit faults (EIO on the index.tmp rename) inside the sequences.",
+   "confirmer": {
+    "id": "S3-CRAS-02",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "c",
+    "reason": "Confirmed. OracleTests.swift contains 0 calls to runDueWork, settleDeletions or reapDeletable. In Sources, reap(maxKeys:) is reached only from performRunDueWork and from purge's reapDeletable. BlobDeletionUnit.run is the only blob unlink and is called only from reap. open() removes only foreign names. My mutant Z puts a fatalError in BlobDeletionUnit.run: the shipped OracleTests still passes all 16 seeds, so no blob is ever unlinked in its sequences. The reaping probe hits the fatalError, so it does unlink (2-7 unlinks per seed in the baseline, matching the hunter's log). I-3 therefore holds vacuously in the oracle. One limit of the proposed fix: my mutant G makes deletionBlocker return .none for every doomed key, so the reaper skips the ack, commit, lease and grace checks. It is NOT detected by the hunter's reaping oracle, by any S3AuditSink-audited probe, by StoreCrashTests or by CleanupCrashTests eviction. S3AuditSink.violations only checks paths in the current snapshot, despite its doc comment mentioning grace, and the sink acknowledges inline. So the fix needs the non-acknowledging sink and a grace-aware audit, not just a reap step. Non-blocking: I-3 is genuinely verified elsewhere. Under G, StoreDeletionTests and other targeted tests failed (8 failing tests, 29 issues). The oracle still checks I-1, I-2, I-4, I-5 and oracle agreement, so it is not assertion-free (G4). Dropping the reap was recorded with ruling R3 (c.md:975), though that record did not note the I-3 vacuity. Owner C (Cleanup/OracleTests.swift). Evidence: confirm-crash/S3-CRAS-02-confirm-run.txt and S3-CRAS-02-03-confirm-mutants.diff."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-7",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/CleanupCrashTests.swift:52 (eviction: I-3 is not audited inside the crashed lifetime); Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:25 (b1 and b2 are both 'png', so bindCopy/copyBlob is never crashed)",
+  "problem": "S3-CRAS-03: Several cleanup flows have no crash-at-every-boundary coverage at all: purge(.all), purge(.evictable), reportUnreadable followed by the re-download that replaces the corrupt name, orphan GC (doom, then reap), verifyIntegrity, and eviction that waits for a lease. In addition, the two-extension copy path (copyBlob, then a placement from .parttmp) is never crashed, because FirstSync's dedupe pair uses one extension. The shipped eviction enumeration also never checks I-3 inside the crashed lifetime (whether an unlink hit a path the readers' snapshot held), only the reopened state. All flows passed the probes: no behaviour bug.",
+  "fix": "Crash-point enumerations (every point, every mode) for purge(.all), purge(.evictable), quarantine, orphan GC, deep verification, the second-extension copy and an eviction held by a lease; adapt `confirm-crash/S3-CRAS-03-S3CleanupCrashProbe.swift` and its audit sink.",
+  "detail": {
+   "id": "S3-CRAS-03",
+   "kind": "hunt",
+   "lens": "crash",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/CleanupCrashTests.swift:52 (eviction: I-3 is not audited inside the crashed lifetime); Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:25 (b1 and b2 are both 'png', so bindCopy/copyBlob is never crashed)",
+   "requirements": "R-STO-5, R-CLN-2, R-CLN-5, R-CLN-6, R-CLN-8, R-CLN-12, R-INT-4, I-1..I-5",
+   "problem": "Several cleanup flows have no crash-at-every-boundary coverage at all: purge(.all), purge(.evictable), reportUnreadable followed by the re-download that replaces the corrupt name, orphan GC (doom, then reap), verifyIntegrity, and eviction that waits for a lease. In addition, the two-extension copy path (copyBlob, then a placement from .parttmp) is never crashed, because FirstSync's dedupe pair uses one extension. The shipped eviction enumeration also never checks I-3 inside the crashed lifetime (whether an unlink hit a path the readers' snapshot held), only the reopened state. All flows passed the probes: no behaviour bug.",
+   "evidence": ".build-orchestrator/s3-probes/crash/S3-CRAS-03-run.txt: all 13 tests passed ('Suite \"S3 probe: crash at every boundary during cleanup flows\" passed after 83.439 seconds', load ~300). Crash points: purge(.all) 15, purge(.evictable) 14, quarantine 22, orphan GC 8, verify 7, leased eviction 13, update 29, second extension enumerated, each in 4 modes. Kill->power-loss pairs: purge 340 per mode, quarantine 469 per mode, leased eviction 287 per mode; second extension and update passed. Every crashed and every relaunched lifetime is audited by S3AuditSink (no unlink of a path in the readers' current snapshot). These probes kill mutants A, B, H and I (S3-CRAS-05-mutants-run.txt).",
+   "repro": "copy S3-CRAS-03-S3CleanupCrashProbe.swift, S3-CRAS-03-S3AuditSink.swift and S3UpdateCrashProbe.swift into Tests/ZTronAssetStorageTests/S3Crash of an s3-base worktree; swift test --skip Benchmarks --filter ZTronAssetStorageTests.S3CleanupCrashProbe",
+   "fix": "Commit S3CleanupCrashProbe.swift and S3AuditSink.swift (or fold the scenarios into CleanupCrashTests), and use the audited sink in CleanupCrashTests.crashDuringEviction and crashDuringLegacyMigration. The pair tests took 5-26 s per argument at load 30-300, so slice them the way StoreCrashTests.killThenPowerLoss does before running under TSan or on the Simulator.",
+   "confirmer": {
+    "id": "S3-CRAS-03",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "c",
+    "reason": "Reproduced: all 13 S3CleanupCrashProbe tests pass on s3-base. The suite took 24.9 s at load 20-45. Crash points match the hunter's exactly: purge(.all) 15, purge(.evictable) 14, quarantine 22, orphan GC 8, verify 7, leased eviction 13, second extension 32, update 29. Pairs also match: 340, 469, 287, 685 and 645 per mode. No shipped Cleanup test enumerates crash points for these flows; PurgeTests, IntegrityTests, GarbageCollectionTests and others only reopen survivors. The copy path is never crashed by shipped tests. FirstSync's b1 and b2 are both 'png', and the legacy fixture's only duplicate pair is .jpg/.jpg. My mutant X puts a fatalError in copyBlob: StoreCrashTests, CleanupCrashTests and OracleTests all pass (12 tests), while the probe's secondExtension test hits it. CleanupCrashTests.crashDuringEviction indeed has no I-3 check inside the crashed lifetime. That adds little, though: the crashed run's operations are a deterministic prefix of the clean run's. Also, mutant G shows the proposed S3AuditSink audit detects no ack, grace or lease bypass in these scenarios. Non-blocking: these flows are not in SPEC 7.3's mandatory list, and every MUST involved (R-CLN-2/5/6/8/12, R-INT-4) has tests (Q-6) and behaves correctly under the probes. Owner: C for purge, quarantine, orphan GC, verify and leased eviction. The second-extension copy path (Store/AssetStore+Publish.swift, FirstSync) is B's. Evidence: confirm-crash/S3-CRAS-03-confirm-run.txt."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-8",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/CleanupCrashTests.swift:91 (legacy: one crash per run); Tests/ZTronAssetStorageTests/Core/StoreOpenTests.swift:222,255 (OS purge only after a clean close)",
+  "problem": "S3-CRAS-04: The S1-01 hazard (a lifetime building on a killed process's unsynced namespace, then losing power) is enumerated only by StoreCrashTests.killThenPowerLoss over the first sync. Legacy migration moves irreplaceable prior-art files with renames across directories, but it is crashed only once per run. It is never killed and then hit by a power loss while the next lifetime migrates on and removes the tree, which is where a moved file could be lost. Likewise, OS purges (blobs/, the root, half the blobs) are tested only after a clean close. Both combinations hold under the probes: no behaviour bug.",
+  "fix": "Kill-then-power-loss pairs for legacy migration (H-10) and for an OS purge after a crash; adapt `confirm-crash/S3-CRAS-04-*`. The legacy pairs took 187 s for 16 cases at load 20\u201345: parameterise them so each case stays inside its guard under TSan (S3-R4), every pair kept.",
+  "detail": {
+   "id": "S3-CRAS-04",
+   "kind": "hunt",
+   "lens": "crash",
+   "location": "Tests/ZTronAssetStorageTests/Cleanup/CleanupCrashTests.swift:91 (legacy: one crash per run); Tests/ZTronAssetStorageTests/Core/StoreOpenTests.swift:222,255 (OS purge only after a clean close)",
+   "requirements": "R-STO-11, R-STO-5, R-CLN-7, H-1, H-10, store-1 S1-01",
+   "problem": "The S1-01 hazard (a lifetime building on a killed process's unsynced namespace, then losing power) is enumerated only by StoreCrashTests.killThenPowerLoss over the first sync. Legacy migration moves irreplaceable prior-art files with renames across directories, but it is crashed only once per run. It is never killed and then hit by a power loss while the next lifetime migrates on and removes the tree, which is where a moved file could be lost. Likewise, OS purges (blobs/, the root, half the blobs) are tested only after a clean close. Both combinations hold under the probes: no behaviour bug.",
+   "evidence": ".build-orchestrator/s3-probes/crash/S3-CRAS-04-run.txt: '\u2714 Test \"R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file\" with 48 test cases passed after 304.382 seconds'; 'total pairs 11606' (load 60-100). Every verified legacy file's bytes are found in the tree or as a blob after every pair, and I-1..I-5 hold on reopen. S3-CRAS-04-purge-after-crash-run.txt: 'R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim with 8 test cases passed after 4.473 seconds'. An earlier 4-slice run hit the 1-minute limit on 5 of 8 cases with no expectation failure.",
+   "repro": "copy S3-CRAS-04-S3LegacyPairsProbe.swift and S3-CRAS-04-S3PurgeAfterCrashProbe.swift into Tests/ZTronAssetStorageTests/S3Crash (S3PurgeAfterCrashProbe needs FirstSync from StoreCrashTests.swift); swift test --skip Benchmarks --filter 'ZTronAssetStorageTests.(S3LegacyPairsProbe|S3PurgeAfterCrashProbe)'",
+   "fix": "Commit both probes. Keep the legacy pairs at 24 or more slices (about 6 s per case at load ~80, so TSan or the Simulator need more slices or a smaller fixture). Add a SyncStamp to the purge-after-crash scenario so its 'no stale synced claim' check is not trivially true (FirstSync never stamps).",
+   "confirmer": {
+    "id": "S3-CRAS-04",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "c",
+    "reason": "Reproduced. S3LegacyPairsProbe passes 48 cases with 11,606 pairs in total, exactly the hunter's count. The run of 16 tests took 186.9 s at load 20-45. S3PurgeAfterCrashProbe passes 8 cases in 4.9 s. The legacy check is not vacuous: a wrong path would make 'kept' false. Code check: StoreCrashTests.killThenPowerLoss is the only two-lifetime kill-then-power-loss enumeration. CleanupCrashTests legacy migration crashes once and then reopens cleanly. LegacyPhaseOneStateSpaceTests covers only phase 1's index commits inside open(), over initial index disks, with one crash per lifetime. It does not cover later phases' blob moves across a second lifetime. The R-CLN-7 OS-purge tests (StoreOpenTests:222, 255) start from clean closes. Non-blocking: R-STO-5 and R-STO-11 require single-crash enumeration, which exists, and SPEC 7.3's OS-purge scenarios are not combined with a crash. Both combinations hold, so this is added robustness coverage only. As the hunter notes, the 'no stale synced claim' check is trivially true because FirstSync never stamps. Owner: C (legacy migration). The purge-after-crash scenario is built on B's FirstSync and B's R-CLN-7 tests. Evidence: confirm-crash/S3-CRAS-04-confirm-run.txt."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-9",
+  "location": "Sources/ZTronAssetStorage/Integrity/StoreIntegrity.swift:54-79 checks identity and .failed only; recordFailure guards at :101-107",
+  "problem": "S3-B-040: recordIntegrityFailure has no presence guard (recordFailure got one in L4-R16): one await separates the engine's presence read from the store write, and a legacy adoption or an apply's adoption of an orphaned blob of the same content can bind the id inside it",
+  "fix": "`recordIntegrityFailure` (`Integrity/StoreIntegrity.swift:54-79`) gets the presence guard `recordFailure` has (:101-107); a failing test first if a seam reaches the window, otherwise record why none does.",
+  "detail": {
+   "id": "S3-B-040",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Integrity/StoreIntegrity.swift:54-79 checks identity and .failed only; recordFailure guards at :101-107",
+   "problem": "recordIntegrityFailure has no presence guard (recordFailure got one in L4-R16): one await separates the engine's presence read from the store write, and a legacy adoption or an apply's adoption of an orphaned blob of the same content can bind the id inside it",
+   "category": "unproven-suspicion",
+   "sources": [
+    "l4-rulings.md L4-R24(3)",
+    "ADR-053 Assignments",
+    "f.md F-14, F-22"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3C-10",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift:426-431 text unchanged",
+  "problem": "S3-B-039: LegacyPhases.swift:426-431's comment above L5K-R17's wait omits the return when a processing it waited for put its file back in the queue (ARCHITECTURE \u00a74.7 (3))",
+  "fix": "Comment fix at `Migration/LegacyPhases.swift:426-431` (ARCHITECTURE \u00a74.7 (3)).",
+  "detail": {
+   "id": "S3-B-039",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift:426-431 text unchanged",
+   "problem": "LegacyPhases.swift:426-431's comment above L5K-R17's wait omits the return when a processing it waited for put its file back in the queue (ARCHITECTURE \u00a74.7 (3))",
+   "category": "documentation",
+   "sources": [
+    "ADR-055 Assignments (comments only)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "Sources/ZTronAssetStorage/Eviction/StoreEviction.swift:14 is still a synchronous package func",
+  "problem": "S3-B-026: OI-4: the synchronous dry run evictionPlan(toFree:protecting:) holds the actor about 2.5 ms at 10,000 records and about 38 ms at maxEntries; moving it off the actor needs an async signature (a contract change with WP-F)",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-026",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Eviction/StoreEviction.swift:14 is still a synchronous package func",
+   "problem": "OI-4: the synchronous dry run evictionPlan(toFree:protecting:) holds the actor about 2.5 ms at 10,000 records and about 38 ms at maxEntries; moving it off the actor needs an async signature (a contract change with WP-F)",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-052 Assignments (OI-4)",
+    "c.md OI-4"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "files are already adopted; only the stamp migration and tree/key removal wait; actor hold 3.3 ms at 10,000",
+  "problem": "S3-B-027: Legacy phase 3 can stay undecided under continuous access stamps or pins: migrateLegacy ends finished:false after three last calls at 10,000 files with about 16,400 stamps (R9, RE-S29); C-24's alternative CCR (a serial bumped only by presence-reducing mutations) would close it",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-027",
+   "kind": "backlog",
+   "location": "files are already adopted; only the stamp migration and tree/key removal wait; actor hold 3.3 ms at 10,000",
+   "problem": "Legacy phase 3 can stay undecided under continuous access stamps or pins: migrateLegacy ends finished:false after three last calls at 10,000 files with about 16,400 stamps (R9, RE-S29); C-24's alternative CCR (a serial bumped only by presence-reducing mutations) would close it",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (R9; Assignments WP-F)",
+    "c.md C-24",
+    "l3-close8-verify-c.json [3],[12]"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "a persisted per-file count needs a STAMPS field in WP-B's codec (a CCR); not made",
+  "problem": "S3-B-031: OI-11 / C-14 cycle-2 amendment (NEEDS-HUMAN-REVIEW): a legacy file whose read or move fails transiently three times in one lifetime is abandoned and downloaded again, phase 4 then removes manifest.json and the key so it stays unattributed for good, and the kept set lives in memory so a crash can let phase 4 remove a kept file",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-031",
+   "kind": "backlog",
+   "location": "a persisted per-file count needs a STAMPS field in WP-B's codec (a CCR); not made",
+   "problem": "OI-11 / C-14 cycle-2 amendment (NEEDS-HUMAN-REVIEW): a legacy file whose read or move fails transiently three times in one lifetime is abandoned and downloaded again, phase 4 then removes manifest.json and the key so it stays unattributed for good, and the kept set lives in memory so a crash can let phase 4 remove a kept file",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (R5 deviations)",
+    "c.md OI-11, C-14"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "read in AssetStore+Commit.swift, not audited across every WP-B write",
+  "problem": "S3-B-035: Phase 3's mutation-serial guard assumes WP-B bumps commits.mutationSerial in the turn of every persisted change; it was audited only for quarantine and pin",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-035",
+   "kind": "backlog",
+   "location": "read in AssetStore+Commit.swift, not audited across every WP-B write",
+   "problem": "Phase 3's mutation-serial guard assumes WP-B bumps commits.mutationSerial in the turn of every persisted change; it was audited only for quarantine and pin",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-052 (Not verified)",
+    "c.md Not verified here (C-24)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "ratified as the safest default",
+  "problem": "S3-B-028: C-12 (NEEDS-HUMAN-REVIEW): a checksum-less legacy file without a valid local checksum is dropped and downloaded again instead of hashed inside open()",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-028",
+   "kind": "backlog",
+   "location": "ratified as the safest default",
+   "problem": "C-12 (NEEDS-HUMAN-REVIEW): a checksum-less legacy file without a valid local checksum is dropped and downloaded again instead of hashed inside open()",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (R5 deviations)",
+    "c.md C-12"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "ratified as the safest default",
+  "problem": "S3-B-029: C-13 (NEEDS-HUMAN-REVIEW): an undecodable or unusable legacy manifest degrades the launch and adopts nothing; its files stay in the legacy root (a place-without-records primitive would be needed)",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-029",
+   "kind": "backlog",
+   "location": "ratified as the safest default",
+   "problem": "C-13 (NEEDS-HUMAN-REVIEW): an undecodable or unusable legacy manifest degrades the launch and adopts nothing; its files stay in the legacy root (a place-without-records primitive would be needed)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (R5 deviations)",
+    "c.md C-13"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "ratified as the safest default",
+  "problem": "S3-B-030: C-14 (NEEDS-HUMAN-REVIEW): a legacy root on another volume cannot be renamed into blobs/ (EXDEV); its files are dropped and downloaded again (a store copy primitive would be needed)",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-030",
+   "kind": "backlog",
+   "location": "ratified as the safest default",
+   "problem": "C-14 (NEEDS-HUMAN-REVIEW): a legacy root on another volume cannot be renamed into blobs/ (EXDEV); its files are dropped and downloaded again (a store copy primitive would be needed)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (R5 deviations)",
+    "c.md C-14"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "ratified as the safest default",
+  "problem": "S3-B-032: C-15 (NEEDS-HUMAN-REVIEW): phase 4 removes only what the prior art wrote and never recursively; files it cannot attribute and a non-empty root stay (R-STO-11 says remove the legacy directory)",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-032",
+   "kind": "backlog",
+   "location": "ratified as the safest default",
+   "problem": "C-15 (NEEDS-HUMAN-REVIEW): phase 4 removes only what the prior art wrote and never recursively; files it cannot attribute and a non-empty root stay (R-STO-11 says remove the legacy directory)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (R5 deviations)",
+    "c.md C-15"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "by ruling",
+  "problem": "S3-B-033: C-2, C-4, C-6 accepted without review tag: eviction does not rank Apple-adopted assets after ordinary ones; eviction's budget counts pending reclaim while FreeSpace.budgetBytes does not; lastCleanupAt is stamped only by a run that changed something",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-033",
+   "kind": "backlog",
+   "location": "by ruling",
+   "problem": "C-2, C-4, C-6 accepted without review tag: eviction does not rank Apple-adopted assets after ordinary ones; eviction's budget counts pending reclaim while FreeSpace.budgetBytes does not; lastCleanupAt is stamped only by a run that changed something",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (accepted without review tag, R5)",
+    "c.md C-2, C-4, C-6"
+   ],
+   "proposed": "none"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "recorded in ADR-055; no code change ruled",
+  "problem": "S3-B-041: Dooms exception to L5K-R20: a doom's removal-only install runs ahead of recordFailure's and recordIntegrityFailure's ordered commit (IntegrityBookkeeping.swift is unchanged); I-3 keeps the bytes until a snapshot without the asset is acknowledged",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-041",
+   "kind": "backlog",
+   "location": "recorded in ADR-055; no code change ruled",
+   "problem": "Dooms exception to L5K-R20: a doom's removal-only install runs ahead of recordFailure's and recordIntegrityFailure's ordered commit (IntegrityBookkeeping.swift is unchanged); I-3 keeps the bytes until a snapshot without the asset is acknowledged",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-055 Merge rulings (4)",
+    "l5k-rulings.md L5K-R27(4)"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "fake volume only",
+  "problem": "S3-B-036: Legacy migration on a device: the Caches to Application Support rename on one APFS volume, a root on another volume, LiveLegacyDefaults, Unicode normalisation or case differences between legacy path components and disk names, the overlap guard's identity walks and sandbox stat refusals (/var to /private/var, App Group containers), and phase 3's ordered vs durable commit (OI-2)",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-036",
+   "kind": "backlog",
+   "location": "fake volume only",
+   "problem": "Legacy migration on a device: the Caches to Application Support rename on one APFS volume, a root on another volume, LiveLegacyDefaults, Unicode normalisation or case differences between legacy path components and disk names, the overlap guard's identity walks and sandbox stat refusals (/var to /private/var, App Group containers), and phase 3's ordered vs durable commit (OI-2)",
+   "category": "device-only",
+   "sources": [
+    "ADR-052 (Not verified)",
+    "c.md Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "the fake gives every new file a new inode",
+  "problem": "S3-B-037: Deep verification's incarnation check against a real rename-over on APFS: a volume that reuses inode numbers at once could hide a same-size replacement",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-037",
+   "kind": "backlog",
+   "location": "the fake gives every new file a new inode",
+   "problem": "Deep verification's incarnation check against a real rename-over on APFS: a volume that reuses inode numbers at once could hide a same-size replacement",
+   "category": "device-only",
+   "sources": [
+    "ADR-052 (Not verified)",
+    "c.md C-8, Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3C-11",
+  "location": "macOS 27 release probes only",
+  "problem": "S3-B-038: C-22's actor holds, apply's chunked eviction (c-8), a purge's wait for another reaper's deletion (a kernel-blocked unlink delays it) and the holders-scan prefilter's even-spread assumption were measured on macOS with the fake file system, not on a device",
+  "fix": "Record. S3-B-026 (OI-4): within C2 at 10,000 (2.5 ms); the async contract change is declined for Stage 3. S3-B-027: liveness under continuous stamping; OPTIONAL fix only if C-24's serial fits inside WP-C's files. S3-B-035: audit by reading that every persisted WP-B write bumps `commits.mutationSerial` in its turn, and record the audit table. The NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-038",
+   "kind": "backlog",
+   "location": "macOS 27 release probes only",
+   "problem": "C-22's actor holds, apply's chunked eviction (c-8), a purge's wait for another reaper's deletion (a kernel-blocked unlink delays it) and the holders-scan prefilter's even-spread assumption were measured on macOS with the fake file system, not on a device",
+   "category": "device-only",
+   "sources": [
+    "ADR-052 (Not verified)",
+    "c.md Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ }
+]

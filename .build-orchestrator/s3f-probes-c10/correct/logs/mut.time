@@ -1,0 +1,22 @@
+enospcNoDefer apply ok
+17:45:47 enospcNoDefer build
+17:46:00 enospcNoDefer test
+enospcNoDefer revert ok
+reinstateNoReplay apply ok
+17:51:29 reinstateNoReplay build
+17:51:49 reinstateNoReplay test
+reinstateNoReplay revert ok
+edgeNoReplay apply ok
+17:53:39 edgeNoReplay build
+17:53:52 edgeNoReplay test
+edgeNoReplay revert ok
+relaneNoDefer apply ok
+17:58:26 relaneNoDefer build
+17:58:36 relaneNoDefer test
+relaneNoDefer revert ok
+throttleAtNow apply ok
+18:00:36 throttleAtNow build
+18:00:44 throttleAtNow test
+throttleAtNow revert ok
+18:01:33 rebuild clean
+18:01:42 done

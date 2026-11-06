@@ -1,0 +1,66 @@
+== M1-stampBreakerRefusal: EngineDispatch.swift count=1
+   build exit 0
+   run 1 exit 1
+     ✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:154:9: Expec
+     ✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:155:9: Expec
+     ✘ Test run with 1 test in 1 suite failed after 0.841 seconds with 2 issues.
+   run 2 exit 1
+     ✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:154:9: Expec
+     ✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:155:9: Expec
+     ✘ Test run with 1 test in 1 suite failed after 0.822 seconds with 2 issues.
+== M7-purgeJoinsKept: EngineCommands.swift count=1
+   build exit 0
+   run 1 exit 1
+     ✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:222:9: Expectation failed:
+     ✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:223:9: Expectation failed:
+     ✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:232:9: Expectation failed:
+     ✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:276:9: Expectation failed: 
+     ✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:284:9: Expectation failed: 
+     ✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:285:9: Expectation failed: 
+     ✘ Test run with 2 tests in 1 suite failed after 1.338 seconds with 6 issues.
+   run 2 exit 1
+     ✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:222:9: Expectation failed:
+     ✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:223:9: Expectation failed:
+     ✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:232:9: Expectation failed:
+     ✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:276:9: Expectation failed: 
+     ✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:284:9: Expectation failed: 
+     ✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:285:9: Expectation failed: 
+     ✘ Test run with 2 tests in 1 suite failed after 1.547 seconds with 6 issues.
+== M8-stampWithoutSlot: EngineJobs.swift count=1
+   build exit 0
+   run 1 exit 1
+     ✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:345
+     ✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:346
+     ✘ Test run with 2 tests in 1 suite failed after 2.350 seconds with 2 issues.
+   run 2 exit 1
+     ✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:345
+     ✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:346
+     ✘ Test run with 2 tests in 1 suite failed after 2.080 seconds with 2 issues.
+== M9-cycle13FollowedLane: EngineFailures.swift count=1
+   build exit 0
+   run 1 exit 1
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:459:9: Expectation fai
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:462:25: Issue recorded
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:508:9: Expecta
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:511:25: Issue 
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:566:9: Expectatio
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:567:9: Expectatio
+     ✘ Test run with 3 tests in 1 suite failed after 3.293 seconds with 6 issues.
+   run 2 exit 1
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:459:9: Expectation fai
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:462:25: Issue recorded
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:508:9: Expecta
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:511:25: Issue 
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:566:9: Expectatio
+     ✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:567:9: Expectatio
+     ✘ Test run with 3 tests in 1 suite failed after 3.263 seconds with 6 issues.
+== M2-verdictVisitDropped: EngineFollow.swift count=1
+   build exit 0
+   run 1 exit 1
+     ✘ Test "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.sw
+     ✘ Test run with 1 test in 1 suite failed after 1.158 seconds with 1 issue.
+   run 2 exit 1
+     ✘ Test "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.sw
+     ✘ Test run with 1 test in 1 suite failed after 1.206 seconds with 1 issue.
+revert diff: none
+exit 0

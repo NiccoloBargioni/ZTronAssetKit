@@ -1,0 +1,33 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+✘ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:68:9: Expectation failed: (try? b2Result.get())?.byteSize == Int64(cBytes.count)
+↳ B2, asking after the refusal, is served by a new attempt (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+↳ (try? b2Result.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:69:9: Expectation failed: starts == 2
+↳ C's content started twice: the refused attempt and B2's new job: 1
+↳ starts == 2 → false
+↳   starts → 1
+✘ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" with 2 test cases failed after 0.943 seconds with 2 issues.
+↳ /// A user request made after a failure whose verdict waits for the follow is served by a new job, as it is when the
+↳ /// follow visits first: C (1 MB) is the content of zz-a and zz-b, one user waiter each (A, B); v3 moves zz-a to a
+↳ /// 16-byte content while the follow owes C's visit. C's attempt is refused (a 400: final for the run), then a second
+↳ /// user request for zz-b (B2) arrives. Visited first, the refusal answers B and removes C; B2 creates a new job, whose
+↳ /// attempt serves the bytes. With the verdict waiting, B2 joined the failed job and the drain answered it with the
+↳ /// earlier attempt's failure (PROBE-C9-JOIN-RESOLVE, PROBE-C9R-JOIN-RESOLVE).
+◇ Test "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+✔ Test "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" with 2 test cases passed after 0.759 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.703 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 1.703 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

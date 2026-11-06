@@ -1,0 +1,69 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+        "deviceName" : "iPhone 18 Pro Max",
+        "modelName" : "iPhone 18 Pro Max",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 1,
+      "passedTests" : 3008,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "ZTronAssetKit · Built with macOS 27.0",
+  "expectedFailures" : 0,
+  "failedTests" : 1,
+  "finishTime" : 1793569291.183,
+  "passedTests" : 1505,
+  "result" : "Failed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1793568848.077,
+  "statistics" : [
+    {
+      "subtitle" : "1759 test runs",
+      "title" : "256 tests ran with dynamic parameters"
+    }
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "Expectation failed: started.first == n.transferID\nstarted.first → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d\nn.transferID → c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb: N, queued at P's visit, starts before the members the follow-up re-queues (visit-first): [c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d, c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb, c-d2d5570fbc4b2bea8b5dd91e820a443881d9f7573a11d5c58fadacb46b1fdfc1]",
+      "targetName" : "ZTronAssetSyncTests",
+      "testIdentifier" : 246,
+      "testIdentifierString" : "EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)",
+      "testIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)",
+      "testName" : "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)"
+    }
+  ],
+  "title" : "Test - ZTronAssetKit",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "6% of duration",
+      "text" : "12 longest test runs with outlier durations exceeding 14.22s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "81% of duration",
+      "text" : "1 longest test run with outlier durations exceeding 18.75s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "12% of duration",
+      "text" : "12 longest test runs with outlier durations exceeding 4.06s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 1506
+}

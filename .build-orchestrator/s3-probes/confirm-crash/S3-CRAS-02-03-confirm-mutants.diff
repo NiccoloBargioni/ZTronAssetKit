@@ -1,0 +1,118 @@
+diff --git a/Sources/ZTronAssetStorage/Blobs/BlobUnits.swift b/Sources/ZTronAssetStorage/Blobs/BlobUnits.swift
+index 4ad248f..c223e0e 100644
+--- a/Sources/ZTronAssetStorage/Blobs/BlobUnits.swift
++++ b/Sources/ZTronAssetStorage/Blobs/BlobUnits.swift
+@@ -103,7 +103,9 @@ enum BlobPlacementUnit {
+                 try fileSystem.removeItem(at: source)
+                 return .success(.keptExisting)
+             }
+-            try fileSystem.synchronizeFile(at: source, level: .barrier)
++            if ProcessInfo.processInfo.environment["S3MUT"] != "A" {
++                try fileSystem.synchronizeFile(at: source, level: .barrier)
++            }
+             let fanOut = layout.fanOutDirectory(for: key.hash)
+             createdFanOut = try fileSystem.itemInfo(at: fanOut) == nil
+             try fileSystem.createDirectory(at: fanOut)
+@@ -163,6 +165,9 @@ enum BlobDeletionUnit {
+     /// Removes each key's blob until the budget would be spent; absent files count as removed (idempotent sweeps,
+     /// R-CLN-12).
+     static func run(fileSystem: any FileSystem, layout: StoreLayout, keys: [BlobKey], time: any TimeSource, budget: TimeInterval) -> Outcome {
++        if ProcessInfo.processInfo.environment["S3MUT"] == "Z", !keys.isEmpty {
++            fatalError("S3MUT Z: a blob deletion unit ran")
++        }
+         let start = time.monotonicNow()
+         var last = start
+         var slowest: TimeInterval = 0
+diff --git a/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift b/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
+index d0ce85b..97ae5d5 100644
+--- a/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
++++ b/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
+@@ -161,7 +161,7 @@ enum IndexCommitUnit {
+         }
+         let temporary = layout.indexURL(.temporary)
+         do throws(FileSystemError) {
+-            for fanOut in input.dirtyFanOuts {
++            for fanOut in input.dirtyFanOuts where ProcessInfo.processInfo.environment["S3MUT"] != "B" {
+                 try IndexCommitUnit.barrier(layout.blobsDirectory.appendingPathComponent(fanOut, isDirectory: true), fileSystem)
+             }
+             if input.blobsDirectoryDirty {
+@@ -181,7 +181,9 @@ enum IndexCommitUnit {
+         }
+         do throws(FileSystemError) {
+             try IndexCommitUnit.replaceCurrent(with: .temporary, layout: layout, fileSystem: fileSystem, committedFile: &outcome.committedFile)
+-            try fileSystem.synchronizeDirectory(at: layout.root, level: level)
++            if ProcessInfo.processInfo.environment["S3MUT"] != "I" || input.durability == .durable {
++                try fileSystem.synchronizeDirectory(at: layout.root, level: level)
++            }
+             if input.durability == .durable {
+                 try fileSystem.synchronizeDirectory(at: layout.container, level: .full)
+                 try fileSystem.synchronizeDirectory(at: layout.container.deletingLastPathComponent(), level: .full)
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift
+index 1007c57..342def1 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift
+@@ -354,6 +354,9 @@ extension AssetStore {
+     /// `UInt32.max`, away from the engine's start counter), so no two copies share a name; the copy is accepted only
+     /// with exactly `byteCount` bytes hashing to `source.hash`, so I-1 holds even if the source changed meanwhile.
+     private func copyBlob(_ source: BlobKey, byteCount: Int64) async throws(StoreError) -> URL {
++        if ProcessInfo.processInfo.environment["S3MUT"] == "X" {
++            fatalError("S3MUT X: copyBlob ran")
++        }
+         guard let layout = self.state.core.layout else {
+             throw .notOpen
+         }
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+index 1f6deca..edaf1aa 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+@@ -43,22 +43,25 @@ extension AssetStore {
+         guard case .doomed(let info)? = self.state.core.blobTable[key] else {
+             return .notDoomed
+         }
++        if ProcessInfo.processInfo.environment["S3MUT"] == "G" {
++            return .none
++        }
+         if self.state.core.unavailable != nil {
+             return .unavailable
+         }
+         if self.state.core.degraded {
+             return .degraded
+         }
+-        guard let eligibleAt = info.eligibleAt else {
++        guard let eligibleAt = info.eligibleAt ?? (ProcessInfo.processInfo.environment["S3MUT"] == "F" ? MonotonicInstant(nanoseconds: 0) : nil) else {
+             return .acknowledgement
+         }
+-        if self.state.core.committedGeneration < info.droppedInGeneration {
++        if self.state.core.committedGeneration < info.droppedInGeneration, ProcessInfo.processInfo.environment["S3MUT"] != "C" {
+             return .commit
+         }
+         if let leases = self.state.cleanup.leases[key], !leases.isEmpty {
+             return .lease
+         }
+-        if eligibleAt > self.environment.time.uptimeNow() {
++        if eligibleAt > self.environment.time.uptimeNow(), ProcessInfo.processInfo.environment["S3MUT"] != "S" {
+             return .grace(eligibleAt)
+         }
+         guard let fresh = self.state.core.snapshots.lastAcknowledgedInstallStart, fresh >= eligibleAt else {
+diff --git a/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift b/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+index cc1a13b..614cf8e 100644
+--- a/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
++++ b/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+@@ -197,7 +197,7 @@ enum LaunchReconciliation {
+             switch table[key] {
+             case .live(let references)?:
+                 table[key] = .live(references: references + 1)
+-            case .doomed(let info)? where info.reason == .unreferenced:
++            case .doomed(let info)? where info.reason == .unreferenced || ProcessInfo.processInfo.environment["S3MUT"] == "E":
+                 table[key] = .live(references: 1)
+             case nil:
+                 table[key] = .live(references: 1)
+@@ -226,7 +226,7 @@ enum LaunchReconciliation {
+             blobBytes: bytes,
+             orphans: orphans,
+             missingBlobs: missing,
+-            adoptedFanOuts: fanOuts,
++            adoptedFanOuts: ProcessInfo.processInfo.environment["S3MUT"] == "H" ? [] : fanOuts,
+             doomedRepairs: repairs,
+             osPurgeDetected: osPurge
+         )

@@ -1,0 +1,8 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine: transfers during legacy migration (L5K-R1)" started.
+◇ Test "R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)" started.
+✔ Test "R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)" passed after 1.866 seconds.
+✔ Suite "Engine: transfers during legacy migration (L5K-R1)" passed after 1.866 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.866 seconds.

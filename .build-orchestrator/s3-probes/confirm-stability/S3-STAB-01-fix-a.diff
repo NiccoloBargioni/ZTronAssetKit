@@ -1,0 +1,21 @@
+diff --git a/Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift b/Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift
+index 1fdbc22..78ad665 100644
+--- a/Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift
++++ b/Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift
+@@ -415,11 +415,14 @@ struct LegacyEdgeTests {
+         }
+         // Phases 2 and 3 run unit by unit; phase 4 lists the root first (nothing before it lists the legacy tree).
+         try await CorePoll.until("phase 4 listed the legacy root") {
++            // The held unit is read before the listings: a unit held while no listing of phase 4 has run yet cannot follow
++            // the root's listing, so the poll never releases a second phase-4 unit (S3-STAB-01; L5K-R27 (2), fix (a)).
++            let held = await metadata.heldUnits.first
+             if listings() > 0 {
+                 return true
+             }
+-            if let unit = await metadata.heldUnits.first {
+-                await metadata.release(unit)
++            if let held {
++                await metadata.release(held)
+             }
+             return false
+         }

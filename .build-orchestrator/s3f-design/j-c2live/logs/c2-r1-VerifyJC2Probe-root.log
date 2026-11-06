@@ -1,0 +1,15 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyJC2Probe" started.
+◇ Test "VERIFY-J-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" started.
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 744, changeEvery 2, handles 1
+✘ Test "VERIFY-J-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" recorded an issue at VerifyJC2Probe.swift:14:6: Caught error: .incomplete("1000 members still wait for space after the deferred sweeps")
+✘ Test "VERIFY-J-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" failed after 0.052 seconds with 1 issue.
+✘ Suite "VerifyJC2Probe" failed after 0.052 seconds with 1 issue.
+↳ /// Judge c2live (scratch, never committed): the D1 designer's extended-window C2 probe made design-agnostic. The
+↳ /// reclaim lands while the follow is owed (its follow-ups held); the window then releases the follow and runs until the
+↳ /// follow, every deferred decision, sweep and pump follow-up is over (`jSettled`, defined per design in VerifyJC2Design.swift).
+✘ Test run with 1 test in 1 suite failed after 0.052 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

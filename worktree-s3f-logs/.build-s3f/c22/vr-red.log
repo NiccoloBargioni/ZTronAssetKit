@@ -1,0 +1,23 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a job whose failure verdict waits for a follow is reported when it is not failed or is at another epoch (F-28, S3-R27 item 6)" started.
+✘ Test "R-SYN-5: a job whose failure verdict waits for a follow is reported when it is not failed or is at another epoch (F-28, S3-R27 item 6)" recorded an issue at EngineFollowBarrierVerdictRecordTests.swift:45:9: Expectation failed: bumped.contains(elsewhere) && !bumped.contains(unfailed)
+↳ a waiting verdict's job at another epoch is reported as at another epoch, and only so: []
+↳ bumped.contains(elsewhere) && !bumped.contains(unfailed) → false
+↳   bumped.contains(elsewhere) → false
+↳   !bumped.contains(unfailed) → <not evaluated>
+✘ Test "R-SYN-5: a job whose failure verdict waits for a follow is reported when it is not failed or is at another epoch (F-28, S3-R27 item 6)" failed after 0.220 seconds with 1 issue.
+↳ /// `barrierFailsA429BeyondTheCapsAsOnArrival`'s swept-first state: C (zz-c) downloads for U's user waiter and gets a
+↳ /// 429 beyond the caps while the follow owes its visits, so its job fails and the verdict waits for the follow. Set
+↳ /// `.queued`, the job is reported not failed; moved to another epoch, it is reported at another epoch; each edit
+↳ /// leaves the other clause quiet.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.220 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.220 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

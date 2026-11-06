@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetKit/Prefetch/Prefetch.swift b/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
+index dc552c5..5cdf5cf 100644
+--- a/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
++++ b/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
+@@ -134,7 +134,7 @@ public final class PrefetchWindowController {
+         var next: [AssetID: (handle: PrefetchHandle, priority: AssetPriority)] = [:]
+         for target in targets {
+             if let existing = self.handles[target.id] {
+-                if existing.priority == target.priority {
++                if existing.priority <= target.priority {
+                     next[target.id] = existing
+                 } else {
+                     let replacement = self.client.prefetch([target.id], priority: target.priority)

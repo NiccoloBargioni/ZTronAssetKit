@@ -1,0 +1,44 @@
+== MA-noloop: exit 1; ✘ Test run with 58 tests in 4 suites failed after 1.150 seconds with 5 issues.
+    ✘ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" recorded an issue at BackgroundInterleavingTests.swift:454:9: Expectation failed: changes.last == 0.25
+    PROBE-FAIL OS task ends at Optional(0.5) (base Optional(0.5)), newest request 0.25; landed [0.75, 0.25, 0.5] | schedule: req0 held1<-r0 req1 held2<-r1 req2 held3<-r2 rel1 done0 rel3 done2 rel2 done1
+    PROBE-FAIL OS task ends at Optional(0.75) (base Optional(0.75)), newest request 0.25; landed [0.5, 0.25, 0.75] | schedule: req0 held1<-r0 req1 held2<-r1 req2 held3<-r2 rel2 done1 rel3 done2 rel1 done0
+    PROBE-FAIL OS task ends at Optional(0.5) (base Optional(0.5)), newest request 0.25; landed [0.25, 0.75, 0.5] | schedule: req0 held1<-r0 req1 held2<-r1 req2 held3<-r2 rel3 done2 rel1 done0 rel2 done1
+    PROBE-FAIL OS task ends at Optional(0.75) (base Optional(0.75)), newest request 0.25; landed [0.25, 0.5, 0.75] | schedule: req0 held1<-r0 req1 held2<-r1 req2 held3<-r2 rel3 done2 rel2 done1 rel1 done0
+    PROBE-FAIL OS task ends at Optional(0.5) (base Optional(0.5)), newest request 0.25; landed [0.75, 0.25, 0.5] | schedule: req0 held1<-r0 req1 held2<-r1 req2H listing<-r2 relL2 held3<-r2 rel1 done0 rel3 done2 rel2 done1
+== MB-noserial: exit 1; ✘ Test run with 58 tests in 4 suites failed after 6.148 seconds with 4 issues.
+    ✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at BackgroundInterleavingTests.swift:361:9: Expectation failed: changes.last == 0.25
+    ✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at BackgroundInterleavingTests.swift:362:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.25]
+    ✘ Test "R-NET-10: a newer promotion is kept over an older demotion whose listing returns later" recorded an issue at BackgroundInterleavingTests.swift:384:9: Expectation failed: changes.last == 0.75
+    ✘ Test "R-NET-10: a newer promotion is kept over an older demotion whose listing returns later" recorded an issue at BackgroundInterleavingTests.swift:385:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+== MC-finished-keeps-priority: exit 1; ✘ Test run with 58 tests in 4 suites failed after 0.889 seconds with 6 issues.
+    ✘ Test "R-NET-10: a priority write that lands after its transfer finished is followed by no other write" recorded an issue at BackgroundInterleavingTests.swift:482:9: Expectation failed: changes == [0.25, 0.75]
+    PROBE-FAIL write issued after the terminal: ["0.75", "0.25", "0.25*"] | schedule: req0 held1<-r0 req1 held2<-r1 rel2 done1 fin rel1 held3<-r0 rel3 done0
+    PROBE-FAIL write issued after the terminal: ["0.75", "0.25", "0.25*"] | schedule: req0 held1<-r0 req1 held2<-r1 fin rel1 held3<-r0 rel2 done1 rel3 done0
+    PROBE-FAIL write issued after the terminal: ["0.75", "0.25", "0.25*"] | schedule: req0 held1<-r0 req1 held2<-r1 fin rel1 held3<-r0 rel3 done0 rel2 done1
+    PROBE-FAIL write issued after the terminal: ["0.75", "0.25", "0.25*"] | schedule: req0 held1<-r0 req1 held2<-r1 fin rel2 done1 rel1 held3<-r0 rel3 done0
+    PROBE-FAIL write issued after the terminal: ["0.75", "0.25", "0.25*"] | schedule: req0 held1<-r0 req1H listing<-r1 relL1 held2<-r1 rel2 done1 fin rel1 held3<-r0 rel3 done0
+== MD-end-keeps-controls: exit 1; ✘ Test run with 58 tests in 4 suites failed after 64.001 seconds with 14 issues.
+    ✘ Test "probe: a pause queued behind a held priority change is delivered after it; the control task ends" recorded an issue at S3DC2CorrectProbeTests.swift:363:6: Time limit was exceeded: 60.000 seconds
+    ✘ Test "R-SYN-14: a background handle's control task ends with its attach, however the attach ends" recorded an issue with 1 argument ending → consumerGone at BackgroundControlTaskTests.swift:26:6: Time limit was exceeded: 60.000 seconds
+    ✘ Test "R-SYN-14: a background handle's control task ends with its attach, however the attach ends" recorded an issue with 1 argument ending → replaced at BackgroundControlTaskTests.swift:26:6: Time limit was exceeded: 60.000 seconds
+    ✘ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" recorded an issue at BackgroundInterleavingTests.swift:434:6: Time limit was exceeded: 60.000 seconds
+    ✘ Test "R-NET-10: a priority write that lands after its transfer finished is followed by no other write" recorded an issue at BackgroundInterleavingTests.swift:462:6: Time limit was exceeded: 60.000 seconds
+    ✘ Test "R-SYN-14: a background handle's control task ends with its attach, however the attach ends" recorded an issue with 1 argument ending → terminal at BackgroundControlTaskTests.swift:26:6: Time limit was exceeded: 60.000 seconds
+== ME-relay-replaces: exit 1; ✘ Test run with 58 tests in 4 suites failed after 6.619 seconds with 966 issues.
+    ✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at BackgroundCoordinatorTests.swift:613:9: Expectation failed: calls == ["first"]
+    ✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at BackgroundCoordinatorTests.swift:614:9: Expectation failed: relay.hasHandler(for: ours)
+    ✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at BackgroundCoordinatorTests.swift:618:9: Expectation failed: calls == ["first", "second"]
+    ✘ Test "probe: relay calls each of many handlers exactly once, oldest first" recorded an issue at S3DC2CorrectProbeTests.swift:445:13: Expectation failed: relay.hasHandler(for: ours) == (accepted > completed)
+    ✘ Test "probe: relay calls each of many handlers exactly once, oldest first" recorded an issue at S3DC2CorrectProbeTests.swift:445:13: Expectation failed: relay.hasHandler(for: ours) == (accepted > completed)
+    ✘ Test "probe: relay calls each of many handlers exactly once, oldest first" recorded an issue at S3DC2CorrectProbeTests.swift:445:13: Expectation failed: relay.hasHandler(for: ours) == (accepted > completed)
+== MF-relay-newest: exit 1; ✘ Test run with 58 tests in 4 suites failed after 8.220 seconds with 7 issues.
+    ✘ Test "probe: relay calls each of many handlers exactly once, oldest first" recorded an issue at S3DC2CorrectProbeTests.swift:452:9: Expectation failed: calls == Array(0..<accepted)
+    ✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at BackgroundCoordinatorTests.swift:613:9: Expectation failed: calls == ["first"]
+    ✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at BackgroundCoordinatorTests.swift:618:9: Expectation failed: calls == ["first", "second"]
+    ✘ Test "R-NET-3: a handler handed over while an earlier one still waits runs only after its own wake's events were staged, and the earlier one still runs" recorded an issue at BackgroundCoordinatorTests.swift:652:9: Expectation failed: calls == ["first staged: true"]
+    ✘ Test "probe: overlapping wakes whose waits begin in reverse order still call each handler after its own wake's events" recorded an issue at S3DC2CorrectProbeTests.swift:411:9: Expectation failed: calls == ["first staged: true"]
+    ✘ Test "R-NET-3: a handler handed over while an earlier one still waits runs only after its own wake's events were staged, and the earlier one still runs" recorded an issue at BackgroundCoordinatorTests.swift:656:9: Expectation failed: calls == ["first staged: true", "second staged: true"]
+== MI-stale-takes-serial: exit 1; ✘ Test run with 58 tests in 4 suites failed after 7.111 seconds with 2 issues.
+    ✘ Test "probe: a replaced handle's late priority request never supersedes the current attach's request" recorded an issue at S3DC2CorrectProbeTests.swift:357:9: Expectation failed: changes == [0.75]
+    ✘ Test "probe: a replaced handle's late priority request never supersedes the current attach's request" recorded an issue at S3DC2CorrectProbeTests.swift:358:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+== MK-deinit-noop: exit 0; ✔ Test run with 58 tests in 4 suites passed after 8.264 seconds.

@@ -1,0 +1,193 @@
+=== none
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.454 seconds.
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.458 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.501 seconds.
+✔ Test run with 168 tests in 18 suites passed after 0.696 seconds.
+=== R1J-serial-before-token
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+✘ Test "R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks" recorded an issue at BackgroundInterleavingTests.swift:553:9: Expectation failed: changes == [0.75]
+✘ Test "R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks" recorded an issue at BackgroundInterleavingTests.swift:554:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+✘ Test "R-NET-10: a replaced handle's buffered control never cancels the joining handle's newer priority change" recorded an issue at BackgroundInterleavingTests.swift:531:9: Expectation failed: changes == [0.75, 0.25]
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.465 seconds.
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.466 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.526 seconds.
+✘ Test run with 168 tests in 18 suites failed after 0.671 seconds with 3 issues.
+=== R1K-if-not-while
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.596 seconds.
+✘ Test "R-NET-10: a priority rewrite that itself lands after a newer write is followed by the newest value" recorded an issue at BackgroundInterleavingTests.swift:591:9: Expectation failed: changes.last == 0.5
+✘ Test "R-NET-10: a priority rewrite that itself lands after a newer write is followed by the newest value" recorded an issue at BackgroundInterleavingTests.swift:592:9: Expectation failed: changes.count == 5
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.608 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.657 seconds.
+✘ Test run with 168 tests in 18 suites failed after 1.132 seconds with 2 issues.
+=== X1-no-second-token-check
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+✘ Test "R-NET-10: a priority change from a handle replaced while it listed the tasks never reaches the transfer that replaced it" recorded an issue at BackgroundInterleavingTests.swift:82:9: Expectation failed: await rig.driver.priorityChanges.isEmpty
+✘ Test "R-NET-10: a priority change from a handle replaced while it listed the tasks never reaches the transfer that replaced it" recorded an issue at BackgroundInterleavingTests.swift:83:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.25]
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.554 seconds.
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.608 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.680 seconds.
+✘ Test run with 168 tests in 18 suites failed after 1.154 seconds with 2 issues.
+=== X2-no-serial-guard
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at BackgroundInterleavingTests.swift:361:9: Expectation failed: changes.last == 0.25
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at BackgroundInterleavingTests.swift:362:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.25]
+✘ Test "R-NET-10: a newer promotion is kept over an older demotion whose listing returns later" recorded an issue at BackgroundInterleavingTests.swift:384:9: Expectation failed: changes.last == 0.75
+✘ Test "R-NET-10: a newer promotion is kept over an older demotion whose listing returns later" recorded an issue at BackgroundInterleavingTests.swift:385:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.512 seconds.
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.542 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.633 seconds.
+✘ Test run with 168 tests in 18 suites failed after 1.035 seconds with 4 issues.
+=== X3-finished-keeps-serial
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.564 seconds.
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.565 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.696 seconds.
+✔ Test run with 168 tests in 18 suites passed after 1.067 seconds.
+=== X4-no-entry-token-check
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+✘ Test "R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks" recorded an issue at BackgroundInterleavingTests.swift:553:9: Expectation failed: changes == [0.75]
+✘ Test "R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks" recorded an issue at BackgroundInterleavingTests.swift:554:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.520 seconds.
+✘ Test "R-NET-10: a replaced handle's buffered control never cancels the joining handle's newer priority change" recorded an issue at BackgroundInterleavingTests.swift:531:9: Expectation failed: changes == [0.75, 0.25]
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.600 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.656 seconds.
+✘ Test run with 168 tests in 18 suites failed after 1.046 seconds with 3 issues.
+=== MK-deinit-finishes-nothing
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+PROBE burstEndsAtLast count=202 last=Optional(0.5)
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✔ Test "PROBE hunt: a burst of lane changes ends at the last one" passed after 0.655 seconds.
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.659 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.772 seconds.
+✘ Test "R-SYN-14: a dropped background handle's control task ends at once while its transfer goes on" recorded an issue at BackgroundControlTaskTests.swift:80:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-14: a dropped background handle's control task ends at once while its transfer goes on" recorded an issue at BackgroundControlTaskTests.swift:96:9: Expectation failed: !Task.isCancelled
+✘ Test run with 168 tests in 18 suites failed after 64.012 seconds with 2 issues.
+=== MG-all
+◇ Test "PROBE hunt: a burst of lane changes ends at the last one" started.
+◇ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" started.
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+✘ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" recorded an issue at BackgroundInterleavingTests.swift:463:9: Expectation failed: Array(changes.prefix(2)) == [0.25, 0.75]
+PROBE burstEndsAtLast count=1 last=Optional(0.75)
+✘ Test "PROBE hunt: a burst of lane changes ends at the last one" recorded an issue at S3DC3CorrectProbeTests.swift:113:9: Expectation failed: changes.count == lanes.count + 1
+✘ Test "PROBE hunt: a burst of lane changes ends at the last one" recorded an issue at S3DC3CorrectProbeTests.swift:114:9: Expectation failed: changes.last == AssetPriority.prefetch.urlSessionTaskPriority
+✘ Test "R-NET-10: a priority write that lands after its transfer finished is followed by no other write" recorded an issue at BackgroundInterleavingTests.swift:492:9: Expectation failed: changes == [0.25, 0.75]
+PROBE staleBufferedPause changes=[0.75, 0.25] cancellations=[false]
+✘ Test "PROBE hunt: a burst of lane changes ends at the last one" failed after 0.321 seconds with 2 issues.
+✘ Test "R-NET-10: a priority rewrite that itself lands after a newer write is followed by the newest value" recorded an issue at BackgroundInterleavingTests.swift:590:9: Expectation failed: Array(changes.prefix(4)) == [0.25, 0.75, 0.5, 0.25]
+✘ Test "R-NET-10: a priority rewrite that itself lands after a newer write is followed by the newest value" recorded an issue at BackgroundInterleavingTests.swift:592:9: Expectation failed: changes.count == 5
+✔ Test "PROBE hunt: replaced handle's buffered pause never reaches the joined transfer" passed after 0.635 seconds.
+PROBE edgesOldVersusNewOrder early began=4 ended=4
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" passed after 0.738 seconds.
+✘ Test run with 168 tests in 18 suites failed after 1.103 seconds with 6 issues.
+=== MG handleControlsInOrder run 1
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:420:9: Expectation failed: delivered == [.priority(0.75), .listing, .priority(0.25)]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:422:9: Expectation failed: changes == [0.75, 0.25]
+✘ Test run with 1 test in 1 suite failed after 63.981 seconds with 4 issues.
+=== MG handleControlsInOrder run 2
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:420:9: Expectation failed: delivered == [.priority(0.75), .listing, .priority(0.25)]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:422:9: Expectation failed: changes == [0.75, 0.25]
+✘ Test run with 1 test in 1 suite failed after 63.995 seconds with 4 issues.
+=== MG handleControlsInOrder run 3
+✔ Test run with 1 test in 1 suite passed after 0.017 seconds.
+=== MG handleControlsInOrder run 4
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:420:9: Expectation failed: delivered == [.priority(0.75), .listing, .priority(0.25)]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:422:9: Expectation failed: changes == [0.75, 0.25]
+✘ Test run with 1 test in 1 suite failed after 63.993 seconds with 4 issues.
+=== MG handleControlsInOrder run 5
+✔ Test run with 1 test in 1 suite passed after 0.016 seconds.
+=== MG handleControlsInOrder run 6
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:420:9: Expectation failed: delivered == [.priority(0.75), .listing, .priority(0.25)]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:422:9: Expectation failed: changes == [0.75, 0.25]
+✘ Test run with 1 test in 1 suite failed after 64.001 seconds with 4 issues.
+=== MG handleControlsInOrder run 7
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:420:9: Expectation failed: delivered == [.priority(0.75), .listing, .priority(0.25)]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:422:9: Expectation failed: changes == [0.75, 0.25]
+✘ Test run with 1 test in 1 suite failed after 63.999 seconds with 3 issues.
+=== MG handleControlsInOrder run 8
+✔ Test run with 1 test in 1 suite passed after 0.043 seconds.
+=== MG handleControlsInOrder run 9
+✔ Test run with 1 test in 1 suite passed after 0.044 seconds.
+=== MG handleControlsInOrder run 10
+✔ Test run with 1 test in 1 suite passed after 0.037 seconds.
+=== AMP run 1 (noTaskOutlivesATransfer + old-order probe)
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+PROBE edgesOldVersusNewOrder early began=4 ended=3
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✔ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" passed after 0.313 seconds.
+✘ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" recorded an issue at S3DC3CorrectProbeTests.swift:51:9: Expectation failed: early.ended == 4
+✘ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" failed after 0.314 seconds with 1 issue.
+✘ Test run with 2 tests in 2 suites failed after 0.314 seconds with 1 issue.
+=== AMP run 2 (noTaskOutlivesATransfer + old-order probe)
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+PROBE edgesOldVersusNewOrder early began=4 ended=3
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✘ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" recorded an issue at S3DC3CorrectProbeTests.swift:51:9: Expectation failed: early.ended == 4
+✘ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" failed after 0.278 seconds with 1 issue.
+✔ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" passed after 0.285 seconds.
+✘ Test run with 2 tests in 2 suites failed after 0.285 seconds with 1 issue.
+=== AMP run 3 (noTaskOutlivesATransfer + old-order probe)
+◇ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" started.
+PROBE edgesOldVersusNewOrder early began=4 ended=3
+✔ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" passed after 0.230 seconds.
+PROBE edgesOldVersusNewOrder late began=4 ended=4
+✘ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" recorded an issue at S3DC3CorrectProbeTests.swift:51:9: Expectation failed: early.ended == 4
+✘ Test "PROBE S3D-4: edges read before stop (old order) vs after stop (new order)" failed after 0.249 seconds with 1 issue.
+✘ Test run with 2 tests in 2 suites failed after 0.249 seconds with 1 issue.

@@ -1,0 +1,14 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineJobs.swift b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+index bb22010..5c29a61 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -254,6 +254,9 @@ extension SyncEngine {
+                 self.retire(transfer)
+             }
+         } else {
++            if let active = job.active {
++                self.abandon(transfer, active)
++            }
+             self.relane(transfer, from: before)
+         }
+         self.notifyObservers()

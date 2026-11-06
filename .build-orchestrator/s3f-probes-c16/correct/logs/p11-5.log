@@ -1,0 +1,11 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" started.
+P-11 200 assets at 10.0 ms: concurrency 1 3.540506625 s, 5 1.035124417 s, speedup 3.420368186523031 (min 3.0)
+✔ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" passed after 4.593 seconds.
+✔ Suite "SyncBenchmarks" passed after 4.593 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 4.594 seconds.
+✔ Test run with 1 test in 2 suites passed after 4.594 seconds.

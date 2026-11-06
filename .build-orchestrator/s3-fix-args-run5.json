@@ -1,0 +1,27 @@
+{
+ "base": "s3-base",
+ "bar": "strict",
+ "maxCycle": 18,
+ "simSlots": [
+  {
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E"
+  }
+ ],
+ "wps": [
+  {
+   "wp": "s3f",
+   "name": "Stage 3 WP-F (sync engine)",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c14-issues.json",
+   "fromCycle": 15,
+   "maxCycle": 18,
+   "focus": "Stage 3 hardening, continued under the narrowed bar (S3-R16, S3-R17) and the new ruling S3-R18 with its amendment S3-R18a: read the end of the rulings file named above before anything else. Cycles 1-14 are committed on wp/s3f (HEAD 388f744; see docs/adr-drafts/s3f.md). Cycle 14 fixed every cycle-13 finding. Its verifiers left 5 blocking items, listed in the findings file named above with the non-blocking ones; their probes are under /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c14/. S3-R18 settles them by simplification. (1) Remove the place stamps' admission (the stamp's throttle refusal, freeSlots and what exists only for them): the barrier-end pump admits on the live throttle, breaker and slots alone. That fixes STAMP-AHEAD. Sweep-first answer assertions that expected a stamp's past view change one to one under item 1's exception, recorded. (2) A passed publication re-routes its moved ids at once instead of the deferred mark, and is right when a later apply lands while the earlier follow is owed (S3-R18a item 1). The mark, followPassedPublication and followedLane's publishing-job skip go. (3) G4 for whatever stays in followedLane. An earlier cycle-15 fixer was stopped before it knew S3-R18. Its unfinished tests are on branch wip/s3f-c15a (5a87864): reuse what fits, by copying files or hunks into wp/s3f, never by merging that branch. A stopped copy's unverified analysis is in /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c15-handback-analysis.md: check it before relying on it. Order of work: first commit the failing tests for the blocking items in both LaneDropVisit orders (CLAUDE.md P3), including the two-applies-while-owed case; then the removals and the re-route; then G4; then the draft (record S3-R18 and S3-R18a as orchestrator rulings, each removal, each one-to-one assertion change, and the residual risks). S3-R12 and S3-R13 apply unchanged; never edit Package.swift. The verifiers judge by S3-R16 to S3-R18a."
+  }
+ ]
+}

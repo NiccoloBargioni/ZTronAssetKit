@@ -1,0 +1,9 @@
+== sync1
+✔ Test run with 511 tests in 53 suites passed after 121.818 seconds.
+failing-lines=0
+== sync2
+✔ Test run with 511 tests in 53 suites passed after 119.091 seconds.
+failing-lines=0
+== sync3
+✔ Test run with 511 tests in 53 suites passed after 81.778 seconds.
+failing-lines=0

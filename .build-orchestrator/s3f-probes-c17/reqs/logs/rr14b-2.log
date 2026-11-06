@@ -1,0 +1,81 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC17ReqsProbes" started.
+◇ Test "PROBE-C17R-RR14-PUBLICATION-HOP" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17R-RR14-PUBLICATION-HOP" started.
+PROBE-C17R-RR14 followVisitedFirst after v3: (owed: false, c: "nil", n: "verifying", nHoldsB: true, nInterests: 2)
+PROBE-C17R-RR14 followVisitedFirst after v4: (owed: false, c: "nil", n: "verifying", nHoldsB: true, nInterests: 2)
+PROBE-C17R-RR14 followVisitedFirst p=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) mStarts=0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17R-RR14-PUBLICATION-HOP" started.
+PROBE-C17R-RR14 sweepFollowsFirst after v3: (owed: true, c: "downloading", n: "verifying", nHoldsB: false, nInterests: 1)
+PROBE-C17R-RR14 sweepFollowsFirst after v4: (owed: true, c: "nil", n: "verifying", nHoldsB: false, nInterests: 1)
+PROBE-C17R-RR14 sweepFollowsFirst at N's failure: (owed: true, waits: true, nHoldsB: false, bOn: [c-d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d])
+PROBE-C17R-RR14 sweepFollowsFirst p=failure(ZTronAssetModel.AssetError.integrityFailure) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) mStarts=1
+✘ Test "PROBE-C17R-RR14-PUBLICATION-HOP" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17ReqsProbes.swift:98:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ PROBE-C17R-RR14: B was joined to N's publication at v3 and passed by v4's visit, so N's integrity failure answers it (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); mStarts 1
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 48
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "PROBE-C17R-RR14-PUBLICATION-HOP" with 2 test cases failed after 1.032 seconds with 1 issue.
+↳ /// PROBE-C17R-RR14-PUBLICATION-HOP: the draft's RR-14 ("an interest moved onto a publishing job's content by one apply
+↳ /// and on by the next, while the publication runs, skips that publication's failure"; an answer difference by the
+↳ /// fixer's own analysis, not probed there). C (100 kB, zz-b; a user waiter B) downloads; N (16 B, zz-p; a user waiter
+↳ /// P) downloads bytes that fail their checksum and publishes, held at its first store unit. v3 then moves zz-b onto
+↳ /// N's content, and v4 moves it on to M (48 B), both while N's publication is held. N's publication then fails its
+↳ /// integrity check.
+↳ /// Visit-first: v3's visit superseded C and joined B to N's publication; v4's visit passed N (its publication began
+↳ /// before the apply), so N's integrity failure answered P and B `integrityFailure`.
+↳ /// Sweep-first: `bringInbound` ran at N's publication start, before v3; nothing brings B onto N afterwards, and the
+↳ /// owed visit of C, comparing with v4's copy, moves B straight to M, which serves it.
+✘ Suite "VerifyC17ReqsProbes" failed after 1.032 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 17, requirements lens). Never committed.
+✘ Test run with 1 test in 1 suite failed after 1.032 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

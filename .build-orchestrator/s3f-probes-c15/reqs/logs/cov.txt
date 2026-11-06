@@ -1,0 +1,5 @@
+cov start 18:46:33 { 6.49 11.73 13.85 }
+cov test exit 0 18:54:15 { 12.55 17.49 16.51 }
+.build-verify-s3f-c15-reqs/out/Products/Debug/codecov/default.profdata
+export exit 0
+gate exit 1

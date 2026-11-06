@@ -1,0 +1,33 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+✘ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:706:9: Expectation failed: after.p == .downloading && after.q == .queued
+↳ P, paused, resumes at its queue's front before Q: (p: Optional(ZTronAssetSync.JobState.queued), q: Optional(ZTronAssetSync.JobState.downloading), bQueuedAt: Optional(1000000000ns), violations: [])
+↳ after.p == .downloading && after.q == .queued → false
+↳   after.p == .downloading → false
+↳   after.q == .queued → <not evaluated>
+✘ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:707:9: Expectation failed: restarted.first == p.transferID
+↳ the next start is P's: [c-abd8303b9570c59dfcb282f45541e39cc0387da171d8e14f4a3ae2b2a2df73e2]
+↳ restarted.first == p.transferID → false
+↳   restarted.first → c-abd8303b9570c59dfcb282f45541e39cc0387da171d8e14f4a3ae2b2a2df73e2
+↳     some → c-abd8303b9570c59dfcb282f45541e39cc0387da171d8e14f4a3ae2b2a2df73e2
+↳       rawValue → "c-abd8303b9570c59dfcb282f45541e39cc0387da171d8e14f4a3ae2b2a2df73e2"
+↳   p.transferID → c-917bb09fdb415c1256ea3cebb5f83c36e924fe60573ecdcfabe1c51d028bf526
+↳     rawValue → "c-917bb09fdb415c1256ea3cebb5f83c36e924fe60573ecdcfabe1c51d028bf526"
+✘ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" with 2 test cases failed after 0.373 seconds with 2 issues.
+↳ /// A transfer whose pause completes while a follow is owed resumes at its queue's front, as it does when the follow
+↳ /// visits first (the cycle-9 amendment (a): a place that waits for the follow keeps `front`). One slot: P (prefetch)
+↳ /// downloads, Q (prefetch) waits behind it. While the follow is owed (or after it, visit-first), P's attempt ends
+↳ /// paused (the transport's `.paused`, delivered through `paused`). Visited first, P is queued at the front and starts
+↳ /// again before Q. And a place taken while the follow is owed keeps the time it was requested at: a bulk request made
+↳ /// before the clock moves 10 s is queued at that time, not at the follow's end, so bulk aging (`bulkAging`, 30 s)
+↳ /// counts its whole wait (the clock stays short of it here, so the aged-bulk rule does not reorder the starts read).
+✘ Suite "Engine runs" failed after 0.373 seconds with 2 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 0.373 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

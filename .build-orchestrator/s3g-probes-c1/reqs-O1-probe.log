@@ -1,0 +1,15 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "KitBenchmarks" started.
+◇ Test "P-8: a prefetch window update over 10 pages stays within ui_call_ms_max with a radius far beyond the carousel" started.
+P-8 prefetch window update over 10 pages, radius 10000000: median 9.637417 ms (runs [9.723, 9.639, 9.634125, 9.637417, 9.629458000000001]; budget 1.0 ms)
+✘ Test "P-8: a prefetch window update over 10 pages stays within ui_call_ms_max with a radius far beyond the carousel" recorded an issue at BenchKit.swift:278:17: Expectation failed: median <= callMax
+↳ radius 10000000: median 9.637417 ms
+↳ median <= callMax → false
+↳   median → 9.637417
+↳   callMax → 1.0
+✘ Test "P-8: a prefetch window update over 10 pages stays within ui_call_ms_max with a radius far beyond the carousel" recorded an issue at BenchKit.swift:254:10: Time limit was exceeded: 60.000 seconds
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

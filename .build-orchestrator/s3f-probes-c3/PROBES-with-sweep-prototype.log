@@ -1,0 +1,38 @@
+◇ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" started.
+◇ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" started.
+◇ Test case passing 1 argument round → 0 to "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test case passing 1 argument round → 1 to "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test "PROBE-C3-PARTIAL: a 404 for a shared job answers only the id still mapped to it" started.
+◇ Test case passing 1 argument round → 0 to "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" started.
+◇ Test case passing 1 argument round → 2 to "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test case passing 1 argument round → 1 to "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" started.
+◇ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument failure → .notFound to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument failure → .integrity to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument failure → .rejected to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument failure → .transientAtCap to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+PROBE-C3-W4[integrity] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[integrity] answer: success(ZTronAssetModel.AssetLocation(..))
+PROBE-C3-W4[notFound] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[notFound] answer: success(ZTronAssetModel.AssetLocation(..))
+PROBE-C3-SPACE setup: the old job is Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))
+PROBE-C3-PARTIAL: a success(ZTronAssetModel.AssetLocation(..)), b failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "PROBE-C3-PARTIAL: a 404 for a shared job answers only the id still mapped to it" passed after 3.726 seconds.
+PROBE-C3-W4[transientAtCap] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[transientAtCap] answer: success(ZTronAssetModel.AssetLocation(..))
+PROBE-C3-W4[rejected] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[rejected] answer: success(ZTronAssetModel.AssetLocation(..))
+✔ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" with 4 test cases passed after 4.222 seconds.
+PROBE-C3-SPACE before the reap: (listed: true, oldState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), unfollowed: false, owed: true); room above reserve 1000003, pending 300
+PROBE-C3-SPACE after the reap: (oldState: nil, owed: true, waiting: true)
+PROBE-C3-SPACE answer: success(ZTronAssetModel.AssetLocation(..)); room above reserve now 1000336
+✔ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" passed after 4.958 seconds.
+PROBE-C3-W4b[0]: owed at release (1792, 1), complete true, answer success(ZTronAssetModel.AssetLocation(..))
+PROBE-C3-W4b[2]: owed at release (1792, 1), complete true, answer success(ZTronAssetModel.AssetLocation(..))
+PROBE-C3-W4b[1]: owed at release (1792, 1), complete true, answer success(ZTronAssetModel.AssetLocation(..))
+PROBE-C3-W1b[1]: complete true, starts since the apply 4, stale 0
+✔ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" with 3 test cases passed after 7.169 seconds.
+PROBE-C3-W1b[0]: complete true, starts since the apply 4, stale 0
+✔ Test "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" with 2 test cases passed after 7.578 seconds.
+✔ Test run with 5 tests in 1 suite passed after 7.578 seconds.

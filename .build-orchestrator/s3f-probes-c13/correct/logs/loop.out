@@ -1,0 +1,32 @@
+LOOP START 12:42:16 { 22.83 97.41 166.19 }
+w3-1 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.514 seconds.
+w6-1 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.494 seconds.
+w4-1 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.409 seconds.
+w5-1 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.342 seconds.
+w1-1 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.446 seconds.
+w2-1 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.188 seconds.
+w3-2 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.158 seconds.
+w6-2 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.232 seconds.
+w4-2 exit 0 ✔ Test run with 1 test in 1 suite passed after 0.988 seconds.
+w5-2 exit 0 ✔ Test run with 1 test in 1 suite passed after 0.920 seconds.
+w1-2 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.014 seconds.
+w2-2 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.000 seconds.
+w3-3 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.026 seconds.
+w6-3 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.401 seconds.
+w4-3 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.528 seconds.
+w5-3 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.905 seconds.
+w1-3 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.006 seconds.
+w2-3 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.595 seconds.
+w3-4 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.414 seconds.
+w6-4 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.471 seconds.
+w4-4 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.371 seconds.
+w5-4 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.491 seconds.
+w1-4 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.326 seconds.
+w2-4 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.014 seconds.
+w3-5 exit 0 ✔ Test run with 1 test in 1 suite passed after 1.743 seconds.
+w6-5 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.029 seconds.
+w4-5 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.480 seconds.
+w5-5 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.500 seconds.
+w1-5 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.454 seconds.
+w2-5 exit 0 ✔ Test run with 1 test in 1 suite passed after 2.659 seconds.
+LOOP END 12:44:15 { 27.52 73.20 147.43 }

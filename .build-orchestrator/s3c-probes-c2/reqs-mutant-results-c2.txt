@@ -1,0 +1,72 @@
+=== S3MUT=none
+exit=0
+✔ Test run with 14 tests in 2 suites passed after 0.021 seconds.
+=== S3MUT=P1
+exit=1
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:482:9: Expectation failed: await LargeBlobTests.purgedIDs(harness, shared) == ["w0", "w1"]
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:446:9: Expectation failed: await LargeBlobTests.purgedIDs(harness, shared).isEmpty
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:483:9: Expectation failed: result == PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:485:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:485:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:487:9: Expectation failed: await LargeBlobTests.references(harness, key) == 3
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:447:9: Expectation failed: result == PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 0)
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:449:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:449:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:449:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:449:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" recorded an issue with 1 argument chunk → 2 at LargeBlobTests.swift:451:9: Expectation failed: await LargeBlobTests.references(harness, key) == 5
+✘ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" with 2 test cases failed after 0.012 seconds with 7 issues.
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" failed after 0.012 seconds with 5 issues.
+=== S3MUT=P2
+exit=1
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:482:9: Expectation failed: await LargeBlobTests.purgedIDs(harness, shared) == ["w0", "w1"]
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:483:9: Expectation failed: result == PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:485:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:485:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:487:9: Expectation failed: await LargeBlobTests.references(harness, key) == 3
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" failed after 0.013 seconds with 5 issues.
+✘ Test run with 14 tests in 2 suites failed after 0.022 seconds with 5 issues.
+=== S3MUT=P3
+exit=1
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" failed after 63.998 seconds with 1 issue.
+✘ Test run with 14 tests in 2 suites failed after 63.998 seconds with 1 issue.
+=== S3MUT=P4
+exit=1
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:482:9: Expectation failed: await LargeBlobTests.purgedIDs(harness, shared) == ["w0", "w1"]
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:483:9: Expectation failed: result == PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:485:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:485:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:487:9: Expectation failed: await LargeBlobTests.references(harness, key) == 3
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" failed after 0.013 seconds with 5 issues.
+✘ Test "probe P2: evictable purge, holders swapped between turns" recorded an issue at VerifierS3CC1CorrectProbe.swift:90:9: Expectation failed: purged == ["w0", "w1"]
+✘ Test "probe P2: evictable purge, holders swapped between turns" failed after 0.003 seconds with 1 issue.
+✘ Test run with 14 tests in 2 suites failed after 0.022 seconds with 6 issues.
+=== S3MUT=Q1
+exit=1
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:543:9: Expectation failed: await LargeBlobTests.cou
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:546:13: Expectation failed: await harness.isPresent
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:546:13: Expectation failed: await harness.isPresent
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:548:9: Expectation failed: await LargeBlobTests.ref
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" with 2 test cases failed after 0.019 seconds with 4 issues.
+✘ Test "probe P3: quota eviction, holders swapped between turns" recorded an issue at VerifierS3CC1CorrectProbe.swift:124:9: Expectation failed: evicted == 2
+✘ Test "probe P3: quota eviction, holders swapped between turns" failed after 0.003 seconds with 1 issue.
+✘ Test run with 14 tests in 2 suites failed after 0.030 seconds with 5 issues.
+=== S3MUT=Q2
+exit=1
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:543:9: Expectation failed: await LargeBlobTests.cou
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:546:13: Expectation failed: await harness.isPresent
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:546:13: Expectation failed: await harness.isPresent
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" recorded an issue with 1 argument point → betweenChunks at LargeBlobTests.swift:548:9: Expectation failed: await LargeBlobTests.ref
+✘ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" with 2 test cases failed after 0.013 seconds with 4 issues.
+✘ Test "probe P3: quota eviction, holders swapped between turns" recorded an issue at VerifierS3CC1CorrectProbe.swift:124:9: Expectation failed: evicted == 2
+✘ Test "probe P3: quota eviction, holders swapped between turns" failed after 0.003 seconds with 1 issue.
+✘ Test run with 14 tests in 2 suites failed after 0.023 seconds with 5 issues.
+=== S3MUT=Q3
+exit=1
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → bound at LargeBlobTests.swift:310:9: Expectation failed: await LargeBlobTests.count(harness, shared, .absent(.evicted))
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → bound at LargeBlobTests.swift:312:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → bound at LargeBlobTests.swift:312:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → bound at LargeBlobTests.swift:312:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → bound at LargeBlobTests.swift:317:9: Expectation failed: await LargeBlobTests.references(harness, key) == (change == .b
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" with 2 test cases failed after 0.014 seconds with 5 issues.
+✘ Test run with 14 tests in 2 suites failed after 0.022 seconds with 5 issues.

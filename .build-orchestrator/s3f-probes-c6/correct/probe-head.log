@@ -1,0 +1,25 @@
+ 5:30  up 4 days, 17:54, 2 users, load averages: 28.50 33.52 65.64
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC6CorrectProbes" started.
+◇ Suite "Engine regressions, close-out cycle 8" started.
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" started.
+◇ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+✔ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" passed after 0.218 seconds.
+✔ Suite "Engine regressions, close-out cycle 8" passed after 0.218 seconds.
+PROBE-C6-READDROP visitFirst=true before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), ids: Optional(1), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace))) after=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.downloading), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274435456, volumeOpportunistic: 268435456, usedBytes: 316, pendingReclaim: 0, budgetBytes: 137217886, reserveBytes: 268435456)), violations: 0)
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" started.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases passed after 0.956 seconds.
+✔ Suite "Engine runs" passed after 0.957 seconds.
+PROBE-C6-READDROP visitFirst=false before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), ids: Optional(2), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace))) after=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.downloading), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274435456, volumeOpportunistic: 268435456, usedBytes: 300, pendingReclaim: 0, budgetBytes: 137217878, reserveBytes: 268435456)), violations: 0)
+✔ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" with 2 test cases passed after 1.418 seconds.
+✔ Suite "VerifyC6CorrectProbes" passed after 1.419 seconds.
+✔ Test run with 3 tests in 3 suites passed after 1.419 seconds.
+exit 0
+ 5:31  up 4 days, 17:54, 2 users, load averages: 27.41 33.21 65.34

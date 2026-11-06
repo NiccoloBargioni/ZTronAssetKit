@@ -1,0 +1,58 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC1Correct probes" started.
+◇ Test "PROBE-V1: a user-lane group's job that failed offline before the first reading is retried by that reading" started.
+◇ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" started.
+◇ Test "PROBE-V6: a lagging subscriber across three runs gets every run's end before the next run's start and its start before its progress" started.
+◇ Test "PROBE-V3: a run over a healthy asset and one failed at the integrity cap reports exactly the capped one and writes no stamp" started.
+◇ Test "PROBE-V1b: a first satisfied reading with nothing failed starts nothing extra" started.
+◇ Test "PROBE-V4: cancellations and new calls racing a multi-turn shutdown settle resume every caller once" started.
+✘ Test "PROBE-V6: a lagging subscriber across three runs gets every run's end before the next run's start and its start before its progress" recorded an issue at VerifyC1CorrectProbes.swift:138:17: Expectation failed: started.map { $0 < at } == true
+↳ PROBE-V6 FAIL: run 3's progress before its start: [ZTronAssetModel.AssetEvent.syncProgress(run-3, ZTronAssetModel.SyncProgress(fraction: 0.75, completedCount: 1, totalCount: 2, bytesReceived: 1, bytesExpected: 2)), ZTronAssetModel.AssetEvent.syncFinished(run-2, ZTronAssetModel.SyncOutcome.failed(ZTronAssetModel.AssetError.cancelled)), ZTronAssetModel.AssetEvent.syncStarted(run-3, ZTronAssetModel.SyncTrigger.explicit)]
+↳ started.map { $0 < at } == true → false
+↳   started.map { $0 < at } → false
+↳     some → false
+↳     some → true
+✘ Test "PROBE-V6: a lagging subscriber across three runs gets every run's end before the next run's start and its start before its progress" failed after 0.002 seconds with 1 issue.
+✘ Test "PROBE-V1: a user-lane group's job that failed offline before the first reading is retried by that reading" recorded an issue at VerifyC1CorrectProbes.swift:30:13: Expectation failed: after != .failed(.whenOnline)
+↳ PROBE-V1 FAIL: satisfied first reading left the job Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.whenOnline))
+↳ after != .failed(.whenOnline) → false
+↳   after → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳     some → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳       failed → .whenOnline
+↳   .failed(.whenOnline) → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳     some → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳       failed → .whenOnline
+✘ Test "PROBE-V1: a user-lane group's job that failed offline before the first reading is retried by that reading" failed after 0.007 seconds with 1 issue.
+↳ /// A user-lane group (no waiter, so no fail-fast answer) keeps a job whose attempt failed offline before the
+↳ /// engine's first reading after an idle teardown; the first satisfied reading must retry it.
+✔ Test "PROBE-V1b: a first satisfied reading with nothing failed starts nothing extra" passed after 0.008 seconds.
+✘ Test "PROBE-V3: a run over a healthy asset and one failed at the integrity cap reports exactly the capped one and writes no stamp" recorded an issue at VerifyC1CorrectProbes.swift:90:25: Issue recorded
+↳ PROBE-V3 FAIL: a run over an integrity-capped asset ended .complete(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 23:11:40 +0000, finishedAt: 2023-11-14 23:11:40 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 0, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 1, unchangedCount: 1, fetchBytes: 0, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 0, bytesDownloaded: 0, failures: []))
+✘ Test "PROBE-V3: a run over a healthy asset and one failed at the integrity cap reports exactly the capped one and writes no stamp" failed after 0.017 seconds with 1 issue.
+✘ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" recorded an issue at VerifyC1CorrectProbes.swift:262:9: Expectation failed: check.bad.isEmpty
+↳ PROBE-V5 FAIL: jobs left not following the copy: ["c-099dfefc94 holds f012", "c-252000624d holds f009", "c-339e51e715 holds f001", "c-381d1f5c99 holds f007", "c-3e711cf877 holds f013", "c-598b5af2ee holds f000", "c-677af15fd9 holds f008", "c-95ae594401 holds f010", "c-af046231f6 holds f011", "c-b086853a0f holds f006", "c-bb5f12e564 holds f005", "c-c671ad4886 holds f002", "c-e0ce3c1ecf holds f004", "c-f107198cf8 holds f014", "c-fb9c0860e7 holds f003"]
+↳ check.bad.isEmpty → false
+↳   check.bad → ["c-099dfefc94 holds f012", "c-252000624d holds f009", "c-339e51e715 holds f001", "c-381d1f5c99 holds f007", "c-3e711cf877 holds f013", "c-598b5af2ee holds f000", "c-677af15fd9 holds f008", "c-95ae594401 holds f010", "c-af046231f6 holds f011", "c-b086853a0f holds f006", "c-bb5f12e564 holds f005", "c-c671ad4886 holds f002", "c-e0ce3c1ecf holds f004", "c-f107198cf8 holds f014", "c-fb9c0860e7 holds f003"]
+↳   isEmpty → false
+✘ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" recorded an issue at VerifyC1CorrectProbes.swift:263:9: Expectation failed: check.violations.isEmpty
+↳ PROBE-V5: ["job c-f107198cf8fe7d9940f14e3356cafa4c98bf894182e3701bead7c1ba615cfeac holds f014, which the copy maps elsewhere, and is not in unfollowed", "job c-c671ad48865d4f6bd000e2aef5dc4925bf822639ba86676083a7d4c3ae0d0ac1 holds f002, which the copy maps elsewhere, and is not in unfollowed", "job c-af046231f6b80cac383e63792d48259123efd98db074323154f5fbd8769c235c holds f011, which the copy maps elsewhere, and is not in unfollowed", "job c-95ae59440184f89525b52ad49b9b2cf5011e9304f4226ab2bfe1689d8193f152 holds f010, which the copy maps elsewhere, and is not in unfollowed", "job c-598b5af2eeb36231632f9765bf33a453e3d90e22d8f6e3ccb593e0292ece2cfc holds f000, which the copy maps elsewhere, and is not in unfollowed", "job c-339e51e7154229d7df7c2a21a3b32e5bf74816675351faf2a9ad8fea241115c9 holds f001, which the copy maps elsewhere, and is not in unfollowed", "job c-381d1f5c995e97c12d22aec904d58e7e2bf57119efc0d144b02e34bb6b8eb60b holds f007, which the copy maps elsewhere, and is not in unfollowed", "job c-252000624d339e2a4c0c2d90a316e1618ef4f6cf521cabbaa79a99da6ee1f573 holds f009, which the copy maps elsewhere, and is not in unfollowed", "job c-fb9c0860e72244557eda267946a0ae9193f36dbe16c4342f714de8db7d29d35a holds f003, which the copy maps elsewhere, and is not in unfollowed", "job c-e0ce3c1ecf460cb4bcdfc291732f4a063d7bce24f8f6416b4c83a5b2bf3a3f93 holds f004, which the copy maps elsewhere, and is not in unfollowed", "job c-3e711cf877dc96b4e64d03ba1e72c7934ccbbbd2e75072b0d6226cb30dd0a742 holds f013, which the copy maps elsewhere, and is not in unfollowed", "job c-099dfefc94fd5c236f7b85c0220d2bc73fd6160099fd39dd044f5d14dba48d6d holds f012, which the copy maps elsewhere, and is not in unfollowed", "job c-b086853a0fbad3d10f7843c27d6b3350b610cad8f56b51970a4d4fda11912b11 holds f006, which the copy maps elsewhere, and is not in unfollowed", "job c-bb5f12e5644dd23254feee5a697b7d043a1dc9d8b67db0143e8bb4c882ed6066 holds f005, which the copy maps elsewhere, and is not in unfollowed", "job c-677af15fd97cf5975d83943b3387ff9eaf3037209d5bae996ede7fe4be44a105 holds f008, which the copy maps elsewhere, and is not in unfollowed"]
+↳ check.violations.isEmpty → false
+↳   check.violations → ["job c-f107198cf8fe7d9940f14e3356cafa4c98bf894182e3701bead7c1ba615cfeac holds f014, which the copy maps elsewhere, and is not in unfollowed", "job c-c671ad48865d4f6bd000e2aef5dc4925bf822639ba86676083a7d4c3ae0d0ac1 holds f002, which the copy maps elsewhere, and is not in unfollowed", "job c-af046231f6b80cac383e63792d48259123efd98db074323154f5fbd8769c235c holds f011, which the copy maps elsewhere, and is not in unfollowed", "job c-95ae59440184f89525b52ad49b9b2cf5011e9304f4226ab2bfe1689d8193f152 holds f010, which the copy maps elsewhere, and is not in unfollowed", "job c-598b5af2eeb36231632f9765bf33a453e3d90e22d8f6e3ccb593e0292ece2cfc holds f000, which the copy maps elsewhere, and is not in unfollowed", "job c-339e51e7154229d7df7c2a21a3b32e5bf74816675351faf2a9ad8fea241115c9 holds f001, which the copy maps elsewhere, and is not in unfollowed", "job c-381d1f5c995e97c12d22aec904d58e7e2bf57119efc0d144b02e34bb6b8eb60b holds f007, which the copy maps elsewhere, and is not in unfollowed", "job c-252000624d339e2a4c0c2d90a316e1618ef4f6cf521cabbaa79a99da6ee1f573 holds f009, which the copy maps elsewhere, and is not in unfollowed", "job c-fb9c0860e72244557eda267946a0ae9193f36dbe16c4342f714de8db7d29d35a holds f003, which the copy maps elsewhere, and is not in unfollowed", "job c-e0ce3c1ecf460cb4bcdfc291732f4a063d7bce24f8f6416b4c83a5b2bf3a3f93 holds f004, which the copy maps elsewhere, and is not in unfollowed", "job c-3e711cf877dc96b4e64d03ba1e72c7934ccbbbd2e75072b0d6226cb30dd0a742 holds f013, which the copy maps elsewhere, and is not in unfollowed", "job c-099dfefc94fd5c236f7b85c0220d2bc73fd6160099fd39dd044f5d14dba48d6d holds f012, which the copy maps elsewhere, and is not in unfollowed", "job c-b086853a0fbad3d10f7843c27d6b3350b610cad8f56b51970a4d4fda11912b11 holds f006, which the copy maps elsewhere, and is not in unfollowed", "job c-bb5f12e5644dd23254feee5a697b7d043a1dc9d8b67db0143e8bb4c882ed6066 holds f005, which the copy maps elsewhere, and is not in unfollowed", "job c-677af15fd97cf5975d83943b3387ff9eaf3037209d5bae996ede7fe4be44a105 holds f008, which the copy maps elsewhere, and is not in unfollowed"]
+↳   isEmpty → false
+✘ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" recorded an issue at VerifyC1CorrectProbes.swift:265:9: Expectation failed: check.wanted == 35
+↳ // 35 ids remain from the group (10 changed, 5 re-pathed, 20 kept); f999 was never in the group.
+↳ PROBE-V5: assets wanted 40, jobs 40, downloading at the apply 1
+↳ check.wanted == 35 → false
+↳   check.wanted → 40
+✘ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" failed after 0.019 seconds with 3 issues.
+↳ /// After an apply that changes, drops, re-paths and keeps members of a waiting prefetch group (some downloading),
+↳ /// no job outside verifying or committing holds an id the copy maps to another transfer, every invariant holds, and
+↳ /// the changed members' new content is wanted by the group.
+✔ Test "PROBE-V4: cancellations and new calls racing a multi-turn shutdown settle resume every caller once" passed after 0.373 seconds.
+✘ Suite "VerifyC1Correct probes" failed after 0.373 seconds with 6 issues.
+↳ /// Independent close-out verification probes (s3f, cycle 1, correctness lens). Scratch only, never committed.
+✘ Test run with 6 tests in 1 suite failed after 0.373 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

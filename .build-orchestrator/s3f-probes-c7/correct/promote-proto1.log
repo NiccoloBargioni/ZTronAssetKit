@@ -1,0 +1,5 @@
+PROBE-C7-RANK-PROMOTE visitFirst=true aResult: success(ZTronAssetModel.ok(zz-a,3000000)) rResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 3000000)) pResult: success(ZTronAssetModel.ok(zz-p,3000000))
+PROBE-C7-RANK-PROMOTE visitFirst=false aResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000)) rResult: success(ZTronAssetModel.ok(zz-r,3500000)) pResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+✘ Test "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" recorded an issue with 1 argument visitFirst → false at VerifyC7CorrectProbes.swift:224:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+✘ Test "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" with 2 test cases failed after 3.924 seconds with 1 issue.
+✘ Test run with 1 test in 1 suite failed after 3.926 seconds with 1 issue.

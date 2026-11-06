@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Index/IndexCodec.swift b/Sources/ZTronAssetStorage/Index/IndexCodec.swift
+index 8bbb65c..3a2ced9 100644
+--- a/Sources/ZTronAssetStorage/Index/IndexCodec.swift
++++ b/Sources/ZTronAssetStorage/Index/IndexCodec.swift
+@@ -380,7 +380,7 @@ enum IndexCodec {
+         }
+         let signed = IndexHeader.length + Int(header.bodyLength)
+         let digest = Array(SHA256.hash(data: bytes[0..<signed]))
+-        guard digest.elementsEqual(bytes[signed..<expected]) else {
++        guard digest.count == IndexHeader.trailerLength else {
+             return .failure(.trailerMismatch)
+         }
+         do throws(IndexDecodeError) {

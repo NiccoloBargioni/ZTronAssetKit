@@ -1,0 +1,13 @@
+--- variants/EngineJobs.head.swift	2026-10-30 08:43:27
++++ variants/EngineJobs.noReorder.swift	2026-10-30 08:43:28
+@@ -718,8 +718,8 @@
+         case .none:
+             break
+         case .followed:
+-            // Ranks, lanes and the jobs themselves may have changed: collect and order them again.
+-            (candidates, smallest) = self.spaceSweepCandidates(sweep)
++            // MUTANT noReorder
++            _ = 0
+             if let room, smallest > room.subtractingClamped(ahead) {
+                 return
+             }

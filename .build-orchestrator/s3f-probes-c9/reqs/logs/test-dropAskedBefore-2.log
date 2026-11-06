@@ -1,0 +1,28 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+✘ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:708:9: Expectation failed: after.bQueuedAt == requestedAt
+↳ the bulk request is queued at the time it was made, not when the follow ended: Optional(11000000000ns) vs 1000000000ns
+↳ after.bQueuedAt == requestedAt → false
+↳   after.bQueuedAt → 11000000000ns
+↳     some → 11000000000ns
+↳       nanoseconds → 11000000000
+↳   requestedAt → 1000000000ns
+↳     nanoseconds → 1000000000
+✘ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" with 2 test cases failed after 0.388 seconds with 1 issue.
+↳ /// A transfer whose pause completes while a follow is owed resumes at its queue's front, as it does when the follow
+↳ /// visits first (the cycle-9 amendment (a): a place that waits for the follow keeps `front`). One slot: P (prefetch)
+↳ /// downloads, Q (prefetch) waits behind it. While the follow is owed (or after it, visit-first), P's attempt ends
+↳ /// paused (the transport's `.paused`, delivered through `paused`). Visited first, P is queued at the front and starts
+↳ /// again before Q. And a place taken while the follow is owed keeps the time it was requested at: a bulk request made
+↳ /// before the clock moves 10 s is queued at that time, not at the follow's end, so bulk aging (`bulkAging`, 30 s)
+↳ /// counts its whole wait (the clock stays short of it here, so the aged-bulk rule does not reorder the starts read).
+✘ Suite "Engine runs" failed after 0.388 seconds with 1 issue.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 0.389 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

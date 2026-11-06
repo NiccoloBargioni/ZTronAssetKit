@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift b/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift
+index c7f0bd6..f13e114 100644
+--- a/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift
++++ b/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift
+@@ -92,7 +92,7 @@ public struct TransportSecurityPolicy: Sendable, Hashable {
+         }
+         if origin.scheme != "https" {
+             let loopback = origin.host == "127.0.0.1" || origin.host == "::1" || origin.host == "localhost"
+-            guard self.plaintext == .loopbackOnly, loopback else {
++            guard self.plaintext == .loopbackOnly else {
+                 return .insecureScheme
+             }
+         }

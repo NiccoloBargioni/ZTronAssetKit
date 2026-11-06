@@ -1,0 +1,28 @@
+EngineFollow.swift   985|      0|                byIdentifier[target.entry.identifier] = index
+EngineFollow.swift  1024|  7.54k|                guard pending.isEmpty || pending[asset] == nil, let listed = copy.entry(for: asset) else {
+EngineFollow.swift  1025|    166|                    continue
+EngineFollow.swift  1031|      0|                    index = byIdentifier[asset].flatMap { SyncEngine.sameTransfer(listed, targets[$0].entry) ? $0 : nil }
+EngineFollow.swift  1039|      0|                    first?.ids.insert(asset)
+EngineFollow.swift  1041|      0|                    others[slot].ids.insert(asset)
+EngineFollow.swift  1043|      0|                    others.append((index, [asset]))
+EngineFollow.swift  1050|      0|                found.append((job.epoch, other.target, holder, other.ids))
+EngineFollow.swift  1156|      0|            return false
+EngineFollow.swift  1168|    354|        for transfer in [move.target, move.holder] where self.state.inboundWaits[transfer] != nil && !self.inboundBlocks(transfer) {
+EngineFollow.swift  1177|      0|            return
+EngineFollow.swift  1183|      0|                continuation.resume()
+EngineFollow.swift  1199|      0|            waits[transfer]?.resume()
+EngineFollow.swift  1246|      0|            self.releaseInboundWaits()
+EngineFailures.swift   724|     90|            if !pending.isEmpty, let target = pending[asset] {
+EngineFailures.swift   725|      0|                return target == job.transfer
+EngineFailures.swift   726|     90|            }
+EngineFailures.swift   771|     17|                        if visit?.contains(asset) ?? true || movedBefore.contains(asset) || (!pending.isEmpty && pending[asset] != nil) {
+EngineDispatch.swift  1031|  15.5k|        if self.inboundBlocks(transfer) {
+EngineDispatch.swift  1036|      3|            await self.awaitInboundMoves(transfer)
+EngineDispatch.swift  1037|      3|            guard self.isRunning else {
+EngineDispatch.swift  1038|      0|                return
+EngineDispatch.swift  1040|      3|            guard self.state.jobs[transfer]?.epoch == epoch, self.state.jobs[transfer]?.state == .verifying else {
+EngineDispatch.swift  1041|      0|                if self.state.jobs[transfer] == nil {
+EngineDispatch.swift  1042|      0|                    self.recordBreaker(.abandoned(transfer))
+EngineDispatch.swift  1045|      0|                await self.state.staging?.discard(file.name)
+EngineDispatch.swift  1046|      0|                return
+EngineShutdown.swift   117|  5.03k|        self.releaseInboundWaits()

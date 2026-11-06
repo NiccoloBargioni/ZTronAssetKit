@@ -1,0 +1,14 @@
+# confirm run at s3-base b5796ba (load ~42): swift test --skip-build --filter S3SecurityStorageProbeTests
+error: Process '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper --test-bundle-path /Users/admin/Documents/ZTronAssetKit/.build-s3-confirm-security/out/Products/Debug/ZTronAssetStorageTests.xctest/Contents/MacOS/ZTronAssetStorageTests --skip-build --scratch-path /Users/admin/Documents/ZTronAssetKit/.build-s3-confirm-security --skip Benchmarks --filter S3SecurityStorageProbeTests /Users/admin/Documents/ZTronAssetKit/.build-s3-confirm-security/out/Products/Debug/ZTronAssetStorageTests.xctest/Contents/MacOS/ZTronAssetStorageTests --testing-library swift-testing' exited with unexpected signal code 5
+◇ Test run started.
+◇ Suite "S3 security probes: storage" started.
+◇ Test "R-MAN-3: availability never traps when the declared sizes of missing entries sum past Int64.max" started.
+# crash report swiftpm-testing-helper-2026-10-29-094735.ips {'codes': '0x0000000000000001, 0x00000001097098b8', 'rawCodes': [1, 4453341368], 'type': 'EXC_BREAKPOINT', 'signal': 'SIGTRAP'}
+Swift runtime failure: arithmetic overflow /<compiler-generated> None
+AssetStore.currentAvailability(of:) AssetStore+Reads.swift 85
+AssetStore.availability(of:) AssetStore.swift 99
+S3SecurityStorageProbeTests.availabilitySaturatesBytesMissing() S3SecurityStorageProbeTests.swift 29
+# with S3-SECU-01-fix.diff applied (load ~34):
+✔ Test "R-MAN-3: availability never traps when the declared sizes of missing entries sum past Int64.max" passed after 0.004 seconds.
+✔ Suite "S3 security probes: storage" passed after 0.004 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.004 seconds.

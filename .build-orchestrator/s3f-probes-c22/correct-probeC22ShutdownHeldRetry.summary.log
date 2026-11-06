@@ -1,0 +1,13 @@
+probe-sync build start 09:51:52 loads { 2.80 6.41 23.55 }
+probe-sync build end 09:51:59 rc=0 loads { 3.06 6.40 23.45 }
+probeC22ShutdownHeldRetry start 09:51:59 loads { 3.06 6.40 23.45 }
+probeC22ShutdownHeldRetry end 09:52:03 rc=0 loads { 3.05 6.35 23.33 }
+◇ Test "PROBE-C22C-SHUTDOWN-HELD-RETRY" started.
+PROBE-C22C-SHUTDOWN-HELD-RETRY followVisitedFirst round 1: behind 0; after v4 O downloading interests 11, O requests 2; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+PROBE-C22C-SHUTDOWN-HELD-RETRY followVisitedFirst round 2: behind 0; after v4 O downloading interests 11, O requests 2; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+PROBE-C22C-SHUTDOWN-HELD-RETRY followVisitedFirst round 3: behind 0; after v4 O downloading interests 11, O requests 2; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+PROBE-C22C-SHUTDOWN-HELD-RETRY sweepFollowsFirst round 1: behind 4; after v4 O failed(ZTronAssetModel.RetryDisposition.nextRun) interests 1, O requests 1; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+PROBE-C22C-SHUTDOWN-HELD-RETRY sweepFollowsFirst round 2: behind 4; after v4 O failed(ZTronAssetModel.RetryDisposition.nextRun) interests 1, O requests 1; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+PROBE-C22C-SHUTDOWN-HELD-RETRY sweepFollowsFirst round 3: behind 4; after v4 O failed(ZTronAssetModel.RetryDisposition.nextRun) interests 1, O requests 1; zz-o failed(shutDown); members ["failed(shutDown)"] x10
+✔ Test "PROBE-C22C-SHUTDOWN-HELD-RETRY" passed after 3.222 seconds.
+✔ Test run with 1 test in 1 suite passed after 3.222 seconds.

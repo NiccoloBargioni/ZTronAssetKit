@@ -1,0 +1,48 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC5CorrectSyncProbes" started.
+◇ Suite "Engine regressions, close-out cycle 8" started.
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test "PROBE-C5-LANEDROP: a space sweep's re-queue after a partial follow does not take room from the next waiter" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C5-LANEDROP: a space sweep's re-queue after a partial follow does not take room from the next waiter" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+✘ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" recorded an issue at EngineRegressionCycle8Tests.swift:306:9: Expectation failed: turn.parked == SyncEngine.parksPerPump
+↳ one sweep turn parked 575 jobs, at most parksPerPump = 512
+↳ turn.parked == SyncEngine.parksPerPump → false
+↳   turn.parked → 575
+↳   SyncEngine.parksPerPump → 512
+✘ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" recorded an issue at EngineRegressionCycle8Tests.swift:307:9: Expectation failed: turn.waiting == count - 1 - SyncEngine.parksPerPump && turn.followUpHeld
+↳ the rest wait for the turn's follow-up sweep: (parked: 575, waiting: 0, followUpHeld: false)
+↳ turn.waiting == count - 1 - SyncEngine.parksPerPump && turn.followUpHeld → false
+↳   turn.waiting == count - 1 - SyncEngine.parksPerPump → false
+↳   turn.followUpHeld → <not evaluated>
+✘ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" failed after 0.157 seconds with 2 issues.
+↳ /// One turn of a space sweep parks at most `parksPerPump` jobs and leaves the rest to its follow-up sweep (C2). The
+↳ /// park of a job whose follow lowered its lane during the sweep (`sweepSpaceParked`, PROBE-C5-LANEDROP, close-out
+↳ /// cycle 6) goes through the same bound, so this count pins both; the turn's length is measured by the release
+↳ /// benchmarks of parking a 10,000-member group and of a reclaim during an owed follow. The setup is
+↳ /// `reclaimedSweepReachesEveryWaitingMember`'s: more members than one turn parks wait `awaitingSpace` for `x`'s
+↳ /// 300 bytes on a volume with no other room above the reserve; the store reaps `x` and the purge path's `.reclaimed`
+↳ /// sweep runs with its follow-ups held (`holdSpaceSweepFollowUps()`): its one turn re-queues the first member into
+↳ /// the 300 bytes and parks exactly `parksPerPump` of the others `insufficientSpace` (nothing is left to reclaim).
+✘ Suite "Engine regressions, close-out cycle 8" failed after 0.158 seconds with 2 issues.
+↳ /// The behaviour of the bounds close-out cycle 8 put on the engine's actor turns when many jobs park for lack of space
+↳ /// (C2, R-SYN-11; review of close-out cycle 7, PROBE-C7C-2; `docs/adr-drafts/f.md`, F-28). The turn lengths themselves
+↳ /// are measured by the release benchmark `R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an
+↳ /// ENOSPC's free-space read over it, never hold the engine's actor longer than P-9's heartbeat_gap_ms_p99_max`; these
+↳ /// tests pin what the bounds must not change: every job still ends where the gate puts it, and nothing is re-queued only
+↳ /// to be parked again.
+PROBE-C5-LANEDROP visitFirst=true: before the reclaim (owed: false, jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jIDs: Optional(1), jState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), kState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))); room before (important above reserve) 1999000, opportunistic -4001000, pending 4000000; after the sweep (jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), kState: Optional(ZTronAssetSync.JobState.downloading), space: Optional("important 5999000, opportunistic -1000, pending 0")); K's waiter success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/45/45efd7a94a35945017248a64ba01bdd050315b6ffe8e5937f70cd92ced7f11eb.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); A's waiter success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ea/ea7f112ed6ca1786bfbe78b5d61ea359e3bf60f010bf419a7da7c696952d0d29.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C5-LANEDROP: a space sweep's re-queue after a partial follow does not take room from the next waiter" started.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases passed after 0.744 seconds.
+✔ Suite "Engine runs" passed after 0.744 seconds.
+PROBE-C5-LANEDROP visitFirst=false: before the reclaim (owed: true, jLane: Optional(ZTronAssetModel.AssetPriority.userInitiated), jIDs: Optional(2), jState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), kState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))); room before (important above reserve) 1999000, opportunistic -4001000, pending 4000000; after the sweep (jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), kState: Optional(ZTronAssetSync.JobState.downloading), space: Optional("important 5999000, opportunistic -1000, pending 0")); K's waiter success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/45/45efd7a94a35945017248a64ba01bdd050315b6ffe8e5937f70cd92ced7f11eb.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); A's waiter success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ea/ea7f112ed6ca1786bfbe78b5d61ea359e3bf60f010bf419a7da7c696952d0d29.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C5-LANEDROP: a space sweep's re-queue after a partial follow does not take room from the next waiter" with 2 test cases passed after 1.331 seconds.
+✔ Suite "VerifyC5CorrectSyncProbes" passed after 1.332 seconds.
+✘ Test run with 3 tests in 3 suites failed after 1.332 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

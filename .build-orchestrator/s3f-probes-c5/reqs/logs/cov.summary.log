@@ -1,0 +1,18 @@
+✔ Test run with 151 tests in 16 suites passed after 2.058 seconds.
+✔ Test "R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)" passed after 16.319 seconds.
+✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 103.010 seconds.
+✔ Test run with 406 tests in 52 suites passed after 104.026 seconds.
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" recorded an issue at LoopbackHTTPServerTests.swift:400:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 0 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 1 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 2 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 3 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 0 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 1 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 2 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 3 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test run with 459 tests in 60 suites failed after 356.460 seconds with 559 issues.
+✔ Test run with 84 tests in 18 suites passed after 339.633 seconds.
+✔ Test run with 85 tests in 11 suites passed after 49.822 seconds.
+✔ Test run with 71 tests in 10 suites passed after 13.509 seconds.
+✔ Test run with 104 tests in 14 suites passed after 3.288 seconds.

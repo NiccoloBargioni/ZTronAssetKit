@@ -1,0 +1,89 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ U is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ U is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" with 4 test cases failed after 1.956 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane a visit-first engine's job had when the moved interest sits on
+↳ /// a job whose publication began after the apply: Y's download completes after v3's apply, so its publication begins
+↳ /// while the follow is owed, and C gets a 429 with Retry-After 60 s (above the user lane's 30 s cap). Visited first,
+↳ /// Y's visit at the apply moved U onto C while Y downloaded, so C was user work: nothing was throttled, C failed,
+↳ /// and U and P were answered `serverUnavailable(60)`. Read without the interests of a job that publishes, C was
+↳ /// prefetch work: the origin was throttled for 60 s on arrival, and C's retry served U and P (the cycle-14 verifiers).
+↳ /// `wLane`: Y's other waiter is a user's (the requirements verifier's probe) or a prefetch waiter's (the correctness
+↳ /// verifier's); either way it is served by Y.
+◇ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:152:9: Expectation failed: outcome.u == .failure(.notFound)
+↳ U shares C's 404 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ outcome.u == .failure(.notFound) → false
+↳   outcome.u → success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-u
+↳         rawValue → "zz-u"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 1000000
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" with 2 test cases failed after 1.068 seconds with 1 issue.
+↳ /// The moved user shares C's 404 when the moved interest sits on a job whose publication began after the apply, with
+↳ /// C's 404 while the follow is owed: visited first, U rode C since the apply and was answered `notFound` with P.
+↳ /// Left on Y, U was re-routed onto C's content after Y's commit, and a second request for content that had just
+↳ /// answered 404 served U (PROBE-C14R-PASSED-FAIL-BARRIER).
+✘ Suite "Engine follow barrier (F-28)" failed after 3.025 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 3.025 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

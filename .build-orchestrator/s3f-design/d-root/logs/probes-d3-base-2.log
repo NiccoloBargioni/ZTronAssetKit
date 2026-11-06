@@ -1,0 +1,29 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 5] ZTronAssetSyncTests-product
+[4 / 7] ZTronAssetSyncTests-product
+[10 / 12] ZTronAssetSyncTests-product
+Build complete! (3,92 s)
+error: Process '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper --test-bundle-path /Users/admin/Documents/ZTronAssetKit/.build-s3f-d-root-wt/.build-x/out/Products/Debug/ZTronAssetSyncTests.xctest/Contents/MacOS/ZTronAssetSyncTests --scratch-path .build-x --filter DesignD3Probes/(joinAbandon|readPromote|ticket) /Users/admin/Documents/ZTronAssetKit/.build-s3f-d-root-wt/.build-x/out/Products/Debug/ZTronAssetSyncTests.xctest/Contents/MacOS/ZTronAssetSyncTests --testing-library swift-testing' exited with unexpected signal code 5
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "DesignD3Probes" started.
+◇ Test "PROBE-D3-JOIN-ABANDON" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D3-JOIN-ABANDON" started.
+PROBE-D3-JOIN-ABANDON followVisitedFirst before: (owed: false, c: nil, p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)))
+PROBE-D3-JOIN-ABANDON followVisitedFirst decided: (owed: false, p: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-D3-JOIN-ABANDON followVisitedFirst P: success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ec/ec91c709e57f13ff7ce54ad46e770fd4ed14846f3f131600252088e9a498d12c.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/52/52e79581b08b948c39519746a4ea85bf2526732c3b543a7e594da8ccb51c1666.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D3-JOIN-ABANDON" started.
+PROBE-D3-JOIN-ABANDON sweepFollowsFirst before: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)))
+PROBE-D3-JOIN-ABANDON sweepFollowsFirst decided: (owed: true, p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)))
+PROBE-D3-JOIN-ABANDON sweepFollowsFirst P: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/52/52e79581b08b948c39519746a4ea85bf2526732c3b543a7e594da8ccb51c1666.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D3-JOIN-ABANDON" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:324:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+↳ P's user waiter is answered from its 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2000000))
+↳ (try? pResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "PROBE-D3-JOIN-ABANDON" with 2 test cases failed after 0.743 seconds with 1 issue.
+◇ Test "PROBE-D3-READ-PROMOTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D3-READ-PROMOTE" started.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

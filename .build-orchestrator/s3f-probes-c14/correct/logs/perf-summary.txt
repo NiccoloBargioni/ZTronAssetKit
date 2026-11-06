@@ -1,0 +1,185 @@
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "C2: WP-C's report, verification, orphan GC, quarantine, eviction and purges never hold the store's actor for more than 10 ms at 10,000 assets" passed after 12.673 seconds.
+✔ Test "C2: WP-C's actor stretches at 10,000 and at 100,000 assets (maxEntries), thread CPU per stretch" passed after 51.047 seconds.
+✔ Test "C2: legacy migration's actor holds at 10,000 and at 100,000 legacy files" passed after 28.736 seconds.
+✔ Test "C2: quota eviction holds the actor at most 10 ms at 10,000 records when five or ten ids share each blob" passed after 3.484 seconds.
+✔ Test "C2: quota eviction, apply's eviction plan and an evictable purge hold the actor at most 10 ms at 10,000 assets when ids were bound to their blobs after the selection" passed after 9.769 seconds.
+✔ Test "C2: apply holds the actor at most 10 ms at 10,000 records with an eviction plan of the whole store, of one or two ids per blob, and while it binds aliases" passed after 5.311 seconds.
+✔ Suite "CleanupBenchmarks" passed after 111.022 seconds.
+P-1 lookup p99 0.458 µs at 10,000 (median 0.292), 0.334 µs at 100; ratio 1.3712574850299402 (max 3.0); budget 25.0 µs
+✔ Test "P-1: lookup on the main actor stays under lookup_p99_us at 10,000 assets and scales within scale_ratio_max" passed after 0.030 seconds.
+P-8 main-thread file-system calls 0 (max 0)
+P-8 events: p99 0.00425 ms, max 0.021832999999999998 ms (budget 1.0 ms)
+P-8 locate: p99 0.00075 ms, max 0.006083 ms (budget 1.0 ms)
+P-8 lookup: p99 0.000708 ms, max 0.002875 ms (budget 1.0 ms)
+P-8 prefetch: p99 0.0035830000000000002 ms, max 0.009958 ms (budget 1.0 ms)
+P-8 register: p99 0.0022080000000000003 ms, max 0.007333999999999999 ms (budget 1.0 ms)
+P-8 resolve entry: p99 0.002125 ms, max 0.009125 ms (budget 1.0 ms)
+P-8 unregister: p99 0.002042 ms, max 0.002541 ms (budget 1.0 ms)
+P-8 window update: p99 0.012875 ms, max 0.0235 ms (budget 1.0 ms)
+✔ Test "P-8: UI-facing calls make zero main-thread file-system calls and each stays within ui_call_ms_max" passed after 0.571 seconds.
+P-8 bundle enumerations [false] (on main: 0); locate 0.00012679199999999997 ms per call (budget 1.0 ms)
+✔ Test "P-8: the fallback chain's bundle step does no work on the main thread" passed after 0.001 seconds.
+P-9 64 resolves of 2 MiB in 0.651341333 seconds; heartbeat gaps 43, p99 15.044 ms, max 15.044 ms (budget 50.0 ms, tick 10.0 ms)
+✔ Test "P-9: 64 concurrent resolves plus hashing keep the heartbeat gap p99 within budget" passed after 0.815 seconds.
+P-12 init p99 0.002709 ms over fakes, 0.006375 ms over .live() (budget 1.0 ms); file-system calls 0
+✔ Test "P-12: AssetClient.init completes within init_ms_max and performs no file-system call" passed after 0.002 seconds.
+✔ Suite "KitBenchmarks" passed after 1.420 seconds.
+P-3 reference 3283455 bytes: p50 18.374375 ms, max 18.508042 ms, budget 80.0 ms
+✔ Test "P-3: decoding and validating the 3.3 MB reference manifest stays under manifest_decode_validate_ms" passed after 0.364 seconds.
+P-3 at the limit, dense manifest: 33064934 bytes, worst 196.589167 ms, threshold 817.5396221358295 ms
+P-3 at the limit, dense manifest truncated: 24798700 bytes, worst 66.951791 ms, threshold 817.5396221358295 ms
+P-3 at the limit, dense manifest with edits: 33064934 bytes, worst 34.095167 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge unknown string: 33554172 bytes, worst 17.668792 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge multi-byte string: 33554170 bytes, worst 103.626 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge escaped file name: 33554173 bytes, worst 103.48875 ms, threshold 817.5396221358295 ms
+P-3 at the limit, deep nesting: 33554432 bytes, worst 0.001166 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings: 14600001 bytes, worst 38.633792 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings, keepFirst: 14600001 bytes, worst 38.828875 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings, at the estimate's limit: 16199954 bytes, worst 90.774833 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 entries with one 16-byte path component and one 16-byte tag, at the estimate's limit: 17053287 bytes, worst 96.051709 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 entries with three 16-byte path components, at the estimate's limit: 18333287 bytes, worst 97.5095 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 60,000 entries with three 16-byte strings and three 16-byte path components, at the estimate's limit: 13732933 bytes, worst 67.812875 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 minimal entries, at the estimate's limit: 11079954 bytes, worst 66.43075 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 empty objects, quarantined: 300001 bytes, worst 9.317708 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 25-byte path components: 33553806 bytes, worst 125.090625 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 61 one-byte tags per entry: 33554361 bytes, worst 290.319708 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge identifier: 33554169 bytes, worst 17.465875 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge tag: 33554174 bytes, worst 17.457583 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge checksum: 33554176 bytes, worst 17.440084 ms, threshold 817.5396221358295 ms
+P-3 at the limit, entries sharing one identifier, keepFirst: 8100001 bytes, worst 50.769333 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 32 empty path components and 31 one-byte tags per entry, at the estimate's limit: 23627640 bytes, worst 174.622375 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 31 one-byte tags per entry, at the estimate's limit: 28146620 bytes, worst 208.585792 ms, threshold 817.5396221358295 ms
+P-3 at the limit, shortest escaped 8-byte unknown keys, assets before schemaVersion: 33554429 bytes, worst 347.180125 ms, threshold 817.5396221358295 ms
+P-3 at the limit, shortest escaped 8-byte unknown keys in one entry: 33554428 bytes, worst 203.351792 ms, threshold 817.5396221358295 ms
+P-3 at the limit, escaped 13-byte unknown keys in the envelope: 33554415 bytes, worst 106.41975 ms, threshold 817.5396221358295 ms
+✔ Test "P-3: the reference decode rate holds for fuzzed manifests at the 32 MiB payload limit, keeping R-MAN-3 within 1 s" passed after 13.680 seconds.
+✔ Suite "ModelBenchmarks" passed after 14.044 seconds.
+P-2 index load, 1411449 bytes, 10,000 records: p50 9.969333 ms, p95 10.062917 ms, max 10.080209 ms, budget 25.0 ms
+✔ Test "P-2: cold index load of 10,000 records off the main thread is under budget" passed after 0.341 seconds.
+P-5 commit of 10,000 records, 16 dirty fan-outs: ordered p50 13.75775 ms, p95 14.749792 ms, max 15.041042 ms; durable p50 20.212458 ms, p95 24.869417 ms, max 24.869417 ms; budget 40.0 ms. Bulk sync: 40 commits in 10 s, at most 4 in any second, budget 4.0
+✔ Test "P-5: index commit of 10,000 records is under budget and a bulk sync commits at most 4 per second" passed after 1.143 seconds.
+P-6 streaming SHA-256 of 256 MiB: 2391.574068594025 MB/s, one-shot 2909.9456523435883 MB/s, ratio 0.8218621082039517, peak resident delta 0.0 MiB over 1542 in-read samples; floors 800.0 MB/s, 0.7x, cap 4.0 MiB
+✔ Test "P-6: streaming SHA-256 of 256 MiB meets the throughput floor, the one-shot ratio and the memory cap" passed after 1.730 seconds.
+P-13 reclaim of 10000 blobs: 0.6871288329999999 s in 534 units, unit max 14.244 ms (p50 0.964167 ms, p95 0.994542 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.045708 ms, p99 0.060167 ms, max 0.1645 ms; unit on-CPU max 10.148208 ms; units over the batch budget: ["5.437792 ms wall, 0.848833 ms on CPU", "6.298875 ms wall, 0.683084 ms on CPU", "10.159167 ms wall, 10.148208 ms on CPU", "7.103167 ms wall, 0.961833 ms on CPU", "8.3065 ms wall, 0.733291 ms on CPU", "8.208208 ms wall, 0.5305 ms on CPU", "14.244 ms wall, 1.094042 ms on CPU"]; blob unlinks inside the reclaim: max 13.382667 ms, 6 over 4.0 ms [4.693417, 5.695041, 6.269541, 7.754667, 7.830666, 13.382667]
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+↳ every batch between suspension points: the longest deletion unit took 14.244 ms
+↳ longest <= batchBudget → false
+↳   longest → 14.244
+↳   batchBudget → 5.0
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.327 seconds with 1 issue.
+✔ Test "C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch" passed after 3.715 seconds.
+✘ Suite "StorageBenchmarks" failed after 9.258 seconds with 1 issue.
+↳ /// P-2, P-5, P-6 and P-13 (WP-B), release configuration, live file system in directories inside this repository
+↳ /// (`.build-tests/`, git-ignored). Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// **Statistics (ADR draft B-9, as ruled by the orchestrator at the L2 close-out).** P-2 judges the p95 of cold
+↳ /// loads. P-5 judges **both** the ordered commit a bulk sync performs and the durable one (flush, close, adoption
+↳ /// report) on their p95 against `index_commit_ms`; the commits-per-second ceiling is a hard maximum over every
+↳ /// sliding second. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
+↳ /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
+↳ /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
+↳ /// duration is asserted against `batch_ms_max` (p50 and p95 printed beside it); the unit's time budget (ADR draft
+↳ /// B-10) makes it fit by design, and an unlink profile of this volume is printed as the justification. Figures
+↳ /// measured while other worktrees build are informative; the orchestrator's quiet-machine run is the reference.
+↳ /// C2 has no budget key: its test reports the longest hold of the store's actor seen by a probe, best of five
+↳ /// runs, against the rule's own 10 ms.
+P-4 plan 10,000: 11.652792 ms (budget 20.0); 20,000: 22.99275 ms; ratio 1.9731537300245299 (max 2.5)
+✔ Test "P-4: planning 10,000 vs 10,000 entries with 10% churn stays within plan_ms and scales by at most doubling_ratio_max" passed after 0.872 seconds.
+P-14 armed timers 0 (max 0), owned tasks 0 (max 0), sleepers 0
+✔ Test "P-14: after quiescence the engine owns at most idle_timers_max timers and idle_tasks_max tasks" passed after 0.015 seconds.
+P-7 resident delta: 2.078125 MiB for 256 MiB, 0.09375 MiB for 1024 MiB (max 48.0)
+✔ Test "P-7: a 1 GiB synthetic bulk sync adds at most sync_memory_delta_mib_max MiB and does not grow with catalog size" passed after 4.719 seconds.
+P-11 200 assets at 10.0 ms: concurrency 1 3.551399833 s, 5 1.029041083 s, speedup 3.4511740023503026 (min 3.0)
+✔ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" passed after 4.621 seconds.
+R-SYN-12 prune of 10,000 ids: nobody subscribed 0.008242416 s, one stalled subscriber 0.011852666 s, ratio 1.4380087100675334 (max 2, plus 5 ms)
+✔ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber costs at most twice the same sync with nobody subscribed" passed after 0.537 seconds.
+R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking 4.029125 ms, during an ENOSPC's free-space read 2.702833 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.029125, 3.99375, 4.061709] and [4.462959, 2.625625, 2.702833]
+✔ Test "R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, hold the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" passed after 6.499 seconds.
+R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait 4.981041 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.050417, 4.981041, 5.224125]
+✔ Test "R-SYN-11: re-admitting 10,000 prefetch members parked for lack of space when the volume gains room holds the engine's actor at most C2's 10 ms per turn" passed after 1.007 seconds.
+R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline 1.405375 ms, coming back 4.156333 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.405375, 1.398125, 1.420125] and [4.368375, 4.156333, 4.072458]
+✔ Test "R-SYN-13: losing and regaining the network under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" passed after 1.122 seconds.
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 4.415334 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.427, 4.352209, 4.415334]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 0.735 seconds.
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 2.2425 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.521167, 5.473208, 2.2425]; at 1,000: 0.211208 ms; the group without waiters: [1.160084, 0.828791, 0.738792]
+✔ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" passed after 16.048 seconds.
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 1.304333 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.292625, 1.308208, 1.304333]
+✔ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" passed after 0.984 seconds.
+R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait 4.539583 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.63875, 4.505458, 4.539583]
+✔ Test "R-SYN-6: a sync whose manifest changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" passed after 1.680 seconds.
+R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait 4.908625 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.908625, 4.891709, 5.084708]
+✔ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the engine's actor at most C2's 10 ms per turn" passed after 0.394 seconds.
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 1.188417 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.187458, 1.188417, 1.190792]
+✔ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" passed after 3.445 seconds.
+R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait 4.956916 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.956916, 4.868958, 5.006]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle of user-initiated priority holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 0.704 seconds.
+R-SYN-3 re-join of a released 10,000-member prefetch handle: longest actor wait 5.943459 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.155875, 8.153541, 5.943459]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-3 re-join of a released 10,000-member bulk handle: longest actor wait 5.553 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.509875, 5.755625, 5.553]; members re-joined while the release was pending [432, 432, 432]
+✔ Test "R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn" passed after 8.010 seconds.
+R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait 0.024041 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.024041, 0.022583, 0.03625]
+✔ Test "R-SYN-4: cancelling a resolve while 10,000 prefetch members wait holds the engine's actor at most C2's 10 ms per turn" passed after 0.485 seconds.
+R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait 0.077125 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.077125, 0.075042, 0.220583]
+✔ Test "R-SYN-5: a breaker cooldown's end over 10,000 prefetch members parked by it holds the engine's actor at most C2's 10 ms per turn" passed after 1.124 seconds.
+R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait 0.834334 ms (budgets 50.0 ms median, 10.0 ms best); totals [1.927791458, 2.220411208, 2.18883625] s; runs [11.549458, 0.828834, 0.834334]
+✔ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" passed after 7.206 seconds.
+R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait 21.214333 ms (budgets 50.0 ms median, 10.0 ms best); runs [15.107042, 21.214333, 46.122583]
+✘ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:478:13: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+↳ [15.107042, 21.214333, 46.122583]
+↳ (runs.min() ?? .infinity) <= Self.c2Budget → false
+↳   (runs.min() ?? .infinity) → 15.107042
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" failed after 18.336 seconds with 1 issue.
+↳ /// C2 at SPEC §6's reference scale when a 429 extends an origin's throttle under user-initiated waiters (close-out
+↳ /// cycle 16, F-36): a 1 s 429 throttles the origin, 10,000 user-initiated `resolve` callers park within
+↳ /// `interactiveMaxWait` and wait, and a running member's 60 s 429 then extends the throttle; later turns answer
+↳ /// every waiter fail-fast, at most `parksPerPump` jobs a turn. Medians of three against P-9, the best of the three
+↳ /// against C2, after a warm-up.
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 8.214333 ms (budgets 50.0 ms median, 10.0 ms best); runs [8.214333, 8.614125, 7.93625]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 10.184417 ms (budgets 50.0 ms median, 10.0 ms best); runs [16.858083, 10.184417, 8.671167]
+✔ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" passed after 10.162 seconds.
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 1 handle(s): longest actor wait 14.818 ms (budgets 50.0 ms median, 10.0 ms best); runs [12.684458, 14.818, 43.474875]
+✘ Test "R-SYN-11: a reclaim of space during an owed follow that changed one member in 20 of a 10,000-member prefetch group, its sweeps following the owed visits and then judging every member, holds the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:531:17: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+↳ 1 handle(s): [12.684458, 14.818, 43.474875]
+↳ (runs.min() ?? .infinity) <= Self.c2Budget → false
+↳   (runs.min() ?? .infinity) → 12.684458
+↳   Self.c2Budget → 10.0
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 2 handle(s): longest actor wait 9.548417 ms (budgets 50.0 ms median, 10.0 ms best); runs [13.004833, 9.548417, 9.424958]
+✘ Test "R-SYN-11: a reclaim of space during an owed follow that changed one member in 20 of a 10,000-member prefetch group, its sweeps following the owed visits and then judging every member, holds the engine's actor at most C2's 10 ms per turn" failed after 11.265 seconds with 1 issue.
+↳ /// C2 when the reclaim's sweep meets an owed follow that moved few members (VERIFY-C8-C2-MIXED, the close-out
+↳ /// cycle-8 verifier): as `reclaimDuringFollowTurns`, but the forced sync changes one member in 20, so after the
+↳ /// apply's turn the follow still owes about 244 visits and the sweep has every one of the 10,000 members left to
+↳ /// judge once they are made. Cycle 8's sweep followed the owed holders and then collected, sorted and judged all
+↳ /// 10,000 in one turn: 10.0 to 12.0 ms best with one handle, against 6.7 ms at `7426fee`. Behind the follow barrier
+↳ /// (S3-R11) a sweep turn either follows or judges: the design panel measured 5.7 to 6.0 ms. With one handle and
+↳ /// with two; medians of three against P-9, the best of the three against C2, after a warm-up.
+R-SYN-11 follow end and drain of 10,000 places under 10,000 changed prefetch members: longest actor wait 6.58425 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.58425, 107.17525, 6.253459]; follow ended [231.9695, 670.758792, 224.639417] ms and drain ended [232.066417, 670.794709, 224.642667] ms after the release
+✔ Test "R-SYN-11: the end of an owed follow that changed every member of a 10,000-member prefetch group, and the drain of 10,000 places in a queue that waited for it, hold the engine's actor at most C2's 10 ms per turn" passed after 3.543 seconds.
+R-SYN-11 follow's last turn plus the drain's first batch under 10,000 prefetch members and 10,000 waiting places: the turn [5.641875, 5.69575, 5.780959] ms; longest actor wait 5.702084 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.656584, 5.702084, 5.789958]
+✔ Test "R-SYN-11: an owed follow's last turn, a full turn of visits under a 10,000-member prefetch group plus the first batch of 10,000 places that waited for it, holds the engine's actor at most C2's 10 ms" passed after 2.411 seconds.
+✘ Suite "SyncBenchmarks" failed after 105.936 seconds with 2 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+P-10 500 assets: 8 TCP connections (max 8), 500 requests, 0.059847875 seconds
+✔ Test "P-10: 500 small assets over a loopback server use at most connections_max TCP connections" passed after 0.060 seconds.
+✔ Suite "TransportBenchmarks" passed after 0.060 seconds.
+✔ Test "every budget in quality-gates.json is present with numeric thresholds the benchmarks can read" passed after 0.001 seconds.
+✔ Suite "BudgetsBenchmarks" passed after 0.001 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 241.743 seconds with 3 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 44 tests in 8 suites failed after 241.744 seconds with 3 issues.

@@ -1,0 +1,6 @@
+start 02:14 rev 99a573d load { 2.58 3.17 3.58 }
+sync diff: none
+r6-fast-drops-here run1: ✘ Test run with 17 tests in 1 suite failed after 36.210 seconds with 4 issues. | EngineFollowBarrierAnswerTests.swift:532:9, EngineFollowBarrierAnswerTests.swift:535:25, EngineFollowBarrierLaneTests.swift:271:9, EngineFollowBarrierPublicationTests.swift:107:25 | load { 45.15 22.84 11.53 }
+r6-fast-drops-here run2: ✘ Test run with 17 tests in 1 suite failed after 34.088 seconds with 4 issues. | EngineFollowBarrierAnswerTests.swift:532:9, EngineFollowBarrierAnswerTests.swift:535:25, EngineFollowBarrierLaneTests.swift:271:9, EngineFollowBarrierPublicationTests.swift:107:25 | load { 24.84 20.41 11.16 }
+revert diff: none
+end 02:17 load { 24.84 20.41 11.16 }

@@ -1,0 +1,179 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued, which a withdrawal replayed before the batch drops, rides a new job of its content, with the visit-first answers (F-28, D-13, e1-PR)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued, which a withdrawal replayed before the batch drops, rides a new job of its content, with the visit-first answers (F-28, D-13, e1-PR)" recorded an issue at EngineFollowBarrierRequeueRemovalTests.swift:19:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued, which a withdrawal replayed before the batch drops, rides a new job of its content, with the visit-first answers (F-28, D-13, e1-PR)" recorded an issue at EngineFollowBarrierRequeueRemovalTests.swift:164:9: Expectation failed: Self.sizes([kResult]) == [16] && Self.sizes(wResults) == [20, 20, 20]
+↳ K gets O's bytes and W1…W3 W's (visit-first): K success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/08/08607b4c230e82ea74fd39ba8e1b3042dd1012d41244427109f0b685346aed99.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), W [-1, -1, -1]; X at the replay queued at epoch 6 holding ["zz-x"], after it gone (pin epoch Optional(6)); X's content requested 1 times, W's 1
+↳ Self.sizes([kResult]) == [16] && Self.sizes(wResults) == [20, 20, 20] → false
+↳   Self.sizes([kResult]) == [16] → true
+↳   Self.sizes(wResults) == [20, 20, 20] → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued, which a withdrawal replayed before the batch drops, rides a new job of its content, with the visit-first answers (F-28, D-13, e1-PR)" failed after 192.079 seconds with 2 issues.
+↳ /// e1-PR: X's job as the batch's replay finds it and after it is recorded with the answers; the answers are
+↳ /// visit-first's: K O's bytes, V2 its cancellation, W1…W3 W's bytes.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" recorded an issue with 2 arguments visit → .followVisitedFirst, edge → false at EngineFollowBarrierRerouteRequeueTests.swift:143:9: Expectation failed: replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty
+↳ the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: (x: [zz-x], w: [zz-a1, zz-a2, zz-a3]); X at the replay queued at epoch 6 (pin epoch Optional(6))
+↳ replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty → false
+↳   replayed.x == (ids + [xID]).sorted() → false
+↳   replayed.w.isEmpty → <not evaluated>
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" recorded an issue with 2 arguments visit → .followVisitedFirst, edge → true at EngineFollowBarrierRerouteRequeueTests.swift:143:9: Expectation failed: replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty
+↳ the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: (x: [zz-x], w: [zz-a1, zz-a2, zz-a3]); X at the replay queued at epoch 6 (pin epoch Optional(6))
+↳ replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty → false
+↳   replayed.x == (ids + [xID]).sorted() → false
+↳   replayed.w.isEmpty → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, edge → false at EngineFollowBarrierRerouteRequeueTests.swift:143:9: Expectation failed: replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty
+↳ the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: (x: [zz-x], w: [zz-a1, zz-a2, zz-a3]); X at the replay queued at epoch 6 (pin epoch Optional(6))
+↳ replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty → false
+↳   replayed.x == (ids + [xID]).sorted() → false
+↳   replayed.w.isEmpty → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, edge → true at EngineFollowBarrierRerouteRequeueTests.swift:143:9: Expectation failed: replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty
+↳ the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: (x: [zz-x], w: [zz-a1, zz-a2, zz-a3]); X at the replay queued at epoch 6 (pin epoch Optional(6))
+↳ replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty → false
+↳   replayed.x == (ids + [xID]).sorted() → false
+↳   replayed.w.isEmpty → <not evaluated>
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" with 4 test cases failed after 6.881 seconds with 4 issues.
+↳ /// rr21-T8b (rr21-B17's pin, kept by the ENOENT re-queue's end): O (zz-o, K's, and zz-a1…zz-a3, W1…W3's) and X
+↳ /// (zz-x) download; V's request for zz-x is cancelled and V2's arrives while X's cancelled attempt drains, whose
+↳ /// completion then comes with no staged bytes, so X's job publishes the drained file, held at its claim (on the
+↳ /// store's metadata executor), while O publishes too. K0 maps zz-a1…zz-a3 to X's content, O's commit owes their
+↳ /// re-routes, K1 maps them to W's content while X still publishes (K1's layer pins X), and X's claim then finds
+↳ /// ENOENT: a fresh attempt at the same epoch, queued behind the barrier. Visited first, the commit re-routed W1…W3
+↳ /// onto X publishing, K1's visit passed X, and X's fresh attempt's commit, under K1's copy, re-routed them to W's
+↳ /// content. The re-queue keeps the pin (e1-R1), and no apply came after it: the replay keeps W1…W3 on X's fresh
+↳ /// attempt, so X holds zz-a1…zz-a3 and zz-x and W has no job, and X's commit re-routes them to W's content.
+↳ ///
+↳ /// With `edge` (e1-P3, Stage 3 close-out cycle 22, ruling S3-R27 item 12.2; `analyse-g4-reach.md` (b)), the network
+↳ /// drops and returns after K0, before O's commit: swept first, the two elements' decisions about jobs wait ahead of
+↳ /// the batch, so the drain replays them between X's re-queue and the batch's replay, which reads X's state then (a
+↳ /// park at the same epoch would leave X `.blocked` there). Visited first they apply at once, while X and O publish.
+↳ /// Visit-first answers either way: the ids ride X.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, owe → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, owe → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .followVisitedFirst, owe → true at EngineFollowBarrierRerouteRequeueTests.swift:391:9: Expectation failed: Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 and W1…W3 X's 404 (visit-first): after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .followVisitedFirst, owe → true at EngineFollowBarrierRerouteRequeueTests.swift:392:9: Expectation failed: run.x == ids + ["zz-x"]
+↳ after the replay X holds zz-a1…zz-a3 and zz-x: after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.x == ids + ["zz-x"] → false
+↳   run.x → [zz-x]
+↳   ids + ["zz-x"] → [zz-a1, zz-a2, zz-a3, zz-x]
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .followVisitedFirst, owe → true at EngineFollowBarrierRerouteRequeueTests.swift:393:9: Expectation failed: !run.requested.contains("W")
+↳ W's content is never requested: after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ !run.requested.contains("W") → true
+↳   run.requested.contains("W") → false
+↳     run.requested → ["X", "O", "W"]
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, owe → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, owe → false at EngineFollowBarrierRerouteRequeueTests.swift:391:9: Expectation failed: Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 and W1…W3 X's 404 (visit-first): after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, owe → false at EngineFollowBarrierRerouteRequeueTests.swift:392:9: Expectation failed: run.x == ids + ["zz-x"]
+↳ after the replay X holds zz-a1…zz-a3 and zz-x: after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.x == ids + ["zz-x"] → false
+↳   run.x → [zz-x]
+↳   ids + ["zz-x"] → [zz-a1, zz-a2, zz-a3, zz-x]
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, owe → false at EngineFollowBarrierRerouteRequeueTests.swift:393:9: Expectation failed: !run.requested.contains("W")
+↳ W's content is never requested: after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ !run.requested.contains("W") → true
+↳   run.requested.contains("W") → false
+↳     run.requested → ["X", "W", "O"]
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, owe → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, owe → true at EngineFollowBarrierRerouteRequeueTests.swift:391:9: Expectation failed: Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 and W1…W3 X's 404 (visit-first): after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, owe → true at EngineFollowBarrierRerouteRequeueTests.swift:392:9: Expectation failed: run.x == ids + ["zz-x"]
+↳ after the replay X holds zz-a1…zz-a3 and zz-x: after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.x == ids + ["zz-x"] → false
+↳   run.x → [zz-x]
+↳   ids + ["zz-x"] → [zz-a1, zz-a2, zz-a3, zz-x]
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, owe → true at EngineFollowBarrierRerouteRequeueTests.swift:393:9: Expectation failed: !run.requested.contains("W")
+↳ W's content is never requested: after the replay X holds ["zz-x"], jobs ["X", "W"]; requested ["O", "W", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [20, 20, 20] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/44/449f973a2b231a35538dd1e35c4eacfbe4cca2384a8f35db4bdd2796b11278c3.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ !run.requested.contains("W") → true
+↳   run.requested.contains("W") → false
+↳     run.requested → ["X", "O", "W"]
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" with 4 test cases failed after 6.355 seconds with 9 issues.
+↳ /// T-E1 (correct #1, PROBE-C21C-PIN-ENOENT-404): no apply after X's re-queue, and X's fresh attempt fails with a 404.
+↳ /// Visited first, the commit re-routed W1…W3 onto X publishing, K1's visit passed X (RR-14), and the ENOENT re-routed
+↳ /// nothing (D-13): the pair rode X's fresh attempt, whose 404 answered it, and W's content was never requested. Without
+↳ /// the low budget (`owe == false`) `followVisitedFirst` is that reference's own path.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" with 2 test cases passed after 4.730 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierRerouteRequeueTests.swift:415:9: Expectation failed: Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 X's 404, W1…W3 .notFound at K2 (visit-first): after the replay X holds ["zz-x"], jobs ["X", "U"]; requested ["O", "U", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5e/5e80d1434a5516141843099ecdf5ddbe52eb6512258da18ed542cc850364a731.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierRerouteRequeueTests.swift:416:9: Expectation failed: run.requested == ["O", "X"]
+↳ neither W nor U is requested: after the replay X holds ["zz-x"], jobs ["X", "U"]; requested ["O", "U", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5e/5e80d1434a5516141843099ecdf5ddbe52eb6512258da18ed542cc850364a731.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.requested == ["O", "X"] → false
+↳   run.requested → ["X", "U", "O"]
+↳   ["O", "X"] → ["X", "O"]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRerouteRequeueTests.swift:415:9: Expectation failed: Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 X's 404, W1…W3 .notFound at K2 (visit-first): after the replay X holds ["zz-x"], jobs ["X", "U"]; requested ["O", "U", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5e/5e80d1434a5516141843099ecdf5ddbe52eb6512258da18ed542cc850364a731.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k]) == [16] && run.v2 == .failure(.notFound) → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRerouteRequeueTests.swift:416:9: Expectation failed: run.requested == ["O", "X"]
+↳ neither W nor U is requested: after the replay X holds ["zz-x"], jobs ["X", "U"]; requested ["O", "U", "X"]; K [16], V2 failure(ZTronAssetModel.AssetError.notFound), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5e/5e80d1434a5516141843099ecdf5ddbe52eb6512258da18ed542cc850364a731.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.requested == ["O", "X"] → false
+↳   run.requested → ["U", "O", "X"]
+↳   ["O", "X"] → ["X", "O"]
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" with 2 test cases failed after 5.067 seconds with 4 issues.
+↳ /// T-E3: K1 maps the pair to W's content while X publishes; after X's re-queue, K2 drops the pair and K3 lists it on
+↳ /// U's content. Visited first, K2's visit moved the pair off the queued X under K2's copy, which does not list it
+↳ /// (T21): W1…W3 get `.notFound`, and U's content is never requested.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierRerouteRequeueTests.swift:427:9: Expectation failed: Self.sizes([run.k, run.v2]) == [16, 26] && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 Y's, W1…W3 .notFound at K2 (visit-first): after the replay X holds [], jobs ["U", "Y"]; requested ["O", "U", "X", "Y"]; K [16], V2 success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/66/66c956c5311ba9dbc6581070b79013c2ff630262fa904f77b2cd841bdd84ed66.png, fileExtension: png, byteSize: 26, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/52/52f69515a74c10c64564114b4ab5e565bf931a2ee5ac0284140972e4a4d1dd2a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k, run.v2]) == [16, 26] && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k, run.v2]) == [16, 26] → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierRerouteRequeueTests.swift:428:9: Expectation failed: run.requested == ["O", "X", "Y"]
+↳ neither W nor U is requested: after the replay X holds [], jobs ["U", "Y"]; requested ["O", "U", "X", "Y"]; K [16], V2 success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/66/66c956c5311ba9dbc6581070b79013c2ff630262fa904f77b2cd841bdd84ed66.png, fileExtension: png, byteSize: 26, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/52/52f69515a74c10c64564114b4ab5e565bf931a2ee5ac0284140972e4a4d1dd2a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.requested == ["O", "X", "Y"] → false
+↳   run.requested → ["X", "U", "Y", "O"]
+↳   ["O", "X", "Y"] → ["Y", "O", "X"]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" started.
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRerouteRequeueTests.swift:427:9: Expectation failed: Self.sizes([run.k, run.v2]) == [16, 26] && run.w.allSatisfy { $0 == .failure(.notFound) }
+↳ K gets O's bytes, V2 Y's, W1…W3 .notFound at K2 (visit-first): after the replay X holds [], jobs ["U", "Y"]; requested ["O", "U", "X", "Y"]; K [16], V2 success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/66/66c956c5311ba9dbc6581070b79013c2ff630262fa904f77b2cd841bdd84ed66.png, fileExtension: png, byteSize: 26, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/52/52f69515a74c10c64564114b4ab5e565bf931a2ee5ac0284140972e4a4d1dd2a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ Self.sizes([run.k, run.v2]) == [16, 26] && run.w.allSatisfy { $0 == .failure(.notFound) } → false
+↳   Self.sizes([run.k, run.v2]) == [16, 26] → true
+↳   run.w.allSatisfy { $0 == .failure(.notFound) } → false
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRerouteRequeueTests.swift:428:9: Expectation failed: run.requested == ["O", "X", "Y"]
+↳ neither W nor U is requested: after the replay X holds [], jobs ["U", "Y"]; requested ["O", "U", "X", "Y"]; K [16], V2 success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/66/66c956c5311ba9dbc6581070b79013c2ff630262fa904f77b2cd841bdd84ed66.png, fileExtension: png, byteSize: 26, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), W1…W3 [22, 22, 22] success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/52/52f69515a74c10c64564114b4ab5e565bf931a2ee5ac0284140972e4a4d1dd2a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); violations []
+↳ run.requested == ["O", "X", "Y"] → false
+↳   run.requested → ["U", "O", "Y", "X"]
+✘ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" with 2 test cases failed after 4.526 seconds with 4 issues.
+↳ /// T-E4: T-E3, with K2 also mapping zz-x to Y's content, so that K2's visit takes X's job off (X held only zz-x, the
+↳ /// pair being owed). Visited first, K2's visit moved the pair off the queued X under K2's copy (T21) and zz-x to Y:
+↳ /// W1…W3 get `.notFound`, V2 Y's bytes. The kept end, not X's state, decides the walk.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" with 2 test cases passed after 4.168 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 223.809 seconds with 23 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 7 tests in 1 suite failed after 223.809 seconds with 23 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

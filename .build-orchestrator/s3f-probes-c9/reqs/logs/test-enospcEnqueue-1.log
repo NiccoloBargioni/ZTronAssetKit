@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+✔ Test "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" with 2 test cases passed after 0.736 seconds.
+✔ Suite "Engine runs" passed after 0.737 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.737 seconds.

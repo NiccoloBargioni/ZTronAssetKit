@@ -1,0 +1,41 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Verifier s3c c1 correctness probes" started.
+◇ Test "probe P1: evictable purge, holders swapped before the first turn" started.
+◇ Test case passing 1 argument chunk → 1000 to "probe P1: evictable purge, holders swapped before the first turn" started.
+◇ Test case passing 1 argument chunk → 2 to "probe P1: evictable purge, holders swapped before the first turn" started.
+✘ Test "probe P1: evictable purge, holders swapped before the first turn" recorded an issue with 1 argument chunk → 2 at VerifierS3CC1CorrectProbe.swift:55:9: Expectation failed: purged.isEmpty
+↳ chunk 2: an evictable purge keeps whole a blob an essential record holds; purged ["w0", "w1", "w2", "w3"], PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 4)
+↳ purged.isEmpty → false
+↳   purged → ["w0", "w1", "w2", "w3"]
+↳   isEmpty → false
+✘ Test "probe P1: evictable purge, holders swapped before the first turn" with 2 test cases failed after 0.008 seconds with 1 issue.
+↳ /// P1. The swap lands between the evictable purge's selection and its first turn. With the default chunk the blob is
+↳ /// one `purgeChunk` group: its holders are read again, w9 is essential, and the blob is kept whole. With a chunk of 2
+↳ /// it goes through `purgeAcrossTurns`, whose first turn is documented to check every holder "as purgeChunk does".
+◇ Test "probe P2: evictable purge, holders swapped between turns" started.
+✘ Test "probe P2: evictable purge, holders swapped between turns" recorded an issue at VerifierS3CC1CorrectProbe.swift:90:9: Expectation failed: purged == ["w0", "w1"]
+↳ the purge stops at the changed holders, w2 and w3 keeping the blob; purged ["w0", "w1", "w2", "w3"], PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 4)
+↳ purged == ["w0", "w1"] → false
+↳   purged → ["w0", "w1", "w2", "w3"]
+✘ Test "probe P2: evictable purge, holders swapped between turns" failed after 0.002 seconds with 1 issue.
+↳ /// P2. The swap lands between two turns of an evictable purge (chunk 2). Documented: a later turn's holders are read
+↳ /// again "when an id was bound to the blob or left it", and a holder that became unpurgeable stops the blob, "the rest
+↳ /// keeping the blob".
+◇ Test "probe P3: quota eviction, holders swapped between turns" started.
+✘ Test "probe P3: quota eviction, holders swapped between turns" recorded an issue at VerifierS3CC1CorrectProbe.swift:124:9: Expectation failed: evicted == 2
+↳ eviction stops at the turn after the holders changed; evicted 4, CleanupResult(bytesFreed: 0, filesRemoved: 0, bytesDeferred: 0)
+↳ evicted == 2 → false
+↳   evicted → 4
+✘ Test "probe P3: quota eviction, holders swapped between turns" failed after 0.002 seconds with 1 issue.
+↳ /// P3. The same swap between two turns of quota eviction (chunk 2). Documented (row s3c-1): each later turn checks
+↳ /// that "exactly the victims not evicted yet hold it".
+✘ Suite "Verifier s3c c1 correctness probes" failed after 0.013 seconds with 3 issues.
+↳ /// Verifier probes (Stage 3 WP-C close-out, cycle 1, correctness lens). Not for commit.
+↳ ///
+↳ /// The swap: one `apply` prunes w4 (a holder of the shared blob leaves it) and binds w9, an ESSENTIAL id with the same
+↳ /// bytes (a new holder), so the blob table's reference count is unchanged while the holders are not the selected ids.
+✘ Test run with 3 tests in 1 suite failed after 0.013 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetStorageTests (Swift Testing)

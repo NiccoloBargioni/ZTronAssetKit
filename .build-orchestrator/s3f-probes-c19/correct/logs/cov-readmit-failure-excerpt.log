@@ -1,0 +1,9 @@
+2209-◇ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+2210-◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+2211:✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+2212-↳ N, queued at P's visit, starts before the members the follow-up re-queues (visit-first): [c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d, c-d2d5570fbc4b2bea8b5dd91e820a443881d9f7573a11d5c58fadacb46b1fdfc1, c-9bcd875fffc66f4c6075b53db6794f5f2a2cbd88301931abcd4bba7a1a6332c4]
+2213-↳ started.first == n.transferID → false
+2214-↳   started.first → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d
+2215-↳     some → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d
+2216-↳       rawValue → "c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d"
+2217-↳   n.transferID → c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb

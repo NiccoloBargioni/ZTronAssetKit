@@ -1,0 +1,16 @@
+✔ Test "C1: the confirmer's reproduction: a fresh non-canonical staging name is collected as foreign" passed after 0.002 seconds.
+✔ Test "C1: a background task tag with a non-canonical staging name is not ours" passed after 0.003 seconds.
+✔ Test "C1: the finding's spellings are quarantined; ordinary and escaped legitimate paths are still accepted" passed after 0.011 seconds.
+✔ Test "C1: advance(to:) lands exactly from large starts, wakes the sleeper at the target, not the one 1 ns later" passed after 0.049 seconds.
+✔ Test "C1: racing advance(to:) and advance(by:) from many tasks against sleepers: each sleeper resumes once, all wake" passed after 0.066 seconds.
+✔ Test "C1: adding(seconds:) is monotone in its argument, saturates, and ignores NaN/negative/zero" passed after 0.206 seconds.
+C1 S3AH-1 parser agreement: 14760 decodes, mismatches 5252: ["raw \"/éé\": rules [ZTronAssetModel.ManifestEntryViolation.remotePathInvalid(ZTronAssetModel.RemotePathViolation.absolute)] quarantined nil", "raw \"\\\\aa\": rules [ZTronAssetModel.ManifestEntryViolation.remotePathInvalid(ZTronAssetModel.RemotePathViolation.parentSegment)] quarantined nil", "raw \"\\\\a.\": rules [ZTronAssetModel.ManifestEntryViolation.remotePathInvalid(ZTronAssetModel.RemotePathViolation.parentSegment)] quarantined nil", "raw \"\\\\a/\": rules [ZTronAssetModel.ManifestEntryViolation.remotePathInvalid(ZTronAssetM
+✘ Test "C1: streaming parser (raw and fully escaped) agrees with violations(of:) on every enumerated path" failed after 1.445 seconds with 1 issue.
+C1 S3AH-2: parsed 28000 tokens, aliases 0: []
+✔ Test "C1: exhaustive tokens over [0-9-] up to 5 characters and unicode digits: parse implies identical text" passed after 1.722 seconds.
+C1 S3AH-3: round-trip misses below 2^51: 0 []
+✔ Test "C1: adding(seconds: b.seconds(since: a)) == b for 1,000,000 random gaps below 2^51 and random starts" passed after 2.191 seconds.
+C1 S3AH-1: enumerated 218525, accepted 94369, accepted-but-refused 0: []
+C1 S3AH-1: decoder stricter than transport on plain paths: 830: ["\"/́\"", "\"\\\\\\u{0301}\"", "\"?́\"", "\"#́\"", "\":́\"", "\"a\\\\\\u{0301}\"", "\"a?́\"", "\"a#́\"", "\"a:́\"", "\"./́\"", "\".\\\\\\u{0301}\"", "\".?́\"", "\".#́\"", "\".:́\"", "\"/́a\"", "\"/́.\"", "\"/́%2E\"", "\"/́%2e\"", "\"/́%\"", "\"/́é\"", "\"/́́\"", "\"\\\\\\u{0301}a\"", "\"\\\\\\u{0301}.\"", "\"\\\\\\u{0301}%2E\"", "\"\\\\\\u{0301}%2e\"", "\"\\\\\\u{0301}%\"", "\"\\\\\\u{0301}é\"", "\"\\\\\\u{0301}\\u{0301}\"", "\"%2E/́\"", "\"%2E\\\\\\u{0301}\""]
+✔ Test "C1: byte-level and token-level enumerations: decoder-accepted implies RemoteURL.make non-nil" passed after 4.097 seconds.
+✘ Test run with 10 tests in 3 suites failed after 4.098 seconds with 1 issue.

@@ -1,0 +1,20 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC2Correct probes" started.
+◇ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" started.
+PROBE-W4 before the 404: copy lists the id at its new content true, old job Optional(ZTronAssetSync.JobState.downloading), owed visits 344
+PROBE-W4 waiter's answer: failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:121:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-W4 FAIL: the waiter of a listed id was answered failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? answer.get()) != nil → <not evaluated>
+✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" failed after 0.278 seconds with 1 issue.
+↳ /// PROBE-W4: an id whose content changed waits for its follow visit on the job of its replaced content; a 404 for
+↳ /// that replaced content arriving before the visit answers its waiter `.notFound` although the engine's copy lists
+↳ /// the id (F-20's rule: never `.notFound` while the asset is listed). The hold seam stands for the follow-up turn
+↳ /// that has not run yet when the network callback lands (independent tasks in production).
+✘ Suite "VerifyC2Correct probes" failed after 0.278 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 2, correctness lens). Never committed.
+✘ Test run with 1 test in 1 suite failed after 0.278 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,13 @@
+--- .build-verify-s3f-c7-reqs/variants/EngineJobs.head.swift	2026-10-30 07:10:41
++++ .build-verify-s3f-c7-reqs/variants/EngineJobs.gainNoBound.swift	2026-10-30 07:10:41
+@@ -784,10 +784,6 @@
+                 // may read the larger room. A job that fits there is re-queued as an admitted one is, never parked with
+                 // figures whose `available` exceeds its `required` (PROBE-C6-LANEGAIN). Without a follow it is the same
+                 // job, which did not fit.
+-                guard requeues < Self.readmissionsPerTurn else {
+-                    self.scheduleSpaceSweepFollowUp(sweep)
+-                    break
+-                }
+                 if self.requeueSwept(parked, ahead: &ahead) {
+                     requeues += 1
+                 }

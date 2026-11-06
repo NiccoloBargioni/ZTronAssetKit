@@ -1,0 +1,138 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "tests (G4): the store-2 S2-06 regression test does not catch S2-06",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/EvictionTests.swift:240 (R-CLN-4: evicting twice within the grace window frees no more than evicting once), guarding Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift:129",
+  "problem": "ARCHITECTURE section 12.2 makes this test the regression for store-2 S2-06 (section 4.6 requires `available + pendingReclaim` in every budget decision). The test uses `.bytes(500)` with no reserve. `FreeSpace.usedBytes` counts only live blobs (AssetStore+Reads.swift:120-131), so the second run is under budget whether or not pending reclaim is counted. I checked this in a scratch copy under .build-verify-c-reqs-r3/mut: I changed line 129 to `let effective = max(0, available)` and ran the whole ZTronAssetStorageTests bundle. All 399 branch tests passed, this one included (passed after 0.421 s). Only my scratch reserve-driven test failed (`second.bytesFreed == 0`). With the mutant reverted (diff identical), the scratch test passes. No WP-C test runs a reserve-driven or fractional-budget eviction twice within the grace window, so the thrash fix is unpinned.",
+  "fix": "Add a test (or reshape this one) where pending reclaim decides the second run. Example: an unlimited budget with `reserveFreeBytes = free + 1_500` over four 1,000-byte assets; call `evictIfNeeded()` twice and expect `first.bytesFreed == 2_000` and `second.bytesFreed == 0`. Add a `.fractionOfFreeSpace` case where the doomed bytes change the resolved budget. Record the mutant (EvictionOrder.swift:129 without `pending`) as failing it in docs/adr-drafts/c.md, and have the orchestrator point section 12.2's S2-06 row at the new test."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirements: known I-2 violation (CCR-2)",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/GarbageCollectionTests.swift:349-379 (withKnownIssue); Store/AssetStore+Apply.swift adoptKnownBlob (WP-B)",
+  "problem": "Orphan GC can sweep a launch orphan that a running `apply` then binds, leaving a record on a missing blob. This breaks I-2 and R-CLN-2. The bug is reproduced every time: 2 known issues in each of 5 macOS runs and 2 TSan runs, and 1 expected failure on the simulator. It cannot be closed inside WP-C's write set and was routed as CCR-2. The test passes regardless of the bug while it stays under withKnownIssue.",
+  "fix": "Orchestrator: treat CCR-2 as merge-gating for L3/L4. Either apply both halves (WP-B binds a launch orphan only while `state.core.orphans[key] == confirmed[key]`; WP-C clears `orphans[key]` in the turn that submits a removal, which needs a rule-1 exemption) or add CCR-1's doom-instead-of-unlink primitive. Then remove `withKnownIssue`. A possible interim WP-C-side guard, if the orchestrator allows reading WP-B's gate: skip removal units while apply/admit's gate is held."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "TSan headroom of the shared Storage bundle",
+  "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 (WP-H's start/stop race) next to Tests/ZTronAssetStorageTests/Cleanup/LegacyPhaseOneStateSpaceTests.swift:269",
+  "problem": "In my first TSan run of `--filter ZTronAssetStorageTests`, WP-H's 'start racing stop' test exceeded its 60 s limit (failed after 71.559 s). My coverage run and iOS build were running at the same time. The rerun passed it in 43.538 s, with the full run passing 399 tests in 492.932 s. Neither run had a ThreadSanitizer report, and every WP-C test passed in both. WP-C's legacy state space takes 492.9 s under TSan in the same bundle, so the WP-H race has little margin left (see round 2, disposition 3).",
+  "fix": "Orchestrator: run TSan for this bundle on an idle host at merge. If WP-H's race overruns again, lower the TSan concurrency of WP-C's state space further, or split the race's 400 rounds into parameterized cases so each case gets its own limit. Do not loosen any assertion."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "oracle coverage (OI-1)",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/OracleTests.swift:204-205",
+  "problem": "The oracle reaps right after every evict step, so it never covers an `apply` within the deletion grace after an eviction. That is the case where WP-B's adoption rescues and undoes the eviction (OI-1, routed).",
+  "fix": "Once WP-B adopts `.evicted` records only at launch (OI-1), drop the immediate `settleDeletions()` so the oracle runs apply-after-evict within the grace."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "coverage plan figure",
+  "location": "Sources/ZTronAssetStorage/Migration/LiveLegacyDefaults.swift (3/14 lines, 21.43%); docs/ARCHITECTURE.md section 14",
+  "problem": "This is a WP-C contract file that is deliberately untested (writing real defaults is outside the repository). Section 14 says '3 lines', but the export counts 11 uncovered of 14 (OI-5).",
+  "fix": "Orchestrator: update section 14's figure to '11 of 14 lines uncovered'."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "traceability ownership",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/IntegrityTests.swift:108 versus ARCHITECTURE section 11 row R-CLN-8",
+  "problem": "Section 11 marks the only R-CLN-8 test '(F: the re-download is the engine's)', so its writer is F. WP-C's test uses the identical display name, so F's test at L4 would duplicate it.",
+  "fix": "Orchestrator: amend the R-CLN-8 row to credit C's store-side test and give F's engine re-download test a distinct name, or have C rename its test."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "R-CLN-12 scope",
+  "location": "Tests/ZTronAssetStorageTests/Cleanup/IdempotencyTests.swift:12-19",
+  "problem": "The 'run twice is a no-op' cases cover staging GC, orphan GC, eviction, two purges and quarantine. They leave out deep verification and legacy migration, which section 4.6 and store.md section 6.9 also list as idempotent cleanup operations. The only checks for those are partial: `attempts == 1` in the verification race test, and `migrateLegacy` reporting finished after completion without a mutation-count check.",
+  "fix": "Add a `.legacyMigration` case: `migrateLegacy` after it finished makes zero file-system mutations and changes nothing in state. Add a `.deepVerification` case: re-verifying after a corrupt quarantine adds no attempt, dooms nothing new and makes no file-system mutation."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirement deviation not tagged for review",
+  "location": "docs/adr-drafts/c.md C-12, C-13, C-15; tests LegacyMigrationTests.swift:189-205 and LegacyRootTests.swift:91-137",
+  "problem": "R-STO-11 says 'remove the legacy directory'. Phase 4 deliberately keeps files it cannot attribute and keeps the root unless it is empty (an undecodable manifest, user files, stale files from older manifests). It also drops checksum-less files that have no local checksum. Both are documented 'for the orchestrator' but not tagged NEEDS-HUMAN-REVIEW.",
+  "fix": "Orchestrator: record both in docs/DECISIONS.md as deviations from R-STO-11 / store.md section 7, tagged NEEDS-HUMAN-REVIEW."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "evidence (P3/G2)",
+  "location": "docs/adr-drafts/c.md:503-504",
+  "problem": "The round-2 iOS Simulator evidence line says 'see the final line of this section', but the section contains no simulator result.",
+  "fix": "Paste the xcresult summary. For reference, this verifier's run on 6BE15CAF gave result Passed, 763 tests, 762 passed, 0 failed, 0 skipped, 1 expected failure (the CCR-2 known issue)."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "benchmarks (informational; WP-C owns none per section 1.2)",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (WP-B's P-13)",
+  "problem": "In the release run at load 10-100, P-13 failed: unit max 9.962708 ms against a 5.0 ms batch budget (p50 0.964 ms, p95 0.993 ms, total 0.62 s). The other 8 benchmarks passed. WP-C changed no reaper code (OI-3).",
+  "fix": "Orchestrator: re-run `--perf` on an idle host at merge."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / R-STO-11 (legacy migration under transient I/O errors)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyUnits.swift:65-67 and :82-84 (readLegacyFile maps itemInfo/read failures to .unusable), :108-110 (listLegacyTree silently `continue`s past a failed listing); LegacyPhases.swift:459-460 (decode: .unusable becomes undecodable) and :88-89 (applyLegacyPlanWrites commits that plan); LegacyUnits.swift:178-193 (phase 4 re-reads and re-lists, then removes)",
+  "problem": "Phase 1 treats a transient I/O error as if the data were absent or undecodable, and commits a plan that adopts nothing (or skips the files it could not list). Phase 4 then reads manifest.json and lists the tree again. When those succeed, it deletes the legacy files the plan never adopted, so they are downloaded again. This violates R-STO-11 (\"moved, not re-downloaded\") and H-10. It is also inconsistent with C-13, which already makes an I/O error on the root stat mean \"decide nothing\".\n\nTimeline (manifest case):\n1. open() runs phase 1. The read unit for manifest.json fails with EIO, giving .unusable, so undecodable is set: degraded, phase inProgress, ordered commit, empty queue.\n2. migrateLegacy runs phase 3 (syncDue) and commits \"done\" durably.\n3. removeLegacyTree reads manifest.json again and succeeds. LegacyRemoval.plan gets every entry path, so all 13 legacy files are unlinked, then the metadata and the root, then the key.\n\nThe listing case is the same: one failed contentsOfDirectory makes the files in that directory \"unlisted\" and they are counted dropped. Phase 4's listing then succeeds and deletes them.\n\nProven by two probes in a scratch package (sources identical to HEAD, checked with `diff -rq`):\n- ZProbe-read: `adopted: 0, dropped: 0, finished: true; legacyFilesKept=0/13 present=0`\n- ZProbe-list: `adopted: 11, dropped: 2; audioEntries=2 deletedUnadopted=2 syncDue=true`\n\nA related leak follows from the same code: a failed listing in phase 4 still reports finished=true. manifest.json is removed last, so the unlisted prior-art files can never be attributed again.",
+  "fix": "Keep I/O failures separate from absence and from undecodable content:\n1. readLegacyFile returns a distinct `.failed` on an itemInfo or read error. Keep `.unusable` for a manifest that is not a regular file or is over the size limit.\n2. listLegacyTree reports whether every listing unit succeeded.\n3. In phase 1, any failure writes nothing and commits nothing in this lifetime and returns false, the same rule as for a root that cannot be stat-ed. A relaunch in inProgress also keeps its persisted state.\n4. In phase 4 (removeLegacyTree), return false (not finished) when the manifest read or any listing failed, so nothing is removed on a view the earlier phases never saw.\n5. Add ZProbe-read and ZProbe-list as regression tests (FaultRule .read on manifest.json .nth(1) .io; FaultRule .contentsOfDirectory on 'Rex Infernus/Audio' .nth(1) .io)."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / stale synced claim (D-6, R-CLN-7, R-STO-11 phase 3)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift:342-358 (finishLegacyMigration)",
+  "problem": "Phase 3 checks only that every legacy id is present (`allAdopted`). It then writes `SyncStamp(appVersion: legacyStamp, manifestDigest: appliedManifest.digest)` and leaves syncDue false.\n\nIf a newer manifest M was applied during migration, which happens whenever the engine syncs or a run is interrupted before migration ends, the stamp claims M was synced while M's new entries were never fetched.\n\nProven by ZProbe-stamp. Steps: legacy fixture, open, apply(legacy entries + 1 new entry), then migrateLegacy until finished. Result: `stamp.appVersion=Optional(\"1.4+77\") stampDigest==newer=true syncDue=false newEntryResidency=absent(neverFetched)`.\n\nAny engine logic that trusts the stamp's digest or time can skip prefetching the new entry: `.atMostEvery`, `isSyncDue`/`lastSyncedAt`, or \"manifest unchanged since last sync\".",
+  "fix": "Record the legacy manifest's digest at phase 1, either in memory or alongside legacyStamp. In finishLegacyMigration, migrate the stamp only when `appliedManifest.digest` still equals it, or when every entry of the applied manifest is present at its current content. Otherwise set syncDue = true and write no stamp. Add ZProbe-stamp as a regression test."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "concurrency / C2 (cooperative-pool and actor stretch)",
+  "location": "Sources/ZTronAssetStorage/Integrity/DeepVerification.swift:15-16 and :102-116 (referenceIndex() + blobsToVerify on the actor at every verifyIntegrity call)",
+  "problem": "Every verifyIntegrity slice begins with one synchronous actor stretch: referenceIndex() over all records, then blobsToVerify, which maps every live blob and sorts it by (verifiedAt, key).\n\nMeasured as thread-CPU time of exactly these calls, in a release build with -enable-testing on this Mac:\n- 13.46\u201314.02 ms at 10,000 records, the scale of WP-B's own C2 benchmark\n- 197.9\u2013204.3 ms at 100,000 records (maxEntries)\n\nThis is the same computation class as EvictionOrder.candidates (16.4 ms at 10k, 255 ms at 100k). Round 2 (C-21) moved that off the actor for C2, but the verification path was left on it. Deep verification is periodic maintenance, so the store actor stalls on every slice.",
+  "fix": "Build the due list in a bulk unit from a value snapshot (records, blobTable, publishing, integrity.verifiedInPass), as evictionCandidatesOffActor does. The existing per-key re-validation after each hash (live, not publishing, same incarnation, holders re-read) already covers the staleness of the snapshot. Add a probe or test that holds the actor-stretch bound at 10k."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "concurrency / C2 (purge)",
+  "location": "Sources/ZTronAssetStorage/Cleanup/StorePurge.swift:13-28 and :55-74 (purgeSelection sort + one setResidency per record in one turn)",
+  "problem": "purge(.all), and likewise a large .scope or .evictable purge, runs four steps in one actor turn: it selects every record, sorts the AssetIDs by their string rawValue, then calls setResidency once per record (releaseReference, refreshPresentEntry, markDirty).\n\nMeasured thread-CPU of that exact sequence (release, this Mac):\n- 17.34\u201317.93 ms at 10,000 records\n- 209.9\u2013211.1 ms at 100,000 records\n\nThis breaks C2's ~10 ms bound even at the benchmark scale.",
+  "fix": "1. Synchronously, before any await, bump purgeEpoch and clear the stamp (set syncDue), so a running sync can never stamp across the purge and every intermediate commit already says a sync is due.\n2. Compute and sort the selection in a bulk unit from a snapshot.\n3. Apply setResidency in chunks of at most 1,000 ids, with the no-op metadata unit between chunks as in C-21. Re-validate each id: it still references the blob recorded at selection, and the phase is still writable.\n4. Then publish, commit and run awaitReclaim as now.\n\nAdd a test at 10k that bounds the longest actor hold."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "concurrency / C2 at maxEntries (secondary O(N) actor stretches)",
+  "location": "Cleanup/OrphanCollection.swift:39-45 with :70-77 (per-unit recheck rebuilds orphanMarks() \u222a expectedKeys()); Cleanup/StorageReporting.swift:27-63 (tail after the last await); Eviction/QuotaEviction.swift:78, :91, :133 and Integrity/IntegrityBookkeeping.swift:44 (referenceIndex() per eviction chunk, per apply eviction, per quarantine); QuotaEviction.swift:39-46 (snapshot copy-on-write)",
+  "problem": "Thread-CPU measured in release, at 10k / 100k records:\n- Orphan GC re-check, run for every removal unit of at most 64 files: 2.8\u20133.1 ms / 36.8\u201338.2 ms, repeated per unit.\n- storageReport tail: 3.6\u20133.8 ms / 61.7\u201364.1 ms.\n- referenceIndex(): 2.6 ms / 44.7\u201346.0 ms. It runs after every eviction chunk, inside apply's last turn (performApplyEviction), and for every quarantined blob (each reportUnreadable, and each corrupt blob in a verification slice).\n- The first records mutation while the off-actor candidate snapshot is alive pays a full copy: 0.5\u20130.9 ms / 14.4\u201319.4 ms.\n\nAll are within budget at 10k and over budget at maxEntries.",
+  "fix": "- Orphan GC: re-check each candidate in O(1) against blobTable and publishing. Recompute the expected-key set only when records changed since the decision (WP-B's manifest or record revision), or ask WP-B for a counted expected-key index.\n- quarantine(blob:): find the holders of the one key without building the whole index (a single scan, or a WP-B reverse index).\n- storageReport: compute the per-blob sums in the same bulk unit as the candidates.\n- Eviction: rebuild holders only for the next chunk's keys."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "security / overlap guard (C-13)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPlacement.swift:40-46 and :58-69 (identities use itemInfo, i.e. lstat)",
+  "problem": "The identity comparison cannot see through a symbolic link that sits exactly at a compared level, because lstat of that ancestor returns the link's own inode. This contradicts C-13's claim that \"a symbolic link in either path cannot hide the overlap\".\n\nTimeline: legacy root R = /L/CDNAssets; store base = /A/app, where /A is a link to R.\n- containerChain is lstat(/A/app/ZTronAssetKit), lstat(/A/app), lstat(/A) = the link's own inode, then the rest.\n- R is not in that chain, and the paths differ, so the overlap is missed and the store lies inside the legacy root.\n\nThe impact is limited since round 2 (phase 4 removes only paths the manifest attributes), but phases 1 and 4 then list the store's whole tree. Unproven (no probe), so non-blocking.",
+  "fix": "Compare identities of resolved items: stat following links for the ancestors, or run resolvingSymlinksInPath() on both URLs before pathsOverlap. Add the '/A \u2192 R' placement to LegacyRootTests.overlappingRootSkipped."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "reentrancy / lifecycle (R1, c-4)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyUnits.swift:75-86 (readLegacyFile chunk loop) and :99-125 (listLegacyTree)",
+  "problem": "Neither loop re-checks the phase, or cancellation in phase 4, between its units, though their REENTRANCY rows name \"the phase\".\n\nA close() during phase 1 (inside open()) or during phase 4 lets the listing keep submitting units after close's drain has released the lock: up to maxEntries (100,000) directory listings, plus the chunk reads of a payload up to maxPayloadBytes. The work is read-only, so nothing is corrupted, but it is unbounded work after close, and a cancelled migrateLegacy cannot stop it. Unproven, so non-blocking.",
+  "fix": "Make both helpers throwing. Call `try self.checkLive()` after each unit, and check Task.isCancelled in the phase-4 caller."
+ }
+]

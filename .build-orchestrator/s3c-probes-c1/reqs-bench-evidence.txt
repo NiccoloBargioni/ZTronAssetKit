@@ -1,0 +1,14 @@
+## S3MUT=E1
+C2 with shared blobs at 10,000 records (best of 3): quota eviction of every blob with 5 ids per blob 9.848416 ms (max of runs 10.016334 ms), quota eviction of every blob with 10 ids per blob 5.871708 ms (max of runs 5.907375 ms), quota eviction of one blob every id shares 15.563791 ms (max of runs 15.951542 ms), purge(.evictable) of one blob every id shares 2.752209 ms (max of runs 2.821375 ms), purge(.all) of one blob every id shares 1.256333 ms (max of runs 1.349792 ms)
+✘ Test "C2: quota eviction and purges hold the actor at most 10 ms at 10,000 records when five or ten ids share each blob, or all share one" recorded an issue at BenchCleanup.swift:123:17: Expectation failed: (runs.min() ?? .infinity) <= CleanupBenchmarks.budget
+✘ Test run with 1 test in 2 suites failed after 6.396 seconds with 1 issue.
+## S3MUT=U1
+C2 with shared blobs at 10,000 records (best of 3): quota eviction of every blob with 5 ids per blob 9.876542 ms (max of runs 11.564458 ms), quota eviction of every blob with 10 ids per blob 5.883333 ms (max of runs 6.482958 ms), quota eviction of one blob every id shares 2.087792 ms (max of runs 2.198083 ms), purge(.evictable) of one blob every id shares 13.266166 ms (max of runs 13.581458 ms), purge(.all) of one blob every id shares 9.059125 ms (max of runs 9.186083 ms)
+✘ Test "C2: quota eviction and purges hold the actor at most 10 ms at 10,000 records when five or ten ids share each blob, or all share one" recorded an issue at BenchCleanup.swift:123:17: Expectation failed: (runs.min() ?? .infinity) <= CleanupBenchmarks.budget
+✘ Test run with 1 test in 2 suites failed after 6.406 seconds with 1 issue.
+## HEAD (bench.log)
+C2 with shared blobs at 10,000 records (best of 3): quota eviction of every blob with 5 ids per blob 2.109208 ms (max of runs 2.206709 ms), quota eviction of every blob with 10 ids per blob 2.02975 ms (max of runs 2.041 ms), quota eviction of one blob every id shares 2.06475 ms (max of runs 2.128375 ms), purge(.evictable) of one blob every id shares 2.706 ms (max of runs 2.727458 ms), purge(.all) of one blob every id shares 1.2135 ms (max of runs 1.248167 ms)
+P-13 reclaim of 10000 blobs: 0.65558125 s in 528 units, unit max 6.862 ms (p50 0.961542 ms, p95 0.9915 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.045125 ms, p99 0.060583 ms, max 0.073875 ms; unit on-CPU max 1.010125 ms; units over the batch budget: ["5.072917 ms wall, 0.544042 ms on CPU", "6.791583 ms wall, 1.010125 ms on CPU", "6.01175 ms w
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+18:50  up 4 days,  7:13, 2 users, load averages: 3.67 13.67 37.58
+18:55  up 4 days,  7:18, 2 users, load averages: 3.67 8.36 27.85

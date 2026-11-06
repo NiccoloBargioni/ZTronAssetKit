@@ -1,0 +1,33 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetKit
+[3 / 7] ZTronAssetKit
+[7 / 11] ZTronAssetKit
+[10 / 11] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+Build complete! (2,32 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Facade races" started.
+◇ Test "R-CLN-11: a pressure event whose handler stops the observer while a reopen shuts that engine down leaves neither waiting for the other" started.
+✘ Test "R-CLN-11: a pressure event whose handler stops the observer while a reopen shuts that engine down leaves neither waiting for the other" recorded an issue at FacadeRaceTests.swift:195:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-11: a pressure event whose handler stops the observer while a reopen shuts that engine down leaves neither waiting for the other" recorded an issue at FacadeRaceTests.swift:241:25: Issue recorded
+↳ the reopen's shutdown of generation 0 never finished: its pressure observer waits for the reopen
+✘ Test "R-CLN-11: a pressure event whose handler stops the observer while a reopen shuts that engine down leaves neither waiting for the other" failed after 63.997 seconds with 2 issues.
+↳ /// A memory warning while a reopen is about to shut the old engine down: the old engine's observer runs the facade's
+↳ /// handler, which finds the only cache gone and stops the observer through the lifecycle. The reopen's first step,
+↳ /// the old engine's shutdown, joins that observer, so the lifecycle must not make the handler wait for the reopen;
+↳ /// before round 2 it did (in `current()`), and the observer waited for the reopen, the reopen for the shutdown and the
+↳ /// shutdown for the observer, for good. The purge that met the replaced root is awaited only once generation 0 is
+↳ /// shut down, so the test fails at its time limit instead of hanging.
+✘ Suite "Facade races" failed after 63.997 seconds with 2 issues.
+↳ /// Interleavings of the facade's lifecycle placed deterministically through its test seam: a registration that lands
+↳ /// during shutdown, two reopens in a row, a memory-pressure stop during a reopen, and retention-scope changes racing
+↳ /// each other and a reopen.
+✘ Test run with 1 test in 1 suite failed after 63.997 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitTests (Swift Testing)
+exit=1

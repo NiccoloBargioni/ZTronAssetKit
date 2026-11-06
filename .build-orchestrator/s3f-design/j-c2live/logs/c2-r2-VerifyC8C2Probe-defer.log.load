@@ -1,0 +1,3 @@
+load before: 11:25:02 { 3.16 7.28 12.52 }
+load after: 11:25:04 { 3.16 7.28 12.52 }
+TEST defer c2-r2-VerifyC8C2Probe-defer exit 1 in 2 s

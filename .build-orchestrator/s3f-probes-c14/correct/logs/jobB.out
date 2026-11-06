@@ -1,0 +1,17 @@
+LOAD 15:23:46 { 14.55 8.40 11.10 }
+ios build exit 0
+2026-10-31 15:23:53.417 xcodebuild[49267:25369629] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+LOAD 15:24:18 { 20.91 10.67 11.81 }
+sim exit 0
+LOAD 15:34:30 { 132.85 191.95 119.28 }
+	/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c14-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_15-24-26-+0100.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started
+bundle .build-verify-s3f-c14-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_15-24-26-+0100.xcresult
+summary exit 0
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+shutdown exit 149
+JOBB DONE

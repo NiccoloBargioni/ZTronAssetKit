@@ -1,0 +1,153 @@
+{
+ "source": "Level 5 WP-K main run wf_5feaaf72-e33, verification round 3 (unfixed)",
+ "issues": [
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "CCR-K1 is still live in WP-F's engine, so the round-2 correct-1 blocker needs an orchestrator ruling. Nothing in it is left for WP-K to do.",
+   "location": "Root cause, unchanged: Sources/ZTronAssetSync/Engine/EngineRuns.swift:14-39. performSync reaches startRun(trigger: .explicit) at :39 and never reads state.migration.running. EngineLifecycle.swift:313-335 settles start at :317, spawns migration at :319-320 and parks only the launch run at :330-331. Tripwire: Tests/ZTronAssetCompatibilityTests/MigrationLaunchShimTests.swift:72-100, with withKnownIssue(isIntermittent: true) at :96. Request: docs/adr-drafts/k.md:25-40.",
+   "problem": "WP-K did its whole share of the round-2 fix: the failing test first, then MIGRATION step 4 (:65-72) and \u00a74 (:179-181), K-7 (k.md:226-228), K-15, and the doc comments at CDNSyncCoordinator.swift:88-92 and :114-115. The defect is still there because no file under Sources/ changed. I reran MigrationLaunchShimTests 5 times at a load average of about 4. All 5 runs recorded the known issue: 16, 41, 22, 16 and 35 of 150 prior-art files were downloaded again instead of moved. That breaks R-STO-11, a MUST. In my 6 runs at load 12 to 225 (TSan, --quick, 3 filter runs, simulator) the known issue was never recorded, because migration won the race. Because the wrapper is isIntermittent, it can never flag that the engine has been fixed, so it may be left in place after the fix. This is non-blocking for WP-K: the fix lies in WP-F's files (P1), and merging WP-K makes nothing worse, since it adds the warning and the tripwire.",
+   "fix": "Orchestrator: rule on CCR-K1 before the level closes. Either authorise WP-F's change (a) or (b) from k.md:33-37, or accept the residual and record it. With the engine fix: WP-F adds an engine-level test for an explicit sync during legacy migration (F-8 pins only the launch run). WP-K then replaces the wrapper with a strict #expect(downloaded == 0), or with a non-intermittent withKnownIssue made deterministic, for example by using a larger prior-art tree. Until then MIGRATION.md step 4 stays as written.",
+   "id": "L5K-V3-00"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "Doc accuracy: the migration window is not limited to the first launch after adoption",
+   "location": "docs/MIGRATION.md:65-66 (\"is harmless on later launches\"), :38 (\"The first launch after adoption is the exception\"), \u00a74 :155-157 and :179-181; docs/adr-drafts/k.md K-15 (:348-383). The behaviour is in Sources/ZTronAssetStorage/Migration/StoreMigration.swift:8-11: when the persisted phase is inProgress, open() rebuilds the plan and again reports legacyMigrationPending. EngineLifecycle.swift:319-320 then spawns migration, and :330-331 parks only the launch run.",
+   "problem": "A later launch that resumes an interrupted legacy migration has the same window as the first launch after adoption. On that launch an explicit sync re-downloads the files not yet adopted (CCR-K1), and the lookups miss them (step 3's residual). On a device a terminated first launch is plausible, because phase 2 hashes every prior-art byte (k.md says this). So MIGRATION.md:65-66 is wrong for that launch. The unconditional advice in step 4 (no launch sync) still protects adopters, so the impact is low.",
+   "fix": "In MIGRATION.md step 3, step 4 and \u00a74, and in K-15, say \"a launch on which legacy migration is pending: the first one after adoption, and any later launch that resumes a migration interrupted before phase 2 finished\". Replace \"harmless on later launches\" with \"harmless on launches with no legacy migration pending\".",
+   "id": "L5K-V3-01"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "Ownership (carried from rounds 1-2; orchestrator action)",
+   "location": "docs/MIGRATION.md (new file, inside WP-I's docs/**). docs/ARCHITECTURE.md:68 (the \u00a71.2 row for K). The request is recorded at docs/adr-drafts/k.md:8-11. The authorisation is .claude/workflows/assetkit-stage2-level.js:59 (\"You may also write docs/MIGRATION.md\").",
+   "problem": "\u00a71.2 still gives WP-K only Tests/ZTronAssetCompatibilityTests/** (not CompatibilityShimTests.swift) and its ADR draft. docs/MIGRATION.md is not recorded as WP-K's file, so WP-I could treat it as unowned. It is not a scope violation: the launch notes authorise it.",
+   "fix": "At merge, the orchestrator adds a 'Files WP-K added' paragraph to ARCHITECTURE \u00a71.2 that lists docs/MIGRATION.md, like the WP-F and WP-G paragraphs.",
+   "id": "L5K-V3-02"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "Benchmarks (environment, WP-B's budget, not WP-K's)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (P-13)",
+   "problem": "Release run: 35 tests, 1 issue. P-13 failed `longest <= batchBudget` with a unit max of 9.10 ms wall against the 5.0 ms budget. On-CPU max was 1.08 ms (p50 0.96 ms, p95 0.99 ms). Only 2 units were over budget: 9.10 ms wall at 0.38 ms on CPU, and 8.62 ms wall at 1.08 ms on CPU. Blob unlinks inside the reclaim reached 8.87 ms (2 over 4.0 ms). The whole reclaim took 0.585 s against 2.0 s. The 5-minute load average was about 48 during the run. This is the same wall-time unlink stall as rounds 0-2. WP-K owns no benchmark: git diff --stat l5g-merged...HEAD over Sources, Package.swift, Scripts and Tests/ZTronAssetKitBenchmarks is empty.",
+   "fix": "Nothing for WP-K. The orchestrator re-measures P-13 on l5g-merged on a quiet machine.",
+   "id": "L5K-V3-03"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "test robustness: a WP-K test fails under TSan, so the --full TSan step fails (G2/G4, Definition of Done)",
+   "location": "Tests/ZTronAssetCompatibilityTests/MigrationLaunchShimTests.swift:87 (`let legacyLeft = try launch.legacyFilesLeft()`) and :91 (`#expect(legacyLeft == 0, \"every prior-art file left the prior art's tree\")`), test `launchSyncDuringLegacyMigration` (the CCR-K1 tripwire)",
+   "problem": "The strict check `legacyLeft == 0` races the end of legacy migration. The CCR-K1 run downloads some prior-art files. Their legacy copies leave the tree only when the migration loop reaches them or phase 4 runs, which happens asynchronously after the per-asset resolves have returned. Under TSan the test reads the tree first. Full TSan run of the compatibility target: `\u2718 Test run with 69 tests in 10 suites failed after 1.478 seconds with 2 issues (including 1 known issue)`, with `MigrationLaunchShimTests.swift:91:9: Expectation failed: legacyLeft == 0 \u2026 legacyLeft \u2192 2` (downloaded \u2192 2). Re-runs of MigrationLaunchShimTests under TSan: 5 of 6 failed the same way (legacyLeft 1, 1, 1, 1, 2; downloaded 2 each). No ThreadSanitizer report in any run. Probe ProbeLegacyLeftover under TSan, 6 of 6 runs: `downloaded=2 leftAfterSync=2 leftAfterResolves=2 yields=1..3 leftAfterYields=0`, so the copies disappear one to three scheduler turns later with no clock move. It is a timing race, not files that are never removed. On a quiet host without TSan, 6 of 6 runs gave `leftAfterResolves=0`. `Scripts/quality-gates.json` has `tests.tsan = True`, so `verify.sh --full` runs this test under TSan and will usually end in `VERIFY: FAIL`. The close-out's required run of the target under TSan fails the same way. The K evidence has no TSan run of this round-2 test.",
+   "fix": "Make the post-condition deterministic, test first, with this TSan failure as the failing evidence. (1) From `source.starts`, compared with `CompatFixture.transfer(asset)`, find which assets were downloaded. (2) Assert strictly that every other asset's legacy file is gone. Adoption renames the file before its record is present, so this already holds when the resolves return; the lookups test pins the same with 0 transfers and passes under TSan. (3) Check the downloaded assets' legacy copies only inside the CCR-K1 `withKnownIssue` block, or drop that check. Those copies linger only because of the CCR-K1 downloads, and after the engine fix there are none. Do not wait for `.syncStarted(_, .launch)` as a signal that migration ended: when migration ends while the explicit run is still active, `startRun` returns without starting the parked launch run (Sources/ZTronAssetSync/Engine/EngineRuns.swift:72-74). Then run the compatibility target several times under TSan, plus verify.sh --full's TSan step.",
+   "id": "L5K-V3-04"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "orchestrator ruling outstanding: CCR-K1, R-STO-11 MUST (engine defect in WP-F's files; WP-K's part of the round-2 fix is complete)",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:10-39 (performSync reaches startRun(trigger: .explicit) at :39 without reading state.migration.running); EngineLifecycle.swift:317-331; EngineCommands.swift:53-56 (adoptLegacyNow only on the resolve path). Tripwire: Tests/ZTronAssetCompatibilityTests/MigrationLaunchShimTests.swift:96-98. Request: docs/adr-drafts/k.md:25-40",
+   "problem": "Round-2 blocking issue 1 is not fully fixed, because its engine half is still open. The engine code is unchanged, and an explicit sync during legacy migration still downloads prior-art files that R-STO-11 requires to be moved. The defect reproduced in this session: the --quick run recorded the known issue (`6 of 150 prior-art files were`), as did the coverage run, 1 of 10 loop runs on a loaded host, and every TSan run (2 of 150). The non-TSan probe on a quiet host downloaded 37, 46, 52, 43, 53 and 52 of 150. Its reach is the documented path too: MIGRATION.md step 4 allows `syncIfNeeded()` from a user action and admits it re-downloads during the window. WP-K's own part is done and verified: a tripwire test whose download count sits in `withKnownIssue(\u2026, isIntermittent: true)`, with the other expectations strict; the residual stated in MIGRATION.md step 4 (:65-72) and \u00a74 (:179-181), K-7 (:226-228), K-15, and the doc comments at CDNSyncCoordinator.swift:88-92 and :113-115. No WP-K code change is requested.",
+   "fix": "The orchestrator rules on CCR-K1 as k.md's header proposes. Either (a) performSync joins the run that the migration loop's defer starts while `state.migration.running` (or pending and not deferred), instead of starting one, or (b) bulk jobs try `store.adoptLegacyNow` before transferring a record whose legacy file is still pending. The ruling may also defer it, with a record. The ruling must authorise the edit to WP-F's files, add WP-F's direct test, and remove WP-K's `withKnownIssue` wrapper once the fix lands. Note for (a): `startRun` is a no-op while a run is active (EngineRuns.swift:72-74), so the parked launch run must be handled when an explicit run overlaps migration's end.",
+   "id": "L5K-V3-05"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "doc accuracy (proven by probe): the migration window is scoped to 'the first launch after adoption', and step 4 says the launch sync is 'harmless on later launches'",
+   "location": "docs/MIGRATION.md:38-44 (step 3), :65-72 (step 4, 'is harmless on later launches'), :155-157 and :179-181 (\u00a74); docs/adr-drafts/k.md K-7 (:226-228), K-11 (:297-300), K-15 (:348-383), CCR-K1 header (:25-40); doc comments at Shims/CDNLocalStore.swift:15-19, :180-181, :192-193, :211-212, Shims/CDNConfiguration.swift:120-122, Shims/CDNSyncCoordinator.swift:88-92, :113-115",
+   "problem": "Legacy migration resumes on any later launch that finds it unfinished. StoreMigration.swift:7-11 rebuilds the plan when the persisted phase is `inProgress` and reports legacyMigrationPending, and EngineLifecycle.swift:313-320 restarts it after start(). That launch behaves exactly like the first one. Probe ProbeResumedMigration, 5 of 5 runs: launch 1 runs step 3, then the app is terminated (shutdown) during migration, leaving 149 of 150 files unadopted. On launch 2, right after start(), the lookups answered 1 of 150, and the prior art's launch `syncIfNeeded()` downloaded 6, 11, 34, 31 and 5 prior-art files (progress `.complete`, tree empty at the end). On a device, phase 2 hashes every prior-art byte, so an interrupted first launch is plausible. The unconditional advice in step 4 (no launch-task sync until CCR-K1 is fixed) still protects an adopter. But the scope statements and 'harmless on later launches' are false, and an app that resolves the prior art's videos only 'on that launch' (step 3) would miss them on the resumed launch.",
+   "fix": "Rescope every listed passage to 'any launch on which legacy migration is still adopting the prior art's files: the first launch after adoption, and any later launch that resumes a migration an earlier launch did not finish'. Drop or qualify 'harmless on later launches'. Optionally pin it with a shim test, using ProbeResumedMigration as the template: start, then shutdown, then relaunch over the same fakes; the lookups miss and resolves adopt.",
+   "id": "L5K-V3-06"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "behaviour parity / doc gap: lifetime of the URL existingLocalURL hands out (ADR-017 consumer contract)",
+   "location": "Tests/ZTronAssetCompatibilityTests/Shims/CDNLocalStore.swift:175-185 (existingLocalURL doc); docs/MIGRATION.md \u00a74 (:146-191) and k.md K-11; module contract at Sources/ZTronAssetModel/Reports/AssetLocation.swift:13-16 and ADR-035 (deletionGrace 10 s of awake time)",
+   "problem": "Not probed: this follows from the module's documented contract. The prior art kept an asset at one pretty path and replaced its bytes in place when the content changed (prior-art CDNLocalStore.swift:212-228), so a URL a page held stayed valid. The shims hand out content-addressed blob URLs. A content change gives a new URL, and the old blob may be removed `deletionGrace` (10 s of awake time by default) after the snapshot without it is installed, unless a lease holds it (AssetLocation's doc). BasicVideoPage builds its TinyVideoPlayer from the URL at init (BasicVideoPage.swift:56-62), so a page created before a republish, prune or eviction may later re-read a path that is gone. Neither the existingLocalURL doc nor MIGRATION \u00a74 tells the adopter.",
+   "fix": "Add a line to MIGRATION \u00a74 (and to K-11 or the existingLocalURL doc). The URL names the stored content. When the content changes, or the asset is pruned or evicted, the old file is removed `StoragePolicy.deletionGrace` after the new snapshot (ADR-017). A consumer that re-reads the path later, such as BasicVideoPage's player, should look it up again on failure or hold a lease (`AssetClient.withAsset`).",
+   "id": "L5K-V3-07"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "doc accuracy: NetworkAvailabilityMonitor retries also run on power and thermal reports (K-8's parity claim)",
+   "location": "Tests/ZTronAssetCompatibilityTests/Shims/NetworkAvailabilityMonitor.swift:109-118 (`.report`: every satisfied report runs all pending retries); Sources/ZTronAssetTransport/Conditions/LiveDeviceConditionsSource.swift:60-61; docs/adr-drafts/k.md K-8 (:247, 'waits for the next path change'); docs/MIGRATION.md:117",
+   "problem": "K-8 says a retry registered while online 'waits for the next path change'. The shim actually runs pending retries on the next satisfied conditions report. The live source emits one on every path change and also on every Low Power Mode and thermal-state notification. The existing test shows this: NetworkMonitorShimTests.swift:132-136 re-sends an identical `.unrestricted` and retry 2 runs. ZTronSVGView re-registers after each failure, so an SVG that keeps failing also retries on power and thermal changes, where the prior art's NWPathMonitor retried only on path updates. The impact is low.",
+   "fix": "State it in K-8, the MIGRATION \u00a72 row and the monitor's doc comment. Alternatively, for closer parity, run retries only on the first report and on reports whose `network` differs from the previous one.",
+   "id": "L5K-V3-08"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "ownership (carried from rounds 1-2; orchestrator action at merge)",
+   "location": "docs/ARCHITECTURE.md:68 (\u00a71.2 row 'L5, after G | K') and :71-73 (the 'Files WP-x added' paragraphs); request at docs/adr-drafts/k.md:8-11",
+   "problem": "docs/MIGRATION.md is still not recorded as WP-K's file. It sits inside WP-I's docs/**. ARCHITECTURE \u00a71.2 is the orchestrator's file and is unchanged on wp/k, as it should be.",
+   "fix": "At merge, the orchestrator adds a 'Files WP-K added' paragraph to \u00a71.2 that lists docs/MIGRATION.md.",
+   "id": "L5K-V3-09"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "benchmarks (environment, not WP-K)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (P-13); BenchStorage.swift:116 (P-5); BenchSync.swift:177, :204, :317 (C2)",
+   "problem": "Run 1 happened while another worktree's simulator xctest ran at about 640 % CPU (load average up to about 225): 35 tests, 6 issues (P-5 twice, P-13, and the C2 benchmarks for R-SYN-11, R-SYN-13 and R-SYN-5). Re-run with --skip-build at load 2-3: 35 tests, 1 issue, P-13 only: unit max 12.42 ms wall against 5.0 ms, on-CPU max 1.007 ms, p50 0.965 ms, p95 0.993 ms, and every over-budget unit is a wall-time stall. This is the same signature as rounds 0-2. WP-K changed no source, benchmark or package file (`git diff --stat l5g-merged...HEAD -- Sources Package.swift Scripts Tests/ZTronAssetKitBenchmarks` is empty).",
+   "fix": "Nothing for WP-K. The orchestrator re-measures P-13 against WP-B's budget on a quiet volume.",
+   "id": "L5K-V3-10"
+  }
+ ],
+ "author_open": [
+  "Deviation from the task text, for the orchestrator (K-8): NetworkAvailabilityMonitor watches the module's reachability source (AssetEnvironment.conditions; `shared` uses AssetEnvironment.live().conditions), not an AssetClient's events. An idle client observes nothing (R-SYN-14, EngineConditions.swift), and the prior art registers its retry exactly when the client has given up on the asset. The failing test c623b34 proved the event-driven version never fires then.",
+  "The shim test harness (K-10) wraps ManualTimeSource in AutoAdvancingClock. All time comes from the manual clock: sleeps due within 1 s move it automatically, and the harness sets manifestFetchDeadline to 1e6. KitHarness's fenced clock driver needs @testable engine state, which this target cannot import. A verifier should judge this against the rule 'ManualTimeSource only'.",
+  "NEEDS-HUMAN-REVIEW, shim API and behaviour: K-2 the install point is write-once, so CDNAssetResolver.installed = nil and re-installation are ignored. K-3 CDNLocalStore's lookups are @MainActor; the prior-art call sites are main-actor and compile, which PriorArtCallSiteTests pins. K-5 the providers no longer download (CDNShimError.downloadsGoThroughTheClient), and the client's Apple tier reads its catalog from the essential pack, not from BackgroundAssetsCDNProvider(catalog:). K-6 the deprecated initialisers build one client per install point from the first provider; a custom CDNProvidingi is never used as a transport.",
+  "Observation (K-7, nothing changed): CDNSyncProgress(outcome:) maps a `.complete` run whose manifest fetch passed its deadline (manifestFresh false) to `.complete`, although no stamp is written. The next launch retries, so the prior art's retry behaviour holds; the Stage 1 contract body was left as is.",
+  "Behaviour differences inherited from the module and pinned by shim tests (K-11): after a 404 for an asset's new content, the old bytes are no longer served (ADR-032, L4-R16); the prior art kept the old file. The extension filter also applies to manifest-known assets (ADR-037). An on-demand resolve downloads before checking the extension.",
+  "For the merge: put the proposed REENTRANCY rows k-1\u2026k-3 (main-actor awaits in CDNSyncCoordinator, a test-target type) into ARCHITECTURE \u00a710. Credit the 51 new R-CAR-6 test names in \u00a711's R-CAR-6 row.",
+  "Optional, not a contract change request (K-13): a public read of the client's applied manifest would make cachedAsset(forIdentifier:) faithful and let verifyFullyAvailable() work without a provider.",
+  "Not verified here: Q-10, the adoption inside ZTronCarouselCore (ADR-006); the live monitor and StaticManifestCDNProvider against real networks; the shims at run time below the iOS 17 test-bundle target (only typechecked at iOS 15 and macOS 12)."
+ ],
+ "history": [
+  {
+   "round": 1,
+   "blocking": 3,
+   "total": 18,
+   "fix_open": [
+    "Orchestrator at merge: record docs/MIGRATION.md as WP-K's file in ARCHITECTURE \u00a71.2 (a 'Files WP-K added' paragraph). It was authorised by the WP-K launch notes; WP-K cannot edit ARCHITECTURE.md. Noted in the k.md header.",
+    "Orchestrator at merge: K-6 is now tagged NEEDS-HUMAN-REVIEW (shim behaviour; storage location). CDNLocalStore(baseDirectory: X) roots the store at X's parent/ZTronAssetKit/v1. Add it to the DECISIONS owner review list.",
+    "Orchestrator at merge: the proposed REENTRANCY row k-1 now also covers the `await self.run(_:)` in syncIfNeeded() and verifyAndRepair() (nothing is read after it).",
+    "Declined (owner's call): sharing one install point per directory across CDNLocalStore(baseDirectory:) instances. It would need a main-actor registry, which is global mutable state under SPEC \u00a74.2. Documented and pinned instead as 'one store per parent directory'. Reason recorded in k.md under 'Fix round 1'.",
+    "Partly done (reqs issue 4): once-per-version is pinned across three launches, but the coordinator reporting `.complete` on an app-version change is not. That answer depends on the coordinator's call joining the client's own launch run, and no public API lets a test order the two. The test settles the launch run and pins `.upToDate` instead (K-7), and the MIGRATION \u00a73 row says exactly what is pinned.",
+    "Not WP-K's (correct lens, issue 9): the P-13 benchmark failed again in this worktree, whose Sources are identical to l5g-merged. 35 tests, 1 issue: unit max 6.35 ms wall against the 5.0 ms budget (0.82 ms on CPU; p50 0.96, p95 0.99 ms). The overrun comes from single blob unlinks of up to 5.67 ms, against a volume unlink profile max of 0.085 ms. This is WP-B's budget; re-measure on a quiet volume."
+   ],
+   "fix_contract": []
+  },
+  {
+   "round": 2,
+   "blocking": 2,
+   "total": 10,
+   "fix_open": [
+    "CCR-K1 needs an orchestrator ruling and a WP-F engine change. Until then the CCR-K1 test keeps its intermittent known issue, and MIGRATION.md step 4 tells adopters to keep syncIfNeeded()/verifyAndRepair() out of the launch task on the first launch after adoption.",
+    "Ownership, carried from round 1 (orchestrator action at merge): add a 'Files WP-K added' paragraph listing docs/MIGRATION.md to ARCHITECTURE \u00a71.2. The launch notes authorise the file, and the request is in the k.md header.",
+    "Declined for now, the owner's call (NEEDS-HUMAN-REVIEW, K-5): option (b) for the app key, a key-taking StaticManifestCDNProvider initialiser that refuses cross-origin redirects. The shims cannot read AppKey.secret (K-1), so it would need a plain-String copy of the key outside AppKey's redaction plus redirect handling in the shims, for a call nothing in ZTronCarouselCore or ZTronCarousel makes. Option (a) is implemented instead: documentation, a recommended manifest source that sends the key or client.availability(scope:), and a loopback pin.",
+    "NEEDS-HUMAN-REVIEW, shim behaviour (K-15): on the first launch after adoption, the synchronous lookups miss a prior-art file until migration or a resolve adopts it, after start() has returned. The shims cannot close this without main-thread file I/O (C2). K-13 records an optional migration-awaiting API; it is not requested.",
+    "P-13 benchmark (WP-B's budget, not WP-K's; no WP-K benchmark or source changed): 35 tests, 1 issue, longest <= batchBudget, unit max 9.65 ms wall against 5.0 ms. On-CPU max was 1.02 ms; all six over-budget units were wall-time stalls with blob unlinks up to 9.00 ms. The orchestrator should re-measure on l5g-merged on a quiet volume.",
+    "Not verified (k.md): the length of the migration window on a real device, which sets how long lookups miss prior-art files and how many files a sync during migration would re-download; the shims run on the simulator and macOS 27 only (iOS 15 and macOS 12 are compile-checked); the live provider, monitor and keyed origin."
+   ],
+   "fix_contract": [
+    "CCR-K1 (WP-F engine, behaviour only, no signature change; blocking R-STO-11 for a sync requested during legacy migration). SyncEngine.performSync (Sources/ZTronAssetSync/Engine/EngineRuns.swift:10-39) reaches startRun(trigger: .explicit, mode:) at :39 without reading state.migration.running. start() (EngineLifecycle.swift) settles at :317, spawns the migration at :320 and parks only the launch run (launchRunWaiting, :331). Bulk jobs never try store.adoptLegacyNow, which runs only on the resolve path (EngineCommands.swift:56). Result: CDNSyncCoordinator.syncIfNeeded() or verifyAndRepair() called right after start() on the first launch after adoption downloads every prior-art file that phase 2 has not adopted yet (6 to 41 of 150 in 15 of 15 quiet runs). Minimal change, WP-F's choice: (a) while migration is running (or pending and not deferred), performSync sets launchRunWaiting and joins the run that the migration loop's defer starts (EngineRuns.swift:1055-1058); or (b) before a bulk job starts a transfer for a record whose legacy file is still pending, it tries store.adoptLegacyNow, as awaitAsset does. Tripwire: 'R-CAR-6: a coordinator's syncIfNeeded right after start on the first launch after adoption completes and downloads none of the prior art's files (CCR-K1)'. Remove its withKnownIssue wrapper with the fix. WP-F's F-8 pins only the launch run, so the direct case also needs a WP-F test. Details: docs/adr-drafts/k.md header and K-15."
+   ]
+  },
+  {
+   "round": 3,
+   "blocking": 2,
+   "total": 11,
+   "fix_open": [],
+   "fix_contract": []
+  }
+ ]
+}

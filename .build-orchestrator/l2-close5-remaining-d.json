@@ -1,0 +1,18 @@
+[
+ {
+  "lens": "both",
+  "blocking": false,
+  "area": "docs / contract bookkeeping",
+  "location": "docs/adr-drafts/d.md:5 (the 'Contract signatures' summary of package additions)",
+  "problem": "This cycle added a new package member, `BackgroundTaskTag.forStart(name:expectedBytes:resumeData:)`. D-20.1 (line 138) records it and says it is 'for the orchestrator's acknowledgement (as in ruling 3)'. The summary at the top of the file is the list the orchestrator acknowledges at merge, and it still names only `label(_:priority:)` and the cycle-3 `createdFromResumeData` additions for `BackgroundTaskTag`. The member could be missed at merge. It is not in a contract file (BackgroundTaskTag.swift did not exist at l1-merged), so no ownership rule is broken.",
+  "fix": "In the 'Contract signatures' paragraph, add after the cycle-3 `BackgroundTaskTag` entry: '; close-out cycle 5: `forStart(name:expectedBytes:resumeData:)`, D-20.1'."
+ },
+ {
+  "lens": "both",
+  "blocking": false,
+  "area": "tests / device-only residual (already recorded)",
+  "location": "Sources/ZTronAssetTransport/BackgroundSessionBackend.swift:58-60; Sources/ZTronAssetTransport/Background/BackgroundTaskTag.swift:44 (doc comment)",
+  "problem": "The live driver still uses `resumeData` twice with no test on either use: once as the helper's argument (line 58) and once in its choice between `downloadTask(withResumeData:)` and `downloadTask(with:)` (line 60). Mutant ME changes line 58 to `forStart(..., resumeData: nil)`, and all 147 transport tests still pass. D-20.1 acknowledges this residual and lists it under 'Not verified', so nothing was missed. One wording point: the helper's doc says 'the coverage-excluded live file keeps no expression of its own'. That holds for the tag mapping, but not for the overload choice, which can drift from the tag without any test noticing.",
+  "fix": "No code change needed. Optionally narrow the doc at BackgroundTaskTag.swift:44 to '...keeps no expression of its own for the tag; only its choice of downloadTask overload stays device-only'. Keep the d.md device check that reads `taskDescription` from `getAllTasks` after a pause and restart; it is the only check of these two lines."
+ }
+]

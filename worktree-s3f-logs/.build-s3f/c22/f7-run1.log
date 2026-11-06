@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a commit holds nothing for the manifest for the ids an apply moved away (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit holds nothing for the manifest for the ids an apply moved away (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit holds nothing for the manifest for the ids an apply moved away (F-20, C1)" started.
+✔ Test "R-SYN-11: a commit holds nothing for the manifest for the ids an apply moved away (F-20, C1)" with 2 test cases passed after 0.895 seconds.
+◇ Test "R-SYN-11: a commit holds nothing for the manifest for an id an apply delisted, while another apply is in flight (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit holds nothing for the manifest for an id an apply delisted, while another apply is in flight (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit holds nothing for the manifest for an id an apply delisted, while another apply is in flight (F-20, C1)" started.
+✔ Test "R-SYN-11: a commit holds nothing for the manifest for an id an apply delisted, while another apply is in flight (F-20, C1)" with 2 test cases passed after 1.093 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 1.990 seconds.
+✔ Test run with 2 tests in 1 suite passed after 1.990 seconds.

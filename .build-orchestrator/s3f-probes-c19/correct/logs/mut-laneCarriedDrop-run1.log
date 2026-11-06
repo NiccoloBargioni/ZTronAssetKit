@@ -1,0 +1,100 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .publicationHeld to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurn to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+✔ Test "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" with 6 test cases passed after 6.285 seconds.
+◇ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .publicationHeld to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurn to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld at EngineFollowBarrierPendingLaneTests.swift:229:9: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ J's 429 is prefetch work below its cap: J's retry serves P (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))); jStarts 1
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld at EngineFollowBarrierPendingLaneTests.swift:231:9: Expectation failed: outcome.throttled
+↳ a 429 of prefetch work below its cap throttles the origin (visit-first)
+↳ outcome.throttled → false
+↳   outcome → PendingLaneOutcome(p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))), b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), a: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), throttled: false, jStarts: 1)
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳     b → failure(ZTronAssetModel.AssetError.notFound)
+↳       failure → .notFound
+↳     a → failure(ZTronAssetModel.AssetError.notFound)
+↳       failure → .notFound
+↳     throttled → false
+↳     jStarts → 1
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld at EngineFollowBarrierPendingLaneTests.swift:232:9: Expectation failed: outcome.jStarts == 2
+↳ J's retry starts it again (visit-first): 1
+↳ outcome.jStarts == 2 → false
+↳   outcome.jStarts → 1
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn at EngineFollowBarrierPendingLaneTests.swift:229:9: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ J's 429 is prefetch work below its cap: J's retry serves P (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))); jStarts 1
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn at EngineFollowBarrierPendingLaneTests.swift:231:9: Expectation failed: outcome.throttled
+↳ a 429 of prefetch work below its cap throttles the origin (visit-first)
+↳ outcome.throttled → false
+↳   outcome → PendingLaneOutcome(p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))), b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), a: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), throttled: false, jStarts: 1)
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳     b → failure(ZTronAssetModel.AssetError.notFound)
+↳       failure → .notFound
+↳     a → failure(ZTronAssetModel.AssetError.notFound)
+↳       failure → .notFound
+↳     throttled → false
+↳     jStarts → 1
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn at EngineFollowBarrierPendingLaneTests.swift:232:9: Expectation failed: outcome.jStarts == 2
+↳ J's retry starts it again (visit-first): 1
+↳ outcome.jStarts == 2 → false
+↳   outcome.jStarts → 1
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ at EngineFollowBarrierPendingLaneTests.swift:229:9: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ J's 429 is prefetch work below its cap: J's retry serves P (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))); jStarts 1
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ at EngineFollowBarrierPendingLaneTests.swift:231:9: Expectation failed: outcome.throttled
+↳ a 429 of prefetch work below its cap throttles the origin (visit-first)
+↳ outcome.throttled → false
+↳   outcome → PendingLaneOutcome(p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))), b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), a: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), throttled: false, jStarts: 1)
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳     b → failure(ZTronAssetModel.AssetError.notFound)
+↳       failure → .notFound
+↳     a → failure(ZTronAssetModel.AssetError.notFound)
+↳       failure → .notFound
+↳     throttled → false
+↳     jStarts → 1
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ at EngineFollowBarrierPendingLaneTests.swift:232:9: Expectation failed: outcome.jStarts == 2
+↳ J's retry starts it again (visit-first): 1
+↳ outcome.jStarts == 2 → false
+↳   outcome.jStarts → 1
+✘ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" with 6 test cases failed after 6.415 seconds with 9 issues.
+↳ /// The same with O's 404 (`pendingLane(_:_:ending: .notFound)`): while H's move onto O is owed, B's interest counts by
+↳ /// O's rule, whose waiting 404 answers it, not by H's, whose owed visit would move it: a visit-first engine's O
+↳ /// answered B before v4, so J's 429 was prefetch work, throttled the origin, and J's retry served P.
+✘ Suite "Engine follow barrier (F-28)" failed after 12.702 seconds with 9 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 12.702 seconds with 9 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,42 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Test "PROBE-C10-EDGE-ORDER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-EDGE-ORDER" started.
+PROBE-C10-EDGE-ORDER followVisitedFirst tickets: (f: Optional(2), c: Optional(3), serial: true)
+PROBE-C10-EDGE-ORDER followVisitedFirst mid: (owed: false, c: Optional(ZTronAssetSync.JobState.queued), f: Optional(ZTronAssetSync.JobState.downloading), events: 0)
+PROBE-C10-EDGE-ORDER followVisitedFirst startList: ["o", "F", "C", "N", "C", "F", "C"]
+PROBE-C10-EDGE-ORDER followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/05da4e8395ced16eb405c102f959163e28c8cc6b79fd93a6f230819fe27f2e86.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) fSecond=Optional(5) cSecond=Optional(4) starts=7
+✘ Test "PROBE-C10-EDGE-ORDER" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC10CorrectProbes.swift:400:9: Expectation failed: fSecond != nil && cSecond != nil && fSecond! < cSecond!
+↳ F, re-admitted by the edge ahead of C (same lane, earlier ticket), retries first (visit-first): f=Optional(5) c=Optional(4)
+↳ fSecond != nil && cSecond != nil && fSecond! < cSecond! → false
+↳   fSecond != nil && cSecond != nil → true
+↳   fSecond! < cSecond! → false
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-EDGE-ORDER" started.
+PROBE-C10-EDGE-ORDER sweepFollowsFirst tickets: (f: Optional(2), c: Optional(3), serial: true)
+PROBE-C10-EDGE-ORDER sweepFollowsFirst mid: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), f: Optional(ZTronAssetSync.JobState.queued), events: 3)
+PROBE-C10-EDGE-ORDER sweepFollowsFirst startList: ["o", "F", "C", "N", "C", "F"]
+PROBE-C10-EDGE-ORDER sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/05da4e8395ced16eb405c102f959163e28c8cc6b79fd93a6f230819fe27f2e86.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) fSecond=Optional(5) cSecond=Optional(4) starts=6
+✘ Test "PROBE-C10-EDGE-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:400:9: Expectation failed: fSecond != nil && cSecond != nil && fSecond! < cSecond!
+↳ F, re-admitted by the edge ahead of C (same lane, earlier ticket), retries first (visit-first): f=Optional(5) c=Optional(4)
+↳ fSecond != nil && cSecond != nil && fSecond! < cSecond! → false
+↳   fSecond != nil && cSecond != nil → true
+↳   fSecond! < cSecond! → false
+✘ Test "PROBE-C10-EDGE-ORDER" with 2 test cases failed after 3.113 seconds with 2 issues.
+↳ /// PROBE-C10-EDGE-ORDER (the draft's residual "the `.edge` events are appended before the deferred re-admissions of
+↳ /// the same edge, whatever their ranks"): one transfer slot. F (zz-f, a prefetch member) failed offline earlier and
+↳ /// waits for an edge (`failed(.whenOnline)`); C (zz-a, zz-b) runs for a prefetch member of zz-b, with a user waiter A
+↳ /// of zz-a; v3 moves zz-a. C fails offline (no edge during its attempt), then the path drops and returns. Visited
+↳ /// first, the edge re-admits F and C in the pump's order (same lane, F's earlier ticket): F's retry starts before C's.
+↳ /// With C's verdict waiting, the edge's `.edge(C)` is appended before `readmit`'s place for F, so C's retry starts
+↳ /// first.
+✘ Suite "VerifyC10CorrectProbes" failed after 3.113 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 1 test in 1 suite failed after 3.113 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

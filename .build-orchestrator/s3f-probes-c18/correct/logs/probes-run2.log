@@ -1,0 +1,82 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+Build complete! (1,04 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC18Correct" started.
+◇ Test "C18-REPRO-RR14-PUBLICATION-HOP" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, small → false to "C18-REPRO-RR14-PUBLICATION-HOP" started.
+C18-REPRO-RR14-PUBLICATION-HOP seed 1717302 followVisitedFirst after v4 (owed: false, moves: 0, p: "verifying [zz-p, zz-x] i2"); w=failure(ZTronAssetModel.AssetError.integrityFailure) q=failure(ZTronAssetModel.AssetError.integrityFailure) zStarts=0
+◇ Test case passing 2 arguments visit → .followVisitedFirst, small → true to "C18-REPRO-RR14-PUBLICATION-HOP" started.
+C18-REPRO-RR14-PUBLICATION-HOP seed 1717002 followVisitedFirst after v4 (owed: false, moves: 0, p: "verifying [zz-p, zz-x] i2"); w=failure(ZTronAssetModel.AssetError.integrityFailure) q=failure(ZTronAssetModel.AssetError.integrityFailure) zStarts=0
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, small → false to "C18-REPRO-RR14-PUBLICATION-HOP" started.
+C18-REPRO-RR14-PUBLICATION-HOP seed 1717302 sweepFollowsFirst after v4 (owed: true, moves: 1, p: "verifying [zz-p] i1"); w=failure(ZTronAssetModel.AssetError.integrityFailure) q=failure(ZTronAssetModel.AssetError.integrityFailure) zStarts=0
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, small → true to "C18-REPRO-RR14-PUBLICATION-HOP" started.
+C18-REPRO-RR14-PUBLICATION-HOP seed 1717002 sweepFollowsFirst after v4 (owed: true, moves: 1, p: "verifying [zz-p] i1"); w=failure(ZTronAssetModel.AssetError.integrityFailure) q=failure(ZTronAssetModel.AssetError.integrityFailure) zStarts=0
+✔ Test "C18-REPRO-RR14-PUBLICATION-HOP" with 4 test cases passed after 6.816 seconds.
+◇ Test "C18-REPRO-RETRY-AFTER-DATE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C18-REPRO-RETRY-AFTER-DATE" started.
+C18-REPRO-RETRY-AFTER-DATE followVisitedFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(31.0))) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C18-REPRO-RETRY-AFTER-DATE" started.
+C18-REPRO-RETRY-AFTER-DATE sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(31.0))) cStarts=1
+✔ Test "C18-REPRO-RETRY-AFTER-DATE" with 2 test cases passed after 2.640 seconds.
+◇ Test "PROBE-C18C-PENDING-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C18C-PENDING-LANE" started.
+PROBE-C18C-PENDING-LANE followVisitedFirst at v4 owed false movesOwed 0 hMoveOwed false J.followedLane userInitiated J.lane userInitiated; throttle before nil after nil; p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/fb/fb94b2aed7cba92c36b6fb6fc042c91362783a78b4a76312af8f8324d9919a16.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) jStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C18C-PENDING-LANE" started.
+PROBE-C18C-PENDING-LANE sweepFollowsFirst at v4 owed true movesOwed 9 hMoveOwed true J.followedLane prefetch J.lane prefetch; throttle before nil after Optional(61000000000ns); p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89e8677f5cf203a74c17ec78ee523284d3660bead24fe99d80c0b25eb3239ee1.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) a=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) jStarts=2
+✘ Test "PROBE-C18C-PENDING-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC18CorrectProbes.swift:254:25: Issue recorded
+↳ PROBE-C18C-PENDING-LANE: visit-first, v4's visit moved B onto J, so J's 429 is user work beyond the 30 s cap and P is answered serverUnavailable(60): success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89e8677f5cf203a74c17ec78ee523284d3660bead24fe99d80c0b25eb3239ee1.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); at v4 owed true movesOwed 9 hMoveOwed true J.followedLane prefetch J.lane prefetch; jStarts 2
+✘ Test "PROBE-C18C-PENDING-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC18CorrectProbes.swift:256:9: Expectation failed: after == before
+↳ PROBE-C18C-PENDING-LANE: visit-first, J's 429 is beyond the user lane's cap and throttles nothing: before nil after Optional(61000000000ns)
+↳ after == before → false
+↳   after → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+↳   before → nil
+✘ Test "PROBE-C18C-PENDING-LANE" with 2 test cases failed after 4.257 seconds with 2 issues.
+↳ /// PROBE-C18C-PENDING-LANE. `followedLane` counts an id an owed move carries only on the move's target
+↳ /// (`inboundPendingIDs`, cycle 18), "whatever a later copy maps it to". That holds for a publishing target (the later
+↳ /// apply's visit passes it), not for a target whose exit verdict waits: the drain moves the ids a later apply moved
+↳ /// from the job that verdict leaves (`followAfterVerdict`), as a visit-first engine's visit at that apply moved them.
+↳ ///
+↳ /// O (100 kB; zz-a, user waiter A) and J (16 B; zz-p, prefetch waiter P) download; 72 prefetch holders (zz-g…, own
+↳ /// 16 B contents) and then H (50 kB; zz-b, user waiter B) are created. K (zz-k) publishes, held at its first store
+↳ /// unit, so an apply's walk finds a publication in flight. v3 maps zz-b and every zz-g to O's content. O's attempt
+↳ /// times out (first attempt, below every cap: a retry that keeps every interest). v4 maps zz-b on to J's content.
+↳ /// Then J gets a 429 with `Retry-After` 60 s (above the user lane's 30 s cap, below the prefetch lane's).
+↳ ///
+↳ /// Visit-first: v3's visit moved B onto O; O's timeout backed off and kept B; v4's visit moved B onto J; J's 429 is
+↳ /// user work beyond the cap: J fails, P and B `serverUnavailable(60)`, the origin not throttled by it.
+↳ /// Behind the barrier: O's attempt end makes the first 64 moves; the moves of 8 holders and of H stay owed through v4
+↳ /// (whose turn K's walk takes, `applyWalked`), so at J's 429 B's id is pending onto O and `here` says not J's.
+◇ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C18C-PUBLICATION-WAIT-APPLY" started.
+PROBE-C18C-PUBLICATION-WAIT-APPLY followVisitedFirst at O's bytes -; at v4 waits false O nil; u=success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d2cb75443428d1da09ebecb10f33c15521ff33c64a92ea007b4133411027fd37.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) zStarts=0 ahead sizes [16]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C18C-PUBLICATION-WAIT-APPLY" started.
+PROBE-C18C-PUBLICATION-WAIT-APPLY sweepFollowsFirst at O's bytes waits true movesOwed 8 O verifying ids 65; at v4 waits true O verifying ids 65; u=success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a0/a0466adf29d1a7af9f0c0db4dc90cf5b2dc07f8fb2c94429ad04330ba7eddbe0.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) zStarts=1 ahead sizes [16]
+✘ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC18CorrectProbes.swift:337:9: Expectation failed: (try? uResult.get())?.byteSize == 16
+↳ PROBE-C18C-PUBLICATION-WAIT-APPLY: visit-first, O's publication bound zz-o before v4, so U is served O's 16 bytes: success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a0/a0466adf29d1a7af9f0c0db4dc90cf5b2dc07f8fb2c94429ad04330ba7eddbe0.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); at O's bytes waits true movesOwed 8 O verifying ids 65; at v4 waits true O verifying ids 65; zStarts 1
+↳ (try? uResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY" with 2 test cases failed after 3.034 seconds with 1 issue.
+↳ /// PROBE-C18C-PUBLICATION-WAIT-APPLY. A publication that waits for owed moves (`awaitInboundMoves`, cycle 18) binds
+↳ /// its ids only after them, so an apply that lands during the wait decides which ids the store binds. O (16 B; zz-o,
+↳ /// user waiter U) downloads; 72 prefetch holders (zz-g…, own 16 B contents) wait. v3 maps every zz-g to O's content.
+↳ /// O's bytes arrive. Then v4 maps zz-o to Z (48 B) and keeps every zz-g on O.
+↳ ///
+↳ /// Visit-first: v3's visits moved the holders onto O; O's publication began at its attempt's end with nothing owed,
+↳ /// bound zz-o and the holders' ids and committed before v4: U is served O's 16 bytes.
+↳ /// Behind the barrier: O's attempt end makes 64 moves and its publication waits for the other 8; v4 is applied
+↳ /// meanwhile, so the binding the store checks after the wait meets v4's zz-o on Z.
+✘ Suite "VerifyC18Correct" failed after 16.750 seconds with 3 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 18, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs the cycle-17 blocking scenarios (RR-14 in both verifiers' shapes, the Retry-After date) as this
+↳ /// verifier's own copies. Part 2 hunts cycle 18's mechanism: the owed moves (`inboundMoves`) read by `followedLane`, and
+↳ /// the publication that waits for them (`awaitInboundMoves`) across a later apply. Each runs in both orders and expects
+↳ /// the visit-first outcome.
+✘ Test run with 4 tests in 1 suite failed after 16.750 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

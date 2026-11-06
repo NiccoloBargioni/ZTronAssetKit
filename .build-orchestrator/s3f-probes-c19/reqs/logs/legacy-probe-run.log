@@ -1,0 +1,54 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC19ReqsLegacy" started.
+◇ Test "PROBE-C19R-LEGACY-TARGET" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, followUpsFirst → false to "PROBE-C19R-LEGACY-TARGET" started.
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: v2 synced
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: scripted
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: T downloading
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: T publication held
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: v3 applied
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v3 and B's request: (t: Optional(Set([zz-x])), tState: Optional(ZTronAssetSync.JobState.verifying), h: Optional(Set([zz-x])), hState: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v3b: owed=false unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=0/0 inFlight=["T", "H"] moves=0 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v4: owed=false unfollowed=0 H-unfollowed=false T-unfollowed=false followNext=0/0 inFlight=["T"] moves=0 next=0 jobs=["T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v5: owed=false unfollowed=0 H-unfollowed=false T-unfollowed=false followNext=0/0 inFlight=["T"] moves=0 next=0 jobs=["T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), B success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), tStarts 1, hStarts 1
+◇ Test case passing 2 arguments visit → .followVisitedFirst, followUpsFirst → true to "PROBE-C19R-LEGACY-TARGET" started.
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: v2 synced
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: scripted
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: T downloading
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: T publication held
+PROBE-C19R-LEGACY-TARGET followVisitedFirst step: v3 applied
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v3 and B's request: (t: Optional(Set([zz-x])), tState: Optional(ZTronAssetSync.JobState.verifying), h: Optional(Set([zz-x])), hState: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v3b: owed=false unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=0/0 inFlight=["T", "H"] moves=0 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v4: owed=false unfollowed=0 H-unfollowed=false T-unfollowed=false followNext=0/0 inFlight=["T"] moves=0 next=0 jobs=["T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET followVisitedFirst after v5: owed=false unfollowed=0 H-unfollowed=false T-unfollowed=false followNext=0/0 inFlight=["T"] moves=0 next=0 jobs=["T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET followVisitedFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), B success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), tStarts 1, hStarts 1
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false to "PROBE-C19R-LEGACY-TARGET" started.
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: v2 synced
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: scripted
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: T downloading
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: T publication held
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: v3 applied
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v3 and B's request: (t: Optional(Set([zz-x])), tState: Optional(ZTronAssetSync.JobState.verifying), h: Optional(Set([zz-x])), hState: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v3b: owed=true unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=1/1 inFlight=["T", "H"] moves=0 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v4: owed=true unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=0/0 inFlight=["T", "H"] moves=0 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v5: owed=true unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=0/0 inFlight=["T", "H"] moves=1 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: ["c-7dba52ac6d55705b2a92bb20f340789bb62b483c167e871fed080f11df96ea6e -> l-73839f2edabce81a1b7e12121082232af3388bda71b60ccaa7140fb1e7c93581: [zz-x]"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst false: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), B success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), tStarts 1, hStarts 1
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true to "PROBE-C19R-LEGACY-TARGET" started.
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: v2 synced
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: scripted
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: T downloading
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: T publication held
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst step: v3 applied
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v3 and B's request: (t: Optional(Set([zz-x])), tState: Optional(ZTronAssetSync.JobState.verifying), h: Optional(Set([zz-x])), hState: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v3b: owed=true unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=1/1 inFlight=["T", "H"] moves=0 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v4: owed=true unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=0/0 inFlight=["T", "H"] moves=0 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst after v5: owed=true unfollowed=1 H-unfollowed=false T-unfollowed=true followNext=0/0 inFlight=["T", "H"] moves=1 next=0 jobs=["H: downloading [zz-x] visit=nil", "T: verifying [zz-x] visit=Optional(Set([]))"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst moves owed after v5's walk: ["c-7dba52ac6d55705b2a92bb20f340789bb62b483c167e871fed080f11df96ea6e -> l-73839f2edabce81a1b7e12121082232af3388bda71b60ccaa7140fb1e7c93581: [zz-x]"]
+PROBE-C19R-LEGACY-TARGET sweepFollowsFirst followUpsFirst true: A success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), B success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/74/74f37ea9a159875486d2fb2af802d1ca1d40d96e20b043e070e2e65be4bf5abf.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.unverified, isStale: false)), tStarts 1, hStarts 1
+✔ Test "PROBE-C19R-LEGACY-TARGET" with 4 test cases passed after 7.837 seconds.
+✔ Suite "VerifyC19ReqsLegacy" passed after 7.837 seconds.
+✔ Test run with 1 test in 1 suite passed after 7.837 seconds.

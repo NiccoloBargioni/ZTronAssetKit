@@ -1,0 +1,11 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[9 / 13] ZTronAssetSync
+[12 / 13] ZTronAssetCompatibilityTests-product
+[15 / 16] ZTronAssetKitBenchmarks-product
+[18 / 19] ZTronAssetKitTests-product
+[21 / 22] ZTronAssetSyncTests-product
+Build complete! (3,22 s)

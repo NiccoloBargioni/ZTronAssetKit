@@ -1,0 +1,56 @@
+◇ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" started.
+◇ Test "PROBE-C3-PARTIAL: a 404 for a shared job answers only the id still mapped to it" started.
+◇ Test case passing 1 argument round → 0 to "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test case passing 1 argument round → 1 to "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" started.
+◇ Test case passing 1 argument round → 1 to "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test case passing 1 argument round → 2 to "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" started.
+◇ Test case passing 1 argument failure → .rejected to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument failure → .integrity to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument failure → .transientAtCap to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+◇ Test case passing 1 argument round → 0 to "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" started.
+◇ Test case passing 1 argument failure → .notFound to "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" started.
+PROBE-C3-W4[transientAtCap] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[integrity] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[transientAtCap] answer: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+✘ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" recorded an issue with 1 argument failure → .transientAtCap at VerifyC3CorrectProbes.swift:86:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4 FAIL[.transientAtCap]: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+PROBE-C3-W4[integrity] answer: failure(ZTronAssetModel.AssetError.integrityFailure)
+✘ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" recorded an issue with 1 argument failure → .integrity at VerifyC3CorrectProbes.swift:86:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4 FAIL[.integrity]: failure(ZTronAssetModel.AssetError.integrityFailure)
+PROBE-C3-W4[rejected] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[rejected] answer: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+✘ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" recorded an issue with 1 argument failure → .rejected at VerifyC3CorrectProbes.swift:86:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4 FAIL[.rejected]: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+PROBE-C3-PARTIAL: a failure(ZTronAssetModel.AssetError.notFound), b failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-PARTIAL: a 404 for a shared job answers only the id still mapped to it" recorded an issue at VerifyC3CorrectProbes.swift:124:9: Expectation failed: (try? answerA.get()) != nil
+↳ PROBE-C3-PARTIAL FAIL: moved id answered failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-PARTIAL: a 404 for a shared job answers only the id still mapped to it" failed after 1.778 seconds with 1 issue.
+↳ /// PROBE-C3-PARTIAL: a job shared by two ids (same bytes), only one of which the apply moves; the old content 404s
+PROBE-C3-W4[notFound] before: (listed: true, unfollowed: false, scans: 1)
+PROBE-C3-W4[notFound] answer: failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" recorded an issue with 1 argument failure → .notFound at VerifyC3CorrectProbes.swift:86:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4 FAIL[.notFound]: failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-W4: a failure of a listed id's replaced content before the pass reached it answers from new content" with 4 test cases failed after 1.921 seconds with 4 issues.
+↳ /// PROBE-C3-W4: own reproduction of the cycle-2 W4 defect, the pass-bound form (the target's job not even owed a
+PROBE-C3-W4b[2]: owed at release (1792, 1), complete true, answer failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" recorded an issue with 1 argument round → 2 at VerifyC3CorrectProbes.swift:166:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4b FAIL: failure(ZTronAssetModel.AssetError.notFound)
+PROBE-C3-W1b[0]: complete true, starts since the apply 48, stale 44
+✘ Test "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" recorded an issue with 1 argument round → 0 at VerifyC3CorrectProbes.swift:206:9: Expectation failed: stale.isEmpty
+↳ PROBE-C3-W1b FAIL: 44 stale starts
+PROBE-C3-W4b[1]: owed at release (1792, 1), complete true, answer failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" recorded an issue with 1 argument round → 1 at VerifyC3CorrectProbes.swift:166:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4b FAIL: failure(ZTronAssetModel.AssetError.notFound)
+PROBE-C3-W4b[0]: owed at release (1792, 1), complete true, answer failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" recorded an issue with 1 argument round → 0 at VerifyC3CorrectProbes.swift:166:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-C3-W4b FAIL: failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-C3-W4b: without seams a 404 of a listed id's replaced content during the follow answers from new content" with 3 test cases failed after 3.547 seconds with 3 issues.
+↳ /// PROBE-C3-W4b: own seam-free reproduction (3,000 ids; the 404 released as soon as the copy changes).
+PROBE-C3-W1b[1]: complete true, starts since the apply 48, stale 44
+✘ Test "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" recorded an issue with 1 argument round → 1 at VerifyC3CorrectProbes.swift:206:9: Expectation failed: stale.isEmpty
+↳ PROBE-C3-W1b FAIL: 44 stale starts
+✘ Test "PROBE-C3-W1b: over a whole bounded follow no transfer of replaced content starts after the apply" with 2 test cases failed after 3.732 seconds with 2 issues.
+↳ /// PROBE-C3-W1b: own seam-free reproduction (3,000 members, 4 slots): no start of replaced content after the apply,
+✘ Test run with 4 tests in 1 suite failed after 3.733 seconds with 10 issues.

@@ -1,0 +1,45 @@
+ 4:12  up 6 days, 16:35, 3 users, load averages: 32.23 29.95 24.07
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC17Correct" started.
+◇ Test "PROBE-C17C-INBOUND-SUPERSEDED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-INBOUND-SUPERSEDED" started.
+PROBE-C17C-INBOUND-SUPERSEDED followVisitedFirst after v3 (owed: false, t: "nil", h: "nil"); at the 404 -; tStarts 2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-INBOUND-SUPERSEDED" started.
+PROBE-C17C-INBOUND-SUPERSEDED sweepFollowsFirst after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+✘ Test "PROBE-C17C-INBOUND-SUPERSEDED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17CorrectProbes.swift:455:9: Expectation failed: (try? w.get())?.byteSize == 100_000
+↳ PROBE-C17C-INBOUND-SUPERSEDED: v3's visit superseded T before H's visit moved W to T's content, so a fresh job of T's content serves W (visit-first): failure(ZTronAssetModel.AssetError.notFound) after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+↳ (try? w.get())?.byteSize == 100_000 → <not evaluated>
+✘ Test "PROBE-C17C-INBOUND-SUPERSEDED" with 2 test cases failed after 1.637 seconds with 1 issue.
+↳ /// PROBE-C17C-INBOUND-SUPERSEDED. T (100 kB, zz-a; user waiter A) and H (50 kB, zz-x; user waiter W) download. v3 moves
+↳ /// zz-a to a new content Z and zz-x onto T's content; zz-a's entry comes before zz-x's, so a follow visits T before H.
+↳ /// Visit-first: v3's visit of T finds every id of T moved and supersedes it (T's attempt abandoned), then H's visit
+↳ /// moves W to T's content, where no job is left: a fresh job, whose download (T's next scripted step) serves W; A is
+↳ /// served by Z. Behind the barrier T's held attempt then ends in a 404 (in visit-first that attempt no longer exists).
+↳ /// Suspected sweep-first: `bringInbound` at the 404's deferral moves W onto T's failed job, so T's own visit later
+↳ /// finds an id that stays (zz-x) and no longer supersedes it, and the drain's 404 answers W `notFound`.
+◇ Test "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" started.
+PROBE-C17C-INBOUND-SUPERSEDED-CONTROL followVisitedFirst after v3 (owed: false, t: "downloading e4 [zz-x]", h: "nil"); at the 404 -; tStarts 1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" started.
+PROBE-C17C-INBOUND-SUPERSEDED-CONTROL sweepFollowsFirst after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+✔ Test "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" with 2 test cases passed after 1.627 seconds.
+◇ Test "PROBE-C17C-INBOUND-SUPERSEDED-CONSISTENT" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-INBOUND-SUPERSEDED-CONSISTENT" started.
+PROBE-C17C-INBOUND-SUPERSEDED-CONSISTENT followVisitedFirst after v3 (owed: false, t: "downloading e10 [zz-x]", h: "nil"); at the 404 -; tStarts 2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-INBOUND-SUPERSEDED-CONSISTENT" started.
+PROBE-C17C-INBOUND-SUPERSEDED-CONSISTENT sweepFollowsFirst after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+✔ Test "PROBE-C17C-INBOUND-SUPERSEDED-CONSISTENT" with 2 test cases passed after 1.611 seconds.
+✘ Suite "VerifyC17Correct" failed after 4.877 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 17, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs, unchanged except for their display names, the scenarios the cycle-16 verifiers reported blocking
+↳ /// (PROBE-C16C-VERDICT-MAPPED-BACK, -RR11-RETRY-LANE, -THROTTLE-FAILFAST-LANE, -INTERMEDIATE-HOP, -INTERMEDIATE-HOP-SERVED,
+↳ /// PROBE-C16R-RR11-RETRY-AFTER). Part 2 is this verifier's own variant of a fixed class (an offline exit's fail-fast).
+↳ /// Part 3 hunts what cycle 17's mechanism (`bringInbound`, `takeOffMovedBefore`, `verdictAnswers` through the replays'
+↳ /// functions) may still miss. Each runs in both orders and expects the visit-first outcome.
+✘ Test run with 3 tests in 1 suite failed after 4.877 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+ 4:12  up 6 days, 16:35, 3 users, load averages: 31.92 29.95 24.14

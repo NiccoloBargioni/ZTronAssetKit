@@ -1,0 +1,40 @@
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-29 21:44:20
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 00:02:59
+@@ -709,6 +709,7 @@
+         candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+         var requeues = 0
+         var parks = 0
++        var follows = 0
+         var waiting = false
+         for candidate in candidates {
+             if let room, smallest > room.subtractingClamped(ahead) {
+@@ -723,6 +724,14 @@
+                     self.scheduleSpaceSweepFollowUp(sweep)
+                     break
+                 }
++                if self.holdsMovedID(job) {
++                    // PROTOTYPE (verifier): a follow costs about a follow visit (`followsPerTurn`), not a re-queue.
++                    guard follows < Self.followsPerTurn else {
++                        self.scheduleSpaceSweepFollowUp(sweep)
++                        break
++                    }
++                    follows += 1
++                }
+                 if self.followBeforeActing(transfer) {
+                     // Superseded: the ids went to their new content's jobs, which the gate admits on their own.
+                     requeues += 1
+@@ -749,6 +758,14 @@
+             }
+             // The ids that left this content leave before its fail-fast answers the rest; a job that keeps some is read
+             // again, since the moved interests may have set its lane (and so the volume its figures read).
++            if self.holdsMovedID(job) {
++                // PROTOTYPE (verifier): as above.
++                guard follows < Self.followsPerTurn else {
++                    self.scheduleSpaceSweepFollowUp(sweep)
++                    break
++                }
++                follows += 1
++            }
+             guard !self.followBeforeActing(transfer), let parked = self.state.jobs[transfer] else {
+                 parks += 1
+                 continue

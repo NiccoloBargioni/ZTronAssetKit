@@ -1,0 +1,17 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineCatchUp.swift b/Sources/ZTronAssetSync/Engine/EngineCatchUp.swift
+index 6874f51..281df89 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineCatchUp.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineCatchUp.swift
+@@ -46,7 +46,12 @@ extension SyncEngine {
+         self.state.appliesInFlight -= 1
+         switch result {
+         case .success(let report) where self.isRunning:
++            let s3c0 = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
++            let s3t0 = DispatchTime.now().uptimeNanoseconds
+             self.applied(manifest, etag: etag, report: report, since: serial)
++            let s3t1 = DispatchTime.now().uptimeNanoseconds
++            let s3c1 = clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)
++            print("S3CONF applied(): jobs \(self.state.jobs.count) manifest \(manifest.count): \(Double(s3t1 - s3t0) / 1e6) ms wall, thread CPU \(Double(s3c1 - s3c0) / 1e6) ms")
+         case .failure where self.isRunning:
+             self.storeMutationFailed()
+             self.state.catchUpAfterFailedApply = true

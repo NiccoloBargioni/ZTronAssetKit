@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineManifest.swift b/Sources/ZTronAssetSync/Engine/EngineManifest.swift
+index 0376dad..51f6fd9 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineManifest.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineManifest.swift
+@@ -76,7 +76,7 @@ extension SyncEngine {
+ 
+     /// Starts the fetch task unless one runs.
+     func beginManifestFetch() {
+-        guard self.state.manifestFetch == nil, self.isRunning || self.state.lifecycle == .starting else {
++        guard self.isRunning || self.state.lifecycle == .starting else {
+             return
+         }
+         self.state.lastFetch += 1

@@ -1,0 +1,62 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+        "deviceName" : "iPhone 18 Pro Max",
+        "modelName" : "iPhone 18 Pro Max",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 2939,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "ZTronAssetKit · Built with macOS 27.0",
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "finishTime" : 1793503804.275,
+  "passedTests" : 1491,
+  "result" : "Passed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1793503449.272,
+  "statistics" : [
+    {
+      "subtitle" : "1689 test runs",
+      "title" : "241 tests ran with dynamic parameters"
+    }
+  ],
+  "testFailures" : [
+
+  ],
+  "title" : "Test - ZTronAssetKit",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "7% of duration",
+      "text" : "12 longest test runs with outlier durations exceeding 11.74s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "81% of duration",
+      "text" : "1 longest test run with outlier durations exceeding 18.08s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "13% of duration",
+      "text" : "14 longest test runs with outlier durations exceeding 3.43s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 1491
+}

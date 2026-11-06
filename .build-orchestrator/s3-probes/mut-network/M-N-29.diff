@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetModel/Manifest/ManifestDiff.swift b/Sources/ZTronAssetModel/Manifest/ManifestDiff.swift
+index daa51b9..b316740 100644
+--- a/Sources/ZTronAssetModel/Manifest/ManifestDiff.swift
++++ b/Sources/ZTronAssetModel/Manifest/ManifestDiff.swift
+@@ -89,7 +89,7 @@ public struct ManifestDiff: Sendable, Hashable {
+         if old.contentIdentity != new.contentIdentity {
+             return .contentChanged
+         }
+-        return old == new ? .unchanged : .metadataChanged
++        return .unchanged
+     }
+ 
+     /// The entries of the newer manifest, rebuilt from `old` plus this diff in O(n); `nil` when the diff does not

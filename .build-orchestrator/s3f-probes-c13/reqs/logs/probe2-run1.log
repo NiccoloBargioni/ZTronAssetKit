@@ -1,0 +1,32 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C13R-STAMP-BREAKER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13R-STAMP-BREAKER" started.
+DBGP followVisitedFirst afterApply=(owed: false, n: Optional(ZTronAssetSync.JobState.queued))
+DBGP followVisitedFirst atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+DBGP followVisitedFirst violations=[]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13R-STAMP-BREAKER" started.
+DBGP sweepFollowsFirst afterApply=(owed: true, n: nil)
+DBGP sweepFollowsFirst atEnd=(n: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+DBGP sweepFollowsFirst heap=[]
+DBGP sweepFollowsFirst afterAnHour=(n: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), groupPending: Optional(1))
+✘ Test "PROBE-C13R-STAMP-BREAKER" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierProbeC13Reqs.swift:95:9: Expectation failed: snap.n == .downloading
+↳ N runs once the breaker closed (visit-first): (n: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+↳ snap.n == .downloading → false
+↳   snap.n → .blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))
+↳     some → .blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))
+↳       blocked → .circuitOpen(ZTronAssetModel.BreakerCause.authentication)
+↳         circuitOpen → .authentication
+↳     some → .downloading
+DBGP sweepFollowsFirst violations=[]
+✘ Test "PROBE-C13R-STAMP-BREAKER" with 2 test cases failed after 0.825 seconds with 1 issue.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.825 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.826 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,17 @@
+diff --git a/Sources/ZTronAssetKit/Facade/AssetClient.swift b/Sources/ZTronAssetKit/Facade/AssetClient.swift
+index 8f39622..d9bbce1 100644
+--- a/Sources/ZTronAssetKit/Facade/AssetClient.swift
++++ b/Sources/ZTronAssetKit/Facade/AssetClient.swift
+@@ -189,7 +189,11 @@ public final class AssetClient: Sendable {
+     /// filters case-insensitively; empty means any. `nil` after shutdown.
+     @MainActor
+     public func lookup(_ id: AssetID, extensions: [String] = []) -> AssetLocation? {
+-        self.mirror.lookup(id, extensions: extensions)
++        let found = self.mirror.lookup(id, extensions: extensions)
++        if let found {
++            _ = try? self.environment.fileSystem.itemInfo(at: found.url)
++        }
++        return found
+     }
+ 
+     /// The network step: single-flight, at `priority`, fetch-first for unknown ids (R-CAR-1, R-SYN-4). The

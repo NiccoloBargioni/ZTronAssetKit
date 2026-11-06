@@ -1,0 +1,249 @@
+--- variants/EngineJobs.head.swift	2026-10-30 08:43:27
++++ variants/EngineJobs.prefix.swift	2026-10-30 08:43:27
+@@ -683,71 +683,29 @@
+     /// turn that re-admitted 10,000 members when the volume gained room took about 15 ms: review of close-out cycle 8,
+     /// C2). A read stops re-checking once the room left cannot admit even the smallest job parked `insufficientSpace`.
+     ///
+-    /// While a follow is owed, the sweep first follows every job it would judge that holds an id the follow has not moved
+-    /// yet (`followSweptHolders`), then collects and orders the jobs again, and only then judges any: it judges each job
+-    /// as the follow leaves it, at the place the pump would serve it from. A follow changes what the sweep reads two ways:
+-    /// the followed job loses the moved interests, which may have set its lane (and with it its rank and the volume its
+-    /// verdict and figures read; the two readings are not ordered, so the room may shrink or grow), and the job of the
+-    /// moved id's new content gains them, which may raise its lane. The cycles before judged a job at its pre-follow place
+-    /// and followed it only as the sweep reached it, so each change was patched where it showed: a job re-queued on its
+-    /// pre-follow user lane took the next user job's room (PROBE-C5-LANEDROP), a job parked after a follow that left it
+-    /// room answered its waiter with an `available` above its `required` (PROBE-C6-LANEGAIN), and, with both patched,
+-    /// prefetch work was still admitted and counted ahead of user work the pump serves first, and a job the follow raised
+-    /// to user work was still judged at its prefetch place, so a user waiter's fail-fast reported a shortage the room did
+-    /// not have (the close-out cycle-7 correctness lens, PROBE-C7-RANK-ADMIT, -PARK and -PROMOTE). Following first gives
+-    /// the outcome the sweep gives when the follow visited those jobs before it. The ids leave a job before its fail-fast
+-    /// answers the rest, so a moved id's waiter or ensure member is never answered with its replaced content's figures,
+-    /// and the replaced content is never re-queued to stall its queue's head until the follow's visit (the close-out
+-    /// cycle-3 correctness lens, PROBE-C3-SPACE). At `s3-base` the follow moved every job in the apply's turn, so no
+-    /// sweep ran between the two. A follow costs what a follow turn's visit costs, about ten times a re-queue or a park:
+-    /// the sweep follows at most `followsPerTurn` jobs per turn besides its parks and re-queues (counted as the re-queue
+-    /// or park it preceded, one turn followed up to 1,024 jobs, 9.3 to 13 ms at 10,000 members: the close-out cycle-4
+-    /// correctness lens, PROBE-C4-SWEEP2-C2), and a turn that cannot follow them all judges nothing and leaves the rest
+-    /// to its follow-up sweep, since a job not followed yet would be judged at a place it may not keep.
++    /// A job about to be re-queued or parked `insufficientSpace` that holds an id an owed follow has not moved yet is
++    /// followed first (`followBeforeActing`), as a failure is: its fail-fast would answer that id's waiter or ensure member
++    /// with the replaced content's figures although the copy lists the id at content that may fit, and its re-queue would
++    /// stall its queue's head until the follow's visit (the close-out cycle-3 correctness lens, PROBE-C3-SPACE). A follow
++    /// that keeps some of the job's ids may lower its lane, since the moved interests may have set it, and with it the
++    /// volume its verdict read. The two volume readings are not ordered (neither the store nor the ledger clamps them), so
++    /// the lowered lane's room may be smaller or larger: a job is judged again after its follow either way. One admitted
++    /// before its follow that no longer fits is treated as one that never did (left parked `insufficientSpace`, left
++    /// waiting, or parked within `parksPerPump`): never re-queued, never counted ahead of the jobs behind it. Re-queued on
++    /// its pre-follow user lane, its bytes counted ahead took the room the next user job was judged against, whose
++    /// fail-fast answered that job's waiter with a shortage that did not exist, while the gate parked the followed job
++    /// again (the close-out cycle-5 correctness lens, PROBE-C5-LANEDROP). One about to be parked that fits after its
++    /// follow is re-queued as an admitted one is (within `readmissionsPerTurn`): parked, its fail-fast answered the kept
++    /// waiter with an `available` above its `required` (the close-out cycle-6 correctness lens, PROBE-C6-LANEGAIN). At
++    /// `s3-base` the follow moved every job in the apply's turn, so neither window existed. A follow
++    /// costs what a follow turn's visit costs (`followsPerTurn`), about ten times a re-queue or a park, so the sweep gives
++    /// it its own bound: at most `followsPerTurn` follows per turn besides `parksPerPump` parks and `readmissionsPerTurn`
++    /// re-queues, the rest left to the follow-up sweep. Counted as the re-queue or park it preceded, one turn followed up
++    /// to 1,024 jobs, 9.3 to 13 ms at 10,000 members (the close-out cycle-4 correctness lens, PROBE-C4-SWEEP2-C2). A job
++    /// left waiting acts on nothing and is not followed.
+     func sweepSpaceParked(_ sweep: SpaceSweep) {
+-        let ahead = self.spaceAdmittedAhead()
+-        var (candidates, smallest) = self.spaceSweepCandidates(sweep)
+-        // A read re-checks only jobs parked `insufficientSpace`, and leaves untouched each it does not admit: once the
+-        // room left cannot hold the smallest of them, nothing more changes (a follow moves interests, not sizes).
+-        let room = sweep == .read ? self.state.freeSpace.map { self.largestRoom(in: $0) } : nil
+-        if let room, smallest > room.subtractingClamped(ahead) {
+-            return
+-        }
+-        candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+-        switch self.followSweptHolders(candidates) {
+-        case .none:
+-            break
+-        case .followed:
+-            // Ranks, lanes and the jobs themselves may have changed: collect and order them again.
+-            (candidates, smallest) = self.spaceSweepCandidates(sweep)
+-            if let room, smallest > room.subtractingClamped(ahead) {
+-                return
+-            }
+-            candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+-        case .bounded:
+-            self.scheduleSpaceSweepFollowUp(sweep)
+-            return
+-        }
+-        self.judgeSpaceParked(candidates, sweep: sweep, room: room, smallest: smallest, ahead: ahead)
+-    }
+-
+-    /// One space-parked job a sweep may judge, with its place in the pump's order.
+-    private typealias SweepCandidate = (rank: Int, ticket: UInt64, transfer: TransferID)
+-
+-    /// What `followSweptHolders` did.
+-    private enum SweptFollow {
+-        /// No job the sweep would judge holds an id an owed follow has not moved: the collected order stands.
+-        case none
+-        /// It followed every such job: the jobs must be collected and ordered again.
+-        case followed
+-        /// It followed `followsPerTurn` of them and more are left: the sweep judges nothing this turn.
+-        case bounded
+-    }
+-
+-    /// The jobs `sweep` judges (every space-parked job, or only the `insufficientSpace` ones for a read), unordered, and
+-    /// the size of the smallest.
+-    private func spaceSweepCandidates(_ sweep: SpaceSweep) -> (candidates: [SweepCandidate], smallest: Int64) {
+-        var candidates: [SweepCandidate] = []
++        var ahead = self.spaceAdmittedAhead()
++        var candidates: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
+         var smallest = Int64.max
+         for transfer in self.state.spaceParked {
+             guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state, sweep != .read || reason == .insufficientSpace else {
+@@ -756,57 +714,54 @@
+             smallest = min(smallest, self.spaceSize(of: job))
+             candidates.append((self.queueRank(job), job.ticket, transfer))
+         }
+-        return (candidates, smallest)
+-    }
+-
+-    /// Follows, in `candidates`' order, each job that holds an id an owed follow has not moved yet (`followBeforeActing`,
+-    /// the follow's visit brought forward), at most `followsPerTurn` of them. One check per job and id while a follow is
+-    /// owed (`holdsMovedID`, a lookup and a key comparison); nothing otherwise.
+-    private func followSweptHolders(_ candidates: [SweepCandidate]) -> SweptFollow {
+-        guard self.followOwed else {
+-            return .none
++        // A read re-checks only jobs parked `insufficientSpace`, and leaves untouched each it does not admit: once the
++        // room left cannot hold the smallest of them, nothing more changes.
++        let room = sweep == .read ? self.state.freeSpace.map { self.largestRoom(in: $0) } : nil
++        if let room, smallest > room.subtractingClamped(ahead) {
++            return
+         }
+-        var follows = 0
+-        for candidate in candidates {
+-            guard let job = self.state.jobs[candidate.transfer], self.holdsMovedID(job) else {
+-                continue
+-            }
+-            guard follows < Self.followsPerTurn else {
+-                return .bounded
+-            }
+-            follows += 1
+-            _ = self.followBeforeActing(candidate.transfer)
+-        }
+-        return follows > 0 ? .followed : .none
+-    }
+-
+-    /// Judges `candidates`, in the pump's order and as the follow leaves them, against `room` (a read's) or the ledger
+-    /// (`sweepSpaceParked`), counting the bytes of the jobs re-admitted ahead of each.
+-    private func judgeSpaceParked(_ candidates: [SweepCandidate], sweep: SpaceSweep, room: Int64?, smallest: Int64, ahead: Int64) {
+-        var ahead = ahead
++        candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+         var requeues = 0
+         var parks = 0
++        var follows = 0
+         var waiting = false
+         for candidate in candidates {
+             if let room, smallest > room.subtractingClamped(ahead) {
+                 break
+             }
+             let transfer = candidate.transfer
+-            guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
++            guard var job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
+                 continue
+             }
+-            guard let block = self.spaceBlock(job, ahead: ahead) else {
+-                guard requeues < Self.readmissionsPerTurn else {
++            var verdict = self.spaceBlock(job, ahead: ahead)
++            if verdict == nil {
++                guard requeues < Self.readmissionsPerTurn, self.followFits(job, follows: &follows) else {
+                     self.scheduleSpaceSweepFollowUp(sweep)
+                     break
+                 }
++                if self.followBeforeActing(transfer) {
++                    // Superseded: the ids went to their new content's jobs, which the gate admits on their own.
++                    requeues += 1
++                    continue
++                }
++                // A follow that kept some ids may have lowered the job's lane (the moved interests may have set it),
++                // and with it the volume the verdict read: the job is judged again before it is re-queued and its bytes
++                // counted ahead of the jobs behind it (PROBE-C5-LANEDROP). Without a follow it is the same job.
++                guard let followed = self.state.jobs[transfer] else {
++                    continue
++                }
++                job = followed
++                verdict = self.spaceBlock(job, ahead: ahead)
++            }
++            guard let block = verdict else {
+                 if self.requeueSwept(job, ahead: &ahead) {
+                     requeues += 1
+                 }
+                 continue
+             }
+-            // A job that does not fit: an `insufficientSpace` one stays parked; an `awaitingSpace` one waits or is parked
+-            // within this turn's bound.
++            // A job that does not fit, or no longer fits on the lane its follow left it: an `insufficientSpace` one
++            // stays parked; an `awaitingSpace` one waits or is parked within this turn's bound (its follow, if any, is
++            // done and not counted again).
+             guard reason == .awaitingSpace else {
+                 continue
+             }
+@@ -814,20 +769,40 @@
+                 waiting = true
+                 continue
+             }
+-            guard parks < Self.parksPerPump else {
++            guard parks < Self.parksPerPump, self.followFits(job, follows: &follows) else {
+                 self.scheduleSpaceSweepFollowUp(sweep)
+                 break
+             }
++            // The ids that left this content leave before its fail-fast answers the rest; a job that keeps some is read
++            // again, since the moved interests may have set its lane (and so the volume its verdict and figures read).
++            guard !self.followBeforeActing(transfer), let parked = self.state.jobs[transfer] else {
++                parks += 1
++                continue
++            }
++            if self.spaceBlock(parked, ahead: ahead) == nil {
++                // The lane the follow left reads the other volume, and the two readings are not ordered: a lowered lane
++                // may read the larger room. A job that fits there is re-queued as an admitted one is, never parked with
++                // figures whose `available` exceeds its `required` (PROBE-C6-LANEGAIN). Without a follow it is the same
++                // job, which did not fit.
++                guard requeues < Self.readmissionsPerTurn else {
++                    self.scheduleSpaceSweepFollowUp(sweep)
++                    break
++                }
++                if self.requeueSwept(parked, ahead: &ahead) {
++                    requeues += 1
++                }
++                continue
++            }
+             if let space = self.state.freeSpace {
+                 // The room is computed before the write: the right side of an optional-chained assignment runs inside
+                 // the write's access to `state` (an exclusivity conflict, review of close-out cycle 6).
+-                let available = max(0, self.headroom(for: job, in: space).subtractingClamped(ahead))
+-                if case .insufficientSpace(let required, _)? = job.lastError {
++                let available = max(0, self.headroom(for: parked, in: space).subtractingClamped(ahead))
++                if case .insufficientSpace(let required, _)? = parked.lastError {
+                     // An earlier ENOSPC's figures: the bytes it needed, against the room this read leaves the job.
+                     self.state.jobs[transfer]?.lastError = .insufficientSpace(required: required, available: available)
+                 } else if ahead > 0 {
+                     // The fail-fast answer would report the room without the jobs admitted ahead of this one.
+-                    self.state.jobs[transfer]?.lastError = .insufficientSpace(required: job.entry.byteSize ?? 0, available: available)
++                    self.state.jobs[transfer]?.lastError = .insufficientSpace(required: parked.entry.byteSize ?? 0, available: available)
+                 }
+             }
+             self.park(transfer, reason: .insufficientSpace)
+@@ -858,6 +833,20 @@
+         return true
+     }
+ 
++    /// Whether the sweep's turn may act on `job`: a job that holds an id an owed follow has not moved yet is followed
++    /// before the sweep acts on it and counts against `followsPerTurn` (counted in `follows`); any other job always fits.
++    /// `false` once the turn has followed `followsPerTurn` jobs, and the sweep leaves the rest to its follow-up turn.
++    private func followFits(_ job: Job, follows: inout Int) -> Bool {
++        guard self.holdsMovedID(job) else {
++            return true
++        }
++        guard follows < Self.followsPerTurn else {
++            return false
++        }
++        follows += 1
++        return true
++    }
++
+     /// The bytes of the jobs earlier sweeps re-queued that still wait in the queue with the ticket a sweep gave them;
+     /// the others (started, parked again, re-queued by another path, removed) leave `spaceAdmitted`.
+     private func spaceAdmittedAhead() -> Int64 {

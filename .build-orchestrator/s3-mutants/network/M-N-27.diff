@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Policy/RequestFactory.swift b/Sources/ZTronAssetTransport/Policy/RequestFactory.swift
+index 1cf4454..adfadca 100644
+--- a/Sources/ZTronAssetTransport/Policy/RequestFactory.swift
++++ b/Sources/ZTronAssetTransport/Policy/RequestFactory.swift
+@@ -70,7 +70,7 @@ enum RemoteURL {
+         for component in path.split(separator: "/", omittingEmptySubsequences: false) {
+             let text = String(component)
+             let decoded = text.removingPercentEncoding ?? text
+-            guard !text.isEmpty, decoded != ".", decoded != "..",
++            guard !text.isEmpty, decoded != ".",
+                 !text.contains("?"), !text.contains("#"), !text.contains("\\")
+             else {
+                 return nil

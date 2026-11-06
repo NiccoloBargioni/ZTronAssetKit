@@ -1,0 +1,6 @@
+◇ Test run started.
+PROBE OI-14 before: used=1000 pending=0 budget=500
+PROBE OI-14 control result=CleanupResult(bytesFreed: 600, filesRemoved: 6, bytesDeferred: 0) used after=400
+PROBE OI-14 apply: reused=["o8", "o9"] contentChanged=["o8", "o9"] releasedBytes delta=0 used=1000 pending=0
+PROBE OI-14 result=CleanupResult(bytesFreed: 600, filesRemoved: 6, bytesDeferred: 0) evicted=[0, 1, 2, 3, 4, 5] used after=400 pending=600
+✔ Test run with 40 tests in 4 suites passed after 2.113 seconds.

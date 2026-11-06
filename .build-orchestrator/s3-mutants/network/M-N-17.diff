@@ -1,0 +1,12 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..08f5b9c 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -461,7 +461,6 @@ package struct CircuitBreaker: Sendable, Hashable {
+     private mutating func recordClosed(_ outcome: Outcome, at now: MonotonicInstant, seed: UInt64) {
+         switch outcome {
+         case .objectSuccess:
+-            self.authSuspects.removeAll()
+             self.appendWindow(false)
+             self.successesSinceClose += 1
+             self.resetCarriedTripsIfDue()

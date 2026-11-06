@@ -1,0 +1,182 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC7ReqsProbes" started.
+◇ Suite "Engine regressions, close-out cycle 8" started.
+◇ Suite "Engine runs" started.
+◇ Suite "VerifyC7CorrectProbes" started.
+◇ Test "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test "R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)" started.
+◇ Test "PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job" started.
+◇ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" started.
+◇ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument swept → .waiterReparked to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument swept → .waiterRequeued to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument swept → .ensureReparked to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test "PROBE-C7R-GAIN-AHEAD" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C7R-GAIN-AHEAD" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C7R-GAIN-AHEAD" started.
+PROBE-C7-RANK-admit visitFirst=true before: (owed: false, cLane: Optional(ZTronAssetModel.AssetPriority.prefetch), cRank: Optional(2), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C7-RANK-admit visitFirst=true afterSweep: (owed: false, cLane: nil, c: nil, k: nil, kError: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274434437, volumeOpportunistic: 274434437, usedBytes: 316, pendingReclaim: 0, budgetBytes: 137217376, reserveBytes: 268435456)), violations: [])
+✘ Test "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:171:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ K's user waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:176:25: Issue recorded
+↳ B's prefetch waiter is answered insufficientSpace: C's 5 MB do not fit beside K: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e8/e8816bfee3ba0ee1b0814a7112095be7e17ed9afee04415d66eeebe0ac02c903.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" with 2 test cases passed after 3.790 seconds.
+PROBE-C7-RANK-admit visitFirst=true kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/10/104766510d8f980647ad8e95ab1fc47a261412c724b515e0fedc11f3e65158d0.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 2998981)) aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c3/c3042f7e921bfdeb9319f13e7725c4ad130b8a5579ae10bfe83646b2f1cc0679.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-GAIN-AHEAD visit=followVisitedFirst dResult=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 7000000, available: 4999990)) dStarted=false
+✔ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" passed after 3.877 seconds.
+✔ Suite "Engine regressions, close-out cycle 8" passed after 3.896 seconds.
+✘ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:285:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+↳ A's user waiter, moved onto P, is answered from P's 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+↳ (try? aResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:286:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+↳ P's prefetch waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+↳ (try? pResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:290:25: Issue recorded
+↳ R's prefetch waiter is answered insufficientSpace: its 3.5 MB do not fit beside P: success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/11cec6b44cef42f703f879c0f10555708c9c8415926654aaf9fc273ab8c91ef4.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job" started.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases passed after 3.946 seconds.
+✘ Test "PROBE-C7R-GAIN-AHEAD" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC7ReqsProbes.swift:88:9: Expectation failed: watch.state == nil || watch.state == .blocked(.insufficientSpace)
+↳ PROBE-GAIN-AHEAD: in the sweep's turn D (7 MB) is judged behind C's 5 MB of the 10 MB prefetch room and parked (its fail-fast ends the job), never re-queued: Optional(ZTronAssetSync.JobState.queued)
+↳ watch.state == nil || watch.state == .blocked(.insufficientSpace) → false
+↳   watch.state == nil → false
+↳   watch.state == .blocked(.insufficientSpace) → false
+✔ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" with 3 test cases passed after 4.029 seconds.
+PROBE-GAIN-AHEAD visit=sweepFollowsFirst dResult=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 7000000, available: 4999987)) dStarted=false
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" with 2 test cases passed after 4.057 seconds.
+✘ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" with 2 test cases failed after 4.058 seconds with 3 issues.
+↳ /// The mirror case: a space sweep that follows a job judges the parked job of the moved id's new content at the user
+↳ /// place the moved interest gives it, not at its prefetch place. Parked `awaitingSpace` for 4 MB of a pruned blob with
+↳ /// 2 MB of room: C (5 MB, wanted only by A's user waiter), R (3.5 MB, a prefetch waiter) and P (3 MB, a prefetch
+↳ /// waiter), in that ticket order. A forced sync moves A onto P's content while 2,100 changed entries sort before it,
+↳ /// so the bounded follow owes C's visit (its turns held). The reclaim leaves 6 MB. Followed first, C is superseded,
+↳ /// A's interest makes P user-lane, P is judged first and fits, and R (3.5 MB against the 3 MB left) is parked. Sorted
+↳ /// before the follow, P was judged at its prefetch place after R, R took the room, and A's user waiter was answered
+↳ /// `insufficientSpace(required: 3000000, available: 2500000)` (the close-out cycle-7 correctness lens,
+↳ /// PROBE-C7-RANK-PROMOTE).
+↳ ///
+↳ /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 34.4 to 34.8 s beside a second TSan
+↳ /// process at a load of 1.9 to 18.6 (58 % of 60 s) and 22.2 s alone at a load of 9 to 11 (Stage 3
+↳ /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+↳ /// `EngineFollowTests`.
+✔ Test "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" with 2 test cases passed after 4.081 seconds.
+✔ Test "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" with 2 test cases passed after 4.093 seconds.
+✘ Test "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" with 2 test cases failed after 4.102 seconds with 2 issues.
+↳ /// A space sweep that follows a job judges it at the place the follow leaves it in the pump's order, not at the user
+↳ /// place it held before: C (5 MB) is wanted by A (a user waiter) and B (a prefetch waiter), so its job is user-lane
+↳ /// and, with the earlier ticket, ranked before K (3 MB, a user waiter). Both wait `awaitingSpace` for 4 MB of a
+↳ /// pruned blob. A forced sync moves A to a 16-byte content while 2,100 changed entries sort before it, so the bounded
+↳ /// follow owes C's visit (its turns held). Equal volume readings and 2 MB of room: the reclaim leaves just under 6 MB.
+↳ /// Followed first, C's job is prefetch-lane and judged after K: K fits, and C (5 MB against the 3 MB left) is parked.
+↳ /// Sorted before its follow, C fitted as user work, was followed to prefetch, still fitted, and was re-queued and
+↳ /// counted ahead of K, whose waiter was answered `insufficientSpace(required: 3000000, available: 999000)` (the
+↳ /// close-out cycle-7 correctness lens, PROBE-C7-RANK-ADMIT; it fails the same way on the cycle-6 code).
+↳ ///
+↳ /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 34.4 to 35.4 s beside a second TSan
+↳ /// process at a load of 1.9 to 18.6 (59 % of 60 s) and 21.9 s alone at a load of 9 to 11 (Stage 3
+↳ /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+↳ /// `EngineFollowTests`.
+✘ Test "PROBE-C7R-GAIN-AHEAD" with 2 test cases failed after 4.093 seconds with 1 issue.
+✘ Suite "VerifyC7ReqsProbes" failed after 4.108 seconds with 1 issue.
+↳ /// Close-out cycle 7, requirements lens: PROBE-C7R-GAIN-AHEAD. The setup of
+↳ /// `spaceSweepRequeuesAFollowedJobItsNewLaneFits` plus D (7 MB, a prefetch waiter) parked `awaitingSpace` behind C.
+↳ /// After the reclaim prefetch work has 10 MB: C (5 MB), re-queued by the park branch's re-judgement, must be counted
+↳ /// ahead, so D is judged against 5 MB and parked `insufficientSpace` in the sweep's own turn (its waiter answered at once, so
+↳ /// the job is gone). A re-queue that does not
+↳ /// count C ahead (mutant `gainNoAhead`) re-queues D too.
+✘ Test "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:394:9: Expectation failed: watch.state == nil || watch.state == .blocked(.insufficientSpace)
+↳ in the sweep's turn D (7 MB) is judged behind C's 5 MB of the 10 MB of prefetch room and parked (its fail-fast ends the job), never re-queued: Optional(ZTronAssetSync.JobState.queued)
+↳ watch.state == nil || watch.state == .blocked(.insufficientSpace) → false
+↳   watch.state == nil → false
+↳   watch.state == .blocked(.insufficientSpace) → false
+✘ Test "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" with 2 test cases failed after 4.291 seconds with 1 issue.
+↳ /// A space sweep counts the bytes of a followed job it re-queues ahead of the jobs it judges after it, as it does for
+↳ /// any re-queued job. The setup of `spaceSweepRequeuesAFollowedJobItsNewLaneFits` (C, 5 MB, wanted by A's user waiter
+↳ /// and B's prefetch waiter; no room for user work, 6 MB for prefetch work, 4 MB pending reclaim; A moved to a 16-byte
+↳ /// content while the bounded follow owes C's visit) plus D (7 MB, a prefetch waiter) parked `awaitingSpace` behind C.
+↳ /// After the reclaim prefetch work has 10 MB: C fits its prefetch lane and is re-queued; counted ahead, it leaves D
+↳ /// 5 MB, so D is parked `insufficientSpace` in the sweep's own turn and its fail-fast answers D's waiter with D's 7 MB
+↳ /// against that room. A re-queue that did not count C ahead re-queued D too, over-admitting the room until the gate
+↳ /// parked it again (the close-out cycle-7 requirements lens, PROBE-C7R-GAIN-AHEAD, mutant `gainNoAhead`).
+↳ ///
+↳ /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 33.8 to 34.9 s beside a second TSan
+↳ /// process at a load of 1.9 to 18.6 (58 % of 60 s) and 22.2 s alone at a load of 9 to 11 (Stage 3
+↳ /// close-out cycle 8), over half its 60 s, so the guard is `.minutes(3)`, as for the tests of the same setup in
+↳ /// `EngineFollowTests`.
+✔ Test "R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)" passed after 4.327 seconds.
+✘ Suite "Engine runs" failed after 4.327 seconds with 6 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+PROBE-C7-RANK-admit visitFirst=false before: (owed: true, cLane: Optional(ZTronAssetModel.AssetPriority.userInitiated), cRank: Optional(0), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C7-RANK-admit visitFirst=false afterSweep: (owed: true, cLane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.verifying), k: nil, kError: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274434456, volumeOpportunistic: 274434456, usedBytes: 300, pendingReclaim: 0, budgetBytes: 137217378, reserveBytes: 268435456)), violations: [])
+PROBE-C7-RANK-admit visitFirst=false kResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000)) bResult: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e8/e8816bfee3ba0ee1b0814a7112095be7e17ed9afee04415d66eeebe0ac02c903.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c3/c3042f7e921bfdeb9319f13e7725c4ad130b8a5579ae10bfe83646b2f1cc0679.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job" recorded an issue with 1 argument visitFirst → false at VerifyC7CorrectProbes.swift:128:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ PROBE-C7-RANK-admit: K's user waiter is served before C's prefetch-only job takes the room: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job" with 2 test cases failed after 4.819 seconds with 1 issue.
+↳ /// First branch (pre-follow verdict admits; equal volume readings).
+◇ Test "PROBE-C7-RANK-PARK: a parked-branch job re-queued on its new lane is not admitted ahead of a user job" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C7-RANK-PARK: a parked-branch job re-queued on its new lane is not admitted ahead of a user job" started.
+PROBE-C7-RANK-park visitFirst=true before: (owed: false, cLane: Optional(ZTronAssetModel.AssetPriority.prefetch), cRank: Optional(2), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C7-RANK-park visitFirst=true afterSweep: (owed: false, cLane: nil, c: nil, k: Optional(ZTronAssetSync.JobState.downloading), kError: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 272435459, volumeOpportunistic: 276435459, usedBytes: 300, pendingReclaim: 0, budgetBytes: 136217879, reserveBytes: 268435456)), violations: [])
+PROBE-C7-RANK-park visitFirst=true kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/54/541a1d49c389e1d7544c9eb5c1b8ffae443bbab5249233d2338a225728f66f24.png, fileExtension: png, byteSize: 3900000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4099987)) aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c3/c3042f7e921bfdeb9319f13e7725c4ad130b8a5579ae10bfe83646b2f1cc0679.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C7-RANK-PARK: a parked-branch job re-queued on its new lane is not admitted ahead of a user job" started.
+PROBE-C7-RANK-park visitFirst=false before: (owed: true, cLane: Optional(ZTronAssetModel.AssetPriority.userInitiated), cRank: Optional(0), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C7-RANK-park visitFirst=false afterSweep: (owed: true, cLane: nil, c: nil, k: Optional(ZTronAssetSync.JobState.verifying), kError: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 272435459, volumeOpportunistic: 276435459, usedBytes: 300, pendingReclaim: 0, budgetBytes: 136217879, reserveBytes: 268435456)), violations: [])
+PROBE-C7-RANK-park visitFirst=false kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/54/541a1d49c389e1d7544c9eb5c1b8ffae443bbab5249233d2338a225728f66f24.png, fileExtension: png, byteSize: 3900000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4099987)) aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c3/c3042f7e921bfdeb9319f13e7725c4ad130b8a5579ae10bfe83646b2f1cc0679.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C7-RANK-PARK: a parked-branch job re-queued on its new lane is not admitted ahead of a user job" with 2 test cases passed after 0.877 seconds.
+◇ Test "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" started.
+PROBE-C7-RANK-PROMOTE visitFirst=true before: (owed: false, c: nil, r: Optional((ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), 2, 4)), p: Optional((ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), 0, 5, ZTronAssetModel.AssetPriority.userInitiated)))
+PROBE-C7-RANK-PROMOTE visitFirst=true afterSweep: (owed: false, r: nil, p: Optional((ZTronAssetSync.JobState.downloading, ZTronAssetModel.AssetPriority.userInitiated)), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274435456, volumeOpportunistic: 274435456, usedBytes: 300, pendingReclaim: 0, budgetBytes: 137217878, reserveBytes: 268435456)), violations: [])
+PROBE-C7-RANK-PROMOTE visitFirst=true aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7a/7a69e106db1c102d01a31c9e9308a0de7e6a105251e7784aea6817fa72ec7c10.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) rResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 3000000)) pResult: success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7a/7a69e106db1c102d01a31c9e9308a0de7e6a105251e7784aea6817fa72ec7c10.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" started.
+PROBE-C7-RANK-PROMOTE visitFirst=false before: (owed: true, c: Optional((ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), 0, 3)), r: Optional((ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), 2, 4)), p: Optional((ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), 2, 5, ZTronAssetModel.AssetPriority.prefetch)))
+PROBE-C7-RANK-PROMOTE visitFirst=false afterSweep: (owed: true, r: nil, p: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274435456, volumeOpportunistic: 274435456, usedBytes: 300, pendingReclaim: 0, budgetBytes: 137217878, reserveBytes: 268435456)), violations: [])
+PROBE-C7-RANK-PROMOTE visitFirst=false aResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000)) rResult: success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/11cec6b44cef42f703f879c0f10555708c9c8415926654aaf9fc273ab8c91ef4.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) pResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+✘ Test "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" recorded an issue with 1 argument visitFirst → false at VerifyC7CorrectProbes.swift:224:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+↳ PROBE-C7-RANK-PROMOTE: A's user waiter, moved onto P, is served before R's prefetch job takes the room: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+↳ (try? aResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" with 2 test cases failed after 1.032 seconds with 1 issue.
+↳ /// PROBE-C7-RANK-PROMOTE: the mirror case. The follow of the job judged first (C, wanted only by A's user waiter)
+↳ /// moves A onto P's content, whose parked job (prefetch, ranked after R) becomes user-lane. Its place in the sorted
+↳ /// candidates is still the prefetch one, so R (prefetch, earlier ticket) takes the room first and P is parked: A's
+↳ /// user waiter is answered `insufficientSpace`. Followed first, P is user-lane at the sort, judged before R and fits.
+✘ Suite "VerifyC7CorrectProbes" failed after 6.729 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 7, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C7-RANK: `sweepSpaceParked` sorts its candidates by `queueRank` read BEFORE the owed follow (`candidates` is
+↳ /// built and sorted once). A job whose user lane comes only from a moved id is judged first as user work; its follow
+↳ /// lowers it to prefetch; it still fits (the first branch, or the cycle-7 park-branch re-queue), so it is re-queued and
+↳ /// its bytes are counted `ahead` of the user jobs ranked after it, which the pump would serve before it. The next user
+↳ /// job K is then judged against the room minus the prefetch job's bytes, parked `insufficientSpace`, and its fail-fast
+↳ /// answers K's user waiter with a shortage while the prefetch job takes the room. When the follow visited first the
+↳ /// same sweep serves K first (rank 0) and the prefetch job does not fit.
+✘ Test run with 15 tests in 4 suites failed after 6.729 seconds with 9 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

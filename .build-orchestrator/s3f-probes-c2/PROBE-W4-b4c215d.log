@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC2Correct probes" started.
+◇ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" started.
+PROBE-W4 before the 404: copy lists the id at its new content true, old job nil
+PROBE-W4 waiter's answer: success(ZTronAssetModel.AssetLocation(id: y0599, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6a/6a67f1a0dcc6531f31f3f0fa9f2af6a9566482f29a88c50d10658b03532f0756.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" passed after 0.245 seconds.
+✔ Suite "VerifyC2Correct probes" passed after 0.245 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.245 seconds.

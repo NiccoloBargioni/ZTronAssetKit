@@ -1,0 +1,9 @@
+run 09:53, load avg 33.44 (probes); 09:58, load avg 17.54 (confirmations); worktree detached at s3-base b5796ba
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at S3ConcurrencyProbeTests.swift:35:9: Expectation failed: changes.last == 0.25
+↳ the newest request was bulk (0.25), the OS task ends at Optional(0.75); changes [0.25, 0.75]
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at S3ConcurrencyProbeTests.swift:36:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.25]
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" failed after 0.008 seconds with 2 issues.
+✘ Test "confirm S3-CONC-01 (reverse): the newest promotion is kept over an older demotion" recorded an issue at S3ConfirmPriorityTests.swift:30:9: Expectation failed: changes.last == 0.75
+↳ newest was userInitiated (0.75); OS task ends at Optional(0.25); changes [0.75, 0.75, 0.25]
+✘ Test "confirm S3-CONC-01 (reverse): the newest promotion is kept over an older demotion" recorded an issue at S3ConfirmPriorityTests.swift:31:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+✘ Test "confirm S3-CONC-01 (reverse): the newest promotion is kept over an older demotion" failed after 0.009 seconds with 2 issues.

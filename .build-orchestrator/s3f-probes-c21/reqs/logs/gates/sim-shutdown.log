@@ -1,0 +1,4 @@
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+shutdown exit 149
+    iPhone 18 Pro Max (6BE15CAF-7E02-4060-9338-9DAC025EDF0B) (Shutdown) 

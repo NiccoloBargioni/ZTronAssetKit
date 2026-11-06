@@ -1,0 +1,10 @@
+--- variants/EngineJobs.head.swift	2026-10-30 08:43:27
++++ variants/EngineJobs.requeueNoAhead.swift	2026-10-30 08:43:28
+@@ -853,7 +853,6 @@
+             return false
+         }
+         self.enqueue(job.transfer)
+-        ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
+         self.state.spaceAdmitted[job.transfer] = self.state.jobs[job.transfer]?.ticket
+         return true
+     }

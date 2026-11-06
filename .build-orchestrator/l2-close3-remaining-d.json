@@ -1,0 +1,34 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "process (verification hygiene, not WP-D code)",
+  "location": "/private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/7fbcfa21-90df-4f76-8c7c-0ced89fa87b5/scratchpad/mutate.py (session scratchpad shared by concurrent subagents)",
+  "problem": "At about 23:18 I wrote my mutant-apply script to the session scratchpad. Another verifier working in this worktree at the same time (scratch path .build-verify-d-c3-correct) uses the same file name in the same directory, and its version replaced mine at 23:21. That broke six of my first-batch mutant runs: every apply step from M3a on failed with IndexError, so nothing was mutated. I caught this by checking build activity and applied diffs. I moved the script to .build-verify-d-c3-reqs/mutate.py and reran those mutants; every mutant result reported below comes from a verified apply. The reverse may also have happened: if the other verifier called mutate.py between 23:18 and 23:21 and its runner ignores the apply step's exit status, it ran my script, which applies nothing for its arguments. Any mutant it reported as 'survived' in that window could be false.",
+  "fix": "Ask the correct-lens verifier (.build-verify-d-c3-correct) to re-check any mutant it reported as surviving between 23:18 and 23:21. In future spawn prompts, require verifier scripts to live under the agent's own .build-<name> scratch path, never the shared session scratchpad, and require mutant runners to stop when an apply fails and print the applied diff."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests (defence in depth, informational)",
+  "location": "Tests/ZTronAssetTransportTests/SessionDelegateDirectTests.swift:45 (continuationNeedsFlagAndChecksummedContent); Tests/ZTronAssetTransportTests/SourceTests.swift:174-180 (route rows)",
+  "problem": "Two checks are each caught by only one test, by design. (a) Removing the checksummed-content half of the continuation gate (mutant M1b) is caught only by the direct delegate test, because the coordinator never keeps resume data for a checksum-less identity and so cannot produce such a tag end to end. (b) Reverting routesToBackground alone (mutant M4d) is caught only by the route-table rows for -1 and Int64.min. In negativeSizeStaysInForeground, startIfAdmitted (the second line of defence) still sends the job to the foreground, so that test passes.",
+  "fix": "No change required: both mutants are caught. Optionally add a comment next to the -1 and Int64.min route rows saying they are the only guard on routesToBackground's own bound check."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "test coverage (device-only seam, D-19.2)",
+  "location": "Sources/ZTronAssetTransport/BackgroundSessionBackend.swift:58 (live driver tag with createdFromResumeData: resumeData != nil); duplicated in Tests/ZTronAssetTransportTests/FakeBackgroundSessionDriver.swift:160",
+  "problem": "The flag that carries the 'created from resume data' fact across a relaunch is computed in the live driver, and no test runs that code. Coverage shows BackgroundSessionBackend.swift at 13/96 lines, and llvm-cov counts 0 executions for line 58. The fake driver copies the same expression instead of calling shared code. So a regression in the live driver, such as passing `false` or `resumeData == nil`, would pass every test, and on a device every continuation would be read as a fresh download: no resumeRejected fallback, and a ranged 206 refused as unexpectedStatus(206). The current code is correct. This is a gap in what the tests pin, not a proven bug.",
+  "fix": "Move the decision-free mapping into one package helper that both drivers call, for example `BackgroundTaskTag(name:expectedBytes:resumeData:)` or `static func forStart(name:expectedBytes:resumeData:)`, which sets `createdFromResumeData = resumeData != nil`. The fake then exercises the same line the live driver runs, and the existing relaunch tests pin it. The device-only file would keep only `session.downloadTask(withResumeData:)` versus `downloadTask(with:)` and `label`."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness, device-only residual (D-19.1)",
+  "location": "Sources/ZTronAssetTransport/Session/SessionDelegate+Downloads.swift:69-73",
+  "problem": "Not proven; it can only be checked on a device. A fresh background task (not created from resume data) answered 206 with a Content-Range is now always unexpectedStatus(206), so the engine records failed(.nextRun) and nothing is adopted. If nsurlsessiond resumes a fresh background download internally after a dropped connection, using a Range request (undocumented), and the task's final response is that 206, every such attempt is discarded after the full download. On flaky networks a large asset could then never land. d.md records this under 'Not verified', and it is the orchestrator's directed gate. Before ca8d31b, the code also rejected every background 206, so this is not a regression against the original design.",
+  "fix": "Keep the gate. Add a device check to docs/VERIFICATION.md before background transfers ship: interrupt connectivity in the middle of a large background download and record the final status the OS reports. If a 206 is observed, bring a D-4 deviation to the orchestrator, for example accepting a fresh checksummed-content 206 whose staged size equals byteSize, since the file is hashed at publication."
+ }
+]

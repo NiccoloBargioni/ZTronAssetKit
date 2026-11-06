@@ -1,0 +1,137 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+✘ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierRetryTests.swift:88:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsB && passedAgain.holdsC && passedAgain.unfollowed
+↳ v4's follow passed C's second publication with zz-b and zz-c (visit-first): (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: false, holdsC: true, unfollowed: true)
+↳ passedAgain.c == .verifying && passedAgain.holdsB && passedAgain.holdsC && passedAgain.unfollowed → false
+↳   passedAgain.c == .verifying && passedAgain.holdsB && passedAgain.holdsC → false
+↳   passedAgain.unfollowed → <not evaluated>
+✘ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierRetryTests.swift:96:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ B gets C's integrity failure: both follows passed C, publishing (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 16
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+✘ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRetryTests.swift:88:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsB && passedAgain.holdsC && passedAgain.unfollowed
+↳ v4's follow passed C's second publication with zz-b and zz-c (visit-first): (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: false, holdsC: true, unfollowed: true)
+↳ passedAgain.c == .verifying && passedAgain.holdsB && passedAgain.holdsC && passedAgain.unfollowed → false
+↳   passedAgain.c == .verifying && passedAgain.holdsB && passedAgain.holdsC → false
+↳   passedAgain.unfollowed → <not evaluated>
+✘ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRetryTests.swift:96:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ B gets C's integrity failure: both follows passed C, publishing (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b49dc2d3db4ea82806f38ad0b952e1dedea57bdb8d6317556e604fcd014dd36c.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 16
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" with 2 test cases failed after 1.283 seconds with 4 issues.
+↳ /// A later apply's follow passes again an id an earlier follow passed, when the job's retried publication still
+↳ /// carries it: C (100 kB, the content of zz-a, zz-b and zz-c, a user waiter each) publishes when v3 moves zz-b to N
+↳ /// (16 bytes), so v3's follow passes C with zz-b. C's verification read then fails (EIO), which the interactive
+↳ /// policy retries; the retry downloads bytes that fail their checksum and publishes, and v4, applied while that
+↳ /// second publication verifies, moves zz-c to N2 (24 bytes). Visited first, both follows passed C, publishing, so all
+↳ /// three users were answered `integrityFailure`. The ids a publication re-routes on a pass are only those a
+↳ /// visit-first engine's visit had moved before it began, at an owed follow's apply: none while no follow is owed, as
+↳ /// when the retry's publication began. Counted then, zz-b, which v3's follow passed, was re-routed at v4's visit and
+↳ /// served N.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.284 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.284 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

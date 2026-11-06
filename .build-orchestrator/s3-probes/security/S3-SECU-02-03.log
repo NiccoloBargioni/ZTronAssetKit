@@ -1,0 +1,48 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "S3 security probes: model" started.
+◇ Test "R-SEC-2: staging names parse only in the canonical spelling the module writes" started.
+◇ Test "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" started.
+◇ Test case passing 1 argument fileName → "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.01-2.part" to "R-SEC-2: staging names parse only in the canonical spelling the module writes" started.
+◇ Test case passing 1 argument fileName → "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.1-02.part" to "R-SEC-2: staging names parse only in the canonical spelling the module writes" started.
+◇ Test case passing 1 argument fileName → "c-zz.1-2.part" to "R-SEC-2: staging names parse only in the canonical spelling the module writes" started.
+✘ Test "R-SEC-2: staging names parse only in the canonical spelling the module writes" recorded an issue with 1 argument fileName → "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.01-2.part" at S3SecurityModelProbeTests.swift:38:9: Expectation failed: parsed == nil || parsed?.rawValue == fileName
+↳ c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.01-2.part parsed as c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.1-2.part
+↳ parsed == nil || parsed?.rawValue == fileName → false
+↳   parsed == nil → false
+↳   parsed?.rawValue == fileName → false
+◇ Test case passing 1 argument path → "media//a.png" to "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" started.
+◇ Test case passing 1 argument path → "media/./a.png" to "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" started.
+◇ Test case passing 1 argument path → "./a.png" to "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" started.
+✘ Test "R-SEC-2: staging names parse only in the canonical spelling the module writes" recorded an issue with 1 argument fileName → "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.1-02.part" at S3SecurityModelProbeTests.swift:38:9: Expectation failed: parsed == nil || parsed?.rawValue == fileName
+↳ c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.1-02.part parsed as c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.1-2.part
+↳ parsed == nil || parsed?.rawValue == fileName → false
+↳   parsed == nil → false
+↳   parsed?.rawValue == fileName → false
+◇ Test case passing 1 argument path → "media/%2E/a.png" to "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" started.
+✘ Test "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" recorded an issue with 1 argument path → "media/" at S3SecurityModelProbeTests.swift:28:9: Expectation failed: manifest.quarantinedCount == 1
+↳ manifest.quarantinedCount == 1 → false
+↳   manifest.quarantinedCount → 0
+✘ Test "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" recorded an issue with 1 argument path → "media//a.png" at S3SecurityModelProbeTests.swift:27:9: Expectation failed: manifest.entries.map(\.identifier) == ["ok"]
+↳ media//a.png was accepted although no fetch of it can ever be made
+↳ manifest.entries.map(\.identifier) == ["ok"] → false
+↳   manifest.entries.map(\.identifier) → [ok, x]
+↳   ["ok"] → [ok]
+✘ Test "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" recorded an issue with 1 argument path → "media//a.png" at S3SecurityModelProbeTests.swift:28:9: Expectation failed: manifest.quarantinedCount == 1
+↳ manifest.quarantinedCount == 1 → false
+↳   manifest.quarantinedCount → 0
+✘ Test "R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder" with 6 test cases failed after 0.001 seconds with 12 issues.
+✘ Suite "S3 security probes: model" failed after 0.002 seconds with 14 issues.
+↳ /// S3-SECU-02: the decoder accepts remote paths that `RemoteURL.make` (ADR draft D-6, TR1-10) refuses on every fetch
+↳ /// with `rejected(.invalidURL)`: an empty segment, a `.` segment (also `%2E`), a backslash, a trailing slash. Fix round
+↳ /// 3 (orchestrator decision 3) quarantined `?` and `#` for exactly this reason ("the transport would reject the path on
+↳ /// every fetch"); these spellings were left out, so such an entry is planned, fails every run (`failed(.nextRun)`) and
+↳ /// answers its waiters `.serverUnavailable` instead of being quarantined with a diagnostic.
+↳ ///
+↳ /// S3-SECU-03: staging names parse in spellings the module never writes (`TransferAttempt.token` is canonical decimal),
+↳ /// so `StagingFileName(parsing:)` is not "nil for anything that is not exactly one of our names": a foreign
+↳ /// `c-….01-2.part` parses as ours and its `rawValue` names another file.
+✘ Test run with 2 tests in 1 suite failed after 0.002 seconds with 14 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetModelTests (Swift Testing)

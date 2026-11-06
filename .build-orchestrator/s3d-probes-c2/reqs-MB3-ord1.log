@@ -1,0 +1,21 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Background coordinator interleavings" started.
+◇ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" started.
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:393:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:412:9: Expectation failed: changes == [0.75, 0.25]
+↳ each change reaches the OS task in the order it was made: [0.25]
+↳ changes == [0.75, 0.25] → false
+↳   changes → [0.25]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" failed after 63.997 seconds with 2 issues.
+↳ /// The engine calls a handle's controls synchronously on every lane change (ADR-021 keeps controls ordered), so
+↳ /// the handle must deliver them in that order: the second change starts only after the first one, held at its
+↳ /// listing, reached the OS task, and the task ends at the second change's value.
+✘ Suite "Background coordinator interleavings" failed after 63.998 seconds with 2 issues.
+↳ /// R-NET-3, R-NET-7: the background coordinator's awaits interleaved with controls, starts, the pump and launch
+↳ /// re-attachment (REENTRANCY rows D-2, D-5, D-7), each ordering forced through `FakeBackgroundSessionDriver`'s holds
+↳ /// and the events barrier, never by timing.
+✘ Test run with 1 test in 1 suite failed after 63.998 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetTransportTests (Swift Testing)

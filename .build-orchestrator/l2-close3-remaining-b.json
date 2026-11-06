@@ -1,0 +1,58 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "exhaustive index state space: unjustified pruning of a reachable state, with a real defect of the VPC2-D / probe-1 class (task item 2)",
+  "location": "Tests/ZTronAssetStorageTests/Core/IndexCommitStateSpaceTests.swift:25-30 (pruning comment), :57 and :373-389 (every rotten file names generation 20+position); Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:262-273 (currentHolds trusts a parsed header and the size), :218 (step-4 condition), :251-253 (ENOSPC fallback); docs/adr-drafts/b.md:156 (B-28 item 1) and :192 (B-33 pruning list)",
+  "problem": "The pruning comment says a rotten header can never name the committed generation because every attempt has its own generation and files are only renamed. That is false for bit rot inside the header. IndexHeader.parse has no checksum of its own, and the SHA-256 trailer covers header and body. So a flip in the generation field gives a header that parses, names another file's generation and has the right size, inside a file that fails its trailer check. Consecutive generations 2k+1 and 2k differ only in bit 0, so a single bit flip makes index.bin name index.prev's generation. currentHolds(committed) is then true for a rotten index.bin. Step 4 then moves it over the only valid index.prev, and the ENOSPC fallback removes index.prev. Verifier probes in a scratch copy: (a) I ran IndexSpace.enumerate on the disk bin = generation 11 flipped to name 10, prev = valid 10, with tmp absent, badBody or older. Each disk gave 251 violations, for example 'volume=free a rename that took effect but reported EIO at operation 13 (index.bin \u2192 index.prev), after the launch commit (failed): I-b, the committed generation 10 is not on disk (index.bin invalid (header 10), index.prev absent, index.tmp 12)' and 'volume=fullAtClose io at operation 6 (synchronizeDirectory blobs): I-a, a kill at the end leaves generation 0'. (b) A single launch on a full volume (ENOSPC only, no EIO) performed the mutations [write index.tmp \u2717noSpace, removeItem index.tmp, removeItem index.prev, write index.tmp \u2717noSpace, removeItem index.tmp] and left 'valid generations left []'. (c) End to end, through the VPC2-D lifetime with a header flip instead of a body flip, the output was: 'index.bin generation 5, index.prev generation 4, bits flipped 1'; then 'after the full-volume lifetime: chosen nil'; then 'lifetime 3: degraded true epoch 5 record kept false'; then 'the corrupt-doomed name is served true'. This is the harm of round-3 probe 1 and VPC2-D, from one bit flip plus a full volume, in a state the enumeration prunes. (The lifetime-3 epoch 5 equals a generation lifetime 1 committed. That follows from the rot alone and cannot be avoided once the only record of generation 5 has rotted.)",
+  "fix": "Failing case first. Add seeded rotten states whose header parses and names another file's generation, for index.bin and index.prev. Examples: a copy of generation 11 with its generation field set to 10 (names the committed generation), and one set to 9. Keep them in the enumeration, update the pruning comment, and add a StoreRecoveryTests regression from probe (c). Then fix the unit so that a parsed header plus the right size is not taken as proof. Options: (1) currentHolds returns false when another index file's header also names `generation`, since two files never legitimately share one; this costs one more 64-byte read of index.prev. (2) Carry from the load, which fully verified the chosen file, whether index.bin holds the committed generation (for example IndexCommitInput.currentIsCommitted kept by IndexCommitLedger and set after a successful step 5 and step 6). (3) Verify index.bin's trailer before step 4 moves it over an existing index.prev and before the fallback removes index.prev. Amend B-28 item 1 ('a rotten ... index.bin names another generation') and B-33's pruning list."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "companion enumeration (unordered names): size is printed, not asserted",
+  "location": "Tests/ZTronAssetStorageTests/Core/IndexCommitStateSpaceTests.swift:288-299 (unorderedSurvivorsAreComplete) and :1090 (survivor kill points)",
+  "problem": "The cycle-3 finding that the size is only printed was fixed for the main suite only. The companion suite asserts uniqueness and differing views, not completeness. Mutant: I changed `where point > 0` to `where point > 0 && point % 2 == 0`. The suite then printed 'R-STO-5 unordered names: 812 distinct kill survivors' instead of 1,780 and still passed ('\u2714 Test run with 2 tests in 1 suite passed').",
+  "fix": "Assert the space. Either pin the total (1,780) and the per-row survivor counts, or compute the expected set independently: every kill snapshot after point 0 of every fault-free lifetime of the 392 disks \u00d7 3 volume scripts whose crash views differ, de-duplicated. Assert that the suite's survivors equal that set."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "test failure mode: polling helpers ignore cancellation, so a regression hangs the run",
+  "location": "Tests/ZTronAssetStorageTests/Core/StoreEdgeTests.swift:395-404 (waitForOpenWaiters); same pattern at StoreSweepTests.swift:197 and :205",
+  "problem": "I reverted B-35 in a scratch copy (performOpen's .opening branch back to awaitOpen). parkedOpenAndCloseOnARunningOpen recorded 'StoreEdgeTests.swift:204:6: Time limit was exceeded: 60.000 seconds'. The test process then kept spinning at 150-225% CPU and never exited: the second open now parks in openWaiters, waitForOpenWaiters waits for openReportWaiters, and its `while true { \u2026 await Task.yield() }` never checks cancellation. I killed it after more than 10 minutes. A regression would hang verify.sh and the coverage step instead of failing them.",
+  "fix": "In each polling helper, stop on cancellation: `if Task.isCancelled { Issue.record(\"\u2026\"); return }`, or use `try Task.checkCancellation()` in a throwing helper. In waitForOpenWaiters you could also wait for `openReportWaiters.count + openWaiters.count >= opens + others` and then assert the split. A revert then fails within the time limit, and the run ends."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "process: failing-test-first not visible in history for cycle 4",
+  "location": "commits 9d1e128, 627d6bb, 848ac69 (each holds both the test and the fix); 848ac69 (B-36 fix) comes before 3c0d06e (the companion suite that found it)",
+  "problem": "CLAUDE.md P3 asks for a failing test first, then the fix. Cycle 3 followed this (d9e332f\u2192947a891, b075846\u21923355de5, 5eaab00\u21929298a84). In cycle 4 each test is committed together with its fix. The ADR's 'failed first' issue counts could not be checked from the history. My mutants reproduce them: the c4notfound revert gives 4 issues, and the B-36 revert gives 3 issues on R-CLN-5 plus 36/49 rows of the companion suite.",
+  "fix": "No code change. In later cycles, commit the failing test on its own before the fix."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "TSan time-limit headroom under load (information for the orchestrator)",
+  "location": "Tests/ZTronAssetStorageTests/Core (1-minute limits); the ADR's B-33 amendment 4 claims 3.5\u00d7 headroom",
+  "problem": "My TSan run passed: 281 tests, 0 ThreadSanitizer warnings, no time limit hit. It ran at load 12-18 (another verifier was building in this worktree), and the slowest WP-B test without arguments took 26.4 s ('R-NET-5: a commit asked for while apply writes its\u2026'). That is about 2.3\u00d7 headroom, not the 3.5\u00d7 measured at load 6. This is not a failure.",
+  "fix": "No WP-B change. Orchestrator: run TSan on a quiet machine, as already recorded."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "B-36 committed count vs a commit made before open()'s barrier (L3 interplay; unproven in WP-B because the legacy phase-1 hook is a fatalError stub)",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Open.swift:106 (max(committed, loaded.committedGeneration(rootOrdered:))), together with :147 (committed = 0 at install) and Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:197 and :216-218 (a promotion run with committed 0 renames index.tmp straight over index.bin when index.prev exists)",
+  "problem": "This is a reasoned timeline, not a failing probe. WP-C's phase-1 commit runs before the barrier while a promotion is pending, with input.committedGeneration = 0. Its promotion syncs index.tmp (gen P) and renames it straight over index.bin (gen S, the surviving generation), because currentHolds(0) is false. Its root sync then fails, so promotedName is true, promotedDurably is false and committed stays 0. If the barrier then succeeds, open() sets committedGeneration = max(0, S) = S, but S is no longer on disk (index.bin = P, index.prev = S-1). That breaks B-33's I-b ('the generation the store counts committed is a valid file on disk'). I found no harm: S < P, the reaper is more conservative, and currentHolds(S) is false, so index.prev is kept and step 4 renames straight over index.bin. B-33's enumeration does not model a commit before the barrier.",
+  "fix": "When WP-C's phase 1 lands, add a test that runs a commit before the barrier with a promotion pending and a failed root sync. In open(), count loaded.committedGeneration(rootOrdered:) only while state.core.commits.pendingPromotion == loaded.promotion, meaning no earlier commit touched the index names. Otherwise leave the count to IndexCommitLedger. Alternatively, record this case in B-36's consequences for the orchestrator."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "TSan time-limit headroom under heavy load (environment; not this cycle's code)",
+  "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 (L1 test, unchanged since l1-merged, .timeLimit(.minutes(1))); Tests/ZTronAssetStorageTests/Core/StoreApplyFenceTests.swift:76 (2-minute limit)",
+  "problem": "The TSan run at load 16.6 passed (281 tests, 0 ThreadSanitizer reports). However, 'Test support: start racing stop ends every start exactly once\u2026' took 56.975 s against its 1-minute limit, about 1.05x headroom. The two R-NET-5 apply-fence tests took 51.3 s against 2 minutes, 2.3x headroom. A slightly busier machine would fail the storage target's TSan step on time limits, not on a defect.",
+  "fix": "For the orchestrator, as in the cycle-2 disposition: run the TSan step on a quiet machine, never beside other builds. Optionally have the L1 owner raise the loopback test's limit to 2 minutes or serialise it. No WP-B change is needed."
+ }
+]

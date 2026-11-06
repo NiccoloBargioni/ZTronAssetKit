@@ -1,0 +1,9 @@
+S3MUT=OI14B (insertRecord's and adoptKnownBlob's previous-blob releases call releaseReference directly; the prune keeps releaseCountingBytes), load 198 -> 73:
+✔ Test run with 468 tests in 61 suites passed after 107.569 seconds.
+
+S3MUT=SECU crash report ~/Library/Logs/DiagnosticReports/swiftpm-testing-helper-2026-10-29-120359.ips:
+"sourceLine":84,"sourceFile":"AssetStore+Reads.swift"
+"symbol":"AssetStore.currentAvailability(of:)"
+EXC_BREAKPOINT
+SIGTRAP
+arithmetic overflow

@@ -1,0 +1,33 @@
+15:17  up 5 days,  3:40, 2 users, load averages: 62.02 45.41 49.96
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC9CorrectProbes" started.
+◇ Test "PROBE-C9-SPURIOUS-JOIN" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-SPURIOUS-JOIN" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-SPURIOUS-JOIN" started.
+PROBE-C9-SPURIOUS-JOIN followVisitedFirst after (clock unmoved): (state: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1064548171ns))), attempts: Optional(1), interests: Optional(1)) cStarts=1 a=Optional(16)
+PROBE-C9-SPURIOUS-JOIN sweepFollowsFirst after (clock unmoved): (state: nil, attempts: nil, interests: nil) cStarts=2 a=Optional(16)
+✘ Test "PROBE-C9-SPURIOUS-JOIN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC9CorrectProbes.swift:345:25: Issue recorded
+↳ PROBE-C9-SPURIOUS-JOIN: C backs off after its 500 (visit-first), not re-queued at once: (state: nil, attempts: nil, interests: nil), starts 2
+✘ Test "PROBE-C9-SPURIOUS-JOIN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC9CorrectProbes.swift:347:9: Expectation failed: cStarts == 1
+↳ PROBE-C9-SPURIOUS-JOIN: no second attempt before the backoff ends: 2
+↳ cStarts == 1 → false
+↳   cStarts → 2
+✘ Test "PROBE-C9-SPURIOUS-JOIN" with 2 test cases failed after 1.381 seconds with 2 issues.
+↳ /// PROBE-C9-SPURIOUS-JOIN: the follow's own visit of a job whose retry verdict waits marks the verdict `joined`
+↳ /// (`removeInterest` → `relane` → `verdictsAfterFollow[...]?.joined = true`) although nobody joined, so the drain
+↳ /// re-runs `relane` after `retryLater` and a remaining user interest skips the backoff (T20). C (1 MB) is the content
+↳ /// of zz-a and zz-b, one user waiter each; v3 moves zz-a while the follow owes C's visit; C's attempt fails with a 500.
+↳ /// Visited first, C backs off (`failed(.at)`) and no second attempt starts before the clock passes the backoff.
+✘ Suite "VerifyC9CorrectProbes" failed after 1.381 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 9, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11: every decision that differs, other than by a real-world ledger
+↳ /// input, is blocking).
+✘ Test run with 1 test in 1 suite failed after 1.381 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+15:17  up 5 days,  3:41, 2 users, load averages: 62.18 45.72 50.04

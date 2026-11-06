@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyJLiveness" started.
+◇ Test "LIVE-J-STREAM: a stream of events during an owed follow settles once the follow is released" started.
+LIVE-J-STREAM release: owed before the refollow followOwed false next 0/0 scans 0 sweepFollowUp true pumpWaits false spaceParked 4283 jobs 4312; settled 0.013421167 seconds after the release; after: followOwed false next 0/0 scans 0 sweepFollowUp false pumpWaits false spaceParked 4283 jobs 4504; awaitingSpace 0; queued 217; violations 0
+LIVE-J-STREAM release: owed before the refollow followOwed false next 0/0 scans 0 sweepFollowUp true pumpWaits false spaceParked 4259 jobs 4288; settled 0.013009083 seconds after the release; after: followOwed false next 0/0 scans 0 sweepFollowUp false pumpWaits false spaceParked 4259 jobs 4480; awaitingSpace 0; queued 217; violations 0
+✔ Test "LIVE-J-STREAM: a stream of events during an owed follow settles once the follow is released" passed after 0.562 seconds.
+◇ Test "LIVE-J-SHUTDOWN: shutdown while the follow, its deferred events and sweeps are owed answers everything" started.
+LIVE-J-SHUTDOWN: owed before the refollow followOwed false next 0/0 scans 0 sweepFollowUp true pumpWaits false spaceParked 4283 jobs 4312, at shutdown followOwed false next 0/0 scans 0 sweepFollowUp true pumpWaits false spaceParked 4283 jobs 4408; answered 160 of 160 waiters; left (waiters: 0, jobs: 0)
+LIVE-J-SHUTDOWN: owed before the refollow followOwed false next 0/0 scans 0 sweepFollowUp true pumpWaits false spaceParked 4283 jobs 4312, at shutdown followOwed false next 0/0 scans 0 sweepFollowUp true pumpWaits false spaceParked 4283 jobs 4408; answered 160 of 160 waiters; left (waiters: 0, jobs: 0)
+✔ Test "LIVE-J-SHUTDOWN: shutdown while the follow, its deferred events and sweeps are owed answers everything" passed after 0.519 seconds.
+✔ Suite "VerifyJLiveness" passed after 1.082 seconds.
+✔ Test run with 2 tests in 1 suite passed after 1.082 seconds.

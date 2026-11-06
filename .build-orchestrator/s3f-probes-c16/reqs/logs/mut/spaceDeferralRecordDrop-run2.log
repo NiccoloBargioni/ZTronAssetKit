@@ -1,0 +1,62 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Suite "VerifyC15CorrectNew" started.
+◇ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test "PROBE-C15C-ENOSPC-PASSED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-ENOSPC-PASSED" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst after the apply: (owed: false, c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])))
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst after the drain: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, n: nil)
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-ENOSPC-PASSED" started.
+✔ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" with 2 test cases passed after 1.566 seconds.
+◇ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst after the apply: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])))
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst the ENOSPC waits: (owed: false, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1218960514ns))), verdict: nil, cOwedVisit: false, holdsB: true)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst after the drain: (c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1218960514ns))), holdsB: true, n: nil)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+✔ Test "PROBE-C15C-ENOSPC-PASSED" with 2 test cases passed after 1.742 seconds.
+◇ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+PROBE-C15C-VERDICT-ACROSS-APPLY followVisitedFirst after the 404: (owed: false, c: nil, verdict: nil)
+PROBE-C15C-VERDICT-ACROSS-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+PROBE-C15C-VERDICT-ACROSS-APPLY sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4)))
+✘ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:169:25: Issue recorded
+↳ B gets C's insufficientSpace, answered before v4 existed (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c3/c3084d792b693f7ea3b058bbd087b5d97dc2fb5aedd3756433594796d114397e.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" with 2 test cases failed after 2.468 seconds with 1 issue.
+↳ /// An ENOSPC whose verdict parks the job answers the ids a later apply moved, as a visit-first engine's verdict
+↳ /// answered them before the apply existed (`verdictBeforeApply`, `.noSpace`): the verdict waits as `.spaceFailure`,
+↳ /// and behind the barrier v4's owed visit moved B onto N, which served B.
+◇ Test "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+PROBE-C15C-VERDICT-ACROSS-APPLY sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" with 2 test cases passed after 2.540 seconds.
+◇ Test "PROBE-C15C-STALE-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-STALE-REROUTE" started.
+PROBE-C15C-STALE-REROUTE followVisitedFirst C publishing: (owed: false, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([])), n: Optional(ZTronAssetSync.JobState.downloading))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+PROBE-C15C-STALE-REROUTE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])), n: nil, barrier: false)
+PROBE-C15C-STALE-REROUTE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+PROBE-C15C-STALE-REROUTE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-STALE-REROUTE" started.
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst C publishing: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([zz-b])), n: nil)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([zz-b])), n: nil, barrier: false)
+✔ Test "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" with 2 test cases passed after 2.458 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 6.501 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15C-STALE-REROUTE" with 2 test cases passed after 2.346 seconds.
+✔ Suite "VerifyC15CorrectNew" passed after 6.630 seconds.
+✘ Test run with 6 tests in 2 suites failed after 6.630 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

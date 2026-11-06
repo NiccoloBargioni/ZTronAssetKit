@@ -1,0 +1,15 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+index 1f6deca..3934452 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+@@ -52,9 +52,7 @@ extension AssetStore {
+         guard let eligibleAt = info.eligibleAt else {
+             return .acknowledgement
+         }
+-        if self.state.core.committedGeneration < info.droppedInGeneration {
+-            return .commit
+-        }
++
+         if let leases = self.state.cleanup.leases[key], !leases.isEmpty {
+             return .lease
+         }

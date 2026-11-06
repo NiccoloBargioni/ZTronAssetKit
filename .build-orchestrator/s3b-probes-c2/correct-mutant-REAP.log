@@ -1,0 +1,4 @@
+✘ Test "P-13: the reaper reclaims 10,000 doomed blobs in 20-unlink units reading each key at most batch / attempted times, so its work is linear in the keys" recorded an issue at StoreDeletionTests.swift:311:30: Expectation failed: await store.state.core.lastReap
+✘ Test "P-13: the reaper reclaims 10,000 doomed blobs in 20-unlink units reading each key at most batch / attempted times, so its work is linear in the keys" failed after 3.403 seconds with 1 issue.
+✘ Suite "Core: time-bounded deletion units" failed after 3.403 seconds with 1 issue.
+✘ Test run with 11 tests in 2 suites failed after 3.404 seconds with 1 issue.

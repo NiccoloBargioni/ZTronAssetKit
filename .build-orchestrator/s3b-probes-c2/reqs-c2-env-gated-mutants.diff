@@ -1,0 +1,121 @@
+diff -ru /Users/admin/Documents/ZTronAssetKit/.worktrees/s3b/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/s3b/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift	2026-10-29 13:21:03
++++ Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift	2026-10-29 14:07:00
+@@ -205,7 +205,9 @@
+                 // like a pruned record's (counted, OI-14).
+                 if let previous = self.state.core.records.updateValue(record, forKey: id) {
+                     if let blob = previous.referencedBlob {
++                        if ProcessInfo.processInfo.environment["S3MUT"] == "DETACH" { self.releaseReference(blob, dooming: .unreferenced) } else {
+                         self.releaseCountingBytes(blob)
++                        }
+                     }
+                     self.refreshPresentEntry(id)
+                 }
+@@ -362,7 +364,9 @@
+         record.storedAt = now
+         self.state.core.records[id] = record
+         if let previous, previous != key {
++            if ProcessInfo.processInfo.environment["S3MUT"] == "OI14B" { self.releaseReference(previous, dooming: .unreferenced) } else {
+             self.releaseCountingBytes(previous)
++            }
+         }
+         self.state.core.commits.dirtyFanOuts.insert(key.hash.fanOut)
+         self.refreshPresentEntry(id)
+diff -ru /Users/admin/Documents/ZTronAssetKit/.worktrees/s3b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/s3b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift	2026-10-29 13:22:14
++++ Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift	2026-10-29 14:07:00
+@@ -151,6 +151,9 @@
+     /// `deletionBatchSize` (P-13); failed unlinks stay doomed with backoff. `bytesDeferred` counts doomed bytes whose
+     /// only blocker is a lease.
+     func reap(maxKeys: Int) async -> CleanupResult {
++        if let m = ProcessInfo.processInfo.environment["S3MUT"], m == "REAP" || m == "REAPSTAT" {
++            return await self.reapOld(maxKeys: maxKeys, statistics: m == "REAPSTAT")
++        }
+         var result = CleanupResult()
+         guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
+             return result
+@@ -224,5 +227,73 @@
+     /// The backoff after `failures` failed unlinks of one key: 1 s, doubling, at most 5 minutes.
+     static func unlinkBackoff(afterFailures failures: Int) -> TimeInterval {
+         min(300, pow(2, Double(max(0, min(failures, 16) - 1))))
++    }
++}
++
++extension AssetStore {
++    func reapOld(maxKeys: Int, statistics recording: Bool) async -> CleanupResult {
++        var result = CleanupResult()
++        guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
++            return result
++        }
++        var queue = self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted()[...]
++        var statistics = ReapStatistics(keys: queue.count)
++        var reads = 0
++        let batchSize = max(1, self.configuration.deletionBatchSize)
++        let fileSystem = self.environment.fileSystem
++        let time = self.environment.time
++        var budget = maxKeys
++        while !queue.isEmpty, budget > 0, self.state.core.phase == .open {
++            var batch: [BlobKey] = []
++            while let key = queue.first, batch.count < min(batchSize, budget) {
++                queue.removeFirst()
++                reads += 1
++                guard self.deletionBlocker(key) == .none, case .doomed(let info)? = self.state.core.blobTable[key] else {
++                    continue
++                }
++                self.state.core.deletingDooms[key] = info
++                self.state.core.blobTable[key] = .deleting
++                batch.append(key)
++            }
++            guard !batch.isEmpty else {
++                break
++            }
++            let keys = batch
++            let outcome = await self.runUnit(on: self.environment.metadataExecutor) {
++                BlobDeletionUnit.run(fileSystem: fileSystem, layout: layout, keys: keys, time: time, budget: BlobDeletionUnit.budget)
++            }
++            let uptime = self.environment.time.uptimeNow()
++            for (position, key) in batch.enumerated() {
++                let info = self.state.core.deletingDooms.removeValue(forKey: key)
++                if position >= outcome.attempted {
++                    if let info {
++                        self.state.core.blobTable[key] = .doomed(info)
++                    }
++                    queue.insert(key, at: queue.startIndex + (position - outcome.attempted))
++                } else if outcome.failures[key] != nil, var doom = info {
++                    doom.failedUnlinks += 1
++                    doom.eligibleAt = uptime.adding(seconds: AssetStore.unlinkBackoff(afterFailures: doom.failedUnlinks))
++                    self.state.core.blobTable[key] = .doomed(doom)
++                } else {
++                    self.state.core.blobTable[key] = nil
++                    self.state.core.countedReleases[key] = nil
++                    result.bytesFreed += self.state.core.blobBytes.removeValue(forKey: key) ?? 0
++                    result.filesRemoved += 1
++                }
++                self.resumeKeyWaiters(key)
++            }
++            statistics.units += 1
++            statistics.carried += batch.count - outcome.attempted
++            budget -= outcome.attempted
++            self.markDirtyInternal(.lazy)
++        }
++        if recording, statistics.keys > 0 {
++            statistics.reads = reads
++            self.state.core.lastReap = statistics
++        }
++        for key in self.state.core.blobTable.keys where self.deletionBlocker(key) == .lease {
++            result.bytesDeferred += self.state.core.blobBytes[key] ?? 0
++        }
++        return result
+     }
+ }
+diff -ru /Users/admin/Documents/ZTronAssetKit/.worktrees/s3b/Sources/ZTronAssetStorage/Store/AssetStore+References.swift Sources/ZTronAssetStorage/Store/AssetStore+References.swift
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/s3b/Sources/ZTronAssetStorage/Store/AssetStore+References.swift	2026-10-29 13:18:10
++++ Sources/ZTronAssetStorage/Store/AssetStore+References.swift	2026-10-29 14:07:00
+@@ -106,6 +106,7 @@
+         guard let bytes = self.state.core.countedReleases.removeValue(forKey: key) else {
+             return nil
+         }
++        if ProcessInfo.processInfo.environment["S3MUT"] == "NOTAKE" { return nil }
+         self.state.eviction.releasedBytes -= bytes
+         return bytes
+     }

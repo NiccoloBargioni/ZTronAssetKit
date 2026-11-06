@@ -1,0 +1,20 @@
+1503-◇ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+1504-◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+1505:✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierDeferBucketTests.swift:781:9: Expectation failed: await oWaiter.value == .failure(.shutDown)
+1506-↳ zz-o's waiter is answered shutDown
+1507-↳ await oWaiter.value == .failure(.shutDown) → <not evaluated>
+1508-✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierDeferBucketTests.swift:786:9: Expectation failed: answers.allSatisfy { $0 == .failure(.shutDown) }
+1509-↳ every member's waiter is answered shutDown: [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h00, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h01, url: file:///fake-volume/Library/Application%20
+1510-↳ answers.allSatisfy { $0 == .failure(.shutDown) } → <not evaluated>
+1511-◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+.build-verify-s3f-c22-correct/logs/sync3.log:✘ Test run with 706 tests in 57 suites failed after 595.041 seconds with 2 issues.
+.build-verify-s3f-c22-correct/logs/sync2.log:✔ Test run with 706 tests in 57 suites passed after 418.744 seconds.
+.build-verify-s3f-c22-correct/logs/sync1.log:✔ Test run with 706 tests in 57 suites passed after 393.337 seconds.
+release start 08:59:32 loads { 18.40 26.68 25.10 }
+release end 09:00:32 rc=0 loads { 22.10 26.56 25.18 }
+sync1 start 09:00:32 loads { 22.10 26.56 25.18 }
+sync1 end 09:09:19 rc=0 loads { 11.23 21.00 25.73 }
+sync2 start 09:09:19 loads { 11.23 21.00 25.73 }
+sync2 end 09:16:20 rc=0 loads { 10.26 15.42 21.59 }
+sync3 start 09:16:20 loads { 10.26 15.42 21.59 }
+sync3 end 09:26:20 rc=1 loads { 21.05 95.01 81.74 }

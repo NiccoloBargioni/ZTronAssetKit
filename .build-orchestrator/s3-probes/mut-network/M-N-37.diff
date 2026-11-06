@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetKit/Prefetch/Prefetch.swift b/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
+index dc552c5..ee681fa 100644
+--- a/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
++++ b/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
+@@ -94,7 +94,7 @@ public enum PrefetchWindow {
+         let reach = max(radius, 0)
+         var distance = 1
+         while distance <= reach {
+-            for index in [current + distance, current - distance] where ids.indices.contains(index) {
++            for index in [current - distance, current + distance] where ids.indices.contains(index) {
+                 let id = ids[index]
+                 if seen.insert(id).inserted {
+                     result.append(PrefetchTarget(id: id, priority: .prefetch, distance: distance))

@@ -1,0 +1,30 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+✔ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" with 2 test cases passed after 1.647 seconds.
+◇ Test "PROBE-C15R-REROUTE-STALE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-REROUTE-STALE" started.
+PROBE-C15R-REROUTE-STALE followVisitedFirst after v3: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a]), reroute: Optional([]), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C15R-REROUTE-STALE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), interests: Optional(2), n: nil)
+PROBE-C15R-REROUTE-STALE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), n2: nil)
+PROBE-C15R-REROUTE-STALE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-REROUTE-STALE" started.
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst after v3: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a]), reroute: Optional([]), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), interests: Optional(2), n: nil)
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), n2: nil)
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15R-REROUTE-STALE" with 2 test cases passed after 1.934 seconds.
+◇ Test "PROBE-C15R-VERDICT-LATER-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-VERDICT-LATER-APPLY" started.
+PROBE-C15R-VERDICT-LATER-APPLY followVisitedFirst after the 404: (owed: false, c: nil, verdict: nil)
+PROBE-C15R-VERDICT-LATER-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-VERDICT-LATER-APPLY" started.
+PROBE-C15R-VERDICT-LATER-APPLY sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4, published: false)))
+PROBE-C15R-VERDICT-LATER-APPLY sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "PROBE-C15R-VERDICT-LATER-APPLY" with 2 test cases passed after 1.567 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 5.149 seconds.
+✔ Test run with 3 tests in 1 suite passed after 5.149 seconds.

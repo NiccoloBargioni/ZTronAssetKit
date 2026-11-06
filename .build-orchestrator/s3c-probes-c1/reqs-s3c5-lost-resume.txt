@@ -1,0 +1,35 @@
+# S3C-5 lost-resume mutant L5 (endLegacyAdoption/endLegacyOnDemand drop their waiters)
+## HEAD test file
+17:47:52
+17:47  up 4 days,  6:11, 2 users, load averages: 85.45 47.01 45.36
+exit 1
+17:48:56
+17:48  up 4 days,  6:12, 2 users, load averages: 98.86 58.12 49.63
+✘ Test "R-STO-11: an adopt-on-demand waiting for another call whose read of the file failed transiently tries the file once more and adopts it (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests
+✘ Test "R-STO-11: an adopt-on-demand of a legacy file a batch is placing waits for that adoption and answers the location it bound (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.swift:21:6:
+✘ Test "R-STO-11: a migration batch that finds the queue empty while an adopt-on-demand holds the last claimed legacy file waits for that adoption and finishes the migration in the same call, so its
+✘ Test "R-STO-11: an adopt-on-demand waiting for another call whose caller was cancelled takes the file over and adopts it (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.swift:228:6: Time l
+✘ Test "R-STO-11: close() while an adopt-on-demand waits for another call's adoption of the same legacy file resumes it with the store's shutdown answer (L5K-R13)" recorded an issue at LegacyOnDeman
+✘ Test "R-STO-11: close() while a migration batch waits for the adopt-on-demand of the last claimed legacy file ends both calls with the store's shutdown answer and leaves no mark (L5K-R17, L5K-R22,
+✘ Test "R-STO-13: a migration batch whose publication is coalesced returns right after it instead of waiting for the adopt-on-demand of the last claimed legacy file, so its caller can schedule the t
+✘ Test "R-STO-11: two adopt-on-demand calls of one legacy file share one hash: the second waits for the first's processing and hashes nothing (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.
+✘ Test "R-STO-11: an adopt-on-demand of a legacy file another adopt-on-demand is placing waits for it and answers the location it bound (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.swift:
+✘ Test "R-STO-11: a batch whose read of a legacy file fails while an adopt-on-demand places that file waits for that adoption and reports the file adopted once, never dropped (L5K-R13)" recorded an 
+✘ Test run with 14 tests in 1 suite failed after 64.011 seconds with 20 issues.
+## s3-base test file (same mutant)
+17:49:28
+17:49  up 4 days,  6:12, 2 users, load averages: 121.91 68.43 53.73
+exit 143
+17:52:28
+17:52  up 4 days,  6:15, 2 users, load averages: 127.08 94.41 67.39
+✘ Test "R-STO-11: two adopt-on-demand calls of one legacy file share one hash: the second waits for the first's processing and hashes nothing (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.
+✘ Test "R-STO-11: a batch whose read of a legacy file fails while an adopt-on-demand places that file waits for that adoption and reports the file adopted once, never dropped (L5K-R13)" recorded an 
+✘ Test "R-STO-11: an adopt-on-demand of a legacy file another adopt-on-demand is placing waits for it and answers the location it bound (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.swift:
+✘ Test "R-STO-13: a migration batch whose publication is coalesced returns right after it instead of waiting for the adopt-on-demand of the last claimed legacy file, so its caller can schedule the t
+✘ Test "R-STO-11: close() while an adopt-on-demand waits for another call's adoption of the same legacy file resumes it with the store's shutdown answer (L5K-R13)" recorded an issue at LegacyOnDeman
+✘ Test "R-STO-11: an adopt-on-demand waiting for another call whose read of the file failed transiently tries the file once more and adopts it (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests
+✘ Test "R-STO-11: an adopt-on-demand waiting for another call whose caller was cancelled takes the file over and adopts it (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.swift:220:6: Time l
+✘ Test "R-STO-11: close() while a migration batch waits for the adopt-on-demand of the last claimed legacy file ends both calls with the store's shutdown answer and leaves no mark (L5K-R17, L5K-R22,
+✘ Test "R-STO-11: a migration batch that finds the queue empty while an adopt-on-demand holds the last claimed legacy file waits for that adoption and finishes the migration in the same call, so its
+✘ Test "R-STO-11: an adopt-on-demand of a legacy file a batch is placing waits for that adoption and answers the location it bound (L5K-R13)" recorded an issue at LegacyOnDemandRaceTests.swift:21:6:
+WATCHDOG: still running after 180s, killing 74323

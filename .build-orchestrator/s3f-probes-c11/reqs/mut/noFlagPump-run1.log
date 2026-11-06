@@ -1,0 +1,27 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+✘ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:56:9: Expectation failed: !atEnd.owed && atEnd.b == .downloading
+↳ B has the freed slot once the follow ends, in its last turn (visit-first: at A's commit): (owed: false, b: Optional(ZTronAssetSync.JobState.queued))
+↳ !atEnd.owed && atEnd.b == .downloading → false
+↳   !atEnd.owed → true
+↳   atEnd.b == .downloading → false
+✘ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" with 2 test cases failed after 1.165 seconds with 1 issue.
+↳ /// A slot freed while the follow is owed is filled in the follow's last turn although that turn moved nothing: one
+↳ /// slot; A (zz-a) downloads for a user waiter and B (zz-b) waits in the queue for another. v3 changes only the fillers,
+↳ /// so no job moves. Behind the barrier, A's commit frees the slot and the pump it runs waits for the follow
+↳ /// (`pumpWaitsForFollow`); the follow's last turn visits nothing and no event waits for it, so only its own pump on
+↳ /// that flag starts B. Visited first, A's commit started B at once. Without that pump B waited in the queue with the
+↳ /// slot free until an unrelated pump (the cycle-3 survivor `noFlagPump`).
+✘ Suite "Engine follow barrier (F-28)" failed after 1.166 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.166 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

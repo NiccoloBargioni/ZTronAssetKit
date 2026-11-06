@@ -1,0 +1,5 @@
+◇ Test run started.
+P-13 reap scaling (wall seconds of runDueWork, 20 of 64 keys per unit): [(key: 10000, value: 0.2455605), (key: 20000, value: 0.65933625), (key: 40000, value: 1.982003375)]; 40,000 / 20,000 = 3.0060585550999206 (max 2.5); control with 20-key batches: 20,000 0.31576095800000004 s, 40,000 0.6376059589999999 s, ratio 2.019267876049451; 40,000 against its control = 3.1085082361973346 (max 1.5)
+✘ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" recorded an issue at BenchStorage.swift:296:13: Expectation failed: ratio <= ratioMax
+✘ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" recorded an issue at BenchStorage.swift:297:13: Expectation failed: againstControl <= controlRatioMax
+✘ Test run with 1 test in 2 suites failed after 30.423 seconds with 2 issues.

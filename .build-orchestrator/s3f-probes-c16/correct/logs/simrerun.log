@@ -1,0 +1,73 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -scheme ZTronAssetKit -destination "platform=iOS Simulator,id=5B940E6E-490F-4E9E-A917-A6456A18225E" -derivedDataPath .build-verify-s3f-c16-correct/xcode-sim "-only-testing:ZTronAssetTransportTests/SizeAndResumeTests/pauseKeepsThePartial()" -collect-test-diagnostics never
+
+Resolve Package Graph
+2026-10-31 23:30:34.762 xcodebuild[69901:26210943] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  ZTronAssetKit: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Test Suite 'Selected tests' started at 2026-10-31 23:31:09.813.
+Test Suite 'ZTronAssetTransportTests.xctest' started at 2026-10-31 23:31:09.814.
+Test Suite 'ZTronAssetTransportTests.xctest' passed at 2026-10-31 23:31:09.814.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-10-31 23:31:09.815.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64-apple-ios17.0-simulator
+◇ Suite "Sizes and resume" started.
+◇ Test "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar" started.
+2026-10-31 23:31:09.842056+0100 xctest[70082:26213858] [] nw_listener_socket_inbox_create_socket setsockopt SO_NECP_LISTENUUID failed [2: No such file or directory]
+Resolve Package Graph
+
+✔ Test "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar" passed after 0.768 seconds.
+✔ Suite "Sizes and resume" passed after 0.770 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.770 seconds.
+2026-10-31 23:31:10.901 xcodebuild[69901:26210943] [MT] IDETestOperationsObserverDebug: 35.780 elapsed -- Testing started completed.
+2026-10-31 23:31:10.901 xcodebuild[69901:26210943] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-31 23:31:10.901 xcodebuild[69901:26210943] [MT] IDETestOperationsObserverDebug: 35.780 sec, +35.780 sec -- end
+
+Test session results, code coverage, and logs:
+	/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c16-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_23-30-34-+0100.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

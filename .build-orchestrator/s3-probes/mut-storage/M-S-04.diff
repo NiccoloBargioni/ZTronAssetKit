@@ -1,0 +1,12 @@
+diff --git a/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift b/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+index cc1a13b..e36460e 100644
+--- a/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
++++ b/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+@@ -68,6 +68,7 @@ enum OpenUnits {
+             }
+             let blobsExisted = try OpenUnits.makeDirectory(layout.blobsDirectory, fileSystem)
+             _ = try OpenUnits.makeDirectory(layout.stagingDirectory, fileSystem)
++            fileSystem.releaseLock(lock)
+             return .success(PreparedRoot(layout: layout, lock: lock, blobsRecreated: !blobsExisted))
+         } catch {
+             fileSystem.releaseLock(lock)

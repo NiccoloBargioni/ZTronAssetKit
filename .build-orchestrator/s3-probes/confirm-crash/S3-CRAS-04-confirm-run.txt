@@ -1,0 +1,18 @@
+# S3-CRAS-04 confirmation (baseline, load 20-45)
+◇ Suite "S3 probe: legacy migration kill then power loss" started.
+◇ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+✔ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" with 48 test cases passed after 186.869 seconds.
+✔ Suite "S3 probe: legacy migration kill then power loss" passed after 186.869 seconds.
+total legacy pairs 11606 in 48 cases
+✔ Test run with 16 tests in 4 suites passed after 186.869 seconds.
+purge after crash:
+◇ Test "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .processKill, purge → .blobs to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .processKill, purge → .root to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .processKill, purge → .half to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .processKill, purge → .staging to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → .blobs to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → .root to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → .half to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → .staging to "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" started.
+✔ Test "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" with 8 test cases passed after 4.882 seconds.

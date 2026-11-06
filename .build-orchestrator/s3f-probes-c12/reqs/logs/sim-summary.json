@@ -1,0 +1,69 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+        "deviceName" : "iPhone 18 Pro Max",
+        "modelName" : "iPhone 18 Pro Max",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 1,
+      "passedTests" : 2789,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "ZTronAssetKit · Built with macOS 27.0",
+  "expectedFailures" : 0,
+  "failedTests" : 1,
+  "finishTime" : 1793410534.809,
+  "passedTests" : 1427,
+  "result" : "Failed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1793409874.556,
+  "statistics" : [
+    {
+      "subtitle" : "1543 test runs",
+      "title" : "181 tests ran with dynamic parameters"
+    }
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "Test exceeded execution time allowance of 3 minutes",
+      "targetName" : "ZTronAssetSyncTests",
+      "testIdentifier" : 194,
+      "testIdentifierString" : "EngineFollowBarrierTests/barrierRetriesBehindTheOwedVisitsPlaces(_:)",
+      "testIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierRetriesBehindTheOwedVisitsPlaces(_:)",
+      "testName" : "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)"
+    }
+  ],
+  "title" : "Test - ZTronAssetKit",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "4% of duration",
+      "text" : "2 longest test runs with outlier durations exceeding 30.90s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "86% of duration",
+      "text" : "1 longest test run with outlier durations exceeding 36.50s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "7% of duration",
+      "text" : "1 longest test run with outlier durations exceeding 8.94s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 1428
+}

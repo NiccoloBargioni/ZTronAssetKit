@@ -1,0 +1,55 @@
+--- Sources/ZTronAssetKit/Facade/ClientLifecycle.swift	2026-10-22 13:35:22
++++ .build-verify-g-correct-r3/probes/pkg/Sources/ZTronAssetKit/Facade/ClientLifecycle.swift	2026-10-22 14:23:47
+@@ -26,6 +26,8 @@
+     case pressureRecorded(epoch: UInt64)
+     /// `shutdown()`: `closed` is set and a reopen is running, which the shutdown waits for next.
+     case shutdownWillWaitForReopen
++    /// PROBE (verifier r3, scratch only): the replacement's memory-pressure request was applied; its start follows.
++    case probeAfterPressure
+ }
+ 
+ /// Owns the client's current store and engine, and the reopen after a replaced root (ARCHITECTURE §8, B-15, B-17;
+@@ -130,13 +132,18 @@
+     /// The pair serving now; waits for a running reopen. After shutdown, the last pair (its engine answers
+     /// `.shutDown`).
+     func current() async -> ClientCore {
+-        if let reopening = self.reopening {
+-            // REENTRANCY: g-1 (proposed) — nothing but `core`, read after the wait: the reopen installed it.
+-            _ = await reopening.value
++        // FIX CANDIDATE (verifier r3): wait only until the running reopen installed its replacement (or ended without
++        // one), not for its whole task, which also re-registers groups and starts the replacement.
++        while self.reopening != nil {
++            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
++                self.installWaiters.append(continuation)
++            }
+         }
+         return self.core
+     }
+ 
++    private var installWaiters: [CheckedContinuation<Void, Never>] = []
++
+     /// Whether the engine of `generation` was replaced, or is being shut down by a reopen: its `clientShutDown`
+     /// then ends that engine's stream only, not the client's.
+     func hasRetired(_ generation: UInt64) -> Bool {
+@@ -202,6 +209,9 @@
+             // REENTRANCY: g-3 (proposed) — nothing: the engine ignores a request whose epoch is not newer, so a
+             // concurrent call with the same or a newer epoch wins either way.
+             _ = await next.engine.observeMemoryPressure(epoch: pressure.epoch, handler: pressure.handler)
++        }
++        if let seam = self.seam {
++            await seam(.probeAfterPressure)
+         }
+         for token in self.groups.keys.sorted(by: { $0.rawValue < $1.rawValue }) {
+             // A newer reopen replaced `next` meanwhile (its root vanished too): that reopen's loop re-registers what
+@@ -228,6 +238,11 @@
+     private func endReopen(_ result: ClientCore?) -> ClientCore? {
+         self.reopening = nil
+         self.retiring = nil
++        let waiters = self.installWaiters
++        self.installWaiters = []
++        for waiter in waiters {
++            waiter.resume()
++        }
+         return result
+     }
+ 

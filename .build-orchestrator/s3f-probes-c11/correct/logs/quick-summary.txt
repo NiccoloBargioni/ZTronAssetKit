@@ -1,0 +1,2 @@
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS

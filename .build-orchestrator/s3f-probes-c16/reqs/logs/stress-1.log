@@ -1,0 +1,43 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16ReqsStress" started.
+◇ Test "PROBE-C16R-NEW-STRESS" started.
+◇ Test "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 0 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 1 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 2 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 3 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 4 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 5 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 6 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 7 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 2 arguments copy → 1, visit → .followVisitedFirst to "PROBE-C16R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 1, visit → .sweepFollowsFirst to "PROBE-C16R-NEW-STRESS" started.
+◇ Test case passing 1 argument copy → 8 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 9 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 2 arguments copy → 2, visit → .followVisitedFirst to "PROBE-C16R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 0, visit → .followVisitedFirst to "PROBE-C16R-NEW-STRESS" started.
+◇ Test case passing 1 argument copy → 10 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 11 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 2 arguments copy → 2, visit → .sweepFollowsFirst to "PROBE-C16R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 0, visit → .sweepFollowsFirst to "PROBE-C16R-NEW-STRESS" started.
+◇ Test case passing 1 argument copy → 13 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 14 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 15 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 16 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 17 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 18 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 19 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 20 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 21 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 22 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 12 to "PROBE-C16R-RETRY-STRESS" started.
+◇ Test case passing 1 argument copy → 23 to "PROBE-C16R-RETRY-STRESS" started.
+✔ Test "PROBE-C16R-RETRY-STRESS" with 24 test cases passed after 20.191 seconds.
+✔ Test "PROBE-C16R-NEW-STRESS" with 6 test cases passed after 41.860 seconds.
+✔ Suite "VerifyC16ReqsStress" passed after 41.860 seconds.
+✔ Test run with 2 tests in 1 suite passed after 41.860 seconds.
+real 44.80
+user 133.77
+sys 2.03

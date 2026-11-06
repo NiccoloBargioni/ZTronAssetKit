@@ -1,0 +1,37 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 6] ZTronAssetStorage
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[23 / 23] ZTronAssetKit-product
+Build complete! (3,76 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine failure paths" started.
+◇ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" started.
+◇ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" started.
+✔ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" passed after 0.008 seconds.
+✔ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" passed after 0.009 seconds.
+✘ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" recorded an issue at EnginePublicationRefusalTests.swift:60:9: Expectation failed: answer == .failure(.notFound)
+↳ failure(ZTronAssetModel.AssetError.shutDown)
+↳ answer == .failure(.notFound) → false
+↳   answer → failure(ZTronAssetModel.AssetError.shutDown)
+↳     failure → .shutDown
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" failed after 0.010 seconds with 1 issue.
+↳ /// A publication for an id the store no longer knows (its manifest dropped the id behind the engine's copy, which a
+↳ /// catch-up follows later): `unknownAsset` fails the job until the entry changes and answers the waiter `notFound`.
+✘ Suite "Engine failure paths" failed after 0.010 seconds with 1 issue.
+↳ /// Failure paths of ARCHITECTURE §7.6 and §7.7, reconcile-time job changes (T21, T22), the manifest deadline,
+↳ /// launch reconciliation and a store that cannot open.
+✘ Test run with 3 tests in 1 suite failed after 0.010 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

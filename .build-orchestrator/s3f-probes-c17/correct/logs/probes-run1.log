@@ -1,0 +1,227 @@
+ 3:48  up 6 days, 16:11, 3 users, load averages: 15.18 14.31 16.96
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC17Stress" started.
+◇ Suite "VerifyC17Correct" started.
+◇ Test "C17-STRESS-MOVED-BEFORE-AND-LANE" started.
+◇ Test "C17-STRESS-RETRY-END" started.
+◇ Test "C17-REPRO-VERDICT-MAPPED-BACK" started.
+◇ Test "C17-STRESS-UNLISTED" started.
+◇ Test "C17-STRESS-HOP" started.
+◇ Test case passing 1 argument copy → 1 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 2 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 3 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 4 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 5 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 6 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 0 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 7 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 8 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 9 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C17-REPRO-VERDICT-MAPPED-BACK" started.
+◇ Test case passing 2 arguments copy → 0, visit → .sweepFollowsFirst to "C17-STRESS-MOVED-BEFORE-AND-LANE" started.
+◇ Test case passing 1 argument copy → 11 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 2 arguments copy → 1, visit → .sweepFollowsFirst to "C17-STRESS-MOVED-BEFORE-AND-LANE" started.
+◇ Test case passing 1 argument copy → 10 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 12 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 2 arguments copy → 1, visit → .followVisitedFirst to "C17-STRESS-MOVED-BEFORE-AND-LANE" started.
+◇ Test case passing 2 arguments copy → 0, visit → .followVisitedFirst to "C17-STRESS-MOVED-BEFORE-AND-LANE" started.
+◇ Test case passing 1 argument copy → 15 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 16 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 17 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 18 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 19 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 13 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 14 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 21 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 20 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 22 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 1 argument copy → 23 to "C17-STRESS-RETRY-END" started.
+◇ Test case passing 2 arguments copy → 0, visit → .followVisitedFirst to "C17-STRESS-HOP" started.
+◇ Test case passing 2 arguments copy → 0, visit → .followVisitedFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 0, visit → .sweepFollowsFirst to "C17-STRESS-HOP" started.
+◇ Test case passing 2 arguments copy → 0, visit → .sweepFollowsFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 1, visit → .followVisitedFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 1, visit → .followVisitedFirst to "C17-STRESS-HOP" started.
+◇ Test case passing 2 arguments copy → 1, visit → .sweepFollowsFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 2, visit → .sweepFollowsFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 3, visit → .followVisitedFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 3, visit → .sweepFollowsFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 4, visit → .followVisitedFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 4, visit → .sweepFollowsFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 5, visit → .followVisitedFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 5, visit → .sweepFollowsFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 2, visit → .followVisitedFirst to "C17-STRESS-UNLISTED" started.
+◇ Test case passing 2 arguments copy → 1, visit → .sweepFollowsFirst to "C17-STRESS-HOP" started.
+C17-REPRO-VERDICT-MAPPED-BACK followVisitedFirst after the 404: (owed: false, c: nil, reroute: nil, end: nil, n: Optional(ZTronAssetSync.JobState.downloading))
+✔ Test "C17-STRESS-RETRY-END" with 24 test cases passed after 4.000 seconds.
+C17-REPRO-VERDICT-MAPPED-BACK followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✔ Test "C17-STRESS-UNLISTED" with 12 test cases passed after 4.148 seconds.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C17-REPRO-VERDICT-MAPPED-BACK" started.
+C17-REPRO-VERDICT-MAPPED-BACK sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), reroute: Optional([zz-b]), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-b]))), n: nil)
+C17-REPRO-VERDICT-MAPPED-BACK sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✔ Test "C17-REPRO-VERDICT-MAPPED-BACK" with 2 test cases passed after 5.346 seconds.
+◇ Test "C17-REPRO-RR11-RETRY-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C17-REPRO-RR11-RETRY-LANE" started.
+C17-REPRO-RR11-RETRY-LANE followVisitedFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: false, barrier: false)
+C17-REPRO-RR11-RETRY-LANE followVisitedFirst throttle=Optional(61000000000ns) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/30/30314c47e60d81f8f22b1209d952beb478c2e18add4b54c68cd379203fcf57ac.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C17-REPRO-RR11-RETRY-LANE" started.
+C17-REPRO-RR11-RETRY-LANE sweepFollowsFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: true, barrier: true)
+C17-REPRO-RR11-RETRY-LANE sweepFollowsFirst throttle=Optional(61000000000ns) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/30/30314c47e60d81f8f22b1209d952beb478c2e18add4b54c68cd379203fcf57ac.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "C17-REPRO-RR11-RETRY-LANE" with 2 test cases passed after 2.730 seconds.
+◇ Test "C17-REPRO-THROTTLE-FAILFAST-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C17-REPRO-THROTTLE-FAILFAST-LANE" started.
+C17-REPRO-THROTTLE-FAILFAST-LANE followVisitedFirst before=Optional(11000000000ns) after=Optional(61000000000ns) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/114984b893db42c936e0a6d7f5dec3bc5564c6e6d73c8688b4c6537cfd9ae06b.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C17-REPRO-THROTTLE-FAILFAST-LANE" started.
+C17-REPRO-THROTTLE-FAILFAST-LANE sweepFollowsFirst before=Optional(11000000000ns) after=Optional(61000000000ns) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/114984b893db42c936e0a6d7f5dec3bc5564c6e6d73c8688b4c6537cfd9ae06b.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "C17-REPRO-THROTTLE-FAILFAST-LANE" with 2 test cases passed after 3.341 seconds.
+◇ Test "C17-REPRO-INTERMEDIATE-HOP" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C17-REPRO-INTERMEDIATE-HOP" started.
+✔ Test "C17-STRESS-MOVED-BEFORE-AND-LANE" with 4 test cases passed after 12.461 seconds.
+C17-REPRO-INTERMEDIATE-HOP followVisitedFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C17-REPRO-INTERMEDIATE-HOP" started.
+C17-REPRO-INTERMEDIATE-HOP sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+✔ Test "C17-REPRO-INTERMEDIATE-HOP" with 2 test cases passed after 1.798 seconds.
+◇ Test "C17-REPRO-INTERMEDIATE-HOP-SERVED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C17-REPRO-INTERMEDIATE-HOP-SERVED" started.
+✔ Test "C17-STRESS-HOP" with 4 test cases passed after 13.352 seconds.
+✔ Suite "VerifyC17Stress" passed after 13.353 seconds.
+C17-REPRO-INTERMEDIATE-HOP-SERVED followVisitedFirst b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) mStarts=0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C17-REPRO-INTERMEDIATE-HOP-SERVED" started.
+C17-REPRO-INTERMEDIATE-HOP-SERVED sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) mStarts=0
+✔ Test "C17-REPRO-INTERMEDIATE-HOP-SERVED" with 2 test cases passed after 0.987 seconds.
+◇ Test "C17-REPRO-RR11-RETRY-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C17-REPRO-RR11-RETRY-AFTER" started.
+C17-REPRO-RR11-RETRY-AFTER followVisitedFirst: throttled true; A failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); B failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); P success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8c/8cfe1b3fb9b9a8a4384bd78ee097b128f306c54581eb8ba28a4bf9fe645cfb6c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C17-REPRO-RR11-RETRY-AFTER" started.
+C17-REPRO-RR11-RETRY-AFTER sweepFollowsFirst: throttled true; A failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); B failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); P success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8c/8cfe1b3fb9b9a8a4384bd78ee097b128f306c54581eb8ba28a4bf9fe645cfb6c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "C17-REPRO-RR11-RETRY-AFTER" with 2 test cases passed after 1.121 seconds.
+◇ Test "PROBE-C17C-OFFLINE-FAILFAST-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-OFFLINE-FAILFAST-LANE" started.
+PROBE-C17C-OFFLINE-FAILFAST-LANE followVisitedFirst at C's exit (c: "verifying", interests: 1); N's lane (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch)); throttle=Optional(61000000000ns) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/24/2467a75aef261802ea12b6a14330be08bd713da557930ad2a37834c32e3f3735.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6b/6b0c20093ead82a4bd35cedddb5032658e93d1c17ee8537fc75207273c6c38db.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C17C-OFFLINE-FAILFAST-LANE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC17CorrectProbes.swift:429:9: Expectation failed: bResult == .failure(.offline)
+↳ B gets the offline fail-fast (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/24/2467a75aef261802ea12b6a14330be08bd713da557930ad2a37834c32e3f3735.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.offline) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/24/2467a75aef261802ea12b6a14330be08bd713da557930ad2a37834c32e3f3735.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/24/2467a75aef261802ea12b6a14330be08bd713da557930ad2a37834c32e3f3735.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/24/2467a75aef261802ea12b6a14330be08bd713da557930ad2a37834c32e3f3735.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/24/2467a75aef261802ea12b6a14330be08bd713da557930ad2a37834c32e3f3735.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 100000
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.offline) → failure(ZTronAssetModel.AssetError.offline)
+↳     failure → .offline
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-OFFLINE-FAILFAST-LANE" started.
+PROBE-C17C-OFFLINE-FAILFAST-LANE sweepFollowsFirst at C's exit (c: "failed(ZTronAssetModel.RetryDisposition.nextRun)", interests: 1); N's lane (followed: Optional(ZTronAssetModel.AssetPriority.userInitiated), own: Optional(ZTronAssetModel.AssetPriority.prefetch)); throttle=nil b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+✘ Test "PROBE-C17C-OFFLINE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17CorrectProbes.swift:429:9: Expectation failed: bResult == .failure(.offline)
+↳ B gets the offline fail-fast (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ bResult == .failure(.offline) → false
+↳   bResult → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳     failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳       serverUnavailable → (retryAfter: Optional(60.0))
+↳         retryAfter → 60.0
+↳           some → 60.0
+↳   .failure(.offline) → failure(ZTronAssetModel.AssetError.offline)
+↳     failure → .offline
+✘ Test "PROBE-C17C-OFFLINE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17CorrectProbes.swift:430:9: Expectation failed: throttle != nil
+↳ PROBE-C17C-OFFLINE-FAILFAST-LANE: N's 429 throttles the origin on N's own lane (visit-first)
+↳ throttle != nil → false
+↳   throttle → nil
+✘ Test "PROBE-C17C-OFFLINE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17CorrectProbes.swift:431:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+↳ PROBE-C17C-OFFLINE-FAILFAST-LANE: P is served by N's retry (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C17C-OFFLINE-FAILFAST-LANE" with 2 test cases failed after 0.966 seconds with 4 issues.
+↳ /// PROBE-C17C-OFFLINE-FAILFAST-LANE (correct-3's unprobed offline case, on correct-2's scenario): C's attempt ends
+↳ /// offline with no edge passed while a follow is owed (sweep-first: its verdict waits). Visit-first: `failFast(.offline)`
+↳ /// answers B (a user waiter) at the failure, v4's move of zz-b onto N moves nobody, and N's 429 (Retry-After 60 s,
+↳ /// beyond the interactive cap of 30 s) is decided on N's own prefetch lane: the origin throttled, P served after it.
+◇ Test "PROBE-C17C-INBOUND-SUPERSEDED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-INBOUND-SUPERSEDED" started.
+PROBE-C17C-INBOUND-SUPERSEDED followVisitedFirst after v3 (owed: false, t: "downloading e10 [zz-x]", h: "nil"); at the 404 -; tStarts 2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-INBOUND-SUPERSEDED" started.
+PROBE-C17C-INBOUND-SUPERSEDED sweepFollowsFirst after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+✘ Test "PROBE-C17C-INBOUND-SUPERSEDED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17CorrectProbes.swift:451:9: Expectation failed: (try? w.get())?.byteSize == 100_000
+↳ PROBE-C17C-INBOUND-SUPERSEDED: v3's visit superseded T before H's visit moved W to T's content, so a fresh job of T's content serves W (visit-first): failure(ZTronAssetModel.AssetError.notFound) after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+↳ (try? w.get())?.byteSize == 100_000 → <not evaluated>
+✘ Test "PROBE-C17C-INBOUND-SUPERSEDED" with 2 test cases failed after 0.885 seconds with 1 issue.
+↳ /// PROBE-C17C-INBOUND-SUPERSEDED. T (100 kB, zz-a; user waiter A) and H (50 kB, zz-x; user waiter W) download. v3 moves
+↳ /// zz-a to a new content Z and zz-x onto T's content; zz-a's entry comes before zz-x's, so a follow visits T before H.
+↳ /// Visit-first: v3's visit of T finds every id of T moved and supersedes it (T's attempt abandoned), then H's visit
+↳ /// moves W to T's content, where no job is left: a fresh job, whose download (T's next scripted step) serves W; A is
+↳ /// served by Z. Behind the barrier T's held attempt then ends in a 404 (in visit-first that attempt no longer exists).
+↳ /// Suspected sweep-first: `bringInbound` at the 404's deferral moves W onto T's failed job, so T's own visit later
+↳ /// finds an id that stays (zz-x) and no longer supersedes it, and the drain's 404 answers W `notFound`.
+◇ Test "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" started.
+PROBE-C17C-INBOUND-SUPERSEDED-CONTROL followVisitedFirst after v3 (owed: false, t: "downloading e4 [zz-x]", h: "nil"); at the 404 -; tStarts 1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" started.
+PROBE-C17C-INBOUND-SUPERSEDED-CONTROL sweepFollowsFirst after v3 (owed: true, t: "downloading e4 [zz-a]", h: "downloading"); at the 404 owed true T failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) [zz-a, zz-x] interests 2 end Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-a]))) H nil; tStarts 1
+✔ Test "PROBE-C17C-INBOUND-SUPERSEDED-CONTROL" with 2 test cases passed after 0.897 seconds.
+◇ Test "PROBE-C17C-RETRY-AFTER-DATE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C17C-RETRY-AFTER-DATE" started.
+PROBE-C17C-RETRY-AFTER-DATE followVisitedFirst at C's exit (owed: false, c: "nil"); after the drain nil; b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(31.0))) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C17C-RETRY-AFTER-DATE" started.
+PROBE-C17C-RETRY-AFTER-DATE sweepFollowsFirst at C's exit (owed: true, c: "failed(ZTronAssetModel.RetryDisposition.nextRun)"); after the drain failed(ZTronAssetModel.RetryDisposition.at(27000000000ns)) attempts 1; b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/aa/aacf3154f1d0861c2b8b2f85ae7a6561c6946910e8f1376d0058d4767443672d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✘ Test "PROBE-C17C-RETRY-AFTER-DATE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC17CorrectProbes.swift:569:25: Issue recorded
+↳ PROBE-C17C-RETRY-AFTER-DATE: the 503's Retry-After (31 s at its arrival) is above the cap, so B is answered serverUnavailable (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/aa/aacf3154f1d0861c2b8b2f85ae7a6561c6946910e8f1376d0058d4767443672d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); after the drain failed(ZTronAssetModel.RetryDisposition.at(27000000000ns)) attempts 1; cStarts 2
+✘ Test "PROBE-C17C-RETRY-AFTER-DATE" with 2 test cases failed after 0.858 seconds with 1 issue.
+↳ /// PROBE-C17C-RETRY-AFTER-DATE. C (zz-b; user waiter B; interactive cap of `Retry-After` 30 s) downloads. v3 changes
+↳ /// fillers only, so behind the barrier a follow is owed. C's attempt ends in a 503 whose `Retry-After` is an HTTP date
+↳ /// 31 s ahead of the clock. The clock then moves on 5 s, with the follow (sweep-first) still owed.
+↳ /// Visit-first: `retryLater` at the 503 reads 31 s, above the cap: `Backoff.delay` is `nil`, every interest is
+↳ /// answered (B `serverUnavailable`). Suspected sweep-first: the drain's `retryLater` reads the date against the clock
+↳ /// at the drain (26 s, within the cap), backs off, and C's retry serves B: an answer the visit-first engine never gave
+↳ /// (`EventAfterFollow`'s doc: a `Retry-After` is captured at its arrival).
+✘ Suite "VerifyC17Correct" failed after 18.947 seconds with 6 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 17, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs, unchanged except for their display names, the scenarios the cycle-16 verifiers reported blocking
+↳ /// (PROBE-C16C-VERDICT-MAPPED-BACK, -RR11-RETRY-LANE, -THROTTLE-FAILFAST-LANE, -INTERMEDIATE-HOP, -INTERMEDIATE-HOP-SERVED,
+↳ /// PROBE-C16R-RR11-RETRY-AFTER). Part 2 is this verifier's own variant of a fixed class (an offline exit's fail-fast).
+↳ /// Part 3 hunts what cycle 17's mechanism (`bringInbound`, `takeOffMovedBefore`, `verdictAnswers` through the replays'
+↳ /// functions) may still miss. Each runs in both orders and expects the visit-first outcome.
+✘ Test run with 14 tests in 2 suites failed after 18.947 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+swift test --skip-build --scratch-path ../pbuild --filter 'VerifyC17Correct'  97.80s user 0.76s system 417% cpu 23.585 total
+ 3:48  up 6 days, 16:12, 3 users, load averages: 16.38 14.67 17.03

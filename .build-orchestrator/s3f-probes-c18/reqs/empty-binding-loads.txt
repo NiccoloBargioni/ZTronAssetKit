@@ -1,0 +1,6 @@
+08:28:32 build start load={ 21.68 18.30 21.94 } phase=tsan-build
+08:30:30 build exit 0 load={ 44.12 26.59 24.67 } phase=tsan
+08:46:31 run 1 start load={ 8.10 34.74 50.04 } phase=ios
+08:46:40 run 1 exit 1 load={ 7.55 33.75 49.51 } phase=ios
+08:46:40 run 2 start load={ 7.55 33.75 49.51 } phase=ios
+08:46:46 run 2 exit 1 load={ 8.47 33.50 49.33 } phase=ios

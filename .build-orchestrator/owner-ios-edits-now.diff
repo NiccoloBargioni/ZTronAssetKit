@@ -1,0 +1,830 @@
+diff --git a/Tests/ZTronAssetAppleHostedTests/AppleCatalogTests.swift b/Tests/ZTronAssetAppleHostedTests/AppleCatalogTests.swift
+index c37401c..e814e7f 100644
+--- a/Tests/ZTronAssetAppleHostedTests/AppleCatalogTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/AppleCatalogTests.swift
+@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
+ /// R-APL-4: catalog-in-pack mode (transport.md §11.2 as amended by transport-2 T2-12, T2-14, T2-20).
+ @Suite("Apple tier: catalog")
+ struct AppleCatalogTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: the catalog is read from the essential pack and its digest is the ETag", .timeLimit(.minutes(1)))
+     func catalogFromEssentialPack() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -25,7 +25,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: an unchanged catalog yields notModified and a changed one is fetched", .timeLimit(.minutes(1)))
+     func unchangedCatalogIsNotModified() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -47,7 +47,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a hanging update check never delays reading the installed catalog", .timeLimit(.minutes(1)))
+     func hangingUpdateCheckNeverDelaysTheCatalog() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -72,7 +72,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-APL-4: a failing update check still returns the installed catalog, marked not update-checked",
+         .timeLimit(.minutes(1))
+@@ -101,7 +101,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: packs removed by the update check are reported to the engine once, on notModified too", .timeLimit(.minutes(1)))
+     func removedPacksAreReported() async throws {
+         let fixture = AppleTierFixture(installed: [
+@@ -122,7 +122,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: removals found while a fetch fails are reported by the next successful fetch", .timeLimit(.minutes(1)))
+     func removalsSurviveAFailedFetch() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -144,7 +144,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: update checks are skipped when the request or the configuration disallows them", .timeLimit(.minutes(1)))
+     func updateChecksFollowRequestAndConfiguration() async throws {
+         let disallowed = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -162,7 +162,7 @@ struct AppleCatalogTests {
+         await switchedOff.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a missing catalog pack is made available once and read again", .timeLimit(.minutes(1)))
+     func missingCatalogPackIsMadeAvailable() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -177,7 +177,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a fetch cancelled while the catalog pack downloads ends at once and stops the download", .timeLimit(.minutes(1)))
+     func fetchCancelledDuringCatalogDownload() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -194,7 +194,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a missing catalog pack while offline reports offline", .timeLimit(.minutes(1)))
+     func missingCatalogPackOfflineReportsOffline() async throws {
+         let fixture = AppleTierFixture()
+@@ -208,7 +208,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a catalog pack without the catalog file is permanently missing", .timeLimit(.minutes(1)))
+     func catalogPackWithoutCatalogIsMissing() async throws {
+         let other = ["other.json": Data("{}".utf8)]
+@@ -219,7 +219,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a catalog over the manifest cap is refused while it streams", .timeLimit(.minutes(1)))
+     func oversizedCatalogIsRefused() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -231,7 +231,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a staged catalog that cannot be read back fails and is removed", .timeLimit(.minutes(1)))
+     func unreadableStagedCatalogFails() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -243,7 +243,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a catalog copy that outlives invalidate cancels the fetch and is left for staging GC", .timeLimit(.minutes(1)))
+     func catalogCopyOutlivingInvalidate() async throws {
+         let gated = GatedStagingSink()
+@@ -267,7 +267,7 @@ struct AppleCatalogTests {
+         #expect(!gated.events.contains("discard"))
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: invalidate stops a catalog copy in flight at its next chunk and leaves nothing in staging", .timeLimit(.minutes(1)))
+     func invalidateStopsACatalogCopyInFlight() async throws {
+         let gated = GatedStagingSink()
+@@ -290,7 +290,7 @@ struct AppleCatalogTests {
+         #expect(gated.base.contents.isEmpty)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: an invalid catalog location is rejected without touching any pack", .timeLimit(.minutes(1)))
+     func invalidCatalogLocationIsRejected() async throws {
+         let fixture = AppleTierFixture(configuration: AppleTierConfiguration(catalogPackID: "..", catalogPath: "catalog.json"))
+@@ -302,7 +302,7 @@ struct AppleCatalogTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a manifest fetch after invalidate is cancelled and touches no staging", .timeLimit(.minutes(1)))
+     func fetchAfterInvalidateIsCancelled() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+diff --git a/Tests/ZTronAssetAppleHostedTests/AppleSkewTests.swift b/Tests/ZTronAssetAppleHostedTests/AppleSkewTests.swift
+index f1a20e6..c4fec55 100644
+--- a/Tests/ZTronAssetAppleHostedTests/AppleSkewTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/AppleSkewTests.swift
+@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
+ /// R-APL-4 / transport-2 T2-12 / ADR-032: a catalog and its media packs can be at different versions.
+ @Suite("Apple tier: version skew")
+ struct AppleSkewTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a catalog and pack version skew is transient and never quarantines the asset", .timeLimit(.minutes(1)))
+     func checksumSkewIsTransient() async throws {
+         let catalogVersion = PackAsset("ZTronMedia/images/a.heic", "pixels v2")
+@@ -27,7 +27,7 @@ struct AppleSkewTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a pack file of another size than the catalog's is skew, stopped at the catalog size", .timeLimit(.minutes(1)))
+     func sizeSkewIsTransient() async throws {
+         let asset = PackAsset("ZTronMedia/images/a.heic", "0123456789")
+@@ -48,7 +48,7 @@ struct AppleSkewTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: a file missing from its pack after the pack was made available is skew", .timeLimit(.minutes(1)))
+     func missingFileAfterEnsureIsSkew() async throws {
+         let asset = PackAsset("ZTronMedia/images/new.heic", "added in catalog v2")
+@@ -64,7 +64,7 @@ struct AppleSkewTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-4: an asset larger than the transfer cap is oversize, not skew", .timeLimit(.minutes(1)))
+     func overCapIsOversize() async throws {
+         let asset = PackAsset("ZTronMedia/videos/huge.mp4", String(repeating: "x", count: 64))
+diff --git a/Tests/ZTronAssetAppleHostedTests/AppleTestSeamTests.swift b/Tests/ZTronAssetAppleHostedTests/AppleTestSeamTests.swift
+index 114b9ce..a5adc95 100644
+--- a/Tests/ZTronAssetAppleHostedTests/AppleTestSeamTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/AppleTestSeamTests.swift
+@@ -10,7 +10,7 @@ private let seamAsset = PackAsset("ZTronMedia/seams/a.png", "pixels for the seam
+ /// would make a wait endless into a failure instead of a hung run (ADR draft E-13).
+ @Suite("Apple tier: test seams")
+ struct AppleTestSeamTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("Seams: a cancelled wait for pack waiters returns while the count is still unmet", .timeLimit(.minutes(1)))
+     func cancelledWaiterWaitReturns() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: [seamAsset.path: seamAsset.bytes]])
+@@ -32,7 +32,7 @@ struct AppleTestSeamTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("Seams: a wait for pack waiters ends when the coordinator closes with the count unmet", .timeLimit(.minutes(1)))
+     func waiterWaitEndsOnClose() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: [seamAsset.path: seamAsset.bytes]])
+@@ -52,7 +52,7 @@ struct AppleTestSeamTests {
+         #expect(await collect(handle) == [.failed(.cancelled(.byClient))])
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("Seams: a cancelled wait for a drain returns while a staging write is still open", .timeLimit(.minutes(1)))
+     func cancelledDrainWaitReturns() async throws {
+         let gated = GatedStagingSink()
+@@ -76,7 +76,7 @@ struct AppleTestSeamTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("Seams: cancelling a settle cancels the update check, which is recorded as failed", .timeLimit(.minutes(1)))
+     func cancelledSettleCancelsTheCheck() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+diff --git a/Tests/ZTronAssetAppleHostedTests/AppleTierFixture.swift b/Tests/ZTronAssetAppleHostedTests/AppleTierFixture.swift
+index 88a876f..f005f4f 100644
+--- a/Tests/ZTronAssetAppleHostedTests/AppleTierFixture.swift
++++ b/Tests/ZTronAssetAppleHostedTests/AppleTierFixture.swift
+@@ -41,7 +41,7 @@ struct PackAsset: Sendable {
+ 
+ /// A source over fakes: `FakePackBackend`, `FakeStagingSink` and a recording tap (ADR-047: nothing reaches the
+ /// unified log).
+-@available(macOS 26.0, *)
++@available(macOS 26.0, iOS 26.0, *)
+ struct AppleTierFixture {
+     let backend: FakePackBackend
+     let staging: FakeStagingSink
+diff --git a/Tests/ZTronAssetAppleHostedTests/AppleTierResolutionTests.swift b/Tests/ZTronAssetAppleHostedTests/AppleTierResolutionTests.swift
+index dfc03fd..0ac50eb 100644
+--- a/Tests/ZTronAssetAppleHostedTests/AppleTierResolutionTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/AppleTierResolutionTests.swift
+@@ -10,7 +10,7 @@ import ZTronAssetTestSupport
+ struct AppleTierResolutionTests {
+     private static let http = HTTPSourceConfiguration(baseURL: URL(string: "https://cdn.example.com/")!)
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-5: no usable configuration resolves to noSourceConfigured without building any source")
+     func noUsableConfiguration() {
+         let configurations = [
+@@ -37,7 +37,7 @@ struct AppleTierResolutionTests {
+         }
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-5: a decision naming a tier the configuration cannot build fails closed with noSourceConfigured")
+     func decisionWithoutASourceFailsClosed() {
+         let cases: [(RemoteConfiguration, AssetTier, TierInputs)] = [
+@@ -85,7 +85,7 @@ struct AppleTierResolutionTests {
+         }
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-5: the injected decision is the one resolve follows")
+     func resolveFollowsTheDecision() throws {
+         let configuration = RemoteConfiguration(http: Self.http, appleHosted: AppleTierConfiguration(), awsOnly: false)
+diff --git a/Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift b/Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift
+index 49f309c..156f977 100644
+--- a/Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift
+@@ -14,7 +14,7 @@ private let mediaFiles = [assetA.path: assetA.bytes, assetB.path: assetB.bytes]
+ /// R-APL-1, R-APL-3: assets are copied out of packs into staging (transport.md §11.3, ADR-027).
+ @Suite("Apple tier: transfers")
+ struct AppleTransferTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: the Apple source satisfies RemoteSource end to end against a fake PackBackend", .timeLimit(.minutes(1)))
+     func endToEnd() async throws {
+         let fixture = AppleTierFixture(installed: [
+@@ -63,7 +63,7 @@ struct AppleTransferTests {
+         await source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: constructing the Apple source and selecting the tier call no pack API", .timeLimit(.minutes(1)))
+     func constructionTouchesNoPack() async throws {
+         let backend = FakePackBackend(installed: [Packs.catalog: AppleTierFixture.catalogPack()])
+@@ -81,7 +81,7 @@ struct AppleTransferTests {
+         #expect(backend.calls.isEmpty)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: concurrent fetches of assets in one pack trigger one ensureAvailable", .timeLimit(.minutes(1)))
+     func concurrentFetchesShareOnePackDownload() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+@@ -100,7 +100,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a cancelled waiter leaves the shared pack download running for the others", .timeLimit(.minutes(1)))
+     func cancelledWaiterLeavesOthersRunning() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+@@ -120,7 +120,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: the pack download is cancelled when its last waiter leaves", .timeLimit(.minutes(1)))
+     func lastWaiterLeavingCancelsTheDownload() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+@@ -134,7 +134,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: pause ends a pack transfer as not resumable and keeps nothing in staging", .timeLimit(.minutes(1)))
+     func pauseEndsNotResumable() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+@@ -149,7 +149,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a control after the copy finished discards the staged file and ends the stream once", .timeLimit(.minutes(1)))
+     func controlAfterCopyDiscardsTheFile() async throws {
+         let gated = GatedStagingSink()
+@@ -165,7 +165,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a transfer cancelled before it waits for its pack starts no pack download", .timeLimit(.minutes(1)))
+     func cancelBeforePackWaitStartsNothing() async throws {
+         let gated = GatedStagingSink()
+@@ -180,7 +180,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a stopped transfer whose copy outlives invalidate leaves the copy for staging GC", .timeLimit(.minutes(1)))
+     func stoppedCopyOutlivingInvalidate() async throws {
+         let gated = GatedStagingSink()
+@@ -201,7 +201,7 @@ struct AppleTransferTests {
+         #expect(!gated.events.contains("discard"))
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a transfer stopped before its copy reads a chunk opens no pack file", .timeLimit(.minutes(1)))
+     func stopBeforeTheFirstChunkReadsNothing() async throws {
+         let gated = GatedStagingSink()
+@@ -217,7 +217,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: invalidate stops a copy in flight at its next chunk and leaves nothing in staging", .timeLimit(.minutes(1)))
+     func invalidateStopsACopyInFlight() async throws {
+         let gated = GatedStagingSink()
+@@ -236,7 +236,7 @@ struct AppleTransferTests {
+         #expect(gated.base.contents.isEmpty)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a staged copy whose update stream already ended is discarded instead of delivered", .timeLimit(.minutes(1)))
+     func stagedCopyForAnEndedStreamIsDiscarded() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+@@ -253,7 +253,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: dropping the update stream cancels the transfer", .timeLimit(.minutes(1)))
+     func droppingTheStreamCancels() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+@@ -270,7 +270,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: invalidate cancels pack waiters and returns only after in-flight staging writes", .timeLimit(.minutes(1)))
+     func invalidateDrainsStagingWrites() async throws {
+         let gated = GatedStagingSink()
+@@ -301,7 +301,7 @@ struct AppleTransferTests {
+         #expect(gated.base.contents[assetB.request().partialName] == nil)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: an invalid remote path is rejected without touching any pack", .timeLimit(.minutes(1)))
+     func invalidRemotePathIsRejected() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+@@ -312,7 +312,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a pack the system does not know is permanently missing", .timeLimit(.minutes(1)))
+     func unknownPackIsMissing() async throws {
+         let fixture = AppleTierFixture()
+@@ -322,7 +322,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a staging failure maps into the transfer taxonomy and leaves no partial", .timeLimit(.minutes(1)))
+     func stagingFailureIsMapped() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+@@ -333,7 +333,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a staging name already in use is reported and never discarded", .timeLimit(.minutes(1)))
+     func nameInUseIsNeverDiscarded() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+@@ -347,7 +347,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a checksum-less entry of unknown size is staged without progress or checksum comparison", .timeLimit(.minutes(1)))
+     func legacyEntryIsStagedBySizeOnly() async throws {
+         let fixture = AppleTierFixture(remote: [Packs.media: mediaFiles])
+@@ -365,7 +365,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-OBS-1: an Apple transfer runs inside the transfer signpost interval", .timeLimit(.minutes(1)))
+     func transferIsWrappedInTheInterval() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: mediaFiles])
+@@ -379,7 +379,7 @@ struct AppleTransferTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-OBS-1: a failed, cancelled or paused Apple transfer closes its interval before its terminal update", .timeLimit(.minutes(1)))
+     func stoppedTransferClosesTheInterval() async throws {
+         // Failed: the file is missing from its pack after the pack was made available (skew).
+@@ -410,7 +410,7 @@ struct AppleTransferTests {
+         }
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-OBS-1: the transfer interval is already closed when the driver ends its stream", .timeLimit(.minutes(1)))
+     func intervalClosesBeforeTheStreamEnds() async throws {
+         // Deterministic: `finish()` runs the termination handler synchronously on the driver's own task, so the
+@@ -442,7 +442,7 @@ struct AppleTransferTests {
+         ]
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-3: an adopted asset is served from blobs and never from a pack location", .timeLimit(.minutes(1)))
+     func adoptedAssetIsServedFromBlobs() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: mediaFiles])
+diff --git a/Tests/ZTronAssetAppleHostedTests/FileHandleChunkReaderTests.swift b/Tests/ZTronAssetAppleHostedTests/FileHandleChunkReaderTests.swift
+index d8896f7..84b91f5 100644
+--- a/Tests/ZTronAssetAppleHostedTests/FileHandleChunkReaderTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/FileHandleChunkReaderTests.swift
+@@ -7,7 +7,7 @@ import ZTronAssetModel
+ /// The reader behind `LiveAssetPackBackend` (R-APL-1, C1, C2), exercised with pipes: no file is created.
+ @Suite("Apple tier: file-handle reader")
+ struct FileHandleChunkReaderTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: the live reader opens on its first read and streams bounded chunks to the end")
+     func opensLazilyAndStreams() throws {
+         let pipe = Pipe()
+@@ -28,7 +28,7 @@ struct FileHandleChunkReaderTests {
+         #expect(opens.withLock { $0 } == 1)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: overlapping first reads continue on the handle stored first and never read from two handles")
+     func overlappingFirstReadsShareOneHandle() throws {
+         let first = Pipe()
+@@ -61,7 +61,7 @@ struct FileHandleChunkReaderTests {
+         #expect(opens.withLock { $0 } == 2)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: an absent pack or file asks for the pack and a failed read is readFailed")
+     func failuresMapToSourceFailures() {
+         for (error, expected) in [
+diff --git a/Tests/ZTronAssetAppleHostedTests/PackErrorMappingTests.swift b/Tests/ZTronAssetAppleHostedTests/PackErrorMappingTests.swift
+index e496a51..1db4cbd 100644
+--- a/Tests/ZTronAssetAppleHostedTests/PackErrorMappingTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/PackErrorMappingTests.swift
+@@ -88,7 +88,7 @@ struct PackErrorMappingTests {
+         #expect(PackErrorMapping.systemError(domain: NSCocoaErrorDomain, code: Int(ENOSPC)) == .transient(.unknown(urlErrorCode: 0), retryAfter: nil))
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-2: BackgroundAssets errors become pack errors at the live boundary without touching the manager")
+     func liveErrorBoundary() {
+         #expect(LiveAssetPackBackend.packError(ManagedBackgroundAssetsError.assetPackNotFound(withID: "ZTronMedia")) == .packNotFound)
+diff --git a/Tests/ZTronAssetAppleHostedTests/PackProgressTests.swift b/Tests/ZTronAssetAppleHostedTests/PackProgressTests.swift
+index 4f87bab..2e8a607 100644
+--- a/Tests/ZTronAssetAppleHostedTests/PackProgressTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/PackProgressTests.swift
+@@ -7,7 +7,7 @@ import ZTronAssetTestSupport
+ /// R-APL-2: pack progress as byte values of one asset (D-12).
+ @Suite("Apple tier: progress")
+ struct PackProgressTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-2: pack download progress reaches the engine as byte values scaled to the asset size", .timeLimit(.minutes(1)))
+     func progressIsScaledToTheAsset() async throws {
+         let asset = PackAsset("ZTronMedia/videos/intro.mp4", String(repeating: "v", count: 400))
+@@ -35,7 +35,7 @@ struct PackProgressTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-2: every waiter on one pack sees the pack's progress in its own asset's bytes", .timeLimit(.minutes(1)))
+     func everyWaiterScalesToItsOwnAsset() async throws {
+         let small = PackAsset("ZTronMedia/a.png", String(repeating: "s", count: 200))
+@@ -53,7 +53,7 @@ struct PackProgressTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-2: a pack download that outlived its waiters never reports into a newer download's waiters", .timeLimit(.minutes(1)))
+     func staleFlightNeverReachesANewerWaiter() async throws {
+         let abandoned = PackAsset("ZTronMedia/a.png", String(repeating: "a", count: 400))
+@@ -142,7 +142,7 @@ struct PackProgressTests {
+         #expect(hugeTotal.received(for: PackProgress(completed: top - 1, total: top)) == top - 1)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-2: progress reported under another flight's id never reaches the current flight's waiters", .timeLimit(.minutes(1)))
+     func progressOfAnotherFlightIsDropped() async throws {
+         let backend = FakePackBackend(remote: [Packs.media: ["a.png": Data("a".utf8)]])
+diff --git a/Tests/ZTronAssetAppleHostedTests/PackReleaseTests.swift b/Tests/ZTronAssetAppleHostedTests/PackReleaseTests.swift
+index abda2b8..b27edd6 100644
+--- a/Tests/ZTronAssetAppleHostedTests/PackReleaseTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/PackReleaseTests.swift
+@@ -15,7 +15,7 @@ private func pack(_ paths: String...) -> [String: Data] {
+ /// R-CLN-10 and the source half of R-CLN-9 (H-7, ADR-027).
+ @Suite("Apple tier: releases and source copies")
+ struct PackReleaseTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: reclaim releases a media pack once every entry in it is adopted or excluded", .timeLimit(.minutes(1)))
+     func reclaimReleasesSettledPacks() async throws {
+         let fixture = AppleTierFixture(installed: [
+@@ -35,7 +35,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: a pack that comes back after release is released at most once per catalog generation", .timeLimit(.minutes(1)))
+     func releasedOncePerCatalogGeneration() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)])
+@@ -55,7 +55,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: a report larger than one survey slice releases exactly the packs settled in every slice", .timeLimit(.minutes(1)))
+     func reportAcrossSurveySlices() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA), Packs.extras: pack(extraC)])
+@@ -72,7 +72,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: a release made before the first catalog fetch counts for that catalog's generation", .timeLimit(.minutes(1)))
+     func releaseBeforeFirstFetchIsNotRepeated() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.catalog: AppleTierFixture.catalogPack(), Packs.media: pack(mediaA)])
+@@ -84,7 +84,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-10: a released pack a transfer downloaded again for an adopted asset stays installed until the next catalog generation",
+         .timeLimit(.minutes(1))
+@@ -117,7 +117,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-10: a pack a transfer downloaded again while its release call was running stays released for that generation",
+         .timeLimit(.minutes(1))
+@@ -155,7 +155,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-10: requesting an excluded asset after its pack's release removes the pack once per catalog generation, never in a loop",
+         .timeLimit(.minutes(1))
+@@ -201,7 +201,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: a transfer that ends in skew never re-arms its pack's release within a catalog generation", .timeLimit(.minutes(1)))
+     func skewedTransferDoesNotRearmTheRelease() async throws {
+         // Verifier probe PROBE-R3-1 (ADR-027): the catalog lists `missing`, which the retention scope excludes and the
+@@ -230,7 +230,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: a failed release is reported and planned again by the next reclaim", .timeLimit(.minutes(1)))
+     func failedReleaseIsRetried() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: pack(mediaA)])
+@@ -245,7 +245,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: a pack the system already removed counts as released", .timeLimit(.minutes(1)))
+     func absentPackCountsAsReleased() async throws {
+         let fixture = AppleTierFixture()
+@@ -256,7 +256,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-10: keepPacks and an invalid catalog pack id never release through reclaim", .timeLimit(.minutes(1)))
+     func keepPacksNeverReleases() async throws {
+         let report = AdoptionReport(manifestRemotePaths: [mediaA], adoptedRemotePaths: [mediaA])
+@@ -276,7 +276,7 @@ struct PackReleaseTests {
+         await invalid.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-9: sourceCopyBytes sums the installed bytes of adopted media packs, and a pack the OS removed adds nothing",
+         .timeLimit(.minutes(1))
+@@ -311,7 +311,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-9: a released pack re-downloaded for an adopted asset counts as a source copy again", .timeLimit(.minutes(1)))
+     func redownloadedPackCountsAsASourceCopy() async throws {
+         let fixture = AppleTierFixture(
+@@ -332,7 +332,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-9: a released pack downloaded again on demand counts as a source copy until a later catalog generation releases it",
+         .timeLimit(.minutes(1))
+@@ -380,7 +380,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-9: a pack whose release straddles a new catalog generation and comes back counts until that generation releases it",
+         .timeLimit(.minutes(1))
+@@ -421,7 +421,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-9: a pack whose planned removal is still running or failed counts as a source copy until a removal succeeds",
+         .timeLimit(.minutes(1))
+@@ -461,7 +461,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-9: a pack whose planned removal is running counts as a source copy even after a later survey finds it unsettled",
+         .timeLimit(.minutes(1))
+@@ -514,7 +514,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-9: sourceCopyBytes saturates instead of trapping when the installed sizes sum past Int64.max", .timeLimit(.minutes(1)))
+     func sourceCopyBytesSaturates() async throws {
+         // Verifier probe PROBE-R3-2: `PackBackend` is public, so any injected backend can report such sizes.
+@@ -535,7 +535,7 @@ struct PackReleaseTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-CLN-9: packs kept by keepPacks keep counting as source copies", .timeLimit(.minutes(1)))
+     func keptPacksCount() async throws {
+         let fixture = AppleTierFixture(
+diff --git a/Tests/ZTronAssetAppleHostedTests/PackTransferStopTests.swift b/Tests/ZTronAssetAppleHostedTests/PackTransferStopTests.swift
+index e19cdc9..8bcd132 100644
+--- a/Tests/ZTronAssetAppleHostedTests/PackTransferStopTests.swift
++++ b/Tests/ZTronAssetAppleHostedTests/PackTransferStopTests.swift
+@@ -11,7 +11,7 @@ private let asset = PackAsset("ZTronMedia/images/a.heic", "pixels of a")
+ /// copy and the terminal element is reached deterministically.
+ @Suite("Apple tier: terminal claim")
+ struct PackTransferStopTests {
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: the first stop requested before the claim is the terminal; a stop after the claim is ignored")
+     func claimDecidesOnce() {
+         let stopped = PackTransferStop()
+@@ -28,7 +28,7 @@ struct PackTransferStopTests {
+         #expect(finished.claimTerminal() == nil)
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a racing stop is recorded exactly when the claim reports it", .timeLimit(.minutes(1)))
+     func claimAndRequestAreOneDecision() async {
+         for round in 0..<500 {
+@@ -52,7 +52,7 @@ struct PackTransferStopTests {
+         }
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a cancel or pause landing after the copy staged and before the claim ends the transfer stopped and discards the copy", .timeLimit(.minutes(1)))
+     func stopBeforeClaimReplacesAStagedCopy() async throws {
+         for control in [TransferControl.cancel, .pause] {
+@@ -68,7 +68,7 @@ struct PackTransferStopTests {
+         }
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test("R-APL-1: a control after the claim leaves the staged copy delivered and intact", .timeLimit(.minutes(1)))
+     func controlAfterClaimIsANoOp() async throws {
+         let fixture = AppleTierFixture(installed: [Packs.media: [asset.path: asset.bytes]])
+@@ -84,7 +84,7 @@ struct PackTransferStopTests {
+         await fixture.source.invalidate()
+     }
+ 
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     @Test(
+         "R-CLN-10: a copy staged from a pack downloaded on demand that reaches no consumer leaves the pack released for the generation",
+         .timeLimit(.minutes(1))
+@@ -114,7 +114,7 @@ struct PackTransferStopTests {
+     /// A driver over the fixture's source with its own stop, as `PackTransferHandle.start` builds one, yielding into
+     /// `updates`; without one, into a stream nobody holds (a consumer that dropped it after the terminal was claimed,
+     /// since no stop is wired to it).
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     static func driver(
+         for request: TransferRequest,
+         in fixture: AppleTierFixture,
+@@ -132,7 +132,7 @@ struct PackTransferStopTests {
+ 
+     /// Copies the asset into `request`'s staging file as an attempt would, and returns the staged element the
+     /// attempt proposes.
+-    @available(macOS 26.0, *)
++    @available(macOS 26.0, iOS 26.0, *)
+     static func stagedCopy(of request: TransferRequest, in fixture: AppleTierFixture) async throws -> TransferUpdate {
+         let location = try #require(PackLocation(remotePath: request.remotePath))
+         let copied = await fixture.source.copier.copy(location, as: request.partialName, maxBytes: request.maxBytes)
+diff --git a/Tests/ZTronAssetSyncTests/SyncContractTests.swift b/Tests/ZTronAssetSyncTests/SyncContractTests.swift
+index 4ac3b53..4b58b94 100644
+--- a/Tests/ZTronAssetSyncTests/SyncContractTests.swift
++++ b/Tests/ZTronAssetSyncTests/SyncContractTests.swift
+@@ -4,6 +4,7 @@ import ZTronAssetModel
+ import ZTronAssetSync
+ import ZTronAssetTestSupport
+ 
++
+ @Suite("Sync contracts")
+ struct SyncContractTests {
+     @Test("R-SYN-2: the transition table admits exactly the listed transitions")

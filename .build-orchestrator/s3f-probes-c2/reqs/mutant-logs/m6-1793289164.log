@@ -1,0 +1,32 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 4] ZTronAssetCompatibilityTests-product
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetKit-product
+Build complete! (3,08 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine regressions" started.
+◇ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" started.
+✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" recorded an issue at EngineSync1HalvesTests.swift:216:9: Expectation failed: record.tasksAtMark.allSatisfy { $0 == 0 }
+↳ no owned task was registered when the close began: [1, 0, 0, 0]
+↳ record.tasksAtMark.allSatisfy { $0 == 0 } → <not evaluated>
+✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" failed after 0.012 seconds with 1 issue.
+↳ /// Shutdown joins every owned task before it begins closing the store (R-SYN-15, ADR-039; sync-1 S1-04/S1-09): a
+↳ /// condition observer, called at every notification, records whether any owned task is still registered when the
+↳ /// engine marks the close (`closingStore`). A publication held at its first store unit while a run is in progress
+↳ /// keeps owned tasks alive until the join; closing first (or not joining) closes the store under them. `close()`
+↳ /// drains in-flight work, so the store's own record cannot tell the orders apart (`f.md`, the level-4 verifier's
+↳ /// mutants M5 and M6).
+✘ Suite "Engine regressions" failed after 0.012 seconds with 1 issue.
+↳ /// Regressions the level-4 verifiers found (WP-F fix round 1). Each test failed before its fix.
+✘ Test run with 1 test in 1 suite failed after 0.012 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

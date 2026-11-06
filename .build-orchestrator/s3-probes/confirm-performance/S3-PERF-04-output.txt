@@ -1,0 +1,14 @@
+== run040506a: unmodified s3-base + probe (release)
+10:26  up 3 days, 22:49, 2 users, load averages: 63.75 56.09 43.68
+S3-PERF reap control with 20-key batches (every unit attempts its whole batch, nothing is re-inserted): 20,000 0.657292125 s, 40,000 1.3762172910000001 s, ratio 2.0937681110967215
+S3-PERF reap scaling (wall seconds of runDueWork): [(key: 10000, value: 0.49408325), (key: 20000, value: 1.538325041), (key: 40000, value: 4.111434583)]; 40,000 / 20,000 = 2.67266960715099 (max 2.5)
+✘ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" recorded an issue at S3PerfReapProbe.swift:30:9: Expectation failed: ratio <= ratioMax
+✘ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" failed after 22.675 seconds with 1 issue.
+↳ /// S3-PERF probe: the reaper's own actor work grows linearly with the doomed set (P-13). `reap` keeps its queue as an
+10:27  up 3 days, 22:50, 2 users, load averages: 70.27 58.37 45.06
+== run0405b: reaper patched with a cursor (S3-PERF-04-cursor-reaper-experiment.diff)
+10:33  up 3 days, 22:56, 2 users, load averages: 69.97 59.50 49.39
+S3-PERF reap control with 20-key batches (every unit attempts its whole batch, nothing is re-inserted): 20,000 0.705897208 s, 40,000 1.303142542 s, ratio 1.8460797510336662
+S3-PERF reap scaling (wall seconds of runDueWork): [(key: 10000, value: 0.325105), (key: 20000, value: 0.700226), (key: 40000, value: 1.404718334)]; 40,000 / 20,000 = 2.0060927957545136 (max 2.5)
+✔ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" passed after 18.883 seconds.
+10:33  up 3 days, 22:57, 2 users, load averages: 78.12 62.95 51.12

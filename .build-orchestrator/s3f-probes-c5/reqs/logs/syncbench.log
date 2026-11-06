@@ -1,0 +1,115 @@
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 6]
+[2 / 7] ZTronAssetModel
+[3 / 8] ZTronAssetModel
+[6 / 11] ZTronAssetStorage
+[7 / 12] ZTronAssetStorage
+[11 / 16] ZTronAssetTransport
+[14 / 19] ZTronAssetAppleHosted
+[15 / 20] ZTronAssetAppleHosted
+[19 / 24] ZTronAssetSync
+[23 / 26] ZTronAssetKit
+[34 / 37] ZTronAssetTestSupport
+[44 / 63] ZTronAssetTransportTests-product
+[47 / 65] ZTronAssetAppleHostedTests-product
+[53 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetKitBenchmarks-product
+[59 / 71] ZTronAssetKitBenchmarks-product
+[59 / 71] ZTronAssetKitTests-product
+[61 / 71] ZTronAssetKitTests-product
+[61 / 71] ZTronAssetTransportTests-product
+[64 / 72] ZTronAssetTransportTests-product
+[67 / 74] ZTronAssetTransportTests-product
+[68 / 76] ZTronAssetModelTests-product
+[70 / 76] ZTronAssetModelTests-product
+[70 / 76] ZTronAssetSyncTests-product
+[73 / 77] ZTronAssetSyncTests-product
+[76 / 79] ZTronAssetStorageTests-product
+[84 / 84] ZTronAssetStorageTests-product
+[84 / 84] ZTronAssetSyncTests-product
+[88 / 88] ZTronAssetStorageTests-product
+[92 / 92] ZTronAssetModelTests-product
+[96 / 96] ZTronAssetKitTests-product
+[100 / 100] ZTronAssetKitBenchmarks-product
+[104 / 104] ZTronAssetCompatibilityTests-product
+[108 / 108] ZTronAssetAppleHostedTests-product
+Build complete! (154,34 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "P-4: planning 10,000 vs 10,000 entries with 10% churn stays within plan_ms and scales by at most doubling_ratio_max" started.
+P-4 plan 10,000: 13.128791 ms (budget 20.0); 20,000: 27.332333 ms; ratio 2.0818621455699917 (max 2.5)
+✔ Test "P-4: planning 10,000 vs 10,000 entries with 10% churn stays within plan_ms and scales by at most doubling_ratio_max" passed after 1.008 seconds.
+◇ Test "P-14: after quiescence the engine owns at most idle_timers_max timers and idle_tasks_max tasks" started.
+P-14 armed timers 0 (max 0), owned tasks 0 (max 0), sleepers 0
+✔ Test "P-14: after quiescence the engine owns at most idle_timers_max timers and idle_tasks_max tasks" passed after 0.019 seconds.
+◇ Test "P-7: a 1 GiB synthetic bulk sync adds at most sync_memory_delta_mib_max MiB and does not grow with catalog size" started.
+P-7 resident delta: 5.4375 MiB for 256 MiB, 0.4375 MiB for 1024 MiB (max 48.0)
+✔ Test "P-7: a 1 GiB synthetic bulk sync adds at most sync_memory_delta_mib_max MiB and does not grow with catalog size" passed after 5.365 seconds.
+◇ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" started.
+P-11 200 assets at 10.0 ms: concurrency 1 3.30171475 s, 5 1.042763583 s, speedup 3.166311907921702 (min 3.0)
+✔ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" passed after 4.353 seconds.
+◇ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber costs at most twice the same sync with nobody subscribed" started.
+R-SYN-12 prune of 10,000 ids: nobody subscribed 0.009225375 s, one stalled subscriber 0.0127815 s, ratio 1.3854721352790538 (max 2, plus 5 ms)
+✔ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber costs at most twice the same sync with nobody subscribed" passed after 0.569 seconds.
+◇ Test "R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, hold the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" started.
+R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking 4.397708 ms, during an ENOSPC's free-space read 3.961084 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.248584, 4.397708, 4.4125] and [3.961084, 3.910291, 4.016792]
+✔ Test "R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, hold the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" passed after 3.768 seconds.
+◇ Test "R-SYN-11: re-admitting 10,000 prefetch members parked for lack of space when the volume gains room holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait 5.332958 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.473792, 5.04875, 5.332958]
+✔ Test "R-SYN-11: re-admitting 10,000 prefetch members parked for lack of space when the volume gains room holds the engine's actor at most C2's 10 ms per turn" passed after 0.891 seconds.
+◇ Test "R-SYN-13: losing and regaining the network under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" started.
+R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline 1.217458 ms, coming back 5.309542 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.292292, 1.217458, 1.200542] and [5.449083, 5.309542, 5.079125]
+✔ Test "R-SYN-13: losing and regaining the network under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" passed after 1.054 seconds.
+◇ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" started.
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 5.565 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.318166, 5.565, 5.695125]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 0.686 seconds.
+◇ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" started.
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 1.566541 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.475458, 1.566541, 1.624208]; at 1,000: 0.238125 ms; the group without waiters: [0.742042, 0.674125, 0.645583]
+✔ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" passed after 11.360 seconds.
+◇ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 2.870042 ms (budgets 50.0 ms median, 10.0 ms best); runs [2.870042, 4.019125, 1.4105]
+✔ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" passed after 0.834 seconds.
+◇ Test "R-SYN-6: a sync whose manifest changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait 4.307042 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.307042, 4.154542, 5.014791]
+✔ Test "R-SYN-6: a sync whose manifest changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" passed after 1.429 seconds.
+◇ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait 5.631875 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.451959, 5.631875, 5.651042]
+✔ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the engine's actor at most C2's 10 ms per turn" passed after 0.358 seconds.
+◇ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 1.03675 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.03675, 1.055792, 1.03225]
+✔ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" passed after 3.611 seconds.
+◇ Test "R-SYN-4: releasing a 10,000-member prefetch handle of user-initiated priority holds the engine's actor at most C2's 10 ms per turn and leaves no job" started.
+R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait 5.713875 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.086125, 5.53175, 5.713875]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle of user-initiated priority holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 0.622 seconds.
+◇ Test "R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-3 re-join of a released 10,000-member prefetch handle: longest actor wait 6.605375 ms (budgets 50.0 ms median, 10.0 ms best); runs [10.085208, 6.605375, 6.213292]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-3 re-join of a released 10,000-member bulk handle: longest actor wait 5.446875 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.036167, 5.446875, 5.091708]; members re-joined while the release was pending [432, 432, 432]
+✔ Test "R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn" passed after 5.064 seconds.
+◇ Test "R-SYN-4: cancelling a resolve while 10,000 prefetch members wait holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait 0.030375 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.030375, 0.025291, 0.032583]
+✔ Test "R-SYN-4: cancelling a resolve while 10,000 prefetch members wait holds the engine's actor at most C2's 10 ms per turn" passed after 0.442 seconds.
+◇ Test "R-SYN-5: a breaker cooldown's end over 10,000 prefetch members parked by it holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait 0.087083 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.068, 0.102084, 0.087083]
+✔ Test "R-SYN-5: a breaker cooldown's end over 10,000 prefetch members parked by it holds the engine's actor at most C2's 10 ms per turn" passed after 0.718 seconds.
+◇ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" started.
+R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait 0.233125 ms (budgets 50.0 ms median, 10.0 ms best); totals [1.134320333, 1.136635334, 1.139032291] s; runs [0.21325, 0.487334, 0.233125]
+✔ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" passed after 4.026 seconds.
+◇ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait 7.480083 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.45625, 8.178666, 7.480083]
+✔ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" passed after 10.767 seconds.
+◇ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 5.630375 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.322084, 5.630375, 5.595667]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 6.762416 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.762416, 7.024875, 6.503042]
+✔ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" passed after 7.384 seconds.
+✔ Suite "SyncBenchmarks" passed after 64.339 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 64.339 seconds.
+✔ Test run with 21 tests in 2 suites passed after 64.339 seconds.

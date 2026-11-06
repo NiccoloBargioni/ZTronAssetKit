@@ -1,0 +1,28 @@
+covdiff start 04:46:28 { 80.48 258.15 484.49 }
+Sources/ZTronAssetSync/Engine/EngineCommands.swift: lines 12, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineDispatch.swift: lines 4, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineFailures.swift: lines 6, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineFollow.swift: lines 30, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineJobs.swift: lines 11, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineManifest.swift: lines 9, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineMoves.swift: lines 2, zero-count 0
+Sources/ZTronAssetSync/Engine/EnginePresence.swift: lines 1, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineState.swift: lines 175, zero-count 0
+Sources/ZTronAssetSync/Engine/EngineFollow.swift: lines 23, zero-count 9
+   391: // Shutting down: nothing is admitted any more.
+   392: self.state.drainFollowUpScheduled = false
+   393: self.state.eventsAfterFollow = []
+   394: self.state.eventStamps = []
+   395: self.state.verdictsAfterFollow = [:]
+   396: self.state.joinsAfterFollow = [:]
+   397: self.state.worldHistory = []
+   398: self.state.followStamps = [:]
+   1261: return nil
+   counts: [(390, '21'), (391, '0'), (392, '0'), (393, '0'), (394, '0'), (395, '0'), (396, '0'), (397, '0'), (398, '0'), (590, '37'), (591, '37'), (1061, '4'), (1107, '2'), (1252, '3.73k'), (1253, '400'), (1256, '3.33k'), (1257, '664'), (1258, '3.33k'), (1259, '2.66k'), (1260, '3.33k'), (1261, '0'), (1316, '7'), (1317, '7')]
+Sources/ZTronAssetSync/Engine/EngineMoves.swift: lines 6, zero-count 0
+   counts: [(203, '7'), (206, '1'), (212, '797'), (214, '77'), (220, '35'), (222, '1')]
+Sources/ZTronAssetSync/Engine/EngineJobs.swift: lines 3, zero-count 0
+   counts: [(117, '151k'), (121, '1'), (122, '1')]
+Sources/ZTronAssetSync/Engine/EngineManifest.swift: lines 3, zero-count 0
+   counts: [(393, '1.23k'), (394, '1'), (396, '1.23k')]
+covdiff end 04:46:30

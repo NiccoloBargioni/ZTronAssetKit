@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+✘ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:952:9: Expectation failed: (tickets.n1 ?? .max) < (tickets.n2 ?? .max)
+↳ the follow created N1 before N2, as visit-first: (n1: Optional(581), n2: Optional(576))
+↳ (tickets.n1 ?? .max) < (tickets.n2 ?? .max) → false
+↳   (tickets.n1 ?? .max) → 581
+↳   (tickets.n2 ?? .max) → 576
+✘ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:958:9: Expectation failed: (try? a1Result.get())?.byteSize == Int64(n1Bytes.count)
+↳ A1 is served from N1, created first in the follow's order: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 2499984))
+↳ (try? a1Result.get())?.byteSize == Int64(n1Bytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:962:25: Issue recorded
+↳ A2 gets insufficientSpace: N2 does not fit beside N1 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-a2, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/1b/1bdb7ae3c72fcee571ec0e7ed7f7c69be9b9db56a715c06fa76f741e8d290295.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" with 2 test cases failed after 0.572 seconds with 3 issues.
+↳ /// A later apply's follow, begun while the follow still owes visits, keeps the owed visits in their order and appends
+↳ /// the jobs it adds, sorted (the cycle-9 amendment (e)). 300 prefetch group members and two user holders, C1 (zz-a1)
+↳ /// and C2 (zz-a2), wait for the one slot a user transfer holds; v3 changes every member's content and moves A1 and A2
+↳ /// to new 3.5 MB contents, of which one fits the 6 MB of room. The follow's pass finds the members, then C1, then C2
+↳ /// (entry order), and its first turn visits 256 of them. A second follow (`followApplied`, as a manifest catch-up's
+↳ /// apply runs it) then restarts the visits. C2's transfer sorts before C1's. Visited first (the first follow ended
+↳ /// before the second), C1's visit creates N1 before N2 and A1 is served; a restart that sorted the owed visits again
+↳ /// visited C2 first and served A2 (SECOND-APPLY-REORDER).
+✘ Suite "Engine runs" failed after 0.572 seconds with 3 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 0.572 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..3dbfa55 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -377,7 +377,7 @@ package struct CircuitBreaker: Sendable, Hashable {
+                 self.successesSinceClose = 1
+                 self.resetCarriedTripsIfDue()
+             case .failure(_, let failureCause, _) where failureCause == cause:
+-                self.open(cause, trips: trips + 1, at: now, seed: seed)
++                self.open(cause, trips: trips, at: now, seed: seed)
+             case .failure, .neutral, .abandoned:
+                 self.state = .halfOpen(cause: cause, trips: trips, probe: nil, watchdog: nil)
+             }

@@ -1,0 +1,13 @@
+# Confirmer run on s3-base (b5796ba) in a detached worktree; probes copied from .build-orchestrator/s3-probes/conformance/ unchanged
+# swift test --skip Benchmarks --filter S3Conformance (load ~40)
+◇ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" started.
+R-STO-5 update powerLossDropUnsynced: 41 crash points enumerated
+R-STO-5 update powerLossKeepMetadata: 41 crash points enumerated
+R-STO-5 update processKillTornWrite: 41 crash points enumerated
+R-STO-5 update processKill: 41 crash points enumerated
+✔ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" with 4 test cases passed after 0.252 seconds.
+# Gap check: grep of every @Test display name for R-STO-5 (no other test enumerates crash points of an apply with a content change, relocation or removal); OracleTests.swift:236 draws 'crashBefore = random.below(2) == 0 ? 8 + random.below(60) : nil' (sampling)

@@ -1,0 +1,32 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[23 / 23] ZTronAssetKit-product
+Build complete! (4,06 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine regressions" started.
+◇ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" started.
+✘ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" recorded an issue at EngineSync1RegressionTests.swift:128:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" recorded an issue at EngineSync1RegressionTests.swift:160:9: Expectation failed: paused.count == 1
+↳ the demotion paused the running transfer: []
+↳ paused.count == 1 → false
+↳   paused.count → 0
+✘ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" failed after 63.997 seconds with 2 issues.
+↳ /// A bulk job a policy blocks (Low Data Mode; a bulk-lane handle keeps it) is promoted by a user resolve and starts
+↳ /// at once (user-initiated work may use the constrained network); when the user waiter leaves, the job is demoted to
+↳ /// bulk and its running transfer is paused again, parked by the same policy (sync-1 S1-07, ARCHITECTURE §12.3;
+↳ /// Stage 3, S3-B-068).
+✘ Suite "Engine regressions" failed after 63.998 seconds with 2 issues.
+↳ /// Regressions the level-4 verifiers found (WP-F fix round 1). Each test failed before its fix.
+✘ Test run with 1 test in 1 suite failed after 63.998 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

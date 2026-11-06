@@ -1,0 +1,50 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+✘ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:263:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+↳ P's prefetch waiter is answered from its 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999968))
+↳ (try? pResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" with 2 test cases passed after 0.951 seconds.
+✔ Test "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" with 2 test cases passed after 0.967 seconds.
+✘ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" with 2 test cases failed after 0.985 seconds with 1 issue.
+↳ /// A slot freed while the follow owes the visit that raises a queued prefetch job to user work goes to that job, not to
+↳ /// prefetch work queued before it. Two slots run user transfers; C (5 MB, A's user waiter), R (3.5 MB) and P (3 MB),
+↳ /// both prefetch, are queued in that order; 6 MB of room hold P or R. v3 moves A onto P's content while the follow
+↳ /// owes C's visit; then both slots free. Visited first, P is user work, starts first and R is parked. Pumped first,
+↳ /// R (prefetch, ahead of P) started and P, parked beside it, failed A's user waiter fast (PROBE-D3-PUMP-PROMOTE).
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" with 2 test cases passed after 1.007 seconds.
+✘ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:319:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+↳ A's user waiter, moved onto P, is answered from P's 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 3999984))
+↳ (try? aResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:320:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+↳ P's prefetch waiter is answered from its 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 499984))
+↳ (try? pResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:324:25: Issue recorded
+↳ R's prefetch waiter is answered insufficientSpace: R does not fit beside P: success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b4/b4d0c25196f54e6aa36d48894e83228e0ccce0e609a310ea5a28c442dbace612.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" with 2 test cases failed after 1.053 seconds with 3 issues.
+↳ /// The one-slot form: D (a user download) holds the only slot; C (A's user waiter, 5 MB), R (3.5 MB) and P (3 MB),
+↳ /// both prefetch, are queued for it with 4 MB of room and nothing pending reclaim. v3 moves A onto P's content while
+↳ /// the follow owes C's visit; then D ends. Visited first, P is user work and takes the slot and the room, and R is
+↳ /// parked. Pumped first, R started (C's head waited for the follow), and the promotion's preemption freed the slot
+↳ /// but not R's bytes in flight, so P was parked and A's user waiter failed fast (PROBE-D2-PUMP-PROMOTE).
+✘ Suite "Engine runs" failed after 1.053 seconds with 4 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 5 tests in 1 suite failed after 1.053 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

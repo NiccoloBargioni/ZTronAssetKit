@@ -1,0 +1,10 @@
+✘ Test "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" recorded an issue with 1 argument seed → 4610 at EngineRegressionCycle12Tests.swift:70:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" recorded an issue with 1 argument seed → 4611 at EngineRegressionCycle12Tests.swift:70:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" recorded an issue at EngineSync1LivenessTests.swift:180:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in the queue for a slot without being parked, keep every invariant" recorded an issue at EngineGateModelTests.swift:497:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events never settle, start or park against a gate that admits at now, and never repeat runs without the clock moving" recorded an issue at EngineGateModelTests.swift:479:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync" recorded an issue at EngineEventsTests.swift:19:6: Time limit was exceeded: 240.000 seconds
+✘ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" failed after 348.173 seconds with 3 issues.
+✘ Suite "Engine regressions" failed after 348.182 seconds with 3 issues.
+✘ Test run with 406 tests in 52 suites failed after 348.187 seconds with 10 issues.
+exit 1

@@ -1,0 +1,27 @@
+{
+ "base": "s3-base",
+ "bar": "strict",
+ "maxCycle": 16,
+ "simSlots": [
+  {
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E"
+  }
+ ],
+ "wps": [
+  {
+   "wp": "s3f",
+   "name": "Stage 3 WP-F (sync engine)",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c12-issues.json",
+   "fromCycle": 13,
+   "maxCycle": 16,
+   "focus": "Stage 3 hardening, continued after cycle 12 under a narrowed bar. Cycles 1-12 are committed on wp/s3f (see docs/adr-drafts/s3f.md; HEAD 3f10eaa). Cycle 12's verification left 11 blocking issues (about 8 distinct); they are in the findings file named above, with both lenses' non-blocking issues, and the verifiers' probes are under /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c12/. The rulings file now ends with S3-R16 (the owner's decision of 31 Oct, 'Narrow the bar'). It supersedes S3-R11 item 3's 'every other decision that differs is blocking': blocking is now a different answer to a caller, a broken SPEC MUST or invariant (R-SYN-5 above all: no request to a live-throttled origin; a 429 always throttles on arrival), liveness, flakiness, G4 for code that stays, and the gates. Order, place and timing differences are recorded residual risks. Item 5 of S3-R16 classifies every cycle-12 finding. Prefer simplification (S3-R16 item 3) over new branches: remove machinery that only equalises order, place or timing where it breaks item 1 (e.g. place stamps behind R-I), with the one-to-one test records of item 4. Order of work: first commit the failing tests for the blocking items (CLAUDE.md P3) and fix the hanging test's setup race; then the fixes and removals; then the G4 tests or removals; then the 'Residual risks (S3-R16)' section of the draft. S3-R12 and S3-R13 apply unchanged; never edit Package.swift. The verifiers judge visit-order differences by S3-R16 items 1 and 2."
+  }
+ ]
+}

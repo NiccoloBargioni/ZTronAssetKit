@@ -1,0 +1,46 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine units" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: clientShutDown finishes a queue and nothing is accepted after it" started.
+◇ Test "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test "R-SYN-12: a subscriber queue keeps one slot per key and subject and delivers in publication order" started.
+◇ Test "R-SYN-12: a terminal publish reports whether it moved a live slot, and the moved slot goes to the tail (S3-R27 item 1, a1)" started.
+◇ Test case passing 1 argument seed → 1 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 2 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test "R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)" started.
+◇ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" started.
+◇ Test case passing 1 argument seed → 3 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 1 to "R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)" started.
+◇ Test case passing 1 argument seed → 2 to "R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)" started.
+◇ Test case passing 1 argument seed → 3 to "R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)" started.
+✔ Test "R-SYN-12: a terminal publish reports whether it moved a live slot, and the moved slot goes to the tail (S3-R27 item 1, a1)" passed after 0.001 seconds.
+✔ Test "R-SYN-12: a subscriber queue keeps one slot per key and subject and delivers in publication order" passed after 0.001 seconds.
+✔ Test "R-SYN-12: clientShutDown finishes a queue and nothing is accepted after it" passed after 0.001 seconds.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" started.
+✔ Test "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" with 3 test cases passed after 0.091 seconds.
+✔ Test "R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)" with 3 test cases passed after 0.106 seconds.
+✔ Suite "Engine units" passed after 0.106 seconds.
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitBatchTests.swift:18:6: Time limit was exceeded: 180.000 seconds
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" started.
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitBatchTests.swift:18:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" with 2 test cases failed after 384.001 seconds with 2 issues.
+↳ /// T-A-3: zz-t1, zz-t2 and zz-t3 share X's content, each with a user waiter; zz-t1 was committed before on W's content
+↳ /// (v2), so the stalled subscriber, which reads nothing, still holds its slot. X's publication is held at its first
+↳ /// store unit while v4 makes the follow owe its visits (swept first) or ends it (visited first). At X's commit the
+↳ /// other subscriber's pull waits on an empty queue: it is handed zz-t1's `assetAvailable` and queues the other two in
+↳ /// ascending order; the stalled queue moves zz-t1's slot to its tail, behind which it queues the other two. The
+↳ /// commit's turn counts one move (`eventsCoalesced`) and one hand-off (`eventsDelivered`).
+◇ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+✔ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" with 2 test cases passed after 0.837 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 384.839 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 7 tests in 2 suites failed after 384.839 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

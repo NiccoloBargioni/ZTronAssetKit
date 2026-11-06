@@ -1,0 +1,21 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC12RetrySetupProbe" started.
+◇ Test "PROBE-C12-RETRY-SETUP-RACE" started.
+PROBE-C12-RETRY-SETUP-RACE before the reading: (r: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1005615401ns))), conditions: false)
+PROBE-C12-RETRY-SETUP-RACE after the reading: R=Optional(ZTronAssetSync.JobState.downloading)
+✘ Test "PROBE-C12-RETRY-SETUP-RACE" recorded an issue at VerifyC12RetrySetupProbe.swift:94:9: Expectation failed: stillAt
+↳ the test's setup assumes R keeps waiting for its backoff; the first reading's edge re-queued it: Optional(ZTronAssetSync.JobState.downloading)
+↳ stillAt → <not evaluated>
+✘ Test "PROBE-C12-RETRY-SETUP-RACE" recorded an issue at VerifyC12RetrySetupProbe.swift:42:6: Time limit was exceeded: 60.000 seconds
+✘ Test "PROBE-C12-RETRY-SETUP-RACE" failed after 63.999 seconds with 2 issues.
+↳ /// PROBE-C12-RETRY-SETUP-RACE: `barrierRetriesBehindTheOwedVisitsPlaces`'s own setup (30c2a39), with the watcher's
+↳ /// first reading delivered after R's 500 instead of before it (an interleaving the full bundle produced under load:
+↳ /// the test timed out 180 s in both orders, then `#require(backoffEnd)` failed at ReplayTests:141). A satisfied first
+↳ /// reading is an edge (S3-CONC-04): it re-queues R's transient failure, R starts again on its `.hold` step and keeps
+↳ /// the one slot, so the test's next wait (H downloading) can never hold.
+✘ Suite "VerifyC12RetrySetupProbe" failed after 63.999 seconds with 2 issues.
+✘ Test run with 1 test in 1 suite failed after 64.000 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

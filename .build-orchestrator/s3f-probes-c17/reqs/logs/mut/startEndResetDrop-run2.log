@@ -1,0 +1,30 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" started.
+✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:228:9: Expectation failed: violations.isEmpty
+↳ the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" failed after 0.402 seconds with 1 issue.
+↳ /// A retry downloads with nothing of the publication that failed before it (`invariantViolations()`; cycle 16, ruling
+↳ /// S3-R19 item 3): C's publication fails its verification read (EIO) with no follow owed, so the end it recorded
+↳ /// (`recordPublicationEnd`) stays on the job through the backoff its verdict, given at once, sets; the retry's `start`
+↳ /// resets it, and the re-route set. A later visit reads both as the retry's own (`rerouteOnVisit`). No apply is made:
+↳ /// the property is the attempt's own bookkeeping, the same in both `LaneDropVisit` orders.
+↳ ///
+↳ /// C's first attempt is held until the engine has its first conditions reading, as `verdictLane` and the verdict-apply
+↳ /// tests wait (cycle 17, the cycle-16 requirements verifier's PROBE-C16R-RETRY-END-DIAG): the watcher was torn down
+↳ /// while idle after the v2 sync, and a first reading that came after C's publication failure counted as a satisfied
+↳ /// edge (`EngineConditions`), which re-queued C at once for its transient failure (`owedOnEdge`); the retry's `start`
+↳ /// then reset the end before the setup read it (23 of 120 copies under load).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.402 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.402 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

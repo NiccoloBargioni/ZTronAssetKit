@@ -1,0 +1,10 @@
+Sources/ZTronAssetSync/Engine/EngineCommands.swift: changed 12 lines (12 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineDispatch.swift: changed 4 lines (4 executable), zero-count changed lines 1
+   1118: self.state.jobs[transfer]?.setAssets(bound, for: token)
+Sources/ZTronAssetSync/Engine/EngineFailures.swift: changed 6 lines (6 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineFollow.swift: changed 30 lines (13 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineJobs.swift: changed 11 lines (8 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineManifest.swift: changed 9 lines (9 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineMoves.swift: changed 2 lines (2 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EnginePresence.swift: changed 1 lines (1 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineState.swift: changed 175 lines (92 executable), zero-count changed lines 0

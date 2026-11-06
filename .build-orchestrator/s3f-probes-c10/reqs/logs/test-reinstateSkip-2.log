@@ -1,0 +1,35 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+✘ Test "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:789:9: Expectation failed: after.state == .downloading
+↳ the member wanted again starts once the follow ends, as visit-first: queued
+↳ after.state == .downloading → false
+↳   after.state → .queued
+↳     some → .queued
+↳     some → .downloading
+✘ Test "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:790:9: Expectation failed: after.violations.isEmpty
+↳ ["1 queued jobs wait set aside for a release, but other interests want them"]
+↳ after.violations.isEmpty → false
+↳   after.violations → ["1 queued jobs wait set aside for a release, but other interests want them"]
+↳   isEmpty → false
+✘ Test "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" with 2 test cases failed after 13.655 seconds with 2 issues.
+↳ /// A released member that user work wants while a follow is owed returns to the place it waited when the follow ends
+↳ /// (the drain's `.reinstate` replay; the cycle-9 verifiers' coverage finding, mutant "skip the replay"). More
+↳ /// prefetch members than one release turn releases are queued; the handle is released with its follow-ups held
+↳ /// (`holdReleaseFollowUps`), so the release stays part-way, and its pump sets the members it has not reached aside.
+↳ /// Then the follow is owed, and the last member gains a user-lane interest. Visited first, `reinstate` queues it at
+↳ /// its place in the queue its lane now selects (L4-R24(4), S3-B-065) and the pump starts it in that turn. Behind the
+↳ /// barrier that place waits for the follow; a drain that skipped it left the member aside, queued in no queue, until
+↳ /// the release's last turn.
+✘ Suite "Engine follow barrier (F-28)" failed after 13.656 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 13.656 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,3 @@
+load before: 11:22:04 { 5.31 10.76 14.75 }
+load after: 11:22:13 { 5.19 10.55 14.63 }
+TEST base c2-r1-reclaimDuringFollowTurns-base exit 0 in 9 s

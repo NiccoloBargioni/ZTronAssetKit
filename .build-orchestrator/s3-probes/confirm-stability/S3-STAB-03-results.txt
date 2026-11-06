@@ -1,0 +1,27 @@
+S3-STAB-03 independent confirmation (confirm-stability agent). TSan build of the worktree at s3-base; ZTronAssetSyncTests run whole (all 351 tests, Swift Testing's parallel default) via run-direct.sh.
+
+== Run A: one Sync TSan process alone, load 18.25 -> 22.53 (sync-tsan-1.log):
+✔ Test run with 351 tests in 52 suites passed after 60.832 seconds.
+  22.608 s passed  R-CAR-4: a join's give-up of more than releasesPerTurn claims retires 
+  28.344 s passed  R-SYN-6: a run whose parked claim a re-admission turn still owes a re-
+  33.749 s passed  R-STO-11: a user-initiated prefetch group joined right after start, be
+  33.790 s passed  R-STO-11: ensureAvailable right after start, beside a legacy migration
+  49.695 s passed  R-SYN-2: 10,000 seeded random operations never leave the transition ta
+
+== Run B: two Sync TSan processes at once (what two agents running the TSan gate together do), load 20.55 -> 29.77 (mid-run) -> 31.92 (sync-tsan-2a.log, sync-tsan-2b.log):
+-- sync-tsan-2a.log
+✘ Test run with 351 tests in 52 suites failed after 85.760 seconds with 1 issue.
+✘ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" recorded an issue at EngineModelTests.swift:21:6: Time limit was exceeded: 60.000 seconds
+  29.513 s passed  R-CAR-4: a join's give-up of more than releasesPerTurn claims retires 
+  39.129 s passed  R-SYN-6: a run whose parked claim a re-admission turn still owes a re-
+  46.701 s passed  R-STO-11: ensureAvailable right after start, beside a legacy migration
+  46.945 s passed  R-STO-11: a user-initiated prefetch group joined right after start, be
+  66.833 s failed  R-SYN-2: 10,000 seeded random operations never leave the transition ta
+-- sync-tsan-2b.log
+✘ Test run with 351 tests in 52 suites failed after 86.026 seconds with 1 issue.
+✘ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" recorded an issue at EngineModelTests.swift:21:6: Time limit was exceeded: 60.000 seconds
+  29.796 s passed  R-CAR-4: a join's give-up of more than releasesPerTurn claims retires 
+  38.072 s passed  R-SYN-6: a run whose parked claim a re-admission turn still owes a re-
+  47.385 s passed  R-STO-11: ensureAvailable right after start, beside a legacy migration
+  47.509 s passed  R-STO-11: a user-initiated prefetch group joined right after start, be
+  67.730 s failed  R-SYN-2: 10,000 seeded random operations never leave the transition ta

@@ -1,0 +1,17 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC8C2Probe" started.
+◇ Test "VERIFY-C8-C2-MIXED: a reclaim sweep turn that follows the owed holders and then judges 10,000 members" started.
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 1000, changeEvery 2, handles 1
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 1
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 1
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 1
+VERIFY-C8-C2-MIXED 10,000 members, 1 handle(s): runs [9.045208, 8.573667, 6.930333] ms, best 6.930333 ms
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 2
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 2
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 2
+VERIFY-C8-C2-MIXED 10,000 members, 2 handle(s): runs [8.305792, 7.2955, 7.631416] ms, best 7.2955 ms
+✔ Test "VERIFY-C8-C2-MIXED: a reclaim sweep turn that follows the owed holders and then judges 10,000 members" passed after 7.418 seconds.
+✔ Suite "VerifyC8C2Probe" passed after 7.418 seconds.
+✔ Test run with 1 test in 1 suite passed after 7.418 seconds.

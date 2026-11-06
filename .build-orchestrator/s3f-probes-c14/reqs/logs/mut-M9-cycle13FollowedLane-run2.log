@@ -1,0 +1,64 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:459:9: Expectation failed: throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(61000000000ns)
+↳ throttleAtArrival == nil → false
+↳   throttleAtArrival → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:462:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ef/ef1fb808a5151965ae388c4cade04124778912bac3b56aee3e101a8402b66028.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" with 2 test cases failed after 1.146 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane the visits leave the job, counting an interest another job's
+↳ /// visit moves onto it: C (1 MB, zz-b) runs for P, a prefetch waiter; Y (zz-u) runs for U, a user waiter; v3 moves
+↳ /// zz-u onto C's content; C gets a 429 with Retry-After 60 s (above the user lane's 30 s cap). Visited first, Y's
+↳ /// visit moved U onto C, so C was user work at the 429: `Backoff.delay` deferred to the next run, the origin was not
+↳ /// throttled, and C failed: P and U were answered `serverUnavailable(60)`. Read without U's interest, the background
+↳ /// policy throttled the origin for 60 s on arrival and C's retry served P (the cycle-13 correctness verifier).
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:508:9: Expectation failed: throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(61000000000ns)
+↳ throttleAtArrival == nil → false
+↳   throttleAtArrival → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:511:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/07/07834a9044cf2ea46a7a38404fd0c05bd1c31612da57f5a122902d8a21bcaf4a.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" with 2 test cases failed after 1.086 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane a request's waiting join gives its job: C (1 MB, zz-b) runs for
+↳ /// P, a prefetch waiter; while v3's follow is owed, U requests zz-b; then C gets a 429 with Retry-After 60 s (above
+↳ /// the user lane's 30 s cap). Visited first, U's request joined C at once, so C was user work at the 429: nothing was
+↳ /// throttled, C failed, and P and U were answered `serverUnavailable(60)`. Read without the waiting join, the
+↳ /// background policy throttled the origin on arrival and C's retry served P.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:566:9: Expectation failed: throttleAtArrival != nil
+↳ the 429 throttles the origin for prefetch work (visit-first): nil
+↳ throttleAtArrival != nil → false
+↳   throttleAtArrival → nil
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:567:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+↳ P is served by C's retry once the throttle ends (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" with 2 test cases failed after 1.029 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job: C (1 MB, zz-b) runs for P,
+↳ /// a prefetch waiter, and U, a user waiter; while v3's follow is owed, U withdraws; then C gets a 429 with
+↳ /// Retry-After 60 s (above the user lane's 30 s cap, below the background lane's). Visited first, the withdrawal
+↳ /// removed U's interest at once, so C was prefetch work at the 429: the origin was throttled for 60 s and C's retry
+↳ /// served P. Read with U's interest, whose removal waits for the follow, C was user work: nothing was throttled and P
+↳ /// was answered `serverUnavailable(60)`.
+✘ Suite "Engine follow barrier (F-28)" failed after 3.263 seconds with 6 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 3 tests in 1 suite failed after 3.263 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

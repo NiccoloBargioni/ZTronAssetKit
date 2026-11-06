@@ -1,0 +1,26 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .published to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .insufficientSpace to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .published to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+↳ B was on N at its ENOSPC (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f3/f31cfbf8c4438b172c055f3ed3b9ed1c60c014506f2f3b4b95b125e8712ebbb7.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" with 6 test cases failed after 6.374 seconds with 1 issue.
+↳ /// An interest an apply moved onto a content whose attempt then ended while the follow was owed gets that attempt's
+↳ /// outcome, though a later apply moved its id on before the follow visited its old job (`intermediateHop`;
+↳ /// PROBE-C16C-INTERMEDIATE-HOP and -SERVED, `bringInbound`; cycle 17 adds the ENOSPC): visited first, B was on N when
+↳ /// N's attempt ended.
+✘ Suite "Engine follow barrier (F-28)" failed after 6.374 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 6.374 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

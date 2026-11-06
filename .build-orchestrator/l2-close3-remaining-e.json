@@ -1,0 +1,42 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "decision record / doc consistency (orchestrator-owned documents)",
+  "location": "docs/adr-drafts/e.md:458-461 (Requests for the orchestrator, L2 close-out); stale text at docs/DECISIONS.md:156-157 (ADR-027) and Sources/ZTronAssetModel/Transfer/RemoteSource.swift:105-106",
+  "problem": "The cycle 3 ruling changes the behaviour two orchestrator-owned texts still describe, and e.md asks only for the ARCHITECTURE \u00a76.6 amendment. (1) ADR-027's amendment bullet says the Apple source sums installedBytes of 'adopted, unreleased packs'. (2) ADR-027's Consequences say 'Double residency is bounded by one pack between first adoption and release'. That is no longer true: any pack downloaded again on demand after its release now stays installed, and double-resident, for the rest of the catalog generation (E-10 'Consequence'). (3) The Model contract doc of RemoteSource.sourceCopyBytes() says 'Apple packs not yet released'. A later verifier or WP-F author reading these would expect a released pack to contribute nothing and residency to end at release.",
+  "fix": "Add one request to e.md's L2 close-out list. At merge, the orchestrator amends: DECISIONS ADR-027's amendment bullet ('adopted packs, released or not'); ADR-027's Consequences (double residency lasts until release, and again from an on-demand re-download after release until the next catalog generation, at most one download and one removal per pack per generation); and the `///` doc of RemoteSource.sourceCopyBytes() in ZTronAssetModel. These are doc-only changes, with no signature change."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness / R-CLN-9 reporting under the cycle 3 ruling (proven behaviour; whether it is a defect depends on which text governs)",
+  "location": "Sources/ZTronAssetAppleHosted/AppleSourceState.swift:243-248 (sourceCopyPacks returns adoptedPacks only); Sources/ZTronAssetAppleHosted/AppleHostedRemoteSource.swift:153-161",
+  "problem": "I proved this with a failing probe (VC3-E). Take a media pack whose only catalog entry is excluded by the retention scope. It is released, then downloaded again on demand by a transfer of this source. Under the ruling it now stays installed for the rest of the catalog generation, but its bytes never reach sourceCopyBytes(). The pack has no entry in the report's adoptedRemotePaths once the store has evicted the out-of-scope blob, which the store does first. Probe output: `PROBE-VC3-E first=[\"ZTronExtras\", \"ZTronMedia\"] before=0 staged=true second=[] extrasInstalled=true extrasBytes=Optional(4096) sourceCopyBytes=0`. Before cycle 3 the re-arm removed such a pack at the next maintenance run. Now the whole pack stays hidden from StorageReport for up to a whole generation. This conflicts with ADR-027 ('StorageReport.sourceCopyBytes reports bytes the OS still holds') and with the ruling's wording ('A pack downloaded again on demand after its release ... its installedBytes keep counting in sourceCopyBytes'). It is consistent with E-11 and with the RemoteSource.sourceCopyBytes contract ('for content the store adopted'). It is bounded: one pack per generation, a reporting figure only, no loop and no data loss. So I rate it non-blocking and leave the decision to the orchestrator.",
+  "fix": "Count every pack released in this generation as well. A released pack that is really gone reports installedBytes nil, so it adds 0, and any released pack that came back (restored by the OS or downloaded on demand) is counted until the next generation releases it: `func sourceCopyPacks() -> [PackID] { self.adoptedPacks.union(self.released).sorted() }`. Add the VC3-E timeline as a test: an excluded-only pack, release, transfer of the excluded entry, reclaim with that entry not adopted, then expect sourceCopyBytes == installedBytes(extras). Alternatively the orchestrator confirms the narrower contract reading ('adopted content only') and amends the ruling's and ADR-027's wording."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "docs consistency (orchestrator-owned texts left stale by the cycle 3 ruling)",
+  "location": "Sources/ZTronAssetModel/Transfer/RemoteSource.swift:105-106; docs/DECISIONS.md:154,156 (ADR-027 amendment and Consequences); docs/adr-drafts/e.md 'Requests for the orchestrator (L2 close-out)'",
+  "problem": "e.md asks the orchestrator to amend only ARCHITECTURE \u00a76.6 ('adopted, unreleased packs'). Three other orchestrator-owned texts are now stale in the same way. The RemoteSource.sourceCopyBytes contract doc says 'i.e. Apple packs not yet released'. ADR-027's amendment bullet says 'the Apple source sums PackBackend.installedBytes of adopted, unreleased packs'. ADR-027's Consequences says 'Double residency is bounded by one pack between first adoption and release'. Under the ruling, a released pack downloaded again on demand stays double-resident until the next catalog generation. A later verifier reading these texts would flag the ruled behaviour as a deviation.",
+  "fix": "Extend e.md's cycle 3 request so the orchestrator also amends ADR-027 (the amendment bullet and Consequences: double residency also lasts until the next generation for a pack downloaded again on demand) and the RemoteSource.sourceCopyBytes() doc comment at merge. WP-E does not own those files."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "evidence accuracy (coverage figure)",
+  "location": "docs/adr-drafts/e.md E-13, 'Cycle 3 (the re-arm path deleted, E-10): COVERAGE ... 99.76% (1242/1245) ... the same three lines are not reached'",
+  "problem": "My gate run over all 8 bundles gave `COVERAGE target=ZTronAssetAppleHosted lines= 99.68% (1241/1245) min=70.0 OK`. The extra unreached line is AppleSourceState.swift:66, the early return in endStaging while another staging call still runs. Fix round 2 already recorded this line as scheduling-dependent. The cycle 3 paragraph presents the 3-line figure as exact.",
+  "fix": "Note in E-13's cycle 3 paragraph that AppleSourceState.swift:66 is reached only when two copies overlap by scheduling, so the figure is 1241 or 1242 of 1245. No code change. The gate passes either way."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "cross-WP cancellation contract (unproven suspicion; WP-B's sink is a stub at L2)",
+  "location": "Sources/ZTronAssetAppleHosted/PackTransfer.swift:112-120 (pause/cancel cancel the driver task), :176-178 (conclude's discard), :190-192 (deliver's discard); Sources/ZTronAssetAppleHosted/PackCopier.swift:58-60,83-89",
+  "problem": "pause() and cancel() cancel the driver's task. So the discard of a staged copy (in conclude, deliver and PackCopier.copy's failure path) runs StagingSink.discard from a cancelled task. The StagingSink contract (ZTronAssetModel/Transfer/Staging.swift:65-66) says nothing about cancellation. If WP-B's StoreStagingSink.discard, a fatalError stub at L2, skips or abandons its bulk-executor work when Task.isCancelled, the staging file of every stopped Apple transfer would be left for the next launch's GC. I could not test this, because the real sink does not exist yet.",
+  "fix": "Ask the orchestrator to state in the StagingSink.discard contract that it completes regardless of the caller's cancellation, and to have WP-B/WP-F test it. Alternatively, WP-E runs these discards in a task that does not inherit the driver's cancellation. Re-check when WP-B merges."
+ }
+]

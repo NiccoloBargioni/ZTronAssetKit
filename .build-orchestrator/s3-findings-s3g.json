@@ -1,0 +1,263 @@
+[
+ {
+  "blocking": false,
+  "area": "REQUIRED S3G-1",
+  "location": "Sources/ZTronAssetKit/Prefetch/Prefetch.swift:96 (while distance <= reach), reached from PrefetchWindowController.update (main actor); radius from AssetClientConfiguration.prefetchRadius or init(radius:), never clamped",
+  "problem": "S3-PERF-06: PrefetchWindow.targets walks distance from 1 to radius, allocating a two-element index array at each step, even after both indices left the id array. A radius larger than the carousel therefore costs the main actor O(radius). Passing .max to mean 'the whole carousel' makes update loop about 2^63 times on the main thread, so it effectively never returns.",
+  "fix": "Clamp the prefetch window's walk to the carousel's ids (`Prefetch.swift:96`; `prefetchRadius` and `init(radius:)` are unclamped): a radius of `Int.max` must cost what the carousel's size costs. Add a P-8-style test with a huge radius.",
+  "detail": {
+   "id": "S3-PERF-06",
+   "kind": "hunt",
+   "lens": "performance",
+   "location": "Sources/ZTronAssetKit/Prefetch/Prefetch.swift:96 (while distance <= reach), reached from PrefetchWindowController.update (main actor); radius from AssetClientConfiguration.prefetchRadius or init(radius:), never clamped",
+   "requirements": "R-CAR-3; P-8 ui_call_ms_max (UI-facing call on the main actor)",
+   "problem": "PrefetchWindow.targets walks distance from 1 to radius, allocating a two-element index array at each step, even after both indices left the id array. A radius larger than the carousel therefore costs the main actor O(radius). Passing .max to mean 'the whole carousel' makes update loop about 2^63 times on the main thread, so it effectively never returns.",
+   "evidence": ".build-orchestrator/s3-probes/performance/S3-PERF-06-S3PerfMirrorResetProbe.swift (test prefetchWindowRadius), output in S3-PERF-06-output.txt. Release: 'S3-PERF prefetch window over 10 pages: radius 10 0.043542000000000004 ms, radius 10,000,000 9.267292 ms (10 targets); budget 1.0 ms'. Failing line: 'S3PerfMirrorResetProbe.swift:75:9: Expectation failed: timings.large <= budget'.",
+   "repro": "cp S3-PERF-06-S3PerfMirrorResetProbe.swift <wt>/Tests/ZTronAssetKitBenchmarks/; swift test -c release -Xswiftc -enable-testing --scratch-path <scratch> --filter prefetchWindowRadius",
+   "fix": "Clamp the walk to min(max(radius, 0), max(current, ids.count - 1 - current)), and drop the per-step array literal. Optionally validate or clamp prefetchRadius in AssetClientConfiguration and record the clamp in its doc comment.",
+   "confirmer": {
+    "id": "S3-PERF-06",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "g",
+    "reason": "Reproduced in release at load about 64. The probe failed at S3PerfMirrorResetProbe.swift:75: radius 10 took 0.12 ms and radius 10,000,000 took 13.16 ms for 10 targets, against P-8's 1.0 ms.\n\nThe code at s3-base, Prefetch.swift:96 (`while distance <= reach`), has no clamp to ids.count. Neither prefetchRadius nor init(radius:) is clamped (AssetClientConfiguration.swift:25/54, Prefetch.swift:127). At about 1.3 ns per step, Int.max means about 2^63 iterations on the main actor, which never returns in practice.\n\nThe O(radius) cost is documented on PrefetchWindowController ('O(radius) per update'), and realistic radii (default 2) are far below the cost threshold. This is a robustness gap with no MUST broken: R-CAR-3 is met for sane radii. Non-blocking. The owner is WP-G (Sources/ZTronAssetKit/**)."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3G-2",
+  "location": "no test added since l5g-merged",
+  "problem": "S3-B-090: L5-R22(1): the events exit in next() for a consumer that stopped during its registration runs but is not pinned (mutant M05 survives); pin it with a test read for a started pump or a census of the replacement's registrations",
+  "fix": "L5-R22 (1)\u2013(3): pin the events exit for a consumer that stopped during its registration (mutant M05 must fail); tighten `EventContinuityModel` as L5-R22(2) says; a forced sync ending `.insufficientSpace` or `.serverUnavailable` on a healthy root makes exactly one root check, returns the result as given and does not reopen (mutant M01s must fail).",
+  "detail": {
+   "id": "S3-B-090",
+   "kind": "backlog",
+   "location": "no test added since l5g-merged",
+   "problem": "L5-R22(1): the events exit in next() for a consumer that stopped during its registration runs but is not pinned (mutant M05 survives); pin it with a test read for a started pump or a census of the replacement's registrations",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-054 Merge rulings (1); Assignments (2)",
+    "l5-rulings.md L5-R22(1)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3G-2",
+  "location": "EventContinuityModelTests tolerance table E1...E10 unchanged",
+  "problem": "S3-B-091: L5-R22(2): tighten the EventContinuityModel (stamp performMaintenance and sync(.force) calls; owe the registration engine's clientStarted when the follow turn preceded its start); two tolerance rows are measurement limits of the model, not product promises",
+  "fix": "L5-R22 (1)\u2013(3): pin the events exit for a consumer that stopped during its registration (mutant M05 must fail); tighten `EventContinuityModel` as L5-R22(2) says; a forced sync ending `.insufficientSpace` or `.serverUnavailable` on a healthy root makes exactly one root check, returns the result as given and does not reopen (mutant M01s must fail).",
+  "detail": {
+   "id": "S3-B-091",
+   "kind": "backlog",
+   "location": "EventContinuityModelTests tolerance table E1...E10 unchanged",
+   "problem": "L5-R22(2): tighten the EventContinuityModel (stamp performMaintenance and sync(.force) calls; owe the registration engine's clientStarted when the follow turn preceded its start); two tolerance rows are measurement limits of the model, not product promises",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-054 Merge rulings (2); Assignments (3)",
+    "l5-rulings.md L5-R22(2)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3G-2",
+  "location": "no test added since l5g-merged",
+  "problem": "S3-B-092: L5-R22(3): sync's L5-R20 trigger list is pinned only for .storageUnavailable (mutant M01s survives); add a forced-sync test ending .insufficientSpace or .serverUnavailable on a healthy root (one root check, result returned as given, no reopen)",
+  "fix": "L5-R22 (1)\u2013(3): pin the events exit for a consumer that stopped during its registration (mutant M05 must fail); tighten `EventContinuityModel` as L5-R22(2) says; a forced sync ending `.insufficientSpace` or `.serverUnavailable` on a healthy root makes exactly one root check, returns the result as given and does not reopen (mutant M01s must fail).",
+  "detail": {
+   "id": "S3-B-092",
+   "kind": "backlog",
+   "location": "no test added since l5g-merged",
+   "problem": "L5-R22(3): sync's L5-R20 trigger list is pinned only for .storageUnavailable (mutant M01s survives); add a forced-sync test ending .insufficientSpace or .serverUnavailable on a healthy root (one root check, result returned as given, no reopen)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-054 Merge rulings (3); Assignments (4)",
+    "l5-rulings.md L5-R22(3)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3G-3",
+  "location": "recorded as deliberately untested; Kit coverage still passes (97.83 %)",
+  "problem": "S3-B-096: AssetClient.swift:144-149: no test exhausts the three-reopen limit; llvm-cov shows an underflowed 18.4E counter there, so the Kit coverage is overstated by about 0.27 %",
+  "fix": "Test the three-reopen limit (`AssetClient.swift:144-149`) through a real or documented seam; if none can reach it, record why.",
+  "detail": {
+   "id": "S3-B-096",
+   "kind": "backlog",
+   "location": "recorded as deliberately untested; Kit coverage still passes (97.83 %)",
+   "problem": "AssetClient.swift:144-149: no test exhausts the three-reopen limit; llvm-cov shows an underflowed 18.4E counter there, so the Kit coverage is overstated by about 0.27 %",
+   "category": "test-or-environment",
+   "sources": [
+    "l5-close2-remaining-g.json [7]",
+    "g.md Deliberately untested lines"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-4",
+  "location": "Sources/ZTronAssetKit/Fallback/FallbackChain.swift:136-143 (AssetFallbackChain.fetch); also Tests/ZTronAssetCompatibilityTests/Shims/CDNAssetResolver.swift:74-92 (WP-K)",
+  "problem": "S3-CONF-07: The prior art's network step, ZTronCarouselCore CDNAssetResolver.swift:46, checks `candidateExtensions.contains(asset.fileExtension)` against the cached manifest entry and returns nil before any download. `AssetFallbackChain.fetch` instead calls `client.resolve(id, priority: .userInitiated)` first and checks `url.pathExtension` afterwards. So `fetch(\"clip\", kind: .image)` on a catalog entry that is an .mp4 downloads the whole video at top priority, preempting prefetch, stores it, and only then throws notFound. The existing test (FallbackChainTests.swift:151) uses an asset already held, so it cannot see the download. The compatibility shim copies the same order, and its doc comment cites ADR-037. ADR-037 records only three deviations: lookup after start, the extension filter at the local step, and the bundle index. It does not record downloading before the candidate check. The impact is small (a mismatched catalog entry), but the deviation is unrecorded and observable.",
+  "fix": "Refuted as a defect: K-11 (`docs/adr-drafts/k.md:353`) records the fallback chain's download-before-kind-check deviation. No change; cite K-11 in the draft.",
+  "detail": {
+   "id": "S3-CONF-07",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sources/ZTronAssetKit/Fallback/FallbackChain.swift:136-143 (AssetFallbackChain.fetch); also Tests/ZTronAssetCompatibilityTests/Shims/CDNAssetResolver.swift:74-92 (WP-K)",
+   "requirements": "R-CAR-2 ('identical observable behaviour'), SPEC 7.3 'Facade parity'",
+   "problem": "The prior art's network step, ZTronCarouselCore CDNAssetResolver.swift:46, checks `candidateExtensions.contains(asset.fileExtension)` against the cached manifest entry and returns nil before any download. `AssetFallbackChain.fetch` instead calls `client.resolve(id, priority: .userInitiated)` first and checks `url.pathExtension` afterwards. So `fetch(\"clip\", kind: .image)` on a catalog entry that is an .mp4 downloads the whole video at top priority, preempting prefetch, stores it, and only then throws notFound. The existing test (FallbackChainTests.swift:151) uses an asset already held, so it cannot see the download. The compatibility shim copies the same order, and its doc comment cites ADR-037. ADR-037 records only three deviations: lookup after start, the extension filter at the local step, and the bundle index. It does not record downloading before the candidate check. The impact is small (a mismatched catalog entry), but the deviation is unrecorded and observable.",
+   "evidence": ".build-orchestrator/s3-probes/conformance/S3-CONF-07.swift fails on s3-base, deterministically 5/5 (evidence-probes-on-s3-base.txt): 'S3ConformanceFallbackProbeTests.swift:31:9: Expectation failed: started.isEmpty \u21b3 an .mp4 was downloaded at [ZTronAssetModel.AssetPriority.userInitiated] for an image request \u21b3 started \u2192 [ZTronAssetModel.TransferRequest(\u2026 remotePath: \"media/clip.mp4\", expectedBytes: Optional(300) \u2026'",
+   "repro": "cp .build-orchestrator/s3-probes/conformance/S3-CONF-07.swift Tests/ZTronAssetKitTests/S3ConformanceFallbackProbeTests.swift && swift test --scratch-path <scratch> --skip Benchmarks --filter S3ConformanceFallbackProbeTests",
+   "fix": "Before resolving, reject a non-candidate extension from the entry the client already knows: the applied or fetched manifest entry, read through a package read on the engine (as the fetch-first resolve does for unknown ids), or a resolve variant that takes candidate extensions and fails notFound before creating a job. Apply the same order in the WP-K shim CDNAssetResolver.resolveViaNetwork, or record the deviation in an ADR and in MIGRATION.md. Then commit the probe.",
+   "confirmer": {
+    "id": "S3-CONF-07",
+    "verdict": "refuted",
+    "blocking": false,
+    "wp": "g",
+    "reason": "The behaviour reproduces, 6 failures out of 6: `fetch(\"clip\", kind: .image)` downloads the .mp4 at userInitiated and only then throws notFound. The prior art (ZTronCarouselCore CDNAssetResolver.swift:46) checks the extension before it downloads. But the finding rests on the deviation being unrecorded, and it is recorded. docs/adr-drafts/k.md:353 (K-11) lists 'an on-demand resolve that downloads before its candidate check (as AssetFallbackChain.fetch; the prior art checked the manifest entry first)'. ADR-055 (DECISIONS.md:488) accepted K-11 ('the differences inherited from the module \u2026 accepted and pinned'). MIGRATION.md:220 documents it for adopters. The record explicitly weighed the R-CAR-2 parity difference, so this is an accepted decision, not a defect. The only residue is clarity: the doc comment on FallbackChain.fetch implies parity with CDNAssetResolver.swift:46, and the WP-K shim comment cites ADR-037 rather than K-11/ADR-055. That is non-blocking for G (and K)."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchKit.swift:249 has only the 64-resolve heartbeat P-9; no 100,000-entry case",
+  "problem": "S3-B-093: ADR-050's deferred optional P-9 case: a timed release survey (sliced) at 100,000 manifest entries (E-16) was never written",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-093",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchKit.swift:249 has only the 64-resolve heartbeat P-9; no 100,000-entry case",
+   "problem": "ADR-050's deferred optional P-9 case: a timed release survey (sliced) at 100,000 manifest entries (E-16) was never written",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-050 (Deferred)",
+    "ADR-054 Assignments (7)",
+    "e.md E-16"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "accepted under L5-R4; the check costs one lstat per qualifying failure",
+  "problem": "S3-B-094: Replaced-root limits (L5-R4, L5-R20): a call that succeeds on a replaced root no commit has yet detected does not reopen until a qualifying failure or a commit; a root check whose own stat fails records nothing; a root that vanishes between withAsset's read of unavailableReason and its lease leases from the vanished store",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-094",
+   "kind": "backlog",
+   "location": "accepted under L5-R4; the check costs one lstat per qualifying failure",
+   "problem": "Replaced-root limits (L5-R4, L5-R20): a call that succeeds on a replaced root no commit has yet detected does not reopen until a qualifying failure or a commit; a root check whose own stat fails records nothing; a root that vanishes between withAsset's read of unavailableReason and its lease leases from the vanished store",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-054 Not verified",
+    "g.md Not verified here",
+    "l5-close2-remaining-g.json [1]"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "no seam reaches them",
+  "problem": "S3-B-095: Untested facade interleavings: a reopen landing between two hops of one facade call (subscribe()'s registration, the background-events hand-off, the diagnostic report's three reads), and a stream registration overlapping the client's shutdown (ClientLifecycle.register answered .shutDown) are shown by reading only",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-095",
+   "kind": "backlog",
+   "location": "no seam reaches them",
+   "problem": "Untested facade interleavings: a reopen landing between two hops of one facade call (subscribe()'s registration, the background-events hand-off, the diagnostic report's three reads), and a stream registration overlapping the client's shutdown (ClientLifecycle.register answered .shutDown) are shown by reading only",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-054 Not verified",
+    "g.md Not verified here (G-5, G-16)"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "unproven by design",
+  "problem": "S3-B-097: R-CAR-5's lost update was never reproduced: no seam reaches it, and the record-first order (G-3) removes the window by construction",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-097",
+   "kind": "backlog",
+   "location": "unproven by design",
+   "problem": "R-CAR-5's lost update was never reproduced: no seam reaches it, and the record-first order (G-3) removes the window by construction",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-054 Not verified",
+    "g.md G-3"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "no device run exists",
+  "problem": "S3-B-098: A real rootVanished on a device (iOS purging a Caches root while the app runs) and the reopen's behaviour there, including the root check's cost",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-098",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "A real rootVanished on a device (iOS purging a Caches root while the app runs) and the reopen's behaviour there, including the root check's cost",
+   "category": "device-only",
+   "sources": [
+    "ADR-054 Not verified",
+    "g.md Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "no device run exists",
+  "problem": "S3-B-099: UIKit's background-events hook end to end (the facade test calls handleBackgroundEvents directly) and the live MainBundleLookup against an app bundle with resources",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-099",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "UIKit's background-events hook end to end (the facade test calls handleBackgroundEvents directly) and the live MainBundleLookup against an app bundle with resources",
+   "category": "device-only",
+   "sources": [
+    "ADR-054 Not verified",
+    "g.md Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3G-5",
+  "location": "no device or simulator run exists",
+  "problem": "S3-B-100: P-8 and P-9 on a device (macOS host only), the claims' and L5-R15's C2 figures (macOS 27 at load about 4.9, not a device), and the benchmark bundle on the iOS Simulator (built, not run, ADR-051)",
+  "fix": "Record; S3-B-093 (the optional sliced release survey at 100,000 entries) is OPTIONAL.",
+  "detail": {
+   "id": "S3-B-100",
+   "kind": "backlog",
+   "location": "no device or simulator run exists",
+   "problem": "P-8 and P-9 on a device (macOS host only), the claims' and L5-R15's C2 figures (macOS 27 at load about 4.9, not a device), and the benchmark bundle on the iOS Simulator (built, not run, ADR-051)",
+   "category": "device-only",
+   "sources": [
+    "ADR-054 Not verified",
+    "g.md Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ }
+]

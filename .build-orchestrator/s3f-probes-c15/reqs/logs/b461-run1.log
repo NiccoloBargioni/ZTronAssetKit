@@ -1,0 +1,404 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+✔ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" with 2 test cases passed after 0.467 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:60:9: Expectation failed: throttleAtArrival == nil
+↳ no 429 throttles the origin: visited first, C's transfer was abandoned at the withdrawal; decided on C's user lane, the 429 is `.exhausted`: Optional(61000000000ns)
+↳ throttleAtArrival == nil → false
+↳   throttleAtArrival → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+✘ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:61:9: Expectation failed: (try? dResult.get())?.byteSize == 16
+↳ a later user request is served, no throttle in force (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? dResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" with 2 test cases failed after 0.637 seconds with 2 issues.
+↳ /// A 429 during an owed follow on a job none of whose interests count any more is decided on the job's own lane: C
+↳ /// (1 MB, zz-c) downloads for U, a user waiter, alone; while v3's follow is owed, U withdraws; then C gets a 429 with
+↳ /// Retry-After 60 s (above the user lane's 30 s cap). Visited first, the withdrawal retired C and abandoned its
+↳ /// transfer, so no 429 arrived and nothing was throttled, and a later user request for zz-d was served. Decided on
+↳ /// the bulk policy (the held lane of a job no interest keeps, cycle 14), the 429 throttled the origin for 60 s, and
+↳ /// that request was answered `serverUnavailable`.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" with 6 test cases passed after 1.893 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:125:9: Expectation failed: outcome.throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(60.0)
+↳ outcome.throttleAtArrival == nil → false
+↳   outcome.throttleAtArrival → 60.0
+↳     some → 60.0
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ U is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:125:9: Expectation failed: outcome.throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(60.0)
+↳ outcome.throttleAtArrival == nil → false
+↳   outcome.throttleAtArrival → 60.0
+↳     some → 60.0
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ U is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" with 4 test cases failed after 1.851 seconds with 6 issues.
+↳ /// A 429 during an owed follow is decided on the lane a visit-first engine's job had when the moved interest sits on
+↳ /// a job whose publication began after the apply: Y's download completes after v3's apply, so its publication begins
+↳ /// while the follow is owed, and C gets a 429 with Retry-After 60 s (above the user lane's 30 s cap). Visited first,
+↳ /// Y's visit at the apply moved U onto C while Y downloaded, so C was user work: nothing was throttled, C failed,
+↳ /// and U and P were answered `serverUnavailable(60)`. Read without the interests of a job that publishes, C was
+↳ /// prefetch work: the origin was throttled for 60 s on arrival, and C's retry served U and P (the cycle-14 verifiers).
+↳ /// `wLane`: Y's other waiter is a user's (the requirements verifier's probe) or a prefetch waiter's (the correctness
+↳ /// verifier's); either way it is served by Y.
+◇ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:138:9: Expectation failed: outcome.throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(60.0)
+↳ outcome.throttleAtArrival == nil → false
+↳   outcome.throttleAtArrival → 60.0
+↳     some → 60.0
+✘ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ U is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" with 2 test cases failed after 0.943 seconds with 3 issues.
+↳ /// As above, with C's 429 after the barrier's drain while Y still publishes: visited first, U had moved onto C at the
+↳ /// apply, so C was user work. Left on Y by the follow's visit, U was not one of C's interests and C was decided on the
+↳ /// background policy (PROBE-C14R-PASSED-LANE-AFTER).
+◇ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:152:9: Expectation failed: outcome.u == .failure(.notFound)
+↳ U shares C's 404 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ outcome.u == .failure(.notFound) → false
+↳   outcome.u → success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-u
+↳         rawValue → "zz-u"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 1000000
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" with 2 test cases failed after 1.030 seconds with 1 issue.
+↳ /// The moved user shares C's 404 when the moved interest sits on a job whose publication began after the apply, with
+↳ /// C's 404 while the follow is owed: visited first, U rode C since the apply and was answered `notFound` with P.
+↳ /// Left on Y, U was re-routed onto C's content after Y's commit, and a second request for content that had just
+↳ /// answered 404 served U (PROBE-C14R-PASSED-FAIL-BARRIER).
+◇ Test "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+✘ Test "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:162:9: Expectation failed: outcome.u == .failure(.notFound)
+↳ U shares C's 404 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ outcome.u == .failure(.notFound) → false
+↳   outcome.u → success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-u
+↳         rawValue → "zz-u"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 1000000
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" with 2 test cases failed after 1.065 seconds with 1 issue.
+↳ /// As above, with C's 404 after the barrier's drain (PROBE-C14R-PASSED-FAIL-AFTER).
+◇ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" with 2 test cases passed after 1.108 seconds.
+◇ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+✘ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:272:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ zz-c's user gets C's integrity failure: v4's follow passed C, publishing, in both orders (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" with 2 test cases failed after 1.177 seconds with 1 issue.
+↳ /// A later apply's follow that passes a publication begun before that apply leaves its moved id to the publication's
+↳ /// outcome, whatever an earlier apply's visit of the same publication did (`twoApplies`, v4 after v3's follow ended).
+↳ /// Behind v3's barrier, cycle 14's mark of v3's pass outlived v4's pass, and the failure moved zz-c onto N2 too,
+↳ /// which served zz-c's user (PROBE-C14C-MARK-TWO-APPLIES, the cycle-14 correctness verifier).
+◇ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+✘ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:286:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ zz-c's user gets C's integrity failure: v4 moved zz-c while C published (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" with 2 test cases failed after 1.285 seconds with 1 issue.
+↳ /// As above, with v4 applied while v3's follow still owes the visit of C, which publishes since after v3's apply
+↳ /// (ruling S3-R18a item 1): that visit meets v4's copy, in which zz-b and zz-c both moved. Only zz-b, moved as of the
+↳ /// apply C's publication began after, is re-routed; zz-c, which v4 moved while C already published, is passed as a
+↳ /// visit-first engine's v4 follow passed it, and answered with C's failure. Cycle 14's mark, set by that visit,
+↳ /// moved zz-c at the failure too.
+◇ Test "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+✘ Test "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:301:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ B gets C's integrity failure: the follow passed C, publishing at the apply, in both orders (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c2/c2e5e3b2f740d2921ee5bbd92848cb9ca54286447d7e37040955ba47215c8650.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c2/c2e5e3b2f740d2921ee5bbd92848cb9ca54286447d7e37040955ba47215c8650.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c2/c2e5e3b2f740d2921ee5bbd92848cb9ca54286447d7e37040955ba47215c8650.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c2/c2e5e3b2f740d2921ee5bbd92848cb9ca54286447d7e37040955ba47215c8650.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/c2/c2e5e3b2f740d2921ee5bbd92848cb9ca54286447d7e37040955ba47215c8650.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 16
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" with 2 test cases failed after 1.125 seconds with 1 issue.
+↳ /// A job whose publication began before the apply and failed before the follow's visit is passed by that visit, as a
+↳ /// visit-first engine's follow passed it while it still verified: C verifies when v3 moves zz-b; its bytes fail while
+↳ /// the follow is owed and before the follow's turn that finds C. Visited first, the follow passed C at the apply and
+↳ /// the failure answered both users `integrityFailure`. Met failed, its verdict waiting, C was visited as any failed
+↳ /// job, and B was moved onto N and served (found by the cycle-15 fixer beside PROBE-C14C-MARK-TWO-APPLIES).
+◇ Test "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+✘ Test "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSlotTests.swift:75:9: Expectation failed: (try? k2Result.get())?.byteSize == 20
+↳ K2 waited for the slot K1 took and is served once the throttle ended (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0)))
+↳ (try? k2Result.get())?.byteSize == 20 → <not evaluated>
+✘ Test "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" with 2 test cases failed after 1.124 seconds with 1 issue.
+↳ /// A place given behind the barrier under a throttle, after a place given before the throttle took the last slot,
+↳ /// waits for a slot and starts on the live gates: two slots; C (1 MB, held) downloads for user A and holds one. While
+↳ /// v3's follow is owed, a user requests zz-k1 (K1, held when it runs); then an unknown id's manifest fetch gets a 429
+↳ /// with Retry-After 3 s, which frees no transfer slot; then a user requests zz-k2 (K2). The clock passes the
+↳ /// throttle's end, C completes, and the barrier ends. Visited first, K1 started at once and took the slot C left, so
+↳ /// the pump never tried K2, which waited for a slot and started on the live gates once C completed and the throttle
+↳ /// had ended. Both places stamped "slot free" (cycle 14), K2 was refused on its stamp's throttle at the barrier-end
+↳ /// pump and its caller answered `serverUnavailable(3)` (PROBE-C14C-STAMP-AHEAD).
+✘ Suite "Engine follow barrier (F-28)" failed after 13.711 seconds with 17 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 12 tests in 1 suite failed after 13.712 seconds with 17 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

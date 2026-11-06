@@ -1,0 +1,5 @@
+# swift test --skip-build --scratch-path /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c19-reqs/mutbuild --filter barrierShutsDownWhileAPublicationWaitsForOwedMoves
+# start 22:40:26 load { 18.27 44.09 51.30 }
+# stopped leftover helper 51421
+
+# exit -999 after 370.1 s, end 22:46:36 load { 3.68 15.84 34.74 }

@@ -1,0 +1,12 @@
+# S3-CONF-04 + -05 mutants applied together; --filter 'ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests'
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" recorded an issue at S3ConformanceProbeTests.swift:153:9: Expectation failed: state.running <= harness.configuration.power.interactiveConcurrencyAtCritical
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" recorded an issue at S3ConformanceProbeTests.swift:130:9: Expectation failed: state.running == harness.configuration.power.interactiveConcurrencyAtCritical
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" recorded an issue at S3ConformanceProbeTests.swift:131:9: Expectation failed: await harness.source.starts.count == 1
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" failed after 0.925 seconds with 1 issue.
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" failed after 0.946 seconds with 2 issues.
+✘ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" recorded an issue at S3ConformanceProbeTests.swift:87:9: Expectation failed: result == .failure(.authRejected(.confirmed))
+✘ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" failed after 1.015 seconds with 1 issue.
+✘ Suite "S3 conformance probes: engine" failed after 1.034 seconds with 4 issues.
+✘ Test run with 356 tests in 53 suites failed after 8.375 seconds with 4 issues.
+✔ Test run with 85 tests in 11 suites passed after 2.237 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.339 seconds.

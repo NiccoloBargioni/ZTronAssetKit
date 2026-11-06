@@ -1,0 +1,32 @@
+load before: { 2.95 5.38 9.53 }
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC8C2Probe" started.
+◇ Test "VERIFY-C8-C2-MIXED: a reclaim sweep turn that follows the owed holders and then judges 10,000 members" started.
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 1000, changeEvery 2, handles 1
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 1
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 1
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 1
+VERIFY-C8-C2-MIXED 10,000 members, 1 handle(s): runs [10.123709, 9.895834, 11.40625] ms, best 9.895834 ms
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 2
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 2
+VERIFY-C8-C2 setup: followOwed holders 244, space-parked 10000, changeEvery 20, handles 2
+VERIFY-C8-C2-MIXED 10,000 members, 2 handle(s): runs [11.916, 11.664292, 12.76225] ms, best 11.664292 ms
+✘ Test "VERIFY-C8-C2-MIXED: a reclaim sweep turn that follows the owed holders and then judges 10,000 members" recorded an issue at VerifyC8C2Probe.swift:28:13: Expectation failed: (runs.min() ?? .infinity) <= 10.0
+↳ 2 handle(s): [11.916, 11.664292, 12.76225]
+↳ (runs.min() ?? .infinity) <= 10.0 → false
+↳   (runs.min() ?? .infinity) → 11.664292
+✘ Test "VERIFY-C8-C2-MIXED: a reclaim sweep turn that follows the owed holders and then judges 10,000 members" failed after 7.646 seconds with 1 issue.
+✘ Suite "VerifyC8C2Probe" failed after 7.646 seconds with 1 issue.
+↳ /// Scratch C2 probe (s3f close-out verification, cycle 8, correctness lens). Never committed.
+↳ ///
+↳ /// `reclaimDuringFollowTurns` changes every member's content, so each sweep turn either follows `followsPerTurn` jobs and
+↳ /// judges none, or follows the last ones and finds nothing left to judge (every followed member was superseded). This
+↳ /// probe changes one member in `changeEvery`, so after the apply's turn visited `followsPerTurn` of them about 244 holders
+↳ /// are owed: the reclaim's sweep turn scans 10,000 candidates, follows them all, collects and sorts again, then judges
+↳ /// (re-queues the few the 2,100 bytes hold and parks up to `parksPerPump`): the restructured turn at its heaviest.
+✘ Test run with 1 test in 1 suite failed after 7.646 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+load after: { 2.80 5.27 9.44 }

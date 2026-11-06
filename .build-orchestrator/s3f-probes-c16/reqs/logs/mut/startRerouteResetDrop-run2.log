@@ -1,0 +1,159 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16ReqsProbes" started.
+◇ Test "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 1 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 0 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 6 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 3 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 2 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 4 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 9 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 7 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 8 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 11 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 12 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 15 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 14 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 16 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 18 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 19 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 20 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 13 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 21 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 17 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 10 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 5 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 22 to "PROBE-C16R-RETRY-END-FIXED" started.
+◇ Test case passing 1 argument copy → 23 to "PROBE-C16R-RETRY-END-FIXED" started.
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 8 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 8: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 1 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 1: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 12 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 12: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 6 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 6: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 19 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 19: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 4 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 4: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 20 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 20: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 13 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 13: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 7 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 7: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 17 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 17: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 21 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 21: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 0 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 0: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 15 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 15: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 11 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 11: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 2 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 2: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 10 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 10: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 3 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 3: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 5 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 5: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 18 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 18: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 16 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 16: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 14 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 14: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 23 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 23: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 9 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 9: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" recorded an issue with 1 argument copy → 22 at VerifyC16ReqsProbes.swift:95:9: Expectation failed: violations.isEmpty
+↳ PROBE-C16R-RETRY-END-FIXED copy 22: the retry downloads with nothing of the publication before it: ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-73bded98f4a65de313ec6a0033485850dfcb309cc0baef39c79d96e87acfee74 downloads with an earlier attempt\'s end or re-route set"]
+↳   isEmpty → false
+✘ Test "PROBE-C16R-RETRY-END-FIXED" with 24 test cases failed after 2.262 seconds with 24 issues.
+↳ /// PROBE-C16R-RETRY-END-FIXED: the committed test with the fix this verification proposes: C's first attempt is held
+↳ /// until the engine has its conditions reading (as `verdictBeforeApply` and `verdictLane` wait), so the reading is no
+↳ /// edge that re-queues C during its backoff; then released, its publication fails (EIO) and the committed steps
+↳ /// follow unchanged.
+✘ Suite "VerifyC16ReqsProbes" failed after 2.263 seconds with 24 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, requirements lens). Never committed.
+✘ Test run with 1 test in 1 suite failed after 2.263 seconds with 24 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

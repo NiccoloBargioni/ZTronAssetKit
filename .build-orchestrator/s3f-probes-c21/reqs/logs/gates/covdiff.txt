@@ -1,0 +1,51 @@
+Sources/ZTronAssetSync/Engine/EngineCommands.swift: changed 259 lines (216 executable), zero-count changed lines 4
+   1068: continue
+   1077: break
+   1112: break
+   2253: }
+Sources/ZTronAssetSync/Engine/EngineConditions.swift: changed 1 lines (1 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineDispatch.swift: changed 111 lines (81 executable), zero-count changed lines 1
+   1343: continue
+   PROBE Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1152 count '927': if !(self.state.applied.entry(for: asset).map({ SyncEngine.sameTransfer($0, jobEntry) }) ?? false) {
+   PROBE Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1153 count '898': moved.append(item)
+   PROBE Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1164 count '16.4k': if rerouted > 0, locations.count + rerouted > self.inboundIDsNow {
+   PROBE Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1165 count '113': self.resolveAll(transfer, with: .committed(locations, ascending: ids), boundOnly: true) {
+   PROBE Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1176 count '3': self.state.jobs[transfer]?.subtractAssets(trim.unbound, for: trim.token)
+Sources/ZTronAssetSync/Engine/EngineEvents.swift: changed 8 lines (4 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EngineFailures.swift: changed 89 lines (83 executable), zero-count changed lines 9
+   591: // A user request, or a follow's visit for an apply made since the end, re-queued it meanwhile (T20,
+   592: // `relane`): the gate's ledger decides with the figures just read.
+   861: return false
+   862: }
+   868: guard self.state.run?.token == item.token else {
+   869: return false
+   870: }
+   872: break
+   898: }
+Sources/ZTronAssetSync/Engine/EngineFollow.swift: changed 554 lines (310 executable), zero-count changed lines 2
+   610: self.state.run?.held.remove(transfer)
+   883: return nil
+   PROBE Sources/ZTronAssetSync/Engine/EngineFollow.swift:1581 count '3.57k': case .queued, .blocked, .downloading:
+   PROBE Sources/ZTronAssetSync/Engine/EngineFollow.swift:1582 count '66': return nil
+Sources/ZTronAssetSync/Engine/EngineJobs.swift: changed 227 lines (148 executable), zero-count changed lines 2
+   625: return
+   758: return
+Sources/ZTronAssetSync/Engine/EngineMoves.swift: changed 225 lines (126 executable), zero-count changed lines 0
+Sources/ZTronAssetSync/Engine/EnginePresence.swift: changed 29 lines (20 executable), zero-count changed lines 1
+   356: return
+Sources/ZTronAssetSync/Engine/EngineRuns.swift: changed 41 lines (33 executable), zero-count changed lines 1
+   537: self.state.run?.failures[asset] = AssetFailure(id: asset, error: .notFound, failureClass: .notFound)
+Sources/ZTronAssetSync/Engine/EngineShutdown.swift: changed 25 lines (23 executable), zero-count changed lines 6
+   178: self.state.shutdownSlices.append(steps)
+   179: steps = 0
+   180: // REENTRANCY: RE-S43 (proposed) — nothing: the drained answers belong to this call, and while the
+   181: // lifecycle is `shuttingDown` no resolution owes a new one a follow-up would resume.
+   182: await Task.yield()
+   183: }
+Sources/ZTronAssetSync/Engine/EngineState.swift: changed 341 lines (184 executable), zero-count changed lines 4
+   995: continue
+   1047: continue
+   1058: continue
+   1109: var ids = 0
+Sources/ZTronAssetSync/Engine/SubscriberQueue.swift: changed 5 lines (3 executable), zero-count changed lines 0
+TOTAL zero-count changed lines 30 over 8 bundles

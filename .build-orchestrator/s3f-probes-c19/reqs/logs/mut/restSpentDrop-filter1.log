@@ -1,0 +1,64 @@
+# swift test --skip-build --scratch-path /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c19-reqs/mutbuild --filter barrierDecidesA429OnTheLaneAnOwedMoveLeavesAfterALaterApply|barrierDecidesA429WithoutAnInterestTheOwedMovesVerdictAnswers|barrierMovesASharedContentsIDsOverBoundedTurns|barrierDrainsTheEventsAfterAVisitsRest|barrierMovesOneHoldersIDsOntoTwoPublications|barrierMakesTheOwedMovesBeforeAVisitsRest|barrierBindsTheIDAPublicationKeepsOnceTheMoveOffItsJobIsMade|barrierSpendsTheRerouteOfAVisitMadeOverTurns
+# start 22:25:30 load { 25.94 31.46 33.80 }
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .publicationHeld to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurn to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+✔ Test "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" with 6 test cases passed after 11.165 seconds.
+◇ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .publicationHeld to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurn to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+✔ Test "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" with 6 test cases passed after 11.091 seconds.
+◇ Test "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+✔ Test "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" with 4 test cases passed after 12.741 seconds.
+◇ Test "R-INT-3: a visit's rest waits for the moves a turn's holders leave owed, so the 404 that ended the moves' job answers every member with one request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a visit's rest waits for the moves a turn's holders leave owed, so the 404 that ended the moves' job answers every member with one request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a visit's rest waits for the moves a turn's holders leave owed, so the 404 that ended the moves' job answers every member with one request (F-28)" started.
+✔ Test "R-INT-3: a visit's rest waits for the moves a turn's holders leave owed, so the 404 that ended the moves' job answers every member with one request (F-28)" with 2 test cases passed after 6.514 seconds.
+◇ Test "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceEnds to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceApplies to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergencePublishes to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .attemptEnd to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceBystander to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceEnds to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceApplies to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergencePublishes to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .attemptEnd to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceBystander to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+✔ Test "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" with 14 test cases passed after 21.648 seconds.
+◇ Test "R-SYN-11: the drain's visit after a verdict that moves more ids than a turn moves makes them all before the next waiting event (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the drain's visit after a verdict that moves more ids than a turn moves makes them all before the next waiting event (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the drain's visit after a verdict that moves more ids than a turn moves makes them all before the next waiting event (C2, F-28)" started.
+✔ Test "R-SYN-11: the drain's visit after a verdict that moves more ids than a turn moves makes them all before the next waiting event (C2, F-28)" with 2 test cases passed after 2.408 seconds.
+◇ Test "R-INT-3: a visit re-routing more ids than a turn moves spends the re-route at its last, for the same follow's later visits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a visit re-routing more ids than a turn moves spends the re-route at its last, for the same follow's later visits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a visit re-routing more ids than a turn moves spends the re-route at its last, for the same follow's later visits (F-28)" started.
+✔ Test "R-INT-3: a visit re-routing more ids than a turn moves spends the re-route at its last, for the same follow's later visits (F-28)" with 2 test cases passed after 3.395 seconds.
+◇ Test "R-INT-3: ids one holder gives to two running publications get each its publication's outcome, one owed move per publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: ids one holder gives to two running publications get each its publication's outcome, one owed move per publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: ids one holder gives to two running publications get each its publication's outcome, one owed move per publication (F-28)" started.
+✔ Test "R-INT-3: ids one holder gives to two running publications get each its publication's outcome, one owed move per publication (F-28)" with 2 test cases passed after 2.692 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 71.658 seconds.
+✔ Test run with 8 tests in 1 suite passed after 71.659 seconds.
+
+# exit 0 after 75.7 s, end 22:26:45 load { 156.35 64.34 45.68 }

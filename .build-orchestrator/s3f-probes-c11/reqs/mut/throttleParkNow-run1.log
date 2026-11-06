@@ -1,0 +1,50 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test "PROBE-C10-THROTTLE-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-THROTTLE-LANE" started.
+PROBE-C10-THROTTLE-LANE followVisitedFirst figures: (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+PROBE-C10-THROTTLE-LANE followVisitedFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f6/f638f9105b0b795bc82992eada72e0bf4c65ad20d6f672cd18cc2356d325744a.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be217992888eb6ff4908966035ec6aa741f283d926340ba9514f2eab9ddfb58d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-THROTTLE-LANE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+PROBE-C10-THROTTLE-LANE sweepFollowsFirst figures: (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:278:13: Expectation failed: abs(throttle - background) < 0.000_001
+↳ the origin's throttle is the backoff of C's prefetch lane (visit-first): (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+↳ abs(throttle - background) < 0.000_001 → false
+↳   abs(throttle - background) → 0.6287160519433109
+↳   0.000_001 → 1e-06
+PROBE-C10-THROTTLE-LANE sweepFollowsFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f6/f638f9105b0b795bc82992eada72e0bf4c65ad20d6f672cd18cc2356d325744a.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be217992888eb6ff4908966035ec6aa741f283d926340ba9514f2eab9ddfb58d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C10-THROTTLE-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:273:13: Expectation failed: abs(throttle - background) < 0.000_001
+↳ the origin's throttle is C's prefetch-lane backoff (visit-first): (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+↳ abs(throttle - background) < 0.000_001 → false
+↳   abs(throttle - background) → 0.6287160519433109
+↳   0.000_001 → 1e-06
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" with 2 test cases failed after 0.708 seconds with 1 issue.
+↳ /// A 429 without Retry-After that arrives while the follow owes a visit throttles the origin for the backoff of the
+↳ /// lane the visit leaves its job: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter);
+↳ /// v3 moves zz-a while the follow owes C's visit. C gets a 429 without Retry-After. Visited first, C is prefetch work,
+↳ /// so the throttle is the background policy's first backoff; decided before the visit, it was the interactive
+↳ /// policy's (PROBE-C10-THROTTLE-LANE).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.708 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test "PROBE-C10-THROTTLE-LANE" with 2 test cases failed after 0.709 seconds with 1 issue.
+↳ /// PROBE-C10-THROTTLE-LANE (the draft's residual "the throttle's delay without a Retry-After reads the job's
+↳ /// pre-visit lane"): C (1 MB) is the content of zz-a (M, user) and zz-b (P, prefetch); v3 moves zz-a while the follow
+↳ /// owes C's visit. C gets a 429 without Retry-After. Visited first, C is prefetch-lane, so the origin's throttle is
+↳ /// the background policy's first backoff; before the visit it is the interactive policy's.
+✘ Suite "VerifyC10CorrectProbes" failed after 0.709 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 2 tests in 2 suites failed after 0.710 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,46 @@
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/g/Sources/ZTronAssetSync/Engine/SubscriberQueue.swift	2026-10-22 09:48:43
++++ Sources/ZTronAssetSync/Engine/SubscriberQueue.swift	2026-10-22 20:45:59
+@@ -10,8 +10,10 @@
+     case run
+     /// `transferProgress` of one asset (progress); retired with its transfer.
+     case transfer(AssetID)
+-    /// `clientStarted`, `clientShutDown`.
++    /// `clientStarted`.
+     case client
++    /// `clientShutDown` (VERIFIER MUTANT: its own slot, so it never supersedes an undelivered `clientStarted`).
++    case clientEnd
+     /// `syncStarted`.
+     case runStarted
+     /// `syncFinished`.
+@@ -28,7 +30,7 @@
+         switch self {
+         case .snapshot, .conditions, .run, .transfer:
+             return true
+-        case .client, .runStarted, .runFinished, .asset, .breaker, .maintenance:
++        case .client, .clientEnd, .runStarted, .runFinished, .asset, .breaker, .maintenance:
+             return false
+         }
+     }
+@@ -44,8 +46,10 @@
+             self = .run
+         case .transferProgress(let id, _):
+             self = .transfer(id)
+-        case .clientStarted, .clientShutDown:
++        case .clientStarted:
+             self = .client
++        case .clientShutDown:
++            self = .clientEnd
+         case .syncStarted:
+             self = .runStarted
+         case .syncFinished:
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/g/Tests/ZTronAssetKitTests/EventContinuityModelTests.swift	2026-10-22 19:21:08
++++ Tests/ZTronAssetKitTests/EventContinuityModelTests.swift	2026-10-22 20:45:35
+@@ -1241,7 +1241,7 @@
+                 // A retired generation's is hidden; the final one is I2's.
+                 continue
+             case .clientStarted:
+-                if markerBeforeShutdown, !window.contains(event) {
++                if (generation != final || markerBeforeShutdown), !window.contains(event) {  // VERIFIER: exemption removed for retired generations
+                     self.violation("I1: \(name) lost \(event) of generation \(generation) (\(generation == final ? "final" : "retired")), although it received one of that generation's markers before its shutdown began")
+                 }
+             default:

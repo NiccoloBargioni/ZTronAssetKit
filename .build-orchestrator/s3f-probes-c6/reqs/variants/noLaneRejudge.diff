@@ -1,0 +1,11 @@
+--- .build-verify-s3f-c6-reqs/variants/EngineJobs.head.swift	2026-10-30 05:20:41
++++ .build-verify-s3f-c6-reqs/variants/EngineJobs.noLaneRejudge.swift	2026-10-30 05:20:41
+@@ -747,7 +747,7 @@
+                     continue
+                 }
+                 job = followed
+-                verdict = self.spaceBlock(job, ahead: ahead)
++                verdict = nil
+             }
+             guard let block = verdict else {
+                 if self.transition(transfer, to: .queued) {

@@ -1,0 +1,41 @@
+ 5:35  up 4 days, 17:58, 2 users, load averages: 14.42 23.48 52.71
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC6CorrectProbes" started.
+◇ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" started.
+PROBE-C6-LANEGAIN visitFirst=true before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), ids: Optional(1), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))) afterSweep=(lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.downloading), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 272435459, volumeOpportunistic: 278435459, usedBytes: 300, pendingReclaim: 0, budgetBytes: 136217879, reserveBytes: 268435456))) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/49/493bb497c0a5d0cb3b238461c6e0bf407ced5124cb8abc763a68ce89347cb7a1.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d1cfd9872bf8459d5d9ae01b9fb1ce7b9002d63e7abba724b76772006dce97b8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" started.
+PROBE-C6-LANEGAIN visitFirst=false before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), ids: Optional(2), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))) afterSweep=(lane: nil, c: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 272435459, volumeOpportunistic: 278435459, usedBytes: 300, pendingReclaim: 0, budgetBytes: 136217879, reserveBytes: 268435456))) b=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 10000003)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d1cfd9872bf8459d5d9ae01b9fb1ce7b9002d63e7abba724b76772006dce97b8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" recorded an issue with 1 argument visitFirst → false at VerifyC6CorrectProbes.swift:287:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(cBytes.count)
+↳ B's prefetch waiter: 5 MB fit the 10 MB of prefetch room: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 10000003))
+↳ (try? bResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" with 2 test cases failed after 0.868 seconds with 1 issue.
+↳ /// PROBE-C6-LANEGAIN: the park branch's assumption that a lane drop only shrinks the room (the `followBeforeActing`
+↳ /// re-read, cycle 4, and the fall-through of cycle 6) when the opportunistic volume is LARGER than the important one
+↳ /// (the store does not clamp the two readings, and `largestRoom` itself takes their max). C (5 MB) is wanted by A
+↳ /// (a user waiter) and B (a prefetch waiter); 0 bytes of important room, 6 MB of opportunistic room, x's 4 MB
+↳ /// pending reclaim. A forced sync moves A while the bounded follow owes C's visit. After the reclaim: 4 MB important,
+↳ /// 10 MB opportunistic. Followed first (control), C is prefetch and fits: B's waiter gets the asset. During the owed
+↳ /// follow the sweep judges C on A's user lane (does not fit), follows it (prefetch now) and parks it anyway.
+✘ Suite "VerifyC6CorrectProbes" failed after 0.869 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 6, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C6-READDROP: the cycle-5 lane-drop defect reproduced through a different sweep and different interests. A
+↳ /// free-space read's `.read` sweep (`refreshFreeSpace` -> `reconsiderSpaceBlocked`), not the reclaim's `.reclaimed` one,
+↳ /// and only group interests (no waiter, so no fail-fast hides the outcome). Content C (5 MB) is wanted by A through a
+↳ /// user-lane group and by B through a prefetch group, so its job is user-lane; K (3 MB) is wanted by a user-lane group.
+↳ /// Both are parked `insufficientSpace` (2 MB of important room, none opportunistic, nothing pending reclaim). A forced
+↳ /// sync moves A to a 16-byte content while 2,100 changed fillers sort before it, so the bounded follow owes C's visit
+↳ /// (held). The volume then gains room: 6 MB important, still none opportunistic, and a free-space read sweeps.
+↳ ///
+↳ /// Right outcome (the one the sweep gives when the follow visited first): C's job is prefetch-lane, does not fit and stays
+↳ /// parked; K fits the 6 MB and is re-queued. Pre-fix (`39dadd4` / `48c8dfc`): the sweep judged C on its user lane (fits),
+↳ /// followed it (A leaves, lane drops to prefetch), re-queued it and counted its 5 MB ahead, so K was judged against 1 MB
+↳ /// and left parked although 6 MB are free; the gate then parks C again.
+✘ Test run with 1 test in 1 suite failed after 0.869 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+exit 1
+ 5:35  up 4 days, 17:58, 2 users, load averages: 14.42 23.48 52.71

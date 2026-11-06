@@ -1,0 +1,65 @@
+MUTANT M0 (none)
+== M0-A build-exit=0 0 errors
+== M0-A test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 1.010 seconds. | wall 8s | load averages: 73.71 61.70 62.75
+MUTANT R1A-no-serial-guard applied (1 edit(s))
+== R1A-no-serial-guard-A build-exit=0 0 errors
+== R1A-no-serial-guard-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 1.922 seconds with 4 issues. | wall 8s | load averages: 69.23 61.14 62.54
+MUTANT R1B-task-per-call applied (5 edit(s))
+== R1B-task-per-call-A build-exit=0 0 errors
+== R1B-task-per-call-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 64.009 seconds with 4 issues. | wall 74s | load averages: 100.34 71.83 66.39
+MUTANT R1B2-task-inside-drain applied (1 edit(s))
+== R1B2-task-inside-drain-A build-exit=0 0 errors
+== R1B2-task-inside-drain-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 2.221 seconds with 2 issues. | wall 14s | load averages: 142.80 87.67 72.55
+MUTANT R1C-no-rewrite-loop applied (1 edit(s))
+== R1C-no-rewrite-loop-A build-exit=0 0 errors
+== R1C-no-rewrite-loop-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 3.341 seconds with 1 issue. | wall 19s | load averages: 171.23 101.42 78.25
+MUTANT R1D-finished-keeps-priority applied (1 edit(s))
+== R1D-finished-keeps-priority-A build-exit=0 0 errors
+== R1D-finished-keeps-priority-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 2.194 seconds with 1 issue. | wall 14s | load averages: 178.82 111.01 82.68
+MUTANT R1E-controls-not-finished applied (1 edit(s))
+== R1E-controls-not-finished-A build-exit=0 0 errors
+== R1E-controls-not-finished-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 63.998 seconds with 12 issues. | wall 74s | load averages: 169.10 126.07 91.39
+MUTANT R1J-serial-before-token applied (1 edit(s))
+== R1J-serial-before-token-A build-exit=0 0 errors
+== R1J-serial-before-token-A test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 2.909 seconds. | wall 16s | load averages: 163.34 128.94 93.64
+MUTANT R1K-if-not-while applied (1 edit(s))
+== R1K-if-not-while-A build-exit=0 0 errors
+== R1K-if-not-while-A test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 2.426 seconds. | wall 12s | load averages: 157.18 130.69 95.49
+MUTANT R2F-replace-handler applied (1 edit(s))
+== R2F-replace-handler-A build-exit=0 0 errors
+== R2F-replace-handler-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 2.370 seconds with 5 issues. | wall 15s | load averages: 151.37 132.14 97.43
+MUTANT R2G-complete-calls-all applied (1 edit(s))
+== R2G-complete-calls-all-A build-exit=0 0 errors
+== R2G-complete-calls-all-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 4.249 seconds with 4 issues. | wall 25s | load averages: 357.71 192.02 122.38
+MUTANT R2H-complete-calls-newest applied (1 edit(s))
+== R2H-complete-calls-newest-A build-exit=0 0 errors
+== R2H-complete-calls-newest-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 5.374 seconds with 4 issues. | wall 34s | load averages: 502.89 268.01 156.11
+MUTANT R3-MN22-weak-etag applied (1 edit(s))
+== R3-MN22-weak-etag-A build-exit=0 0 errors
+== R3-MN22-weak-etag-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 3.733 seconds with 3 issues. | wall 21s | load averages: 524.52 310.37 178.20
+MUTANT R4-leaking-control-reader applied (1 edit(s))
+== R4-leaking-control-reader-A build-exit=0 0 errors
+== R4-leaking-control-reader-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 1.661 seconds with 1 issue. | wall 10s | load averages: 522.13 323.73 186.06
+MUTANT R5-held-timeout-tiny applied (1 edit(s))
+== R5-held-timeout-tiny-A build-exit=0 0 errors
+== R5-held-timeout-tiny-A test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 2.229 seconds with 40 issues. | wall 12s | load averages: 512.61 343.28 198.74
+MUTANT EQ1-newest-keeps-serial applied (1 edit(s))
+== EQ1-newest-keeps-serial-A build-exit=0 0 errors
+== EQ1-newest-keeps-serial-A test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 2.941 seconds. | wall 12s | load averages: 498.61 358.41 210.07
+MUTANT EQ2-finished-keeps-serial applied (1 edit(s))
+== EQ2-finished-keeps-serial-A build-exit=0 0 errors
+== EQ2-finished-keeps-serial-A test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 2.465 seconds. | wall 13s | load averages: 487.19 369.18 219.12
+== RUN DONE A M0 R1A-no-serial-guard R1B-task-per-call R1B2-task-inside-drain R1C-no-rewrite-loop R1D-finished-keeps-priority R1E-controls-not-finished R1J-serial-before-token R1K-if-not-while R2F-replace-handler R2G-complete-calls-all R2H-complete-calls-newest R3-MN22-weak-etag R4-leaking-control-reader R5-held-timeout-tiny EQ1-newest-keeps-serial EQ2-finished-keeps-serial
+MUTANT M0 (none)
+== M0-B build-exit=0 0 errors
+== M0-B test-exit=0 ✔ Test run with 163 tests in 18 suites passed after 1.758 seconds. | wall 10s | load averages: 462.75 383.61 234.74
+MUTANT R1J-serial-before-token applied (1 edit(s))
+== R1J-serial-before-token-B build-exit=0 0 errors
+== R1J-serial-before-token-B test-exit=1 ✘ Test run with 163 tests in 18 suites failed after 1.965 seconds with 1 issue. | wall 10s | load averages: 446.56 387.28 241.23
+MUTANT R1K-if-not-while applied (1 edit(s))
+== R1K-if-not-while-B build-exit=0 0 errors
+== R1K-if-not-while-B test-exit=1 ✘ Test run with 163 tests in 18 suites failed after 1.734 seconds with 1 issue. | wall 7s | load averages: 351.59 370.34 239.39
+MUTANT R1C-no-rewrite-loop applied (1 edit(s))
+== R1C-no-rewrite-loop-B build-exit=0 0 errors
+== R1C-no-rewrite-loop-B test-exit=1 ✘ Test run with 163 tests in 18 suites failed after 64.006 seconds with 5 issues. | wall 71s | load averages: 149.28 299.67 224.71
+== RUN DONE B M0 R1J-serial-before-token R1K-if-not-while R1C-no-rewrite-loop

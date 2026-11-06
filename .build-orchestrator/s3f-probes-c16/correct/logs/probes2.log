@@ -1,0 +1,158 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16Correct" started.
+◇ Test "C16-REPRO-REROUTE-STALE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-REROUTE-STALE" started.
+C16-REPRO-REROUTE-STALE followVisitedFirst after v3: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a]), reroute: Optional([]))
+C16-REPRO-REROUTE-STALE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), reroute: Optional([]))
+C16-REPRO-REROUTE-STALE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), n2: nil)
+C16-REPRO-REROUTE-STALE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-REROUTE-STALE" started.
+C16-REPRO-REROUTE-STALE sweepFollowsFirst after v3: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a]), reroute: Optional([]))
+C16-REPRO-REROUTE-STALE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), reroute: Optional([]))
+C16-REPRO-REROUTE-STALE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), n2: nil)
+C16-REPRO-REROUTE-STALE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "C16-REPRO-REROUTE-STALE" with 2 test cases passed after 1.690 seconds.
+◇ Test "C16-REPRO-VERDICT-LATER-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-VERDICT-LATER-APPLY" started.
+C16-REPRO-VERDICT-LATER-APPLY followVisitedFirst after the 404: (owed: false, c: nil, verdict: nil, end: nil)
+C16-REPRO-VERDICT-LATER-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-VERDICT-LATER-APPLY" started.
+C16-REPRO-VERDICT-LATER-APPLY sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4)), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3))))
+C16-REPRO-VERDICT-LATER-APPLY sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "C16-REPRO-VERDICT-LATER-APPLY" with 2 test cases passed after 1.905 seconds.
+◇ Test "C16-REPRO-VERDICT-ACROSS-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-VERDICT-ACROSS-APPLY" started.
+C16-REPRO-VERDICT-ACROSS-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-VERDICT-ACROSS-APPLY" started.
+C16-REPRO-VERDICT-ACROSS-APPLY sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "C16-REPRO-VERDICT-ACROSS-APPLY" with 2 test cases passed after 1.603 seconds.
+◇ Test "C16-REPRO-STALE-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-STALE-REROUTE" started.
+C16-REPRO-STALE-REROUTE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])), rerouteFor: Optional(3), ended: 4)
+C16-REPRO-STALE-REROUTE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+C16-REPRO-STALE-REROUTE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-STALE-REROUTE" started.
+C16-REPRO-STALE-REROUTE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([zz-b])), rerouteFor: Optional(2), ended: 3)
+C16-REPRO-STALE-REROUTE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+C16-REPRO-STALE-REROUTE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "C16-REPRO-STALE-REROUTE" with 2 test cases passed after 1.946 seconds.
+◇ Test "C16-REPRO-ENOSPC-PASSED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-ENOSPC-PASSED" started.
+C16-REPRO-ENOSPC-PASSED followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-ENOSPC-PASSED" started.
+C16-REPRO-ENOSPC-PASSED sweepFollowsFirst the ENOSPC waits: (owed: false, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1218960514ns))), end: nil, holdsB: true)
+C16-REPRO-ENOSPC-PASSED sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+✔ Test "C16-REPRO-ENOSPC-PASSED" with 2 test cases passed after 1.487 seconds.
+◇ Test "C16-REPRO-INTEGRITY-WINDOW" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-INTEGRITY-WINDOW" started.
+C16-REPRO-INTEGRITY-WINDOW followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-INTEGRITY-WINDOW" started.
+C16-REPRO-INTEGRITY-WINDOW sweepFollowsFirst window=true state=(owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: nil)), applies: 3, holdsB: true)
+C16-REPRO-INTEGRITY-WINDOW sweepFollowsFirst after the follow: (c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), holdsB: true, n: nil, barrier: false)
+C16-REPRO-INTEGRITY-WINDOW sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "C16-REPRO-INTEGRITY-WINDOW" with 2 test cases passed after 1.454 seconds.
+◇ Test "C16-REPRO-SPACE-EPOCH" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-SPACE-EPOCH" started.
+C16-REPRO-SPACE-EPOCH followVisitedFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-SPACE-EPOCH" started.
+C16-REPRO-SPACE-EPOCH sweepFollowsFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "C16-REPRO-SPACE-EPOCH" with 2 test cases passed after 2.362 seconds.
+◇ Test "C16-REPRO-LANE-WALK" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-LANE-WALK" started.
+C16-REPRO-LANE-WALK followVisitedFirst between the drain turns: (owed: false, barrier: false, events: 0, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cReroute: Optional(Optional(Set([]))), jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+C16-REPRO-LANE-WALK followVisitedFirst throttle at J's 429: Optional(61000000000ns)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-LANE-WALK" started.
+C16-REPRO-LANE-WALK sweepFollowsFirst between the drain turns: (owed: false, barrier: true, events: 1, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cReroute: Optional(nil), jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+C16-REPRO-LANE-WALK sweepFollowsFirst throttle at J's 429: Optional(61000000000ns)
+✔ Test "C16-REPRO-LANE-WALK" with 2 test cases passed after 1.441 seconds.
+◇ Test "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst after the 404: (owed: false, c: nil, reroute: nil, end: nil, n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.downloading), cAssets: Optional([zz-b]), n: nil, waiterB: [c-cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553])
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), reroute: Optional([zz-b]), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3))), n: nil)
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst after v4: (c: nil, cAssets: nil, n: nil, waiterB: [])
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+✘ Test "PROBE-C16C-VERDICT-MAPPED-BACK" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:620:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(cBytes.count)
+↳ PROBE-C16C-VERDICT-MAPPED-BACK: B was on N at the 404 and v4 moved it back to a fresh job of C's content, which serves it (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? bResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "PROBE-C16C-VERDICT-MAPPED-BACK" with 2 test cases failed after 1.657 seconds with 1 issue.
+↳ /// PROBE-C16C-VERDICT-MAPPED-BACK. C (zz-a, zz-b; user waiters A and B) downloads. v3 moves zz-b to N (held). C gets
+↳ /// a 404 while v3's follow is owed (sweep-first: the verdict waits, `rerouteOnPass == [zz-b]`, the ids moved before it).
+↳ /// v4 maps zz-b back to C's content before the follow visits C.
+↳ /// Visit-first: v3's visit moved B onto N while C downloaded; the 404 answered A alone (C removed); v4's visit
+↳ /// superseded N and moved B back to C's content, a fresh job, whose download serves B (C's next script step).
+↳ /// Sweep-first: the visit finds zz-b on C's content again (moved nothing), the set is spent, and the drain's 404
+↳ /// answers A and B.
+◇ Test "PROBE-C16C-RR11-RETRY-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-RR11-RETRY-LANE" started.
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst after C's 503: (owed: false, c: nil, end: nil, attempts: nil)
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: false, barrier: false)
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst throttle at N's 429: Optional(61000000000ns)
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/30/30314c47e60d81f8f22b1209d952beb478c2e18add4b54c68cd379203fcf57ac.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-RR11-RETRY-LANE" started.
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst after C's 503: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3))), attempts: Optional(0))
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.userInitiated), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: true, barrier: true)
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst throttle at N's 429: nil
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+✘ Test "PROBE-C16C-RR11-RETRY-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:694:9: Expectation failed: throttle != nil
+↳ PROBE-C16C-RR11-RETRY-LANE: N's 429 throttles the origin on N's own (prefetch) lane (visit-first): nil
+↳ throttle != nil → false
+↳   throttle → nil
+✘ Test "PROBE-C16C-RR11-RETRY-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:695:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+↳ PROBE-C16C-RR11-RETRY-LANE: P is served by N's retry after the throttle (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C16C-RR11-RETRY-LANE" with 2 test cases failed after 1.777 seconds with 2 issues.
+↳ /// PROBE-C16C-RR11-RETRY-LANE (the draft's RR-11, "a retry whose Retry-After exceeds the lane's cap", unprobed there).
+↳ /// Interactive retries are short (`shortInteractiveRetry`: Retry-After cap 30 s). C (zz-b) downloads for B, a user
+↳ /// waiter; N (zz-p) for P, a prefetch waiter. v3 changes only fillers (a follow is owed). C gets a 503 with Retry-After
+↳ /// 120 s. v4 moves zz-b onto N's content. N then gets a 429 with Retry-After 60 s.
+↳ /// Visit-first: C's 503 found Retry-After above the user lane's cap and answered B `serverUnavailable(120)` (C ended);
+↳ /// v4 moved nobody; N's 429 was decided on N's own (prefetch) lane: the origin throttled 60 s, N parked, retried after
+↳ /// the throttle and served P.
+↳ /// Sweep-first: `followedLane(N)` counts B's interest, which the drain would move onto N after C's waiting retry
+↳ /// verdict (`verdictAnswers` reads only the attempt cap), so N's 429 is decided on the user lane: `.exhausted`, the
+↳ /// origin unthrottled, and P answered `serverUnavailable(60)`.
+◇ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst after C's 429: (owed: false, c: nil, interests: nil, throttle: Optional(11000000000ns))
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: false)
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst throttle before=Optional(11000000000ns) after N's 429=Optional(61000000000ns)
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/114984b893db42c936e0a6d7f5dec3bc5564c6e6d73c8688b4c6537cfd9ae06b.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst after C's 429: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), interests: Optional(1), throttle: Optional(11000000000ns))
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.userInitiated), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: true)
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst throttle before=Optional(11000000000ns) after N's 429=Optional(11000000000ns)
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:764:9: Expectation failed: after != before
+↳ PROBE-C16C-THROTTLE-FAILFAST-LANE: N's 429 extends the origin's throttle on N's own lane (visit-first)
+↳ after != before → false
+↳   after → 11000000000ns
+↳     some → 11000000000ns
+↳       nanoseconds → 11000000000
+↳   before → 11000000000ns
+↳     some → 11000000000ns
+↳       nanoseconds → 11000000000
+✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:765:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+↳ PROBE-C16C-THROTTLE-FAILFAST-LANE: P is served by N's retry (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" with 2 test cases failed after 1.696 seconds with 2 issues.
+↳ /// PROBE-C16C-THROTTLE-FAILFAST-LANE (a fourth partial answer `verdictAnswers` counts as none: a 429 park's fail-fast,
+↳ /// not in the draft's RR-11). As above, but C gets a 429 with Retry-After 10 s (within the user lane's 30 s cap, beyond
+↳ /// `interactiveMaxWait`).
+↳ /// Visit-first: C's 429 throttled the origin 10 s and parked C; the park answered B `serverUnavailable` (10 s > 2 s);
+↳ /// v4 moved nobody; N's 429 was decided on N's own (prefetch) lane: throttled 60 s, N parked, retried, P served.
+↳ /// Sweep-first: `verdictAnswers(.throttle(.until))` is false, so B counts as moving onto N after C's verdict: N's 429
+↳ /// is decided on the user lane, `.exhausted`, and P is answered `serverUnavailable(60)`.
+✘ Suite "VerifyC16Correct" failed after 19.024 seconds with 5 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs, adapted to cycle 16's names only, every scenario the cycle-15 verifiers reported blocking; every
+↳ /// expectation is the visit-first outcome. Part 2 hunts the classes cycle 16's mechanism (`appliesFollowed`,
+↳ /// `Job.attemptEnd`, `rerouteOnVisit`, `followAfterVerdict`, `verdictAnswers`) may still miss. Each runs in both orders.
+✘ Test run with 11 tests in 1 suite failed after 19.025 seconds with 5 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,1361 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 3]
+Build complete! (0,62 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine regressions, close-out cycle 21" started.
+◇ Suite "Engine gate model, close-out cycle 20" started.
+◇ Suite "Engine client slot" started.
+◇ Suite "Engine regressions, close-out cycle 22" started.
+◇ Suite "Engine regressions, close-out cycle 10" started.
+◇ Suite "Planner properties" started.
+◇ Suite "Engine regressions, close-out cycle 6" started.
+◇ Suite "Engine regressions, round 3" started.
+◇ Suite "Engine single-flight" started.
+◇ Suite "Engine regressions, close-out cycle 16" started.
+◇ Suite "Engine runs" started.
+◇ Suite "Engine group claims" started.
+◇ Suite "Engine regressions, close-out" started.
+◇ Suite "Engine commands" started.
+◇ Suite "Engine run paths" started.
+◇ Suite "Engine conditions" started.
+◇ Suite "Engine launch" started.
+◇ Suite "Engine model" started.
+◇ Suite "Engine over the live transport" started.
+◇ Suite "Engine regressions, close-out cycle 11" started.
+◇ Suite "Engine regressions, close-out cycle 4" started.
+◇ Suite "Engine regressions, close-out cycle 17" started.
+◇ Suite "Engine and the Apple tier" started.
+◇ Suite "Engine regressions, close-out cycle 19" started.
+◇ Suite "Engine and store" started.
+◇ Suite "Engine events" started.
+◇ Suite "Engine regressions, close-out cycle 18" started.
+◇ Suite "Engine regressions, close-out cycle 15" started.
+◇ Suite "Engine regressions" started.
+◇ Suite "Engine regressions, round 2" started.
+◇ Suite "Engine idle and shutdown" started.
+◇ Suite "Engine regressions, close-out cycle 12" started.
+◇ Suite "Engine races" started.
+◇ Suite "Engine regressions, close-out cycle 3" started.
+◇ Suite "Engine: transfers during legacy migration (L5K-R1)" started.
+◇ Suite "Engine regressions, close-out cycle 20" started.
+◇ Suite "Engine support values" started.
+◇ Suite "Engine degraded" started.
+◇ Suite "Engine regressions, close-out cycle 13" started.
+◇ Suite "Engine shutdown from created" started.
+◇ Suite "Engine units" started.
+◇ Suite "Sync contracts" started.
+◇ Suite "Engine regressions, close-out cycle 9" started.
+◇ Suite "Engine safety nets" started.
+◇ Suite "Engine recovery" started.
+◇ Suite "Engine regressions, close-out cycle 7" started.
+◇ Suite "Engine regressions, close-out cycle 8" started.
+◇ Suite "Engine lanes" started.
+◇ Suite "Engine failure paths" started.
+◇ Suite "Engine outcomes" started.
+◇ Test "R-SYN-12: a subscriber that reads nothing between clientStarted and clientShutDown receives both, clientStarted first" started.
+◇ Test "R-SYN-12: the invariant check reports a waiter interest outside the waiter's job and a set-aside entry another interest wants" started.
+◇ Test "R-SYN-7: a lane-wide policy park that stops at its turn's bound reaches every queued member even when user work takes the freed slot" started.
+◇ Test "R-CAR-4: a member of a released handle that another interest wants while the release continues starts at once" started.
+◇ Suite "Engine regressions, close-out cycle 14" started.
+◇ Test "R-SYN-7: a member paused for a policy that cleared before its pause arrived is re-queued and starts again" started.
+◇ Test "R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in the queue for a slot without being parked, keep every invariant" started.
+◇ Suite "Engine regressions, close-out cycle 5" started.
+◇ Test "R-SYN-7: a Low Data Mode flap reported as two conditions elements never leaves a paused prefetch member parked (20 rounds)" started.
+◇ Test "R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events never settle, start or park against a gate that admits at now, and never repeat runs without the clock moving" started.
+◇ Test "R-SYN-13: a member whose offline failure arrives after the network dropped again waits for the next edge and is retried there" started.
+◇ Test "R-SYN-11: an over-budget plan with eviction permitted asks for exactly the shortfall" started.
+◇ Test "R-CAR-4: a lane-wide park during a handle's release parks every other queued member and neither parks nor starts the released ones" started.
+◇ Test "R-SYN-11: a manifest without byteSize never fails the space check with insufficientSpace" started.
+◇ Test "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test "R-SYN-11: ensureAvailable whose member waits for bytes a purge reclaimed before the engine's alarm ran fetches it instead of failing on older free-space figures" started.
+◇ Test "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test "R-SYN-10: ensureAvailable whose member waits for space fetches it as soon as a purge reclaimed the bytes, not at the store's next deadline" started.
+◇ Test "R-SYN-13: a member whose offline failure arrives after the network returned is retried at once, not left waiting for an edge that already passed" started.
+◇ Test "R-SYN-1: a stale, missing or healing record is fetched for its current content" started.
+◇ Test "R-SYN-11: a job waiting for space that nothing will reclaim is re-checked on a fresh free-space read before it fails with insufficientSpace" started.
+◇ Test "R-SYN-1: planning an applied manifest against itself yields no work" started.
+◇ Test "R-SYN-8: a directory or file-name change plans zero downloads" started.
+◇ Test "R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the clock does not move" started.
+◇ Test "R-SYN-5: a pending run that waits for a half-open breaker starts once its silent probe's watchdog passes" started.
+◇ Test "R-SYN-1: a checksum-less entry is re-fetched only when its remotePath changes" started.
+◇ Test "R-SYN-10: ensureAvailable does not download a member another interest committed after its plan" started.
+◇ Test "R-SYN-11: a catalog larger than the budget syncs its largest fitting prefix essential-first" started.
+◇ Test "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test "R-SYN-6: a run whose planned asset another apply binds to content already present counts it as fetched and downloads nothing" started.
+◇ Test "R-INT-5: unverified entries are skipped when allowUnverifiedAssets is false" started.
+◇ Test "R-OBS-3: diagnostics answer while the engine is degraded, with its error ring and the last-known generation and stamp" started.
+◇ Test "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test "R-NET-6: a 404 for content an apply already bound never fails the asset that holds it" started.
+◇ Test "R-CAR-3: a prefetch member whose asset an apply binds to content already present is done, and nothing is downloaded again" started.
+◇ Test "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test "R-MAN-6: on-demand entries are fetched only by explicit scopes" started.
+◇ Test "R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels" started.
+◇ Test "R-SYN-10: a catch-up with the store's manifest announces the ids it pruned and the store's generation" started.
+◇ Test "R-SYN-11: a run with nothing to fetch completes when usage exceeds the budget" started.
+◇ Test "R-SYN-4: two identifiers with the same checksum share one transfer and both become present" started.
+◇ Test "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent" started.
+◇ Test "R-SYN-8: content already present as a blob is reused instead of fetched" started.
+◇ Test "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test "R-SYN-4: withdrawing the highest-priority interest demotes the running transfer" started.
+◇ Test "R-SYN-4: a waiter whose asset an apply binds to content already present is answered from the store and downloads nothing" started.
+◇ Test "R-SYN-4: a binding the engine remembers but the store no longer holds sends the waiter down the job path, never a wrong answer" started.
+◇ Test "R-SYN-4: a caller cancelled before joining fails with cancelled and registers nothing" started.
+◇ Test "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test "R-NET-6: a 404 never marks failed an asset the store bound to that content while the transfer ran" started.
+◇ Test "R-SYN-11: ensureAvailable's plan against important capacity never admits a prefetch parked for opportunistic space" started.
+◇ Test "R-SYN-6: a parked claim counts as owed a re-queue exactly when a follow-up re-admission turn will take it" started.
+◇ Test "R-INT-3: a quarantined entry is skipped until its manifest fingerprint changes" started.
+◇ Test "R-SYN-5: a user-initiated request waiting for a short throttle fails fast once a later 429 extends the throttle beyond interactiveMaxWait" started.
+◇ Test "R-SYN-3: lane queues set aside the entries a scan claims, keep the others in order and restore the valid ones first" started.
+◇ Test "R-SYN-6: a run does not download an asset another interest committed after its plan, and counts it as fetched" started.
+◇ Test "R-CLN-3: an attempt that fails for lack of space leaves no partial without a sidecar in staging" started.
+◇ Test "R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast" started.
+◇ Test "R-SYN-5: a user-initiated request that joins a job a shorter 429 parked fails fast against the origin's throttle a later manifest 429 extended" started.
+◇ Test "R-SYN-5: a retry that falls due in the alarm turn of the cooldown's end probes before the pending run starts" started.
+◇ Test "R-SYN-5: a run that starts while the half-open breaker admits only a probe holds it for its manifest fetch from its start turn" started.
+◇ Test "R-SYN-6: a run's held manifest probe is let go when its fetch finds the origin throttled, so the jobs parked behind it wait for the throttle" started.
+◇ Test "R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instead of settling blocked by the ended throttle" started.
+◇ Test "R-SYN-6: a run blocked by claims a shorter and a longer 429 parked reports the origin's throttle end" started.
+◇ Test "R-SYN-5: a user-initiated request waiting for a short throttle fails fast once a manifest 429 extends the throttle beyond interactiveMaxWait" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test "R-SYN-5: a user-initiated request that joins a job a shorter 429 parked fails fast against the origin's throttle a later transfer 429 extended" started.
+◇ Test "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test "R-SYN-5: a run that joins a manifest fetch admitted while the breaker was closed holds no probe for it, so that fetch's answer does not close the breaker" started.
+◇ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+◇ Test "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test "R-SYN-5: prefetch members that wait for a slot and each end without a verdict start no run per probe while the clock does not move" started.
+◇ Test "R-SYN-11: shutdown while requests, joins and sweeps wait for an owed follow answers every waiter (F-28)" started.
+◇ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" started.
+◇ Test "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test "R-SYN-2: an apply that moves more jobs than one turn takes follows them a bounded slice per turn with every invariant holding between turns" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test "R-SYN-15: shutdown ends every pending claim" started.
+◇ Test "R-SYN-8: a metadata-only manifest change completes the run and writes the stamp" started.
+◇ Test "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test "R-SYN-2: an apply moves only the jobs of the ids it changed and leaves every other waiting job as it was" started.
+◇ Test "R-NET-1: the engine completes a sync against FakeRemoteSource with no network" started.
+◇ Test "R-CAR-4: a group whose join gives up because the start failed ends every pending claim" started.
+◇ Test "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" started.
+◇ Test "R-CAR-3: a successor at the lane of the transfer a claim kept joins it with no priority change" started.
+◇ Test "R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report" started.
+◇ Test "R-CAR-3: a successor naming another id of the same content keeps the job through the predecessor's release" started.
+◇ Test "R-CAR-4: invariantViolations reports a registered group in releasing only while its release holds members, not a large give-up's leftover claims" started.
+◇ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" started.
+◇ Test "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test "R-CAR-4: a join's give-up of more than releasesPerTurn claims retires at most releasesPerTurn jobs a turn" started.
+◇ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test "R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)" started.
+◇ Test "R-SYN-12: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes" started.
+◇ Test "R-CLN-4: pins reach the store and a pinned asset is never evicted" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test "R-SYN-10: ensureAvailable fetches missing in-scope assets at userInitiated priority" started.
+◇ Test "R-CAR-4: a join that gives up after its read for a missing source ends every claim of a large group" started.
+◇ Test "R-OBS-3: diagnostics never report a generation older than the engine announced when the store cannot answer" started.
+◇ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test "R-SYN-11: an ENOSPC failure reports the bytes it needed and the room above the reserve, which is smaller" started.
+◇ Test "R-CAR-8: acquiring a lease on an absent asset resolves it first" started.
+◇ Test "R-CAR-4: a registered group whose give-up leaves claims to the release follow-up never makes its joined members' jobs released-only" started.
+◇ Test "R-SYN-8: reconcile is committed before the first transfer starts" started.
+◇ Test "R-SYN-10: ensureAvailable downloads a member that an apply evicted before it threw" started.
+◇ Test "R-SYN-16: a maintenance step cancelled by shutdown answers shutDown" started.
+◇ Test "R-SYN-9: a launch run starts only when the stamp is missing or the app version changed" started.
+◇ Test "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test "R-CAR-3: groups registered before start keep the job the successor named through the predecessor's release" started.
+◇ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test "R-CAR-4: a job only a claim keeps backs off after a transient failure under its held lane's retry policy instead of failing at once" started.
+◇ Test "R-CAR-3: a release that overtakes a successor's join keeps the job the successor named, and its join promotes the running transfer" started.
+◇ Test "R-CLN-10: source copies a source fails to release after a run are recorded for diagnostics" started.
+◇ Test "R-CAR-4: a released group's pending claims are dropped at most releasesPerTurn a turn, and the job they kept then retires" started.
+◇ Test "R-SYN-10: cancelling ensureAvailable cancels transfers wanted by nobody else and throws cancelled" started.
+◇ Test "R-OBS-3: diagnostics carry the counters, the recent errors, the launch facts and the store's generation and stamp" started.
+◇ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" started.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test "R-SYN-4: a waiter's withdrawal that overtakes a group's join keeps the job the group named" started.
+◇ Test "R-CAR-4: a large group released before start drops every claim without the engine starting" started.
+◇ Test "R-CLN-6: purge ends the active run with failed(cancelled)" started.
+◇ Test "R-SYN-11: a second follow begun while the first still owes visits keeps the barrier, and every waiter gets the visit-first answer (F-28)" started.
+◇ Test "R-SYN-15: shutdown during start answers shutDown and leaves the store closed" started.
+◇ Test "R-SYN-13: an offline failure that arrives after the engine's first conditions reading showed a satisfied path is retried at once" started.
+◇ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test "R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended" started.
+◇ Test "R-MAN-2: an undecodable manifest fails the run with serverUnavailable and leaves the applied manifest in force" started.
+◇ Test "R-CAR-8: a leased asset survives eviction and purge until the lease ends" started.
+◇ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" started.
+◇ Test "R-NET-3: background-session events reach the source and are answered at once after shutdown" started.
+◇ Test "R-SYN-5: no transfer starts before a 429's Retry-After elapses on ManualTimeSource" started.
+◇ Test "R-CAR-4: releasing the only group that claimed a job before its join retires the job in that turn, and nothing leaks" started.
+◇ Test "R-CAR-3: a job a predecessor's join creates after a successor's registration survives the predecessor's release until the successor joins" started.
+◇ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test "R-SYN-16: a maintenance step that throws fails the maintenance with the mapped error and the next one runs" started.
+◇ Test "R-CLN-6: purge(.evictable) makes isSyncDue true and clears lastSyncedAt" started.
+◇ Test "R-SYN-13: an unsatisfied first conditions reading retries nothing and the satisfied reading after it retries the asset once" started.
+◇ Test "R-CAR-2: misspelt identifiers trigger at most one manifest fetch per refetch interval" started.
+◇ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" started.
+◇ Test "R-SYN-6: an offline run ends blocked and a new run starts when the path is satisfied" started.
+◇ Test "R-SYN-5: a run whose manifest fetch is throttled ends blocked and a new run starts when the throttle ends" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test "R-NET-3: an offline launch cancels no live background task" started.
+◇ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" started.
+◇ Test "R-NET-3: a live background task is re-attached after relaunch, not duplicated" started.
+◇ Test "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test "R-NET-6: a 404 is not requested again until its manifest entry changes, across a relaunch" started.
+◇ Test "R-NET-3: a transfer the system cancelled is retried after a backoff and integrity from the transport is recorded" started.
+◇ Test "R-SYN-5: a user request waits for a short origin throttle and fails fast on a long one" started.
+◇ Test "R-NET-8: a refused or invalid resume discards the partial and restarts from zero in the next attempt" started.
+◇ Test "R-APL-4: a missing catalog pack while offline reports offline and leaves the applied manifest in force" started.
+◇ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" started.
+◇ Test "R-NET-3: a download completed while the app was dead is adopted from staging, not re-downloaded" started.
+◇ Test "R-SYN-10: ensureAvailable offline returns a complete report from the applied manifest or throws offline" started.
+◇ Test "R-SYN-13: assets that failed offline are retried when the path becomes satisfied without any timer" started.
+◇ Test "R-SYN-7: Apple-tier transfers and update-checking manifest fetches start only when the engine's DeviceConditions satisfy their NetworkAccess" started.
+◇ Test "R-APL-4: catalog and pack skew triggers one update check and a later retry" started.
+◇ Test "R-SYN-5: a user request for an asset in backoff skips the wait" started.
+◇ Test "R-SYN-7: bulk pauses on Low Data Mode and resumes when it is turned off" started.
+◇ Test "R-SYN-9: the stamp is stored in the index and written only after a complete run" started.
+◇ Test "R-CLN-11: the memory-pressure observer runs only while a handler is set, applies only the newest epoch and stops at shutdown" started.
+◇ Test "R-SYN-7: an Apple-tier request is not started offline while the HTTP tier attempts it" started.
+◇ Test "R-STO-11: the launch run waits for legacy migration and downloads nothing it adopted" started.
+◇ Test "R-SYN-11: a catalog larger than the budget syncs its largest fitting prefix essential-first and stays due" started.
+◇ Test "R-CAR-1: concurrent start calls share one start and a cancelled caller withdraws only itself" started.
+◇ Test "R-SYN-4: cancelling one caller of a shared run neither cancels nor waits for the others" started.
+◇ Test "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished" started.
+◇ Test "R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it" started.
+◇ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" started.
+◇ Test "R-CAR-2: an identifier a fresh manifest lists is admitted and fetched without a run" started.
+◇ Test "R-SYN-15: no foreground staging write lands after the store is closed" started.
+◇ Test "R-OBS-3: the diagnostics keep the last 32 errors" started.
+◇ Test "R-STO-1: a cancelled, paused or failed foreground transfer leaves no byte outside the store root" started.
+◇ Test "R-SYN-6: a run whose claim a lane-wide park left that a conditions re-admission turn still owes a re-queue waits for it instead of settling blocked by the policy" started.
+◇ Test "R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fresh" started.
+◇ Test "R-SYN-10: an ensureAvailable whose manifest fetch an origin throttle refuses reports the time left until the throttle ends" started.
+◇ Test "R-SYN-3: lane queues put entries back at their places, in place order, whatever the order they come back in" started.
+◇ Test "R-SYN-6: a run whose claim parked for space the owed follow-up sweep does not admit settles blocked for lack of space once that sweep ran" started.
+◇ Test "R-SYN-6: a run whose claim parked for space a follow-up free-space sweep still owes a re-check waits for it instead of settling blocked for lack of space" started.
+◇ Test "R-SYN-5: a throttle-gated pending run waits for the origin's end when a 429 extends the throttle after the run answered" started.
+◇ Test "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since" started.
+◇ Test "R-SYN-12: the invariant check reports a queued job that waits in no queue" started.
+◇ Test "R-SYN-5: an ensureAvailable member waiting for a short throttle is answered once a later 429 extends the throttle beyond interactiveMaxWait" started.
+◇ Test "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits" started.
+◇ Test "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work" started.
+◇ Test "R-SYN-13: after one network edge a member whose attempts keep failing offline while the path reads satisfied starts twice, then waits for the next edge" started.
+◇ Test "R-SYN-6: a run whose last working claim ends after the breaker's cooldown but before the alarm's turn waits for the alarm instead of settling blocked by the open breaker" started.
+◇ Test "R-SYN-6: a run whose last working claim ends after the throttle's end but before the alarm's turn waits for the alarm instead of settling blocked by the ended throttle" started.
+◇ Test "R-SYN-5: a run that settled on claims a throttle parked reports the origin's end when a 429 extends the throttle before the run answers" started.
+◇ Test "R-CLN-8: the engine re-downloads an asset reportUnreadable quarantined" started.
+◇ Test "R-SYN-6: a run whose failed-whenOnline claim a network-edge re-admission turn still owes a re-queue waits for it instead of settling offline" started.
+◇ Test "R-APL-3: an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released" started.
+◇ Test "R-SYN-10: availability counts present, missing, stale and failed without any network request" started.
+◇ Test "R-SYN-16: maintenance stops at its time budget on ManualTimeSource and resumes verification where it stopped" started.
+◇ Test "R-CLN-9: storageReport counts bytes the OS still holds in adopted packs" started.
+◇ Test "R-SYN-11: a plan that cannot fit even after eviction fails with insufficientSpace and leaves index, blobs and staging byte-identical" started.
+◇ Test "R-CAR-5: the retention scope bounds bulk runs and evicts excluded entries first without deleting anything by itself" started.
+◇ Test "R-SYN-16: maintenance stops between steps once its deadline passed" started.
+◇ Test "R-CLN-5: every URL handed out stays readable for at least the grace window" started.
+◇ Test "R-SYN-12: a new subscriber first receives the current snapshot and run progress" started.
+◇ Test "R-SYN-12: a subscriber cancelled while waiting is removed and its pending pull returns nil" started.
+◇ Test "R-CLN-9: after a relaunch the engine reclaims source copies before its first storageReport, so a fresh source counts the bytes of adopted packs" started.
+◇ Test "R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync" started.
+◇ Test "R-CAR-5: identifier, tag and prefix scopes select the same entries in planning and availability" started.
+◇ Test "R-SYN-12: a subscriber that breaks out of its loop is removed when its stream is released" started.
+◇ Test "R-SYN-11: with eviction not permitted a run that does not fit evicts nothing" started.
+◇ Test "R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress" started.
+◇ Test "R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource" started.
+◇ Test "R-SYN-5: a sync whose manifest fetch the throttle refuses reports the origin's end when a 429 extends the throttle before the run answers" started.
+◇ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" started.
+◇ Test "R-SYN-6: a run whose claim parked for space loses the room the ledger gained to a job ranked ahead of it settles blocked for lack of space at once" started.
+◇ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" started.
+◇ Test "R-SYN-6: a run whose claim parked for space the ledger admits once a job in flight ended without committing fetches it instead of settling blocked for lack of space" started.
+◇ Test "R-SYN-10: an ensureAvailable whose throttled manifest fetch is answered after a 429 extended the throttle reports the time left until the extended end" started.
+◇ Test "R-SYN-10: ensureAvailable turns its fetches into jobs a pipeline at a time and completes the whole scope" started.
+◇ Test "R-SYN-4: a resolve that joins a shared-content job while it verifies is answered with its location" started.
+◇ Test "R-SYN-11: a prefetch that joins a job parked for lack of space starts it once it fits" started.
+◇ Test "R-SYN-10: an ensureAvailable whose members fail fast as they become jobs still settles, a batch per actor turn" started.
+◇ Test "R-SYN-4: a waiter whose job the store supersedes while a run's apply still commits follows the asset's new content" started.
+◇ Test "R-SYN-5: an unknown-id resolve that a throttled manifest fetch answers after an earlier waiter's admission reports the time left until the origin's extended end" started.
+◇ Test "R-SYN-14: a watcher replaced while its observation is still being set up never unregisters its successor and never observes" started.
+◇ Test "R-SYN-4: an id a shared publication cannot bind because the store moved it to new content follows that content" started.
+◇ Test "R-CLN-10: entries outside the retention scope never block a pack release" started.
+◇ Test "R-SYN-14: waitUntil ends when its caller is cancelled, with the predicate unmet, and a later mutation resumes only the waiters still registered" started.
+◇ Test "R-SYN-15: shutdown in created never opens the store and every API fails with shutDown" started.
+◇ Test "R-CLN-6: a purge during a run's apply leaves the engine following the manifest the store applied" started.
+◇ Test "R-NET-3: a launch run that is due joins the re-attached live transfer it plans" started.
+◇ Test "R-SYN-15: no store mutation or commit happens after close returns" started.
+◇ Test "R-SYN-4: a resolve that joins a job blocked for lack of space is answered at once, as a new job would be" started.
+◇ Test "R-NET-3: the first run after a relaunch joins a re-attached live transfer it plans, never cancels and restarts it" started.
+◇ Test "R-SYN-11: an insufficient-space failure on a volume that holds the transfer is retried, never parked" started.
+◇ Test "R-SYN-6: a run whose claim parked for space the ledger admits alone but not behind a re-queued job waiting for a slot settles blocked for lack of space at once" started.
+◇ Test "R-CLN-6: a purge drops the prefetch group members whose interests it withdraws" started.
+◇ Test "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test "R-CAR-5: a retention scope set while start is in progress reaches the store" started.
+◇ Test "R-SYN-4: a resolve cancelled while its failed attempt is handled leaves no stale drain, so the next resolve downloads" started.
+◇ Test "R-SYN-13: runs that keep failing offline while the path reads satisfied run again only after a network edge, never on a timer" started.
+◇ Test "R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes nothing" started.
+◇ Test "R-SYN-6: a run whose asset joins a shared-content job while it verifies fetches it and completes" started.
+◇ Test "R-SYN-15: shutdown mid-flight cancels every transfer, finishes every stream and leaves zero owned tasks, sleepers and observers" started.
+◇ Test "R-SYN-3: restoring set-aside lane-queue entries merges them by place, behind a front push made after the scan" started.
+◇ Test "R-SYN-11: a resolve that joins a job parked for lack of space downloads it once the job fits" started.
+◇ Test "R-SYN-6: a run whose job is superseded while it publishes still settles once its asset's new content commits" started.
+◇ Test "R-SYN-15: concurrent shutdown calls are idempotent" started.
+◇ Test "R-SYN-12: clientShutDown is the last event every subscriber receives" started.
+◇ Test "R-SYN-16: a heal whose re-download fails ends, and the engine forgets it" started.
+◇ Test "R-SYN-11: a job parked for lack of space starts once a fresh free-space read shows room" started.
+◇ Test "R-NET-3: at launch, staging files nobody can use are discarded: another transfer's partial, and a finished download that fails verification" started.
+◇ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" started.
+◇ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" started.
+◇ Test "R-SYN-2: a stale commit with no interests removes the job and frees its pipeline slot" started.
+◇ Test "R-SYN-5: a half-open probe whose publication fails the store's hash check frees the probe slot" started.
+◇ Test "R-CAR-2: an identifier a run's fetched manifest lists is never answered notFound before the run applies it" started.
+◇ Test "R-SYN-4: a waiter whose job the store supersedes with a manifest the engine never applied follows the store's content" started.
+◇ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" started.
+◇ Test "R-SYN-4: a waiter whose asset changed content while its shared job published follows the new content" started.
+◇ Test "R-CAR-2: an identifier the newest fetched manifest lists is admitted from it when the refetch fails" started.
+◇ Test "R-SYN-4: publishing a transfer the engine cancelled treats ENOENT as that cancellation and never retries it" started.
+◇ Test "R-SYN-5: a half-open probe superseded by an apply frees the probe slot" started.
+◇ Test "R-SYN-11: committed bytes stay in the headroom ledger so the reserve is never crossed" started.
+◇ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" started.
+◇ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" started.
+◇ Test "R-SYN-15: an alarm replaced while its turn waits never unregisters its successor, which fires every due deadline" started.
+◇ Test "R-SYN-4: a job whose last interest left during verification is not retried after an integrity failure" started.
+◇ Test "R-SYN-10: ensureAvailable's apply announces pruned ids and stops their jobs, as a run's apply does" started.
+◇ Test "R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content" started.
+◇ Test "R-SYN-10: ensureAvailable completes after a breaker recovers from an abandoned probe" started.
+◇ Test "R-SYN-3: a user-initiated job starts while bulk work fills the verify and commit pipeline" started.
+◇ Test "R-CLN-3: a failed attempt's partial without a sidecar is discarded, not left in staging" started.
+◇ Test "R-SYN-6: with the default tuning, a run does not download an asset the store holds present after a failed apply dropped the ledger" started.
+◇ Test "R-SYN-12: a store view read before an apply the engine followed never takes the engine's copy back" started.
+◇ Test "R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, PR14c, probes I and J)" started.
+◇ Test "R-SYN-12: a store view refused as possibly older than the copy is read again, so the engine still follows the store" started.
+◇ Test "R-SYN-15: a caller cancelled while start runs gets cancelled, never shutDown" started.
+◇ Test "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test "R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger" started.
+◇ Test "R-STO-13: an older answer of the store's deadline that the engine applies after a newer one never takes a trailing install off the heap (L5K-R16, crossed re-reads)" started.
+◇ Test "R-STO-11: ensureAvailable during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)" started.
+◇ Test "R-STO-13: during legacy migration a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows (ARCHITECTURE §5), and a user-initiated job's adoption installs at once (L5K-R14)" started.
+◇ Test "R-CLN-8: reportUnreadable announces, forgets and heals every asset the store quarantined with the blob, and a run downloads them again" started.
+◇ Test "R-SYN-6: a run whose last working claim ends after a half-open probe's watchdog but before the alarm's turn neither settles blocked by the breaker nor starts a second run" started.
+◇ Test "R-STO-13: a job of two ids promoted while its read of the second id runs answers its user-initiated asker of the first id, adopted at bulk urgency, only once the readers' snapshot holds it (L5K-R21)" started.
+◇ Test "R-SYN-11: a waiter of a job the ledger parks for lack of space gets the bytes it needs and the room above the reserve" started.
+◇ Test "R-SYN-5: a half-open probe that ends without a verdict lets the next parked job probe, so the run neither settles blocked nor starts further runs without the clock moving" started.
+◇ Test "R-STO-13: a download launch reconciliation adopts from staging at bulk urgency reaches the readers' snapshot once the install window has passed, on a launch with no sync due (L5K-R16, enumeration)" started.
+◇ Test "R-STO-11: an explicit sync during legacy migration adopts every prior-art file still pending and downloads none (CCR-K1)" started.
+◇ Test "R-STO-13: the prior-art files the last migration batch adopted reach the readers' snapshot within about two install intervals while phases 3 and 4 still run (L5K-R20)" started.
+◇ Test "R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, L5K-R22, PSPIN)" started.
+◇ Test "R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)" started.
+◇ Test "R-STO-11: a user-initiated prefetch group's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)" started.
+◇ Test "R-SYN-10: ensureAvailable during a bulk sync never fails with storageUnavailable because of concurrent commits" started.
+◇ Test "R-STO-11: an id of the same content that joins a job during the answer site's user-initiated publication is asked too before the answer, so its prior-art file is adopted and nothing is downloaded (L5K-R23)" started.
+◇ Test "R-STO-13: a job of two ids schedules the trailing install of its first id's bulk-urgency adoption before it reads the second id, so the readers see the first id once the install window has passed while that read is still held (L5K-R23, KC4-MULTIID)" started.
+◇ Test "R-STO-13: a prefetch job promoted to the user-initiated lane while its pre-transfer adoption runs answers its user-initiated asker only once the readers' snapshot holds the asset (L5K-R18)" started.
+◇ Test "R-STO-13: during legacy migration a page a user resolves is in the readers' snapshot at once, and the neighbours a prefetch group's jobs adopt reach it once the install window has passed (L5K-R16, PR14b)" started.
+◇ Test "R-STO-11: a later launch that resumes an interrupted legacy migration adopts, never downloads, the prior-art files an explicit sync asks for (L5K-V3-06)" started.
+◇ Test "R-STO-11: when a job's adoption of the last claimed prior-art file ends while the migration batch's install is held, the migration still finishes in that launch instead of backing off to the next maintenance window with every file adopted (L5K-R23, KC4-STALELAST)" started.
+◇ Test "R-STO-13: the prior-art files a migration batch adopted reach the readers' snapshot within about two install intervals while the migration waits for an adopt-on-demand of the last claimed file (L5K-R20, KC3-WAITWINDOW)" started.
+◇ Test "R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)" started.
+◇ Test "R-STO-11: a user-initiated prefetch group joined right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)" started.
+◇ Test "R-STO-11: ensureAvailable's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)" started.
+◇ Test "R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the readers' snapshot once the install window has passed, and the trailing installs stay within the install rate (L5K-R16, PR14a)" started.
+◇ Test "R-STO-11: a job whose last group is released while its pre-transfer read adopts a later id sends no transfer request for the retired attempt, and its draining record ends (L5K-R25, KC4-MULTIID release variant)" started.
+◇ Test "R-STO-11: a prefetch group joined during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)" started.
+◇ Test "R-STO-11: when legacy migration ends while the run that took the launch run's place is active, no launch run follows it and no flag is left" started.
+◇ Test "R-STO-11: a run that starts while the launch run waits for legacy migration takes its place, so no launch run follows once migration ends" started.
+◇ Test "R-SYN-5: a silent probe is abandoned after the watchdog and the next transfer probes" started.
+◇ Test "R-STO-11: shutdown while the migration waits for a job's adoption of the last claimed prior-art file returns, and leaves no migration flag behind (L5K-R17, L5K-R22, row k-7)" started.
+◇ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" started.
+◇ Test "R-NET-3: launch reconciliation attaches wanted live tasks, cancels unwanted ones and adopts completed files" started.
+◇ Test "R-SYN-5: the auth cooldown jitter is keyed by the seed and reproducible" started.
+◇ Test "R-SYN-5: a manifest 403 with a key-rejected hint opens the auth breaker at once" started.
+◇ Test "R-STO-13: ensureAvailable that joins a prefetch job while the job's pre-transfer read re-arms the store's deadline after a bulk adoption returns only once the readers' snapshot holds the asset (L5K-R21, PE5)" started.
+◇ Test "R-SYN-1: launch reconciliation output is sorted and independent of input order" started.
+◇ Test "R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together" started.
+◇ Test "R-NET-8: launch reconciliation resumes the newest partial with a sidecar and discards the rest" started.
+◇ Test "R-SYN-5: a window whose 5xx share equals serverErrorRatio exactly opens the breaker" started.
+◇ Test "R-SYN-5: three ambiguous 403s on distinct assets open the auth breaker but one does not" started.
+◇ Test "R-SYN-5: a half-open probe that fails offline re-arms the probe instead of wedging the breaker" started.
+◇ Test "R-SYN-5: sustained 5xx opens the breaker and a single half-open probe closes it" started.
+◇ Test "R-SYN-5: an alarm turn takes at most dueDeadlinesPerTurn due deadlines, in order, and none that is not due" started.
+◇ Test "R-SYN-5: a same-cause probe failure re-opens with a doubled cooldown" started.
+◇ Test "R-SYN-7: an unsatisfied path blocks bulk and prefetch but admits user-initiated work" started.
+◇ Test "R-SYN-15: shutdown in created cancels and joins the memory-pressure observer, so its observation ends with no further event" started.
+◇ Test "R-NET-1: a remote source that cannot be built leaves stored assets served and fails every fetch with its error" started.
+◇ Test "R-SYN-15: shutdown in created cancels and joins a group's join, which never opens the store" started.
+◇ Test "R-SYN-15: shutdown in created cancels and joins a release follow-up" started.
+◇ Test "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened before the alarm's turn starts it" started.
+◇ Test "R-SYN-16: the verification byte budget follows the time budget" started.
+◇ Test "R-SYN-14: the deadline heap fires in deadline then scheduling order and replaces an entry per reason" started.
+◇ Test "R-SYN-12: a subscriber queue keeps one slot per key and subject and delivers in publication order" started.
+◇ Test "R-SYN-7: lane admission follows network and power policy for every lane" started.
+◇ Test "R-SYN-5: a Retry-After equal to maxRetryAfter is honoured, one above it defers to the next run" started.
+◇ Test "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test "R-SYN-12: clientShutDown finishes a queue and nothing is accepted after it" started.
+◇ Test "R-SYN-12: every event maps to the slot it coalesces under" started.
+◇ Test "R-ENV-1: a cancelled ManualTimeSource sleeper throws promptly and leaves no sleeper behind" started.
+◇ Test "R-NET-1: FakeRemoteSourceFactory hands the store's staging sink to an attachable source before returning it" started.
+◇ Test "R-ENV-1: ManualTimeSource wakes sleepers in deadline then registration order" started.
+◇ Test "R-SYN-11: the planning policy takes eviction permission, unverified admission and the prefix rule from StoragePolicy" started.
+◇ Test "R-SYN-3: lane queues are FIFO with lazy deletion, put a resumed job first and stay within twice the live entries" started.
+◇ Test "R-CAR-2: the unknown-identifier cache expires and forgets the oldest beyond its capacity" started.
+◇ Test "R-SYN-9: refresh policies decide due-ness exhaustively including app-version change and clock skew" started.
+◇ Test "R-NET-3: a completed transfer makes the partials and sidecars of the same transfer garbage" started.
+◇ Test "R-SYN-2: the transition table admits exactly the listed transitions" started.
+◇ Test "Test support: observer censuses of the fake conditions and memory-pressure sources are awaited without polling" started.
+◇ Test "Test support: a fake source and its handles record starts and controls in one global order" started.
+◇ Test "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test "R-SYN-2: an illegal transition is counted and logged, never applied" started.
+◇ Test "R-SYN-15: a source built after shutdown began is invalidated at once and start fails with shutDown" started.
+◇ Test "Test support: generated payloads are a pure function of seed and offset and hash in bounded chunks like one-shot SHA-256" started.
+◇ Test "R-SYN-5: backoff delays are full jitter keyed by asset and attempt and reproducible from the seed" started.
+◇ Test "R-SYN-6: a run whose claimed job vanished without an outcome still settles, and counts the asset as failed" started.
+◇ Test "R-SYN-11: a later free-space read counts the jobs an earlier one re-admitted that still wait for a slot, so together they never exceed the room" started.
+◇ Test "R-CAR-4: releasing a user-initiated handle of more members than one turn releases lets queued prefetch work start in that turn" started.
+◇ Test "R-SYN-3: lane queues stay within twice their live entries while queued jobs move between lanes" started.
+◇ Test "R-SYN-5: a manifest 429 shorter than the origin's throttle leaves the throttle's deadline at its end, where its parked job resumes and no run repeats" started.
+◇ Test "R-SYN-13: when the network returns under more members parked offline than one turn re-queues, every member is re-queued" started.
+◇ Test "R-SYN-11: when the volume gains room for more members parked for space than one turn re-admits, every one is re-queued" started.
+◇ Test "R-SYN-6: a store failure while a run applies its manifest fails the run with the store's error and starts nothing" started.
+◇ Test "R-SYN-5: a Retry-After beyond maxRetryAfter fails the waiter with that wait and ends the job for the run, holding nothing" started.
+◇ Test "R-CAR-4: releasing a prefetch handle of more members than one turn releases leaves no job and starts none of its members meanwhile" started.
+◇ Test "R-SYN-4: a resolve that joins a job waiting to be online is answered offline at once" started.
+◇ Test "R-SYN-5: a prefetch blocked by an open breaker starts when the cooldown ends, and its success closes the breaker" started.
+◇ Test "R-SYN-5: a later transfer 429 with a shorter Retry-After never shortens the origin's throttle" started.
+◇ Test "R-SYN-11: the clock driver of the space tests has stopped when driving returns, so it never advances a clock to a sleeper registered afterwards (2,000 rounds)" started.
+◇ Test "R-SYN-16: maintenance finds a corrupted blob, announces its quarantine, and the engine downloads it again when the quarantine ends" started.
+◇ Test "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test "R-SYN-5: a prefetch held by an origin throttle starts again exactly when the throttle ends" started.
+◇ Test "R-SYN-11: a job waiting for space keeps waiting after a reclaim that leaves it short while more is pending, and starts once the rest is reclaimed" started.
+◇ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection stops before eviction and verification and reports the budget exhausted" started.
+◇ Test "R-SYN-11: when the network returns under more queued members than one pump turn parks, every member the volume cannot hold ends parked for lack of space" started.
+◇ Test "R-SYN-11: a free-space read re-admits the jobs parked for space that the room holds together and leaves the others parked untouched" started.
+◇ Test "R-SYN-3: a userInitiated request for an in-flight bulk asset promotes it without restarting the transfer" started.
+◇ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" started.
+◇ Test "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" started.
+◇ Test "R-NET-10: a promoted asset's priority change reaches the transport before any other transfer starts" started.
+◇ Test "R-SYN-5: a throttle deadline that fires before the origin's throttle ends is kept at the throttle's end, where its parked job resumes" started.
+◇ Test "R-STO-11: a migration call that leaves nothing remaining but cannot finish defers to the next maintenance window, which finishes it" started.
+◇ Test "R-SYN-3: with concurrency 1 a userInitiated request preempts the bulk transfer, which later resumes" started.
+◇ Test "R-SYN-3: a queued bulk job a prefetch request joins is promoted and starts before the bulk job queued ahead of it" started.
+◇ Test "R-SYN-11: once the store reclaimed what jobs waited for, every one the room does not hold is parked insufficientSpace, more than one turn's worth" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test "R-SYN-11: an ensure whose member waits for space after an ENOSPC asking for more than the entry fails with the bytes the ENOSPC asked for and the room above the reserve" started.
+◇ Test "R-SYN-3: concurrency outside 1…16 is clamped and reported in diagnostics" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test "R-SYN-3: a queued bulk job a user-initiated request joins is promoted and starts before the bulk job queued ahead of it" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument iteration → 0 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument iteration → 1 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument iteration → 2 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 3 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument iteration → 4 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument iteration → 5 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument iteration → 6 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument iteration → 7 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument iteration → 8 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument iteration → 9 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument iteration → 10 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument iteration → 11 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument caller → resolve to "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument caller → run to "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 161 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 178 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 195 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 212 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 229 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument failure → .serverErrorAtCap to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .notFound to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .noSpace to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test "R-STO-6: a publication that fails with an I/O error is retried after a backoff and the asset arrives" started.
+◇ Test "R-OBS-3: every engine error maps to the failure class the diagnostics report" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test "R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes" started.
+◇ Test "R-STO-11: a resolve during migration adopts that legacy file first and never waits for the whole catalog" started.
+◇ Test "R-CLN-12: maintenance with no time budget stops after its first step and reports the budget exhausted" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test "R-INT-3: visiting a corrupt asset repeatedly never downloads it more than maxIntegrityAttempts times" started.
+◇ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" started.
+◇ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test "R-SYN-13: transient failures in backoff are retried early on a satisfied edge" started.
+◇ Test "R-NET-3: a background-session failure retries the transfer in the foreground" started.
+◇ Test "R-CAR-1: an engine whose store cannot open answers storageUnavailable from start and every API" started.
+◇ Test "R-SYN-5: an ambiguous 403 is never retried with backoff and never quarantines the asset beyond the run" started.
+◇ Test "R-SYN-11: a fetch blocked on ENOSPC resumes after the store's reaper frees doomed blobs" started.
+◇ Test "R-CAR-7: a store that cannot open degrades the engine and every API answers storageUnavailable" started.
+◇ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" started.
+◇ Test "R-SYN-2: a waiter of an asset whose content changes follows it to the new content" started.
+◇ Test "R-NET-8: launch reconciliation resumes a wanted partial with its sidecar and cancels an unwanted live task" started.
+◇ Test "R-NET-6: a policy rejection fails the asset for the run with serverUnavailable and is not retried" started.
+◇ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" started.
+◇ Test "R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test "R-SYN-2: an asset removed from the manifest while a user waits fails that waiter with notFound" started.
+◇ Test "R-SYN-11: a fetch failing with ENOSPC and nothing to reclaim fails its waiter with the bytes it needs and the room above the reserve" started.
+◇ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" started.
+◇ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test "R-SYN-6: a manifest fetch past its deadline falls back to the applied manifest and leaves the sync due" started.
+◇ Test "R-SYN-5: a manifest 403 opens the breaker and resolve fails fast without a request" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument swept → .waiterReparked to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument swept → .ensureReparked to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument swept → .waiterRequeued to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument order → gateFirst to "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished" started.
+◇ Test case passing 1 argument order → runFirst to "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished" started.
+◇ Test case passing 1 argument count → 200 to "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since" started.
+◇ Test case passing 1 argument count → 576 to "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since" started.
+◇ Test case passing 1 argument second → same to "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits" started.
+◇ Test case passing 1 argument place → inPlace to "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work" started.
+◇ Test case passing 1 argument place → setAside to "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work" started.
+◇ Test case passing 1 argument second → later to "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits" started.
+◇ Test case passing 1 argument seed → 4610 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument seed → 4609 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument seed → 4612 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument seed → 4611 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument cap → 1 to "R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content" started.
+◇ Test case passing 1 argument cap → 3 to "R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content" started.
+◇ Test case passing 1 argument drop → failedApply to "R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger" started.
+◇ Test case passing 1 argument drop → maintenance to "R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger" started.
+◇ Test case passing 2 arguments source → transport, cap → 3 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 2 arguments source → transport, cap → 1 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 2 arguments source → publication, cap → 3 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 2 arguments source → publication, cap → 1 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 1 argument viaEnsure → true to "R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)" started.
+◇ Test case passing 1 argument viaEnsure → false to "R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)" started.
+◇ Test case passing 1 argument gate → .throttle to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened before the alarm's turn starts it" started.
+◇ Test case passing 1 argument gate → .breaker to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened before the alarm's turn starts it" started.
+◇ Test case passing 1 argument seed → 1 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 2 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 3 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 81 to "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test case passing 1 argument seed → 82 to "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test case passing 1 argument seed → 83 to "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test case passing 1 argument wait → serverError to "R-SYN-5: a Retry-After beyond maxRetryAfter fails the waiter with that wait and ends the job for the run, holding nothing" started.
+◇ Test case passing 1 argument wait → throttled to "R-SYN-5: a Retry-After beyond maxRetryAfter fails the waiter with that wait and ends the job for the run, holding nothing" started.
+◇ Test "R-CLN-3: staging GC during maintenance keeps the file of a publication in flight, however old" started.
+◇ Test "R-SYN-10: ensureAvailable for a scope that cannot fit fails with insufficientSpace before any transfer" started.
+◇ Test "R-SYN-10: ensureAvailable evicts least-recently-used standard assets to make room within the budget" started.
+◇ Test "R-SYN-5: a run started while the breaker is open ends blocked without asking for the manifest" started.
+◇ Test "R-SYN-11: a publication that runs out of space fails a user request with insufficientSpace" started.
+◇ Test "R-CAR-1: the first call of any API starts the engine" started.
+◇ Test "R-SYN-12: the invariant check reports every broken engine invariant it guards" started.
+◇ Test case passing 1 argument caller → resolve to "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument caller → ensure to "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument caller → run to "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test "R-SYN-3: owned tasks are spawned at their lane's task priority, and the test harnesses' floor only raises it" started.
+◇ Test "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work" started.
+◇ Test "R-SYN-2: an open pending-run gate is excused only by a live alarm armed at or before its deadline" started.
+◇ Test "R-SYN-11: ensureAvailable short of bytes the store has not scheduled to reclaim fails with insufficientSpace instead of waiting for ever" started.
+◇ Test "R-SYN-11: ensureAvailable whose member lacks room beside a transfer in flight fails with insufficientSpace" started.
+◇ Test "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never" started.
+◇ Test case passing 1 argument concurrency → 1 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument concurrency → 2 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument rejoin → laneChange to "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" started.
+◇ Test case passing 1 argument concurrency → 4 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument rejoin → userWork to "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" started.
+◇ Test case passing 1 argument concurrency → 7 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument concurrency → 16 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+✔ Test "R-SYN-11: a manifest without byteSize never fails the space check with insufficientSpace" passed after 0.373 seconds.
+✔ Test "R-SYN-11: an over-budget plan with eviction permitted asks for exactly the shortfall" passed after 0.373 seconds.
+✔ Test "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" with 40 test cases passed after 0.373 seconds.
+✔ Test "R-SYN-1: plan totals equal the sums of their lists" with 40 test cases passed after 0.374 seconds.
+✔ Test "R-SYN-1: fetch order is stable and essential-first" with 40 test cases passed after 0.374 seconds.
+✔ Test "R-SYN-1: a stale, missing or healing record is fetched for its current content" passed after 0.374 seconds.
+✔ Test "R-SYN-1: planning an applied manifest against itself yields no work" passed after 0.374 seconds.
+✔ Test "R-SYN-8: a directory or file-name change plans zero downloads" passed after 0.374 seconds.
+✔ Test "R-SYN-1: a checksum-less entry is re-fetched only when its remotePath changes" passed after 0.386 seconds.
+✔ Test "R-SYN-11: a catalog larger than the budget syncs its largest fitting prefix essential-first" passed after 0.387 seconds.
+✔ Test "R-INT-5: unverified entries are skipped when allowUnverifiedAssets is false" passed after 0.387 seconds.
+✔ Test "R-SYN-11: more free space never worsens the space assessment" with 40 test cases passed after 0.387 seconds.
+✔ Test "R-SYN-1: narrowing the scope only removes fetches" with 40 test cases passed after 0.388 seconds.
+✔ Test "R-MAN-6: on-demand entries are fetched only by explicit scopes" passed after 0.390 seconds.
+✔ Test "R-SYN-11: a run with nothing to fetch completes when usage exceeds the budget" passed after 0.390 seconds.
+✔ Test "R-SYN-8: content already present as a blob is reused instead of fetched" passed after 0.392 seconds.
+✔ Test "R-SYN-6: a parked claim counts as owed a re-queue exactly when a follow-up re-admission turn will take it" passed after 0.395 seconds.
+✔ Test "R-SYN-1: every identifier lands in exactly one plan bucket" with 40 test cases passed after 0.396 seconds.
+✔ Test "R-INT-3: a quarantined entry is skipped until its manifest fingerprint changes" passed after 0.396 seconds.
+✔ Test "R-SYN-3: lane queues set aside the entries a scan claims, keep the others in order and restore the valid ones first" passed after 0.397 seconds.
+◇ Test case passing 1 argument failure → .integrity to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument failure → .rejected to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument failure → .authentication to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument failure → .serverError to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument reason → .notFound to "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test case passing 1 argument reason → .unreadable to "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+✔ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" passed after 0.671 seconds.
+✔ Test "R-SYN-3: lane queues put entries back at their places, in place order, whatever the order they come back in" passed after 0.672 seconds.
+✔ Test "R-SYN-3: restoring set-aside lane-queue entries merges them by place, behind a front push made after the scan" passed after 0.708 seconds.
+✔ Test "R-SYN-5: a silent probe is abandoned after the watchdog and the next transfer probes" passed after 0.759 seconds.
+✔ Test "R-SYN-5: a manifest 403 with a key-rejected hint opens the auth breaker at once" passed after 0.759 seconds.
+✔ Test "R-SYN-5: the auth cooldown jitter is keyed by the seed and reproducible" passed after 0.760 seconds.
+✔ Test "R-NET-3: launch reconciliation attaches wanted live tasks, cancels unwanted ones and adopts completed files" passed after 0.760 seconds.
+✔ Test "R-NET-8: launch reconciliation resumes the newest partial with a sidecar and discards the rest" passed after 0.761 seconds.
+✔ Test "R-SYN-5: a window whose 5xx share equals serverErrorRatio exactly opens the breaker" passed after 0.761 seconds.
+✔ Test "R-SYN-5: three ambiguous 403s on distinct assets open the auth breaker but one does not" passed after 0.761 seconds.
+✔ Test "R-SYN-1: launch reconciliation output is sorted and independent of input order" passed after 0.761 seconds.
+✔ Test "R-SYN-7: an unsatisfied path blocks bulk and prefetch but admits user-initiated work" passed after 0.761 seconds.
+✔ Test "R-SYN-16: the verification byte budget follows the time budget" passed after 0.764 seconds.
+✔ Test "R-SYN-5: a same-cause probe failure re-opens with a doubled cooldown" passed after 0.766 seconds.
+✔ Test "R-SYN-14: the deadline heap fires in deadline then scheduling order and replaces an entry per reason" passed after 0.766 seconds.
+✔ Test "R-SYN-5: sustained 5xx opens the breaker and a single half-open probe closes it" passed after 0.766 seconds.
+✔ Test "R-SYN-5: a Retry-After equal to maxRetryAfter is honoured, one above it defers to the next run" passed after 0.766 seconds.
+✔ Test "R-SYN-7: lane admission follows network and power policy for every lane" passed after 0.766 seconds.
+✔ Test "R-SYN-12: every event maps to the slot it coalesces under" passed after 0.766 seconds.
+✔ Test "R-SYN-12: clientShutDown finishes a queue and nothing is accepted after it" passed after 0.767 seconds.
+✔ Test "R-SYN-11: the planning policy takes eviction permission, unverified admission and the prefix rule from StoragePolicy" passed after 0.767 seconds.
+✔ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" passed after 0.767 seconds.
+✔ Test "R-CAR-2: the unknown-identifier cache expires and forgets the oldest beyond its capacity" passed after 0.767 seconds.
+✔ Test "R-NET-3: a completed transfer makes the partials and sidecars of the same transfer garbage" passed after 0.767 seconds.
+✔ Test "R-SYN-2: the transition table admits exactly the listed transitions" passed after 0.767 seconds.
+✔ Test "R-SYN-3: lane queues are FIFO with lazy deletion, put a resumed job first and stay within twice the live entries" passed after 0.767 seconds.
+✔ Test "R-SYN-5: a half-open probe that fails offline re-arms the probe instead of wedging the breaker" passed after 0.768 seconds.
+✔ Test "R-SYN-12: a subscriber queue keeps one slot per key and subject and delivers in publication order" passed after 0.767 seconds.
+✔ Test "R-SYN-5: backoff delays are full jitter keyed by asset and attempt and reproducible from the seed" passed after 0.767 seconds.
+✔ Test "Test support: generated payloads are a pure function of seed and offset and hash in bounded chunks like one-shot SHA-256" passed after 0.767 seconds.
+✔ Test "R-SYN-9: refresh policies decide due-ness exhaustively including app-version change and clock skew" passed after 0.767 seconds.
+✔ Test "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" with 3 test cases passed after 0.806 seconds.
+◇ Test case passing 1 argument gate → .throttle to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work" started.
+◇ Test case passing 1 argument gate → .breaker to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work" started.
+◇ Test case passing 1 argument second → same to "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never" started.
+◇ Test case passing 1 argument second → later to "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never" started.
+✔ Test "R-SYN-5: an alarm turn takes at most dueDeadlinesPerTurn due deadlines, in order, and none that is not due" passed after 0.860 seconds.
+✔ Test "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" with 3 test cases passed after 0.863 seconds.
+✔ Test "R-OBS-3: every engine error maps to the failure class the diagnostics report" passed after 0.562 seconds.
+✔ Test "R-SYN-3: owned tasks are spawned at their lane's task priority, and the test harnesses' floor only raises it" passed after 0.515 seconds.
+✔ Suite "Planner properties" passed after 0.887 seconds.
+✔ Suite "Engine units" passed after 0.896 seconds.
+✔ Test "R-SYN-15: shutdown in created never opens the store and every API fails with shutDown" passed after 0.898 seconds.
+✔ Test "R-NET-1: FakeRemoteSourceFactory hands the store's staging sink to an attachable source before returning it" passed after 0.897 seconds.
+✔ Test "Test support: a fake source and its handles record starts and controls in one global order" passed after 0.897 seconds.
+✔ Test "R-SYN-11: the clock driver of the space tests has stopped when driving returns, so it never advances a clock to a sleeper registered afterwards (2,000 rounds)" passed after 1.487 seconds.
+✔ Test "R-CAR-1: an engine whose store cannot open answers storageUnavailable from start and every API" passed after 1.198 seconds.
+✔ Test "R-SYN-15: shutdown in created cancels and joins a group's join, which never opens the store" passed after 1.516 seconds.
+✔ Test "R-SYN-15: shutdown in created cancels and joins a release follow-up" passed after 1.517 seconds.
+✔ Test "R-CAR-4: a group whose join gives up because the start failed ends every pending claim" passed after 1.526 seconds.
+✔ Test "R-SYN-15: shutdown in created cancels and joins the memory-pressure observer, so its observation ends with no further event" passed after 1.532 seconds.
+✔ Suite "Engine shutdown from created" passed after 1.620 seconds.
+✔ Test "R-ENV-1: a cancelled ManualTimeSource sleeper throws promptly and leaves no sleeper behind" passed after 2.030 seconds.
+✔ Test "R-OBS-3: diagnostics answer while the engine is degraded, with its error ring and the last-known generation and stamp" passed after 2.045 seconds.
+✔ Test "R-SYN-15: a source built after shutdown began is invalidated at once and start fails with shutDown" passed after 2.406 seconds.
+✔ Test "R-CAR-7: a store that cannot open degrades the engine and every API answers storageUnavailable" passed after 2.125 seconds.
+✔ Test "R-SYN-15: concurrent shutdown calls are idempotent" passed after 2.444 seconds.
+✔ Test "R-CAR-4: a large group released before start drops every claim without the engine starting" passed after 2.448 seconds.
+✔ Test "R-SYN-12: a subscriber that reads nothing between clientStarted and clientShutDown receives both, clientStarted first" passed after 2.467 seconds.
+✔ Test "R-CAR-5: identifier, tag and prefix scopes select the same entries in planning and availability" passed after 2.498 seconds.
+✔ Test "R-SYN-11: an ENOSPC failure reports the bytes it needed and the room above the reserve, which is smaller" passed after 2.517 seconds.
+✔ Test "R-CAR-1: concurrent start calls share one start and a cancelled caller withdraws only itself" passed after 2.522 seconds.
+✔ Test "R-CAR-1: the first call of any API starts the engine" passed after 2.179 seconds.
+✔ Test "R-ENV-1: ManualTimeSource wakes sleepers in deadline then registration order" passed after 2.525 seconds.
+✔ Test "Test support: observer censuses of the fake conditions and memory-pressure sources are awaited without polling" passed after 2.525 seconds.
+✔ Suite "Engine client slot" passed after 2.531 seconds.
+✔ Test "R-SYN-4: a caller cancelled before joining fails with cancelled and registers nothing" passed after 2.530 seconds.
+✔ Test "R-NET-3: background-session events reach the source and are answered at once after shutdown" passed after 2.560 seconds.
+✔ Test "R-STO-11: the launch run waits for legacy migration and downloads nothing it adopted" passed after 2.562 seconds.
+✔ Test "R-NET-3: at launch, staging files nobody can use are discarded: another transfer's partial, and a finished download that fails verification" passed after 2.566 seconds.
+✔ Test "R-NET-6: a policy rejection fails the asset for the run with serverUnavailable and is not retried" passed after 2.463 seconds.
+✔ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" passed after 2.465 seconds.
+✔ Test "R-SYN-11: a fetch failing with ENOSPC and nothing to reclaim fails its waiter with the bytes it needs and the room above the reserve" passed after 2.532 seconds.
+✔ Test "R-NET-3: a download completed while the app was dead is adopted from staging, not re-downloaded" passed after 2.861 seconds.
+✔ Suite "Sync contracts" passed after 3.049 seconds.
+✔ Test "R-SYN-3: concurrency outside 1…16 is clamped and reported in diagnostics" passed after 3.055 seconds.
+✔ Test "R-CAR-5: a retention scope set while start is in progress reaches the store" passed after 3.077 seconds.
+✔ Test "R-SYN-12: a subscriber that breaks out of its loop is removed when its stream is released" passed after 3.104 seconds.
+✔ Test "R-SYN-4: a waiter whose job the store supersedes with a manifest the engine never applied follows the store's content" passed after 3.116 seconds.
+✔ Test "R-SYN-4: a binding the engine remembers but the store no longer holds sends the waiter down the job path, never a wrong answer" passed after 3.144 seconds.
+✔ Test "R-SYN-15: shutdown during start answers shutDown and leaves the store closed" passed after 3.159 seconds.
+✔ Test "R-STO-6: a publication that fails with an I/O error is retried after a backoff and the asset arrives" passed after 2.860 seconds.
+✔ Test "R-NET-3: a background-session failure retries the transfer in the foreground" passed after 2.862 seconds.
+✔ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" with 2 test cases passed after 2.862 seconds.
+✔ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" passed after 2.866 seconds.
+✔ Test "R-SYN-15: a caller cancelled while start runs gets cancelled, never shutDown" passed after 3.193 seconds.
+✔ Test "R-SYN-13: an offline failure that arrives after the engine's first conditions reading showed a satisfied path is retried at once" passed after 3.201 seconds.
+✔ Test "R-NET-3: a transfer the system cancelled is retried after a backoff and integrity from the transport is recorded" passed after 3.202 seconds.
+✔ Test "R-SYN-5: a Retry-After beyond maxRetryAfter fails the waiter with that wait and ends the job for the run, holding nothing" with 2 test cases passed after 3.211 seconds.
+✔ Test "R-NET-6: a 404 never marks failed an asset the store bound to that content while the transfer ran" passed after 3.220 seconds.
+✔ Test "R-SYN-15: shutdown ends every pending claim" passed after 3.224 seconds.
+✔ Test "R-INT-3: visiting a corrupt asset repeatedly never downloads it more than maxIntegrityAttempts times" passed after 3.020 seconds.
+✔ Test "R-CAR-4: releasing the only group that claimed a job before its join retires the job in that turn, and nothing leaks" passed after 3.351 seconds.
+✔ Test "R-SYN-11: an insufficient-space failure on a volume that holds the transfer is retried, never parked" passed after 3.374 seconds.
+✔ Test "R-SYN-11: a waiter of a job the ledger parks for lack of space gets the bytes it needs and the room above the reserve" passed after 3.380 seconds.
+✔ Test "R-CAR-8: acquiring a lease on an absent asset resolves it first" passed after 3.432 seconds.
+✔ Test "R-SYN-13: an unsatisfied first conditions reading retries nothing and the satisfied reading after it retries the asset once" passed after 3.440 seconds.
+✔ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" passed after 3.447 seconds.
+✔ Test "R-SYN-5: a user request waits for a short origin throttle and fails fast on a long one" passed after 3.454 seconds.
+✔ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" passed after 3.486 seconds.
+✔ Test "R-SYN-4: a resolve that joins a job waiting to be online is answered offline at once" passed after 3.515 seconds.
+✔ Test "R-SYN-5: a user request for an asset in backoff skips the wait" passed after 3.518 seconds.
+✔ Test "R-SYN-4: a resolve that joins a shared-content job while it verifies is answered with its location" passed after 3.518 seconds.
+✔ Test "R-SYN-4: an id a shared publication cannot bind because the store moved it to new content follows that content" passed after 3.526 seconds.
+✔ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" passed after 3.527 seconds.
+✔ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" passed after 3.227 seconds.
+✔ Test "R-SYN-11: a publication that runs out of space fails a user request with insufficientSpace" passed after 3.184 seconds.
+✔ Test "R-CLN-10: entries outside the retention scope never block a pack release" passed after 3.531 seconds.
+✔ Test "R-STO-13: a download launch reconciliation adopts from staging at bulk urgency reaches the readers' snapshot once the install window has passed, on a launch with no sync due (L5K-R16, enumeration)" passed after 3.530 seconds.
+✔ Test "R-CAR-4: a join that gives up after its read for a missing source ends every claim of a large group" passed after 3.554 seconds.
+✔ Test "R-OBS-3: diagnostics never report a generation older than the engine announced when the store cannot answer" passed after 3.566 seconds.
+✔ Test "R-SYN-10: ensureAvailable fetches missing in-scope assets at userInitiated priority" passed after 3.568 seconds.
+✔ Test "R-NET-8: launch reconciliation resumes a wanted partial with its sidecar and cancels an unwanted live task" passed after 3.278 seconds.
+✔ Test "R-NET-3: a live background task is re-attached after relaunch, not duplicated" passed after 3.584 seconds.
+✔ Test "R-SYN-4: a resolve cancelled while its failed attempt is handled leaves no stale drain, so the next resolve downloads" passed after 3.603 seconds.
+✔ Test "R-SYN-12: a subscriber cancelled while waiting is removed and its pending pull returns nil" passed after 3.603 seconds.
+✔ Test "R-SYN-4: a job whose last interest left during verification is not retried after an integrity failure" passed after 3.604 seconds.
+✔ Test "R-SYN-6: a run whose claimed job vanished without an outcome still settles, and counts the asset as failed" passed after 3.618 seconds.
+✔ Test "R-CAR-3: a successor at the lane of the transfer a claim kept joins it with no priority change" passed after 3.649 seconds.
+✔ Test "R-CAR-3: a successor naming another id of the same content keeps the job through the predecessor's release" passed after 3.652 seconds.
+✔ Test "R-SYN-11: ensureAvailable's plan against important capacity never admits a prefetch parked for opportunistic space" passed after 3.656 seconds.
+✔ Test "R-CAR-3: a release that overtakes a successor's join keeps the job the successor named, and its join promotes the running transfer" passed after 3.655 seconds.
+✔ Test "R-CAR-3: a job a predecessor's join creates after a successor's registration survives the predecessor's release until the successor joins" passed after 3.659 seconds.
+✔ Test "R-SYN-2: an asset removed from the manifest while a user waits fails that waiter with notFound" passed after 3.360 seconds.
+✔ Test "R-SYN-10: an ensureAvailable whose manifest fetch an origin throttle refuses reports the time left until the throttle ends" passed after 3.666 seconds.
+✔ Test "R-SYN-10: ensureAvailable for a scope that cannot fit fails with insufficientSpace before any transfer" passed after 3.342 seconds.
+✔ Test "R-SYN-4: a waiter whose asset an apply binds to content already present is answered from the store and downloads nothing" passed after 3.717 seconds.
+✔ Test "R-SYN-4: two identifiers with the same checksum share one transfer and both become present" passed after 3.879 seconds.
+✔ Test "R-CLN-3: an attempt that fails for lack of space leaves no partial without a sidecar in staging" passed after 3.920 seconds.
+✔ Test "R-SYN-10: a catch-up with the store's manifest announces the ids it pruned and the store's generation" passed after 3.920 seconds.
+✔ Test "R-NET-1: a remote source that cannot be built leaves stored assets served and fails every fetch with its error" passed after 4.059 seconds.
+✔ Test "R-SYN-13: transient failures in backoff are retried early on a satisfied edge" passed after 3.877 seconds.
+✔ Test "R-NET-3: an offline launch cancels no live background task" passed after 4.312 seconds.
+✔ Test "R-CAR-2: misspelt identifiers trigger at most one manifest fetch per refetch interval" passed after 4.323 seconds.
+✔ Test "R-SYN-4: a waiter's withdrawal that overtakes a group's join keeps the job the group named" passed after 4.363 seconds.
+✔ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" passed after 4.383 seconds.
+✔ Test "R-SYN-4: publishing a transfer the engine cancelled treats ENOENT as that cancellation and never retries it" passed after 4.383 seconds.
+✔ Test "R-SYN-7: an Apple-tier request is not started offline while the HTTP tier attempts it" passed after 4.388 seconds.
+✔ Test "R-CLN-3: a failed attempt's partial without a sidecar is discarded, not left in staging" passed after 4.388 seconds.
+✔ Test "R-SYN-2: an open pending-run gate is excused only by a live alarm armed at or before its deadline" passed after 4.021 seconds.
+✔ Test "R-SYN-15: an alarm replaced while its turn waits never unregisters its successor, which fires every due deadline" passed after 4.388 seconds.
+✔ Test "R-SYN-4: a waiter whose asset changed content while its shared job published follows the new content" passed after 4.389 seconds.
+✔ Test "R-CAR-4: a released group's pending claims are dropped at most releasesPerTurn a turn, and the job they kept then retires" passed after 4.392 seconds.
+✔ Test "R-SYN-3: a userInitiated request for an in-flight bulk asset promotes it without restarting the transfer" passed after 4.390 seconds.
+✔ Test "R-STO-11: a migration call that leaves nothing remaining but cannot finish defers to the next maintenance window, which finishes it" passed after 4.401 seconds.
+✔ Test "R-CLN-6: purge ends the active run with failed(cancelled)" passed after 4.411 seconds.
+✔ Test "R-CAR-2: an identifier a fresh manifest lists is admitted and fetched without a run" passed after 4.413 seconds.
+✔ Test "R-SYN-4: cancelling one caller of a shared run neither cancels nor waits for the others" passed after 4.413 seconds.
+✔ Test "R-NET-8: a refused or invalid resume discards the partial and restarts from zero in the next attempt" passed after 4.415 seconds.
+✔ Test "R-SYN-14: waitUntil ends when its caller is cancelled, with the predicate unmet, and a later mutation resumes only the waiters still registered" passed after 4.418 seconds.
+✔ Test "R-NET-6: a 404 for content an apply already bound never fails the asset that holds it" passed after 4.430 seconds.
+✔ Test "R-SYN-3: with concurrency 1 a userInitiated request preempts the bulk transfer, which later resumes" passed after 4.428 seconds.
+✔ Test "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" with 4 test cases passed after 4.430 seconds.
+✔ Test "R-SYN-5: a throttle deadline that fires before the origin's throttle ends is kept at the throttle's end, where its parked job resumes" passed after 4.436 seconds.
+✔ Suite "Engine degraded" passed after 4.443 seconds.
+✔ Test "R-SYN-5: a user-initiated request waiting for a short throttle fails fast once a later 429 extends the throttle beyond interactiveMaxWait" passed after 4.441 seconds.
+✔ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" passed after 4.441 seconds.
+✔ Test "R-SYN-2: a waiter of an asset whose content changes follows it to the new content" passed after 4.138 seconds.
+✔ Test "R-SYN-10: ensureAvailable offline returns a complete report from the applied manifest or throws offline" passed after 4.446 seconds.
+✔ Test "R-APL-4: catalog and pack skew triggers one update check and a later retry" passed after 4.446 seconds.
+✔ Test "R-SYN-7: Apple-tier transfers and update-checking manifest fetches start only when the engine's DeviceConditions satisfy their NetworkAccess" passed after 4.447 seconds.
+✔ Test "R-SYN-10: ensureAvailable turns its fetches into jobs a pipeline at a time and completes the whole scope" passed after 4.450 seconds.
+✔ Test "R-SYN-14: a watcher replaced while its observation is still being set up never unregisters its successor and never observes" passed after 4.450 seconds.
+✔ Suite "Engine races" passed after 4.455 seconds.
+✔ Test "R-SYN-11: a resolve that joins a job parked for lack of space downloads it once the job fits" passed after 4.451 seconds.
+✔ Test "R-NET-3: a launch run that is due joins the re-attached live transfer it plans" passed after 4.453 seconds.
+✔ Test "R-CAR-4: a registered group whose give-up leaves claims to the release follow-up never makes its joined members' jobs released-only" passed after 4.455 seconds.
+✔ Test "R-SYN-12: the invariant check reports every broken engine invariant it guards" passed after 4.108 seconds.
+✔ Test "R-SYN-4: withdrawing the highest-priority interest demotes the running transfer" passed after 4.459 seconds.
+✔ Test "R-SYN-10: cancelling ensureAvailable cancels transfers wanted by nobody else and throws cancelled" passed after 4.462 seconds.
+✔ Suite "Engine launch" passed after 4.469 seconds.
+✔ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" passed after 4.164 seconds.
+✔ Test "R-SYN-5: a prefetch held by an origin throttle starts again exactly when the throttle ends" passed after 4.475 seconds.
+✔ Test "R-SYN-11: a free-space read re-admits the jobs parked for space that the room holds together and leaves the others parked untouched" passed after 4.475 seconds.
+✔ Test "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" with 12 test cases passed after 4.483 seconds.
+✔ Test "R-SYN-3: a queued bulk job a user-initiated request joins is promoted and starts before the bulk job queued ahead of it" passed after 4.450 seconds.
+✔ Test "R-CAR-8: a leased asset survives eviction and purge until the lease ends" passed after 4.578 seconds.
+✔ Test "R-SYN-13: assets that failed offline are retried when the path becomes satisfied without any timer" passed after 4.579 seconds.
+✔ Test "R-SYN-11: a prefetch that joins a job parked for lack of space starts it once it fits" passed after 4.584 seconds.
+✔ Test "R-SYN-12: a subscriber that joins a run in progress receives the run's syncStarted and then its latest syncProgress" passed after 4.584 seconds.
+✔ Test "R-SYN-2: an illegal transition is counted and logged, never applied" passed after 4.634 seconds.
+✔ Test "R-SYN-7: a member paused for a policy that cleared before its pause arrived is re-queued and starts again" passed after 4.639 seconds.
+✔ Test "R-SYN-6: a run blocked by claims a shorter and a longer 429 parked reports the origin's throttle end" passed after 4.643 seconds.
+✔ Test "R-SYN-10: ensureAvailable does not download a member another interest committed after its plan" passed after 5.065 seconds.
+✔ Test "R-CLN-11: the memory-pressure observer runs only while a handler is set, applies only the newest epoch and stops at shutdown" passed after 5.485 seconds.
+✔ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" passed after 5.239 seconds.
+✔ Test "R-SYN-4: a waiter whose job the store supersedes while a run's apply still commits follows the asset's new content" passed after 5.570 seconds.
+✔ Test "R-NET-3: the first run after a relaunch joins a re-attached live transfer it plans, never cancels and restarts it" passed after 5.575 seconds.
+✔ Test "R-SYN-6: a run whose asset joins a shared-content job while it verifies fetches it and completes" passed after 5.604 seconds.
+✔ Test "R-SYN-11: committed bytes stay in the headroom ledger so the reserve is never crossed" passed after 5.608 seconds.
+✔ Test "R-CAR-3: a prefetch member whose asset an apply binds to content already present is done, and nothing is downloaded again" passed after 5.611 seconds.
+✔ Test "R-CAR-3: groups registered before start keep the job the successor named through the predecessor's release" passed after 5.673 seconds.
+✔ Test "R-SYN-12: the invariant check reports a queued job that waits in no queue" passed after 5.680 seconds.
+✔ Test "R-SYN-11: a plan that cannot fit even after eviction fails with insufficientSpace and leaves index, blobs and staging byte-identical" passed after 5.684 seconds.
+✔ Test "R-CLN-9: storageReport counts bytes the OS still holds in adopted packs" passed after 5.684 seconds.
+✔ Test "R-CLN-6: a purge drops the prefetch group members whose interests it withdraws" passed after 5.685 seconds.
+✔ Test "R-SYN-4: a resolve that joins a job blocked for lack of space is answered at once, as a new job would be" passed after 5.686 seconds.
+✔ Test "R-SYN-11: ensureAvailable whose member lacks room beside a transfer in flight fails with insufficientSpace" passed after 5.336 seconds.
+✔ Test "R-SYN-6: a manifest fetch past its deadline falls back to the applied manifest and leaves the sync due" passed after 5.478 seconds.
+✔ Test "R-OBS-3: diagnostics carry the counters, the recent errors, the launch facts and the store's generation and stamp" passed after 5.784 seconds.
+✔ Test "R-SYN-5: an ensureAvailable member waiting for a short throttle is answered once a later 429 extends the throttle beyond interactiveMaxWait" passed after 5.794 seconds.
+✔ Test "R-SYN-6: a run whose job is superseded while it publishes still settles once its asset's new content commits" passed after 5.797 seconds.
+✔ Test "R-CLN-9: after a relaunch the engine reclaims source copies before its first storageReport, so a fresh source counts the bytes of adopted packs" passed after 5.797 seconds.
+✔ Test "R-SYN-5: a later transfer 429 with a shorter Retry-After never shortens the origin's throttle" passed after 5.830 seconds.
+✔ Test "R-SYN-13: a member whose offline failure arrives after the network returned is retried at once, not left waiting for an edge that already passed" passed after 5.837 seconds.
+✔ Test "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent" with 2 test cases passed after 5.840 seconds.
+✔ Test "R-SYN-5: a user-initiated request waiting for a short throttle fails fast once a manifest 429 extends the throttle beyond interactiveMaxWait" passed after 5.858 seconds.
+✔ Test "R-SYN-2: an apply moves only the jobs of the ids it changed and leaves every other waiting job as it was" passed after 5.920 seconds.
+✔ Test "R-CLN-12: maintenance with no time budget stops after its first step and reports the budget exhausted" passed after 5.683 seconds.
+✔ Test "R-CLN-10: source copies a source fails to release after a run are recorded for diagnostics" passed after 6.019 seconds.
+✔ Test "R-SYN-15: shutdown mid-flight cancels every transfer, finishes every stream and leaves zero owned tasks, sleepers and observers" passed after 6.102 seconds.
+✔ Test "R-SYN-12: a store view read before an apply the engine followed never takes the engine's copy back" passed after 6.108 seconds.
+✔ Test "R-SYN-5: a user-initiated request that joins a job a shorter 429 parked fails fast against the origin's throttle a later manifest 429 extended" passed after 6.117 seconds.
+✔ Test "R-SYN-5: a user-initiated request that joins a job a shorter 429 parked fails fast against the origin's throttle a later transfer 429 extended" passed after 6.118 seconds.
+✔ Test "R-SYN-5: a run whose manifest fetch is throttled ends blocked and a new run starts when the throttle ends" passed after 6.131 seconds.
+✔ Test "R-CLN-8: the engine re-downloads an asset reportUnreadable quarantined" passed after 6.142 seconds.
+✔ Test "R-SYN-12: a new subscriber first receives the current snapshot and run progress" passed after 6.145 seconds.
+✔ Test "R-CAR-2: an identifier the newest fetched manifest lists is admitted from it when the refetch fails" passed after 6.155 seconds.
+✔ Test "R-SYN-11: a catalog larger than the budget syncs its largest fitting prefix essential-first and stays due" passed after 6.265 seconds.
+✔ Test "R-CLN-3: staging GC during maintenance keeps the file of a publication in flight, however old" passed after 5.947 seconds.
+✔ Test "R-SYN-11: a later free-space read counts the jobs an earlier one re-admitted that still wait for a slot, so together they never exceed the room" passed after 6.293 seconds.
+✔ Test "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened before the alarm's turn starts it" with 2 test cases passed after 6.296 seconds.
+✔ Test "R-SYN-12: the invariant check reports a waiter interest outside the waiter's job and a set-aside entry another interest wants" passed after 6.311 seconds.
+✔ Test "R-SYN-3: a queued bulk job a prefetch request joins is promoted and starts before the bulk job queued ahead of it" passed after 6.306 seconds.
+✔ Test "R-SYN-5: a run that joins a manifest fetch admitted while the breaker was closed holds no probe for it, so that fetch's answer does not close the breaker" passed after 6.314 seconds.
+✔ Test "R-SYN-11: an ensure whose member waits for space after an ENOSPC asking for more than the entry fails with the bytes the ENOSPC asked for and the room above the reserve" passed after 6.320 seconds.
+✔ Test "R-SYN-11: a fetch blocked on ENOSPC resumes after the store's reaper frees doomed blobs" passed after 6.021 seconds.
+✔ Test "R-CAR-4: a job only a claim keeps backs off after a transient failure under its held lane's retry policy instead of failing at once" passed after 6.334 seconds.
+✔ Test "R-SYN-16: a maintenance step that throws fails the maintenance with the mapped error and the next one runs" passed after 6.334 seconds.
+✔ Test "R-SYN-3: a user-initiated job starts while bulk work fills the verify and commit pipeline" passed after 6.352 seconds.
+✔ Test "R-CLN-6: a purge during a run's apply leaves the engine following the manifest the store applied" passed after 6.353 seconds.
+✔ Test "R-SYN-10: ensureAvailable completes after a breaker recovers from an abandoned probe" passed after 6.381 seconds.
+✔ Test "R-SYN-13: a member whose offline failure arrives after the network dropped again waits for the next edge and is retried there" passed after 6.387 seconds.
+✔ Test "R-NET-10: a promoted asset's priority change reaches the transport before any other transfer starts" passed after 6.383 seconds.
+✔ Test "R-SYN-6: a run whose planned asset another apply binds to content already present counts it as fetched and downloads nothing" passed after 6.389 seconds.
+✔ Test "R-SYN-6: a run reports each asset it could not fetch with its failure class" with 4 test cases passed after 6.196 seconds.
+✔ Test "R-SYN-13: after one network edge a member whose attempts keep failing offline while the path reads satisfied starts twice, then waits for the next edge" passed after 6.514 seconds.
+✔ Test "R-SYN-2: a stale commit with no interests removes the job and frees its pipeline slot" passed after 6.519 seconds.
+✔ Suite "Engine regressions, close-out cycle 13" passed after 6.588 seconds.
+✔ Test "R-SYN-5: an ambiguous 403 is never retried with backoff and never quarantines the asset beyond the run" passed after 6.327 seconds.
+✔ Test "R-SYN-6: a run whose last working claim ends after the throttle's end but before the alarm's turn waits for the alarm instead of settling blocked by the ended throttle" passed after 6.681 seconds.
+✔ Test "R-APL-4: a missing catalog pack while offline reports offline and leaves the applied manifest in force" passed after 6.684 seconds.
+✔ Test "R-SYN-5: a sync whose manifest fetch the throttle refuses reports the origin's end when a 429 extends the throttle before the run answers" passed after 6.684 seconds.
+✔ Test "R-SYN-5: a manifest 403 opens the breaker and resolve fails fast without a request" passed after 6.498 seconds.
+✔ Test "R-SYN-5: a throttle-gated pending run waits for the origin's end when a 429 extends the throttle after the run answered" passed after 6.805 seconds.
+✔ Test "R-SYN-16: maintenance stops between steps once its deadline passed" passed after 6.807 seconds.
+✔ Test "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished" with 2 test cases passed after 6.812 seconds.
+✔ Test "R-APL-3: an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released" passed after 6.812 seconds.
+✔ Test "R-SYN-10: an ensureAvailable whose throttled manifest fetch is answered after a 429 extended the throttle reports the time left until the extended end" passed after 6.811 seconds.
+✔ Test "R-SYN-12: a store view refused as possibly older than the copy is read again, so the engine still follows the store" passed after 6.812 seconds.
+✔ Test "R-NET-6: a 404 is not requested again until its manifest entry changes, across a relaunch" passed after 6.814 seconds.
+✔ Test "R-SYN-5: a manifest 429 shorter than the origin's throttle leaves the throttle's deadline at its end, where its parked job resumes and no run repeats" passed after 6.861 seconds.
+✔ Test "R-SYN-16: a maintenance step cancelled by shutdown answers shutDown" passed after 6.965 seconds.
+✔ Test "R-CLN-6: purge(.evictable) makes isSyncDue true and clears lastSyncedAt" passed after 6.983 seconds.
+✔ Test "R-SYN-5: a run that settled on claims a throttle parked reports the origin's end when a 429 extends the throttle before the run answers" passed after 6.994 seconds.
+✔ Test "R-SYN-5: an unknown-id resolve that a throttled manifest fetch answers after an earlier waiter's admission reports the time left until the origin's extended end" passed after 7.008 seconds.
+✔ Suite "Engine and the Apple tier" passed after 7.572 seconds.
+✔ Test "R-SYN-11: a job parked for lack of space starts once a fresh free-space read shows room" passed after 7.578 seconds.
+✔ Suite "Engine regressions, close-out cycle 15" passed after 7.630 seconds.
+✔ Test "R-SYN-11: ensureAvailable short of bytes the store has not scheduled to reclaim fails with insufficientSpace instead of waiting for ever" passed after 7.257 seconds.
+✔ Test "R-SYN-10: ensureAvailable evicts least-recently-used standard assets to make room within the budget" passed after 7.281 seconds.
+✔ Test "R-NET-1: the engine completes a sync against FakeRemoteSource with no network" passed after 7.670 seconds.
+✔ Test "R-SYN-12: clientShutDown is the last event every subscriber receives" passed after 7.761 seconds.
+✔ Test "R-CAR-2: an identifier a run's fetched manifest lists is never answered notFound before the run applies it" passed after 7.834 seconds.
+✔ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection stops before eviction and verification and reports the budget exhausted" passed after 7.839 seconds.
+✔ Test "R-SYN-6: a run does not download an asset another interest committed after its plan, and counts it as fetched" passed after 7.848 seconds.
+✔ Test "R-STO-11: a resolve during migration adopts that legacy file first and never waits for the whole catalog" passed after 7.661 seconds.
+✔ Test "R-SYN-11: a job waiting for space that nothing will reclaim is re-checked on a fresh free-space read before it fails with insufficientSpace" passed after 7.966 seconds.
+✔ Test "R-SYN-6: a run's held manifest probe is let go when its fetch finds the origin throttled, so the jobs parked behind it wait for the throttle" passed after 7.981 seconds.
+✔ Test "R-SYN-10: ensureAvailable downloads a member that an apply evicted before it threw" passed after 8.078 seconds.
+✔ Test "R-MAN-2: an undecodable manifest fails the run with serverUnavailable and leaves the applied manifest in force" passed after 8.105 seconds.
+✔ Test "R-SYN-6: a run whose last working claim ends after the breaker's cooldown but before the alarm's turn waits for the alarm instead of settling blocked by the open breaker" passed after 8.144 seconds.
+✔ Suite "Engine regressions, round 3" passed after 8.236 seconds.
+✔ Test "R-SYN-9: the stamp is stored in the index and written only after a complete run" passed after 8.395 seconds.
+✔ Test "R-CLN-5: every URL handed out stays readable for at least the grace window" passed after 8.412 seconds.
+✔ Test "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work" with 2 test cases passed after 8.155 seconds.
+✔ Test "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" with 3 test cases passed after 8.522 seconds.
+✔ Test "R-CLN-4: pins reach the store and a pinned asset is never evicted" passed after 8.559 seconds.
+✔ Test "R-SYN-9: a launch run starts only when the stamp is missing or the app version changed" passed after 8.563 seconds.
+✔ Suite "Engine regressions, close-out cycle 19" passed after 8.623 seconds.
+✔ Test "R-SYN-10: ensureAvailable during a bulk sync never fails with storageUnavailable because of concurrent commits" passed after 8.635 seconds.
+✔ Test "R-SYN-5: a prefetch blocked by an open breaker starts when the cooldown ends, and its success closes the breaker" passed after 8.640 seconds.
+✔ Test "R-STO-11: shutdown while the migration waits for a job's adoption of the last claimed prior-art file returns, and leaves no migration flag behind (L5K-R17, L5K-R22, row k-7)" passed after 8.741 seconds.
+✔ Suite "Engine regressions, close-out cycle 14" passed after 8.755 seconds.
+✔ Suite "Engine regressions, close-out cycle 7" passed after 8.755 seconds.
+✔ Test "R-SYN-6: a run whose claim parked for space loses the room the ledger gained to a job ranked ahead of it settles blocked for lack of space at once" passed after 8.805 seconds.
+✔ Test "R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger" with 2 test cases passed after 8.812 seconds.
+✔ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" passed after 8.961 seconds.
+✔ Test "R-SYN-6: a run whose claim parked for space the ledger admits once a job in flight ended without committing fetches it instead of settling blocked for lack of space" passed after 9.032 seconds.
+✔ Test "R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content" with 2 test cases passed after 9.039 seconds.
+✔ Test "R-STO-11: a user-initiated prefetch group's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)" passed after 9.042 seconds.
+✔ Test "R-SYN-6: a store failure while a run applies its manifest fails the run with the store's error and starts nothing" passed after 9.042 seconds.
+✔ Test "R-SYN-8: a metadata-only manifest change completes the run and writes the stamp" passed after 9.069 seconds.
+✔ Test "R-SYN-5: no transfer starts before a 429's Retry-After elapses on ManualTimeSource" passed after 9.096 seconds.
+✔ Test "R-STO-13: the prior-art files the last migration batch adopted reach the readers' snapshot within about two install intervals while phases 3 and 4 still run (L5K-R20)" passed after 9.108 seconds.
+✔ Suite "Engine commands" passed after 9.220 seconds.
+✔ Test "R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended" passed after 9.306 seconds.
+✔ Test "R-SYN-16: a heal whose re-download fails ends, and the engine forgets it" passed after 9.307 seconds.
+✔ Test "R-SYN-10: ensureAvailable's apply announces pruned ids and stops their jobs, as a run's apply does" passed after 9.307 seconds.
+✔ Test "R-SYN-13: runs that keep failing offline while the path reads satisfied run again only after a network edge, never on a timer" passed after 9.491 seconds.
+✔ Test "R-SYN-11: with eviction not permitted a run that does not fit evicts nothing" passed after 9.522 seconds.
+✔ Test "R-SYN-5: a run that starts while the half-open breaker admits only a probe holds it for its manifest fetch from its start turn" passed after 9.994 seconds.
+✔ Test "R-SYN-8: reconcile is committed before the first transfer starts" passed after 10.083 seconds.
+✔ Test "R-SYN-16: maintenance stops at its time budget on ManualTimeSource and resumes verification where it stopped" passed after 10.163 seconds.
+✔ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" passed after 10.410 seconds.
+✔ Test "R-SYN-12: after a run's apply throws past its in-memory writes, the engine follows the store and announces its prunes" passed after 10.554 seconds.
+✔ Test "R-SYN-5: a pending run that waits for a half-open breaker starts once its silent probe's watchdog passes" passed after 10.889 seconds.
+✔ Test "R-SYN-16: maintenance finds a corrupted blob, announces its quarantine, and the engine downloads it again when the quarantine ends" passed after 11.290 seconds.
+✔ Test "R-SYN-11: ensureAvailable whose member waits for bytes a purge reclaimed before the engine's alarm ran fetches it instead of failing on older free-space figures" passed after 11.343 seconds.
+✔ Suite "Engine regressions, close-out" passed after 11.393 seconds.
+✔ Test "R-STO-11: ensureAvailable during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)" passed after 11.389 seconds.
+✔ Test "R-STO-11: a job whose last group is released while its pre-transfer read adopts a later id sends no transfer request for the retired attempt, and its draining record ends (L5K-R25, KC4-MULTIID release variant)" passed after 11.643 seconds.
+✔ Test "R-STO-11: ensureAvailable's adoption of a prior-art file the held migration batch is hashing reaches the race in every run, and nothing is downloaded (L5K-R19, L5K-C2-04)" passed after 11.643 seconds.
+✔ Test "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" with 2 test cases passed after 11.754 seconds.
+✔ Test "R-SYN-5: a half-open probe whose publication fails the store's hash check frees the probe slot" passed after 11.885 seconds.
+✔ Suite "Engine recovery" passed after 11.892 seconds.
+✔ Test "R-OBS-3: the diagnostics keep the last 32 errors" passed after 11.924 seconds.
+✔ Test "R-STO-11: an explicit sync during legacy migration adopts every prior-art file still pending and downloads none (CCR-K1)" passed after 12.081 seconds.
+✔ Test "R-SYN-10: availability counts present, missing, stale and failed without any network request" passed after 12.109 seconds.
+✔ Test "R-SYN-11: a job waiting for space keeps waiting after a reclaim that leaves it short while more is pending, and starts once the rest is reclaimed" passed after 12.184 seconds.
+✔ Test "R-SYN-5: a transfer that probes after the cooldown publishes the half-open breaker before it closes" passed after 11.934 seconds.
+✔ Test "R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress" passed after 12.280 seconds.
+✔ Test "R-STO-11: when a job's adoption of the last claimed prior-art file ends while the migration batch's install is held, the migration still finishes in that launch instead of backing off to the next maintenance window with every file adopted (L5K-R23, KC4-STALELAST)" passed after 12.285 seconds.
+✔ Test "R-SYN-10: ensureAvailable whose member waits for space fetches it as soon as a purge reclaimed the bytes, not at the store's next deadline" passed after 12.297 seconds.
+✔ Test "R-SYN-15: no foreground staging write lands after the store is closed" passed after 12.458 seconds.
+✔ Test "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits" with 2 test cases passed after 12.518 seconds.
+✔ Test "R-CAR-5: the retention scope bounds bulk runs and evicts excluded entries first without deleting anything by itself" passed after 12.535 seconds.
+✔ Suite "Engine regressions, close-out cycle 6" passed after 12.574 seconds.
+✔ Test "R-STO-13: a job of two ids schedules the trailing install of its first id's bulk-urgency adoption before it reads the second id, so the readers see the first id once the install window has passed while that read is still held (L5K-R23, KC4-MULTIID)" passed after 12.720 seconds.
+✔ Test "R-SYN-6: an offline run ends blocked and a new run starts when the path is satisfied" passed after 12.817 seconds.
+✔ Suite "Engine regressions, close-out cycle 4" passed after 12.840 seconds.
+✔ Suite "Engine and store" passed after 12.853 seconds.
+✔ Test "R-SYN-6: a run whose last working claim ends after a half-open probe's watchdog but before the alarm's turn neither settles blocked by the breaker nor starts a second run" passed after 12.851 seconds.
+✔ Test "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" with 2 test cases passed after 12.894 seconds.
+✔ Test "R-SYN-5: a half-open probe superseded by an apply frees the probe slot" passed after 12.958 seconds.
+✔ Test "R-SYN-10: an ensureAvailable whose members fail fast as they become jobs still settles, a batch per actor turn" passed after 12.958 seconds.
+✔ Test "R-STO-13: a job of two ids promoted while its read of the second id runs answers its user-initiated asker of the first id, adopted at bulk urgency, only once the readers' snapshot holds it (L5K-R21)" passed after 12.973 seconds.
+✔ Test "R-STO-11: a run that starts while the launch run waits for legacy migration takes its place, so no launch run follows once migration ends" passed after 12.988 seconds.
+✔ Test "R-SYN-6: a run whose claim parked for space the ledger admits alone but not behind a re-queued job waiting for a slot settles blocked for lack of space at once" passed after 13.097 seconds.
+✔ Test "R-CLN-8: reportUnreadable announces, forgets and heals every asset the store quarantined with the blob, and a run downloads them again" passed after 13.119 seconds.
+✔ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" with 2 test cases passed after 13.140 seconds.
+✔ Test "R-SYN-7: bulk pauses on Low Data Mode and resumes when it is turned off" passed after 13.279 seconds.
+✔ Suite "Engine regressions, round 2" passed after 13.315 seconds.
+✔ Test "R-STO-13: ensureAvailable that joins a prefetch job while the job's pre-transfer read re-arms the store's deadline after a bulk adoption returns only once the readers' snapshot holds the asset (L5K-R21, PE5)" passed after 13.323 seconds.
+✔ Suite "Engine regressions, close-out cycle 18" passed after 13.409 seconds.
+✔ Test "R-STO-11: a prefetch group joined during legacy migration adopts the prior-art files instead of downloading them (CCR-K1)" passed after 13.410 seconds.
+✔ Test "R-STO-13: the prior-art files legacy migration's own batches adopt after a sync took the parked launch run's place reach the readers' snapshot once the install window has passed (L5K-R16, PR14c, probes I and J)" passed after 13.441 seconds.
+✔ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" with 2 test cases passed after 13.580 seconds.
+✔ Suite "Engine conditions" passed after 13.599 seconds.
+✔ Test "R-SYN-15: no store mutation or commit happens after close returns" passed after 13.679 seconds.
+✔ Test "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never" with 2 test cases passed after 13.332 seconds.
+✔ Test "R-STO-13: the prior-art files a migration batch adopted reach the readers' snapshot within about two install intervals while the migration waits for an adopt-on-demand of the last claimed file (L5K-R20, KC3-WAITWINDOW)" passed after 13.698 seconds.
+✔ Test "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" with 2 test cases passed after 13.776 seconds.
+✔ Test "R-STO-13: an older answer of the store's deadline that the engine applies after a newer one never takes a trailing install off the heap (L5K-R16, crossed re-reads)" passed after 13.797 seconds.
+✔ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" with 2 test cases passed after 13.876 seconds.
+✔ Suite "Engine regressions, close-out cycle 5" passed after 13.962 seconds.
+✔ Test "R-CAR-4: releasing a user-initiated handle of more members than one turn releases lets queued prefetch work start in that turn" passed after 13.965 seconds.
+✔ Test "R-STO-13: a prefetch job promoted to the user-initiated lane while its pre-transfer adoption runs answers its user-initiated asker only once the readers' snapshot holds the asset (L5K-R18)" passed after 14.109 seconds.
+✔ Test "R-SYN-7: a lane-wide policy park that stops at its turn's bound reaches every queued member even when user work takes the freed slot" passed after 14.122 seconds.
+✔ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" with 2 test cases passed after 14.249 seconds.
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" with 2 test cases passed after 14.446 seconds.
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" with 2 test cases passed after 14.493 seconds.
+✔ Test "R-SYN-11: when the volume gains room for more members parked for space than one turn re-admits, every one is re-queued" passed after 14.507 seconds.
+✔ Test "R-SYN-5: a run started while the breaker is open ends blocked without asking for the manifest" passed after 14.294 seconds.
+✔ Test "R-CAR-4: releasing a prefetch handle of more members than one turn releases leaves no job and starts none of its members meanwhile" passed after 14.643 seconds.
+✔ Test "R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes nothing" passed after 14.707 seconds.
+✔ Test "R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the readers' snapshot once the install window has passed, and the trailing installs stay within the install rate (L5K-R16, PR14a)" passed after 14.717 seconds.
+✔ Suite "Engine outcomes" passed after 14.808 seconds.
+✔ Test "R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)" with 2 test cases passed after 14.936 seconds.
+✔ Test "R-STO-11: when legacy migration ends while the run that took the launch run's place is active, no launch run follows it and no flag is left" passed after 14.936 seconds.
+✔ Test "R-SYN-5: a retry that falls due in the alarm turn of the cooldown's end probes before the pending run starts" passed after 14.953 seconds.
+✔ Test "R-SYN-5: a half-open probe that ends without a verdict lets the next parked job probe, so the run neither settles blocked nor starts further runs without the clock moving" passed after 15.009 seconds.
+✔ Test "R-CAR-4: a member of a released handle that another interest wants while the release continues starts at once" passed after 15.063 seconds.
+✔ Test "R-STO-11: an id of the same content that joins a job during the answer site's user-initiated publication is asked too before the answer, so its prior-art file is adopted and nothing is downloaded (L5K-R23)" passed after 15.245 seconds.
+✔ Suite "Engine regressions, close-out cycle 20" passed after 15.297 seconds.
+✔ Test "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" with 2 test cases passed after 15.307 seconds.
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" with 2 test cases passed after 15.310 seconds.
+✔ Test "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" with 2 test cases passed after 15.377 seconds.
+✔ Test "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since" with 2 test cases passed after 15.412 seconds.
+✔ Test "R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its follow-up sweep (C2)" passed after 15.418 seconds.
+✔ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" with 2 test cases passed after 15.421 seconds.
+✔ Test "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" with 2 test cases passed after 15.424 seconds.
+✔ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" with 3 test cases passed after 15.454 seconds.
+✔ Test "R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fresh" passed after 15.471 seconds.
+✔ Test "R-SYN-11: when the network returns under more queued members than one pump turn parks, every member the volume cannot hold ends parked for lack of space" passed after 15.525 seconds.
+✔ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" with 2 test cases passed after 15.528 seconds.
+✔ Test "R-SYN-11: once the store reclaimed what jobs waited for, every one the room does not hold is parked insufficientSpace, more than one turn's worth" passed after 15.549 seconds.
+✔ Test "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" with 2 test cases passed after 15.607 seconds.
+✔ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" with 2 test cases passed after 15.680 seconds.
+✔ Test "R-SYN-11: shutdown while requests, joins and sweeps wait for an owed follow answers every waiter (F-28)" passed after 15.681 seconds.
+✔ Suite "Engine regressions, close-out cycle 8" passed after 15.741 seconds.
+✔ Test "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" with 2 test cases passed after 15.856 seconds.
+✔ Test "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" with 2 test cases passed after 15.874 seconds.
+✔ Test "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" with 2 test cases passed after 15.875 seconds.
+✔ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" with 2 test cases passed after 15.882 seconds.
+✔ Test "R-CAR-4: a lane-wide park during a handle's release parks every other queued member and neither parks nor starts the released ones" passed after 15.915 seconds.
+✔ Test "R-SYN-11: a second follow begun while the first still owes visits keeps the barrier, and every waiter gets the visit-first answer (F-28)" passed after 15.997 seconds.
+✔ Test "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" with 2 test cases passed after 15.998 seconds.
+✔ Test "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" with 2 test cases passed after 16.031 seconds.
+✔ Test "R-CAR-4: invariantViolations reports a registered group in releasing only while its release holds members, not a large give-up's leftover claims" passed after 16.041 seconds.
+✔ Test "R-CAR-4: a join's give-up of more than releasesPerTurn claims retires at most releasesPerTurn jobs a turn" passed after 16.060 seconds.
+✔ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" with 2 test cases passed after 16.062 seconds.
+✔ Test "R-SYN-13: when the network returns under more members parked offline than one turn re-queues, every member is re-queued" passed after 16.064 seconds.
+✔ Suite "Engine group claims" passed after 16.080 seconds.
+✔ Suite "Engine regressions, close-out cycle 9" passed after 16.099 seconds.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases passed after 16.100 seconds.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" with 2 test cases passed after 16.141 seconds.
+✔ Test "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work" with 2 test cases passed after 16.145 seconds.
+✔ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" with 2 test cases passed after 16.149 seconds.
+✔ Test "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" with 2 test cases passed after 16.235 seconds.
+✔ Suite "Engine regressions, close-out cycle 11" passed after 16.239 seconds.
+✔ Test "R-SYN-5: prefetch members that wait for a slot and each end without a verdict start no run per probe while the clock does not move" passed after 16.302 seconds.
+✔ Test "R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource" passed after 16.345 seconds.
+✔ Suite "Engine regressions, close-out cycle 22" passed after 16.376 seconds.
+✔ Test "R-STO-11: a later launch that resumes an interrupted legacy migration adopts, never downloads, the prior-art files an explicit sync asks for (L5K-V3-06)" passed after 16.400 seconds.
+✔ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" with 3 test cases passed after 16.432 seconds.
+✔ Test "R-SYN-6: a run whose claim parked for space the owed follow-up sweep does not admit settles blocked for lack of space once that sweep ran" passed after 16.473 seconds.
+✔ Test "R-SYN-6: a run whose claim parked for space a follow-up free-space sweep still owes a re-check waits for it instead of settling blocked for lack of space" passed after 16.564 seconds.
+✔ Test "R-STO-13: during legacy migration a page a user resolves is in the readers' snapshot at once, and the neighbours a prefetch group's jobs adopt reach it once the install window has passed (L5K-R16, PR14b)" passed after 16.579 seconds.
+✔ Test "R-STO-1: a cancelled, paused or failed foreground transfer leaves no byte outside the store root" passed after 16.603 seconds.
+✔ Suite "Engine over the live transport" passed after 16.643 seconds.
+✔ Test "R-SYN-6: a run whose failed-whenOnline claim a network-edge re-admission turn still owes a re-queue waits for it instead of settling offline" passed after 16.678 seconds.
+✔ Test "R-SYN-6: a run whose claim a lane-wide park left that a conditions re-admission turn still owes a re-queue waits for it instead of settling blocked by the policy" passed after 16.708 seconds.
+✔ Suite "Engine regressions, close-out cycle 17" passed after 16.747 seconds.
+✔ Test "R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's probe closes it" passed after 16.834 seconds.
+✔ Suite "Engine run paths" passed after 16.852 seconds.
+✔ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" passed after 16.880 seconds.
+✔ Test "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" with 2 test cases passed after 16.913 seconds.
+✔ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" passed after 16.960 seconds.
+✔ Test "R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the clock does not move" passed after 16.979 seconds.
+✔ Suite "Engine regressions, close-out cycle 21" passed after 17.002 seconds.
+✔ Test "R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)" passed after 17.011 seconds.
+✔ Test "R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded" passed after 16.915 seconds.
+✔ Test "R-SYN-7: a Low Data Mode flap reported as two conditions elements never leaves a paused prefetch member parked (20 rounds)" passed after 17.222 seconds.
+✔ Suite "Engine regressions, close-out cycle 10" passed after 17.236 seconds.
+✔ Test "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" with 5 test cases passed after 17.458 seconds.
+✔ Test "R-SYN-3: lane queues stay within twice their live entries while queued jobs move between lanes" passed after 17.507 seconds.
+✔ Suite "Engine safety nets" passed after 17.522 seconds.
+✔ Test "R-SYN-6: with the default tuning, a run does not download an asset the store holds present after a failed apply dropped the ledger" passed after 17.685 seconds.
+✔ Suite "Engine regressions, close-out cycle 3" passed after 17.700 seconds.
+✔ Test "R-STO-13: during legacy migration a bulk sync whose jobs adopt 100 prior-art files installs only the snapshots the install-rate limiter allows (ARCHITECTURE §5), and a user-initiated job's adoption installs at once (L5K-R14)" passed after 17.868 seconds.
+✔ Test "R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels" passed after 18.579 seconds.
+✔ Suite "Engine single-flight" passed after 18.586 seconds.
+✔ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" passed after 18.306 seconds.
+✔ Suite "Engine failure paths" passed after 18.616 seconds.
+✔ Test "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" with 5 test cases passed after 18.726 seconds.
+✔ Suite "Engine lanes" passed after 18.758 seconds.
+✔ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" passed after 19.615 seconds.
+✔ Test "R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report" passed after 20.044 seconds.
+✔ Test "R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answers, every waiter fails fast" passed after 21.041 seconds.
+✔ Test "R-SYN-2: an apply that moves more jobs than one turn takes follows them a bounded slice per turn with every invariant holding between turns" passed after 21.243 seconds.
+✔ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" passed after 21.354 seconds.
+✔ Suite "Engine runs" passed after 21.364 seconds.
+✔ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" passed after 21.859 seconds.
+✔ Suite "Engine idle and shutdown" passed after 21.866 seconds.
+✔ Test "R-STO-11: a user-initiated prefetch group joined right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)" passed after 23.293 seconds.
+✔ Test "R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pace, downloads none of the prior-art files, launch after launch (L5K-R13)" passed after 23.924 seconds.
+✔ Test "R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together" passed after 24.889 seconds.
+✔ Suite "Engine support values" passed after 24.895 seconds.
+✔ Test "R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits for it, never calling migrateLegacy again at once (L5K-R17, L5K-R22, PSPIN)" passed after 25.449 seconds.
+✔ Suite "Engine: transfers during legacy migration (L5K-R1)" passed after 25.456 seconds.
+✔ Test "R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instead of settling blocked by the ended throttle" passed after 25.618 seconds.
+✔ Suite "Engine regressions, close-out cycle 16" passed after 25.621 seconds.
+✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 29.963 seconds.
+✔ Suite "Engine regressions" passed after 29.967 seconds.
+✔ Test "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" with 4 test cases passed after 30.053 seconds.
+✔ Suite "Engine regressions, close-out cycle 12" passed after 30.057 seconds.
+✔ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" passed after 31.969 seconds.
+✔ Suite "Engine model" passed after 31.973 seconds.
+✔ Test "R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in the queue for a slot without being parked, keep every invariant" passed after 32.688 seconds.
+✔ Test "R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events never settle, start or park against a gate that admits at now, and never repeat runs without the clock moving" passed after 32.858 seconds.
+✔ Suite "Engine gate model, close-out cycle 20" passed after 32.860 seconds.
+✔ Test "R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync" passed after 36.427 seconds.
+✔ Suite "Engine events" passed after 36.431 seconds.
+✔ Test run with 438 tests in 52 suites passed after 36.432 seconds.

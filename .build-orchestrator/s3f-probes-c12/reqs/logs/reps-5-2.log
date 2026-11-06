@@ -1,0 +1,31 @@
+Another instance of SwiftPM (PID: 74408) is already running using '/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/repbuild', waiting until that process has finished execution...◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC12RetryRepro" started.
+◇ Test "PROBE-C12R-RETRY-REPRO" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C12R-RETRY-REPRO" started.
+REP step 1: cancelled=false r=nil h=nil p=nil cond=false storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=0 next=nil now=1000000000ns
+REP step 2: cancelled=false r=Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1005615401ns))) h=nil p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=1 next=Optional(1005615401ns) now=1000000000ns
+REP step 3: cancelled=false r=Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1005615401ns))) h=Optional(ZTronAssetSync.JobState.downloading) p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=1 next=Optional(1005615401ns) now=1000000000ns
+REP step 4: cancelled=false r=Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1005615401ns))) h=Optional(ZTronAssetSync.JobState.downloading) p=Optional(ZTronAssetSync.JobState.queued) cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=1 next=Optional(1005615401ns) now=1000000000ns
+REP step 5: cancelled=false r=Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1005615401ns))) h=Optional(ZTronAssetSync.JobState.downloading) p=Optional(ZTronAssetSync.JobState.queued) cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=1 next=Optional(1005615401ns) now=1000000000ns
+REP step 6: cancelled=false r=Optional(ZTronAssetSync.JobState.queued) h=Optional(ZTronAssetSync.JobState.downloading) p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=Optional(run-3) pending=false catchUps=0 sleepers=0 next=nil now=1005615401ns
+REP step 7: cancelled=false r=Optional(ZTronAssetSync.JobState.queued) h=Optional(ZTronAssetSync.JobState.downloading) p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=Optional(run-3) pending=false catchUps=0 sleepers=0 next=nil now=1005615401ns
+REP step 8: cancelled=false r=Optional(ZTronAssetSync.JobState.queued) h=Optional(ZTronAssetSync.JobState.downloading) p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=Optional(run-3) pending=false catchUps=0 sleepers=0 next=nil now=1005615401ns
+REP step 9: cancelled=false r=Optional(ZTronAssetSync.JobState.queued) h=nil p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=Optional(run-3) pending=false catchUps=0 sleepers=0 next=nil now=1005615401ns
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C12R-RETRY-REPRO" started.
+REP step 1: cancelled=false r=nil h=nil p=nil cond=false storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=0 next=nil now=1000000000ns
+REP step 2: cancelled=false r=Optional(ZTronAssetSync.JobState.downloading) h=nil p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=0 next=nil now=1000000000ns
+✘ Test "PROBE-C12R-RETRY-REPRO" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12RetryRepro.swift:23:6: Time limit was exceeded: 60.000 seconds
+REP step 3: cancelled=true r=Optional(ZTronAssetSync.JobState.downloading) h=Optional(ZTronAssetSync.JobState.queued) p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=0 next=nil now=1000000000ns
+REP step 4: cancelled=true r=Optional(ZTronAssetSync.JobState.downloading) h=Optional(ZTronAssetSync.JobState.queued) p=nil cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=0 next=nil now=1000000000ns
+REP step 5: cancelled=true r=Optional(ZTronAssetSync.JobState.downloading) h=Optional(ZTronAssetSync.JobState.queued) p=Optional(ZTronAssetSync.JobState.queued) cond=true storeWork=false storeDeadline=nil owed=false barrier=false events=0 run=nil pending=false catchUps=0 sleepers=0 next=nil now=1000000000ns
+✘ Test "PROBE-C12R-RETRY-REPRO" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12RetryRepro.swift:68:27: Expectation failed: backoffEnd
+↳ setup: R waits for its backoff
+↳ backoffEnd → nil
+✘ Test "PROBE-C12R-RETRY-REPRO" with 2 test cases failed after 64.001 seconds with 2 issues.
+✘ Suite "VerifyC12RetryRepro" failed after 64.002 seconds with 2 issues.
+↳ /// Scratch repro (s3f c12 reqs verifier): `barrierRetriesBehindTheOwedVisitsPlaces` with a state dump after each wait.
+✘ Test run with 1 test in 1 suite failed after 64.002 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

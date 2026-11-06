@@ -1,0 +1,220 @@
+diff -ru Sources/ZTronAssetStorage/Blobs/BlobUnits.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Blobs/BlobUnits.swift
+--- Sources/ZTronAssetStorage/Blobs/BlobUnits.swift	2026-10-29 10:54:24
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Blobs/BlobUnits.swift	2026-10-29 11:57:27
+@@ -103,7 +103,9 @@
+                 try fileSystem.removeItem(at: source)
+                 return .success(.keptExisting)
+             }
+-            try fileSystem.synchronizeFile(at: source, level: .barrier)
++            if ProcessInfo.processInfo.environment["S3MUT"] != "A" {
++                try fileSystem.synchronizeFile(at: source, level: .barrier)
++            }
+             let fanOut = layout.fanOutDirectory(for: key.hash)
+             createdFanOut = try fileSystem.itemInfo(at: fanOut) == nil
+             try fileSystem.createDirectory(at: fanOut)
+diff -ru Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
+--- Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift	2026-10-29 10:54:24
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift	2026-10-29 11:57:27
+@@ -161,7 +161,7 @@
+         }
+         let temporary = layout.indexURL(.temporary)
+         do throws(FileSystemError) {
+-            for fanOut in input.dirtyFanOuts {
++            for fanOut in input.dirtyFanOuts where ProcessInfo.processInfo.environment["S3MUT"] != "B" {
+                 try IndexCommitUnit.barrier(layout.blobsDirectory.appendingPathComponent(fanOut, isDirectory: true), fileSystem)
+             }
+             if input.blobsDirectoryDirty {
+@@ -181,7 +181,9 @@
+         }
+         do throws(FileSystemError) {
+             try IndexCommitUnit.replaceCurrent(with: .temporary, layout: layout, fileSystem: fileSystem, committedFile: &outcome.committedFile)
+-            try fileSystem.synchronizeDirectory(at: layout.root, level: level)
++            if ProcessInfo.processInfo.environment["S3MUT"] != "I" || input.durability == .durable {
++                try fileSystem.synchronizeDirectory(at: layout.root, level: level)
++            }
+             if input.durability == .durable {
+                 try fileSystem.synchronizeDirectory(at: layout.container, level: .full)
+                 try fileSystem.synchronizeDirectory(at: layout.container.deletingLastPathComponent(), level: .full)
+diff -ru Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift
+--- Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift	2026-10-29 10:54:24
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift	2026-10-29 11:57:38
+@@ -172,6 +172,8 @@
+                     }
+                     do throws(FileSystemError) {
+                         try fileSystem.write(data, to: temporary, mode: truncate ? .truncate : .append)
++                    } catch .noSpace where ProcessInfo.processInfo.environment["S3MUT"] == "MS11" {
++                        // swallowed (mutant M-S-11)
+                     } catch {
+                         throw FileSystemErrorMapping.stagingError(error)
+                     }
+diff -ru Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift
+--- Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift	2026-10-29 11:16:02
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift	2026-10-29 11:57:38
+@@ -263,6 +263,10 @@
+     /// theirs). Otherwise a maintenance run overlapping a pruning `apply` freed up to the pruned bytes more than needed,
+     /// each extra asset to be downloaded again (OI-14; Stage 3 S3B-9).
+     private func releaseCountingBytes(_ key: BlobKey) {
++        if ProcessInfo.processInfo.environment["S3MUT"] == "OI14" {
++            self.releaseReference(key, dooming: .unreferenced)
++            return
++        }
+         // Whether `usedBytes` counts the blob, and its bytes, read before the release.
+         var wasLive = false
+         if case .live? = self.state.core.blobTable[key] {
+@@ -359,7 +363,7 @@
+         record.residency = .present(blob: key, byteSize: size, integrity: record.entry.checksum == key.hash ? .verified : .unverified)
+         record.storedAt = now
+         self.state.core.records[id] = record
+-        if let previous, previous != key {
++        if let previous, previous != key, ProcessInfo.processInfo.environment["S3MUT"] != "CONF6" {
+             self.releaseCountingBytes(previous)
+         }
+         self.state.core.commits.dirtyFanOuts.insert(key.hash.fanOut)
+diff -ru Sources/ZTronAssetStorage/Store/AssetStore+Open.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Open.swift
+--- Sources/ZTronAssetStorage/Store/AssetStore+Open.swift	2026-10-29 10:54:24
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Open.swift	2026-10-29 11:57:38
+@@ -155,7 +155,7 @@
+         self.state.core.commits.pendingPromotion = loaded.promotion
+         // The launch epoch is the generation the launch commit carries, persisted; unique only across launches whose
+         // launch commit succeeded over a readable index, so not strictly increasing (ADR-013 as amended by ADR-050).
+-        self.state.core.launchEpoch = loaded.nextGeneration
++        self.state.core.launchEpoch = ProcessInfo.processInfo.environment["S3MUT"] == "EPOCH" ? max(1, loaded.nextGeneration - 1) : loaded.nextGeneration
+         self.state.core.records = reconciled.records
+         self.state.core.blobTable = reconciled.blobTable
+         self.state.core.blobBytes = reconciled.blobBytes
+diff -ru Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift
+--- Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift	2026-10-29 10:59:16
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift	2026-10-29 11:57:38
+@@ -81,7 +81,7 @@
+                 // as every other figure built from manifest sizes does (S3-SECU-01, R-MAN-2): a hostile manifest must
+                 // not trap the process.
+                 report.missing += 1
+-                report.bytesMissing = report.bytesMissing.addingSaturating(max(0, entry.byteSize ?? 0))
++                if ProcessInfo.processInfo.environment["S3MUT"] == "SECU" { report.bytesMissing += entry.byteSize ?? 0 } else { report.bytesMissing = report.bytesMissing.addingSaturating(max(0, entry.byteSize ?? 0)) }
+             case .quarantined?, .failed?:
+                 report.failed += 1
+             }
+diff -ru Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+--- Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift	2026-10-29 11:11:50
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift	2026-10-29 11:57:48
+@@ -49,16 +49,16 @@
+         if self.state.core.degraded {
+             return .degraded
+         }
+-        guard let eligibleAt = info.eligibleAt else {
++        guard let eligibleAt = info.eligibleAt ?? (ProcessInfo.processInfo.environment["S3MUT"] == "F" ? MonotonicInstant(nanoseconds: 0) : nil) else {
+             return .acknowledgement
+         }
+-        if self.state.core.committedGeneration < info.droppedInGeneration {
++        if self.state.core.committedGeneration < info.droppedInGeneration, ProcessInfo.processInfo.environment["S3MUT"] != "C" {
+             return .commit
+         }
+         if let leases = self.state.cleanup.leases[key], !leases.isEmpty {
+             return .lease
+         }
+-        if eligibleAt > self.environment.time.uptimeNow() {
++        if eligibleAt > self.environment.time.uptimeNow(), ProcessInfo.processInfo.environment["S3MUT"] != "S" {
+             return .grace(eligibleAt)
+         }
+         guard let fresh = self.state.core.snapshots.lastAcknowledgedInstallStart, fresh >= eligibleAt else {
+@@ -151,6 +151,9 @@
+     /// `deletionBatchSize` (P-13); failed unlinks stay doomed with backoff. `bytesDeferred` counts doomed bytes whose
+     /// only blocker is a lease.
+     func reap(maxKeys: Int) async -> CleanupResult {
++        if ProcessInfo.processInfo.environment["S3MUT"] == "REAP" {
++            return await self.reapOld(maxKeys: maxKeys)
++        }
+         var result = CleanupResult()
+         guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
+             return result
+@@ -215,5 +218,69 @@
+     /// The backoff after `failures` failed unlinks of one key: 1 s, doubling, at most 5 minutes.
+     static func unlinkBackoff(afterFailures failures: Int) -> TimeInterval {
+         min(300, pow(2, Double(max(0, min(failures, 16) - 1))))
++    }
++}
++
++extension AssetStore {
++    func reapOld(maxKeys: Int) async -> CleanupResult {
++        var result = CleanupResult()
++        guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
++            return result
++        }
++        var queue = self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted()[...]
++        let batchSize = max(1, self.configuration.deletionBatchSize)
++        let fileSystem = self.environment.fileSystem
++        let time = self.environment.time
++        var budget = maxKeys
++        while !queue.isEmpty, budget > 0, self.state.core.phase == .open {
++            var batch: [BlobKey] = []
++            while let key = queue.first, batch.count < min(batchSize, budget) {
++                queue.removeFirst()
++                // Re-validated per key: the state may have changed during the previous unit.
++                guard self.deletionBlocker(key) == .none, case .doomed(let info)? = self.state.core.blobTable[key] else {
++                    continue
++                }
++                self.state.core.deletingDooms[key] = info
++                self.state.core.blobTable[key] = .deleting
++                batch.append(key)
++            }
++            guard !batch.isEmpty else {
++                break
++            }
++            let keys = batch
++            // REENTRANCY: R7 — keys in `.deleting` are gone, or back to `doomed` with backoff on failure (or unchanged
++            // when the unit's time budget ran out before them); waiting publishers are resumed; the loop re-checks the
++            // phase before the next batch.
++            let outcome = await self.runUnit(on: self.environment.metadataExecutor) {
++                BlobDeletionUnit.run(fileSystem: fileSystem, layout: layout, keys: keys, time: time, budget: BlobDeletionUnit.budget)
++            }
++            let uptime = self.environment.time.uptimeNow()
++            for (position, key) in batch.enumerated() {
++                let info = self.state.core.deletingDooms.removeValue(forKey: key)
++                if position >= outcome.attempted {
++                    // Not attempted: back to doomed as it was, first in line for the next unit.
++                    if let info {
++                        self.state.core.blobTable[key] = .doomed(info)
++                    }
++                    queue.insert(key, at: queue.startIndex + (position - outcome.attempted))
++                } else if outcome.failures[key] != nil, var doom = info {
++                    doom.failedUnlinks += 1
++                    doom.eligibleAt = uptime.adding(seconds: AssetStore.unlinkBackoff(afterFailures: doom.failedUnlinks))
++                    self.state.core.blobTable[key] = .doomed(doom)
++                } else {
++                    self.state.core.blobTable[key] = nil
++                    result.bytesFreed += self.state.core.blobBytes.removeValue(forKey: key) ?? 0
++                    result.filesRemoved += 1
++                }
++                self.resumeKeyWaiters(key)
++            }
++            budget -= outcome.attempted
++            // The processed keys leave DOOMED with the next commit (a lazy mutation).
++            self.markDirtyInternal(.lazy)
++        }
++        for key in self.state.core.blobTable.keys where self.deletionBlocker(key) == .lease {
++            result.bytesDeferred += self.state.core.blobBytes[key] ?? 0
++        }
++        return result
+     }
+ }
+diff -ru Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+--- Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift	2026-10-29 10:54:24
++++ .build-verify-s3b-c1-reqs/mut/src/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift	2026-10-29 11:57:38
+@@ -197,7 +197,7 @@
+             switch table[key] {
+             case .live(let references)?:
+                 table[key] = .live(references: references + 1)
+-            case .doomed(let info)? where info.reason == .unreferenced:
++            case .doomed(let info)? where info.reason == .unreferenced || ProcessInfo.processInfo.environment["S3MUT"] == "E" || (ProcessInfo.processInfo.environment["S3MUT"] == "P" && info.reason == .purged):
+                 table[key] = .live(references: 1)
+             case nil:
+                 table[key] = .live(references: 1)
+@@ -226,7 +226,7 @@
+             blobBytes: bytes,
+             orphans: orphans,
+             missingBlobs: missing,
+-            adoptedFanOuts: fanOuts,
++            adoptedFanOuts: ProcessInfo.processInfo.environment["S3MUT"] == "H" ? [] : fanOuts,
+             doomedRepairs: repairs,
+             osPurgeDetected: osPurge
+         )

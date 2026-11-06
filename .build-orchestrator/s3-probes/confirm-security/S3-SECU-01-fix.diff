@@ -1,0 +1,22 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift
+index db8e56d..d73b2b1 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift
+@@ -67,7 +67,7 @@ extension AssetStore {
+             report.total += 1
+             guard let record = self.state.core.records[entry.identifier] else {
+                 report.missing += 1
+-                report.bytesMissing += entry.byteSize ?? 0
++                report.bytesMissing = report.bytesMissing.addingSaturating(max(0, entry.byteSize ?? 0))
+                 continue
+             }
+             switch record.residency {
+@@ -82,7 +82,7 @@ extension AssetStore {
+                 }
+             case .absent, .needsHeal:
+                 report.missing += 1
+-                report.bytesMissing += entry.byteSize ?? 0
++                report.bytesMissing = report.bytesMissing.addingSaturating(max(0, entry.byteSize ?? 0))
+             case .quarantined, .failed:
+                 report.failed += 1
+             }

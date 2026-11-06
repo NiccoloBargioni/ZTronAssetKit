@@ -1,0 +1,4 @@
+start 22:01:13 epoch 1793566873 load { 6.41 28.11 40.95 }
+✔ Suite "Engine follow barrier (F-28)" passed after 1579.964 seconds.
+✔ Test run with 552 tests in 53 suites passed after 1579.966 seconds.
+exit 0 end 22:29:39 epoch 1793568579 load { 81.77 98.34 65.48 }

@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetAppleHosted/AppleSourceState.swift b/Sources/ZTronAssetAppleHosted/AppleSourceState.swift
+index ee438a4..f29c1d3 100644
+--- a/Sources/ZTronAssetAppleHosted/AppleSourceState.swift
++++ b/Sources/ZTronAssetAppleHosted/AppleSourceState.swift
+@@ -238,7 +238,7 @@ actor AppleSourceState {
+     func planRelease(_ survey: ReleaseSurvey) -> ReleasePlan {
+         self.adoptedPacks = survey.adopted
+         self.settledPacks = survey.settled
+-        let packs = survey.settled.subtracting(self.released).subtracting(self.releasing).sorted()
++        let packs = survey.settled.subtracting(self.releasing).sorted()
+         self.releasing.formUnion(packs)
+         return ReleasePlan(packs: packs, generation: self.generation)
+     }

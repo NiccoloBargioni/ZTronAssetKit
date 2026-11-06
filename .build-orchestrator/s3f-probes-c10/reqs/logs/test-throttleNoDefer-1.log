@@ -1,0 +1,38 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+✘ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:422:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A, moved onto N's running job, is served from N, not answered with C's throttle (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" with 2 test cases failed after 0.961 seconds with 1 issue.
+↳ /// A 429's park answers only the interests the job holds once the follow moved its ids: C (1 MB) is the content of
+↳ /// zz-a and zz-b, one user waiter each; N (16 bytes) downloads for W's user waiter of zz-n (held). v3 moves zz-a onto
+↳ /// N's content while the follow owes C's visit. C's attempt gets a 429 with Retry-After 60 s (beyond the interactive
+↳ /// 2 s wait). Visited first, A's interest joined N's running job, which serves it; the park's fail-fast answers B
+↳ /// only. Parked before the visit, the fail-fast answered A too (PROBE-C9-THROTTLE). N runs before the apply in both
+↳ /// orders, so no admission waits for the follow: the probe's own N was created by the visit and, behind the barrier,
+↳ /// admitted only after the 429's throttle was in force (R2's accepted admission wait, under a real-world input).
+◇ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+✘ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:475:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A, moved onto Y's present content by the owed visit, is answered from it (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" with 2 test cases failed after 0.879 seconds with 1 issue.
+↳ /// A 429 answers no interest the owed visit moves onto content already present: Y (16 bytes, zz-y) is present in the
+↳ /// store; C (1 MB) downloads for A (zz-a, user) and B (zz-b, user). v3 moves zz-a onto Y's content and keeps zz-b on
+↳ /// C's. C's attempt then gets a 429 with Retry-After 600 s. Visited first, A was answered from Y before the 429. Behind
+↳ /// the barrier the 429's fail-fast answered A `serverUnavailable` before the owed visit moved it to the present
+↳ /// content (PROBE-C9R-THROTTLE-PRESENT; no admission is involved, so the barrier's admission wait plays no part).
+✘ Suite "Engine follow barrier (F-28)" failed after 1.841 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 1.841 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,16 @@
+# TSan run 1 (load 18 -> 180 -> 7): the new legacy pair test's slice 0
+17:45:19
+17:45  up 4 days,  6:08, 2 users, load averages: 18.86 23.42 38.44
+✘ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 0 at CrashPairTests.swift:40:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" with 128 test cases failed after 2017.404 seconds with 1 issue.
+✘ Test run with 481 tests in 64 suites failed after 2017.411 seconds with 1767 issues.
+18:21:56
+18:21  up 4 days,  6:45, 2 users, load averages: 7.25 50.36 94.03
+# TSan run 2
+18:22:29
+18:22  up 4 days,  6:45, 2 users, load averages: 5.16 45.74 90.84
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" recorded an issue at LoopbackHTTPServerTests.swift:400:6: Time limit was exceeded: 60.000 seconds
+✔ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" with 128 test cases passed after 971.203 seconds.
+✘ Test run with 481 tests in 64 suites failed after 971.213 seconds with 1 issue.
+18:39:18
+18:39  up 4 days,  7:02, 2 users, load averages: 7.98 38.84 66.24

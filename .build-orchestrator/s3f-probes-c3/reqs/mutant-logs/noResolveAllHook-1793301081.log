@@ -1,0 +1,95 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[9 / 13] ZTronAssetSync
+[12 / 13] ZTronAssetCompatibilityTests-product
+[15 / 16] ZTronAssetKitBenchmarks-product
+[18 / 19] ZTronAssetKitTests-product
+[20 / 22] ZTronAssetStorageTests-product
+[21 / 22] ZTronAssetSyncTests-product
+[23 / 23] ZTronAssetSyncTests-product
+Build complete! (10,42 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" started.
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" started.
+◇ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" started.
+◇ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" started.
+◇ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" started.
+◇ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" started.
+◇ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" started.
+◇ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" started.
+◇ Test case passing 1 argument failure → .noSpace to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .notFound to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .serverErrorAtCap to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+PROBE-W4 before the 404: copy lists the id at its new content true, old job Optional(ZTronAssetSync.JobState.downloading), owed visits 344
+✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .notFound at EngineFollowTests.swift:275:9: Expectation failed: (try? answer.get()) != nil
+↳ the waiter of a listed id is answered from its new content: failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? answer.get()) != nil → <not evaluated>
+✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .notFound at EngineFollowTests.swift:276:9: Expectation failed: await harness.source.starts.map(\.id).contains(replacement.transferID)
+↳ the id's new content was fetched
+↳ await harness.source.starts.map(\.id).contains(replacement.transferID) → <not evaluated>
+PROBE-W4 waiter's answer: failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:121:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-W4 FAIL: the waiter of a listed id was answered failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? answer.get()) != nil → <not evaluated>
+✔ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" passed after 1.744 seconds.
+PROBE-W1 between follow turns: owed visits 444, downloading [], starts since the apply 0, of replaced content 0: []
+✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" failed after 1.806 seconds with 1 issue.
+↳ /// PROBE-W4: an id whose content changed waits for its follow visit on the job of its replaced content; a 404 for
+↳ /// that replaced content arriving before the visit answers its waiter `.notFound` although the engine's copy lists
+↳ /// the id (F-20's rule: never `.notFound` while the asset is listed). The hold seam stands for the follow-up turn
+↳ /// that has not run yet when the network callback lands (independent tasks in production).
+✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" with 3 test cases failed after 2.021 seconds with 2 issues.
+↳ /// An id whose content an apply changed keeps its interest on the job of its replaced content until the bounded
+↳ /// follow visits that job, up to many turns later at 10,000. A failure of that job's attempt arriving first is not
+↳ /// that id's failure: the job is followed before it acts, so the waiter follows the id's new content and is
+↳ /// answered from it, never `.notFound` (F-20: never `.notFound` while the asset is listed) nor the old content's
+↳ /// failure. 600 ids, all changed; the last one's user waiter rides its old content's running transfer; the follow
+↳ /// stops after its first turn (`holdFollowFollowUps()`, the turn ordering the network callback ahead of the
+↳ /// follow-up, which production allows) with that job's visit still owed; then the transfer fails. Without the
+↳ /// on-demand follow the waiter was answered `failure(notFound)` (the 404), the 503's error, or the ENOSPC figures
+↳ /// (the close-out cycle-2 correctness lens, PROBE-W4).
+PROBE-W1 after the follow: outcome complete true, starts since the apply 2, of replaced content 0
+✔ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" passed after 2.118 seconds.
+✔ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" passed after 2.128 seconds.
+✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" recorded an issue at EngineFollowTests.swift:323:9: Expectation failed: after.pending == [replacement.transferID]
+↳ the member waits for its new content: []
+↳ after.pending == [replacement.transferID] → false
+↳   after.pending → []
+↳   [replacement.transferID] → [c-3987d796c5b6381d42a38ed6bed999f36e7428f1bb78b98d474b8a7cff3c9903]
+✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" recorded an issue at EngineFollowTests.swift:324:9: Expectation failed: after.new
+↳ the new content's job holds the member's interest
+↳ after.new → false
+↳   after → (pending: [], new: false, old: nil, violations: [])
+↳     pending → []
+↳     new → false
+↳     old → nil
+↳     violations → []
+↳   new → false
+✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" failed after 4.825 seconds with 2 issues.
+↳ /// The prefetch-member form of `replacedContentFailureFollowsTheWaiter`, for a job the follow's pass has not reached
+↳ /// yet: the member whose old content's transfer runs is the last entry of the replaced copy, past the first turn's
+↳ /// `followFormatsPerTurn` comparisons, so no visit is even owed for it when its transfer answers 404. The member
+↳ /// follows its new content (the group waits for that job) instead of being settled by the old content's failure
+↳ /// (the close-out cycle-2 correctness lens, PROBE-W4b's shape with the hold seam).
+✘ Suite "Engine runs" failed after 4.826 seconds with 4 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+PROBE-W4b: owed visits when the 404 was released 1792, sync complete true, waiter's answer failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:159:9: Expectation failed: (try? answer.get()) != nil
+↳ PROBE-W4b FAIL: the waiter of a listed id was answered failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? answer.get()) != nil → <not evaluated>
+✘ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" failed after 5.723 seconds with 1 issue.
+↳ /// PROBE-W4b: PROBE-W4 without any seam: the 404 for the replaced content is released as soon as the copy lists
+↳ /// the id at its new content, racing the follow's own follow-up turns (production scheduling).
+PROBE-W1b: complete true, starts since the apply 4, of replaced content 0
+✔ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" passed after 6.074 seconds.
+✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 6.075 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 2, correctness lens). Never committed.
+✘ Test run with 8 tests in 2 suites failed after 6.075 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

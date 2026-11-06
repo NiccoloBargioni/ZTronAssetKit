@@ -1,0 +1,17 @@
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:98:9: Expectation failed: job.tokensByID[a] == nil
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:108:9: Expectation failed: job.tokensByID[a] == nil && job.tokensByID[b]?.tokens == [t1]
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:113:9: Expectation failed: job.tokensByID[b] == nil && job.tokensByID[c]?.tokens == [t1]
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:120:9: Expectation failed: job.tokensByID[a] == nil && job.tokensByID[b] == nil && job.tokensByID[c]?.tokens == [t1, t3]
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:123:9: Expectation failed: Self.indexed(copy) == Self.recount(copy) && copy.tokensByID[c]?.tokens == [t1]
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test "R-SYN-6: a job's index of its interests by id follows every change to its interests" recorded an issue at EngineIDTokensTests.swift:70:13: Expectation failed: Self.indexed(job) == Self.recount(job)
+✘ Test run with 3 tests in 1 suite failed after 0.014 seconds with 16 issues.

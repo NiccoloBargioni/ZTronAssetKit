@@ -1,0 +1,19 @@
+LOAD 16:03:34 { 39.41 79.06 63.14 }
+c2probe exit 0
+◇ Test "PROBE-C14C-C2-FOLLOWED-LANE" started.
+PROBE-C14C-C2-FOLLOWED-LANE jobs=10000 events=10000 owed=true lane=nil ms=["5.215", "3.929", "4.028", "3.708", "3.645", "3.572", "3.499"] best=3.499 median=3.708 load=521749.8024496667
+✔ Test "PROBE-C14C-C2-FOLLOWED-LANE" passed after 0.722 seconds.
+✔ Test run with 1 test in 2 suites passed after 0.723 seconds.
+LOAD 16:07:45 { 15.72 42.57 50.76 }
+perf exit 1
+LOAD 16:14:44 { 7.86 15.26 33.46 }
+✔ Suite "CleanupBenchmarks" passed after 111.022 seconds.
+✔ Suite "KitBenchmarks" passed after 1.420 seconds.
+✔ Suite "ModelBenchmarks" passed after 14.044 seconds.
+✘ Suite "StorageBenchmarks" failed after 9.258 seconds with 1 issue.
+✘ Suite "SyncBenchmarks" failed after 105.936 seconds with 2 issues.
+✔ Suite "TransportBenchmarks" passed after 0.060 seconds.
+✔ Suite "BudgetsBenchmarks" passed after 0.001 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 241.743 seconds with 3 issues.
+✘ Test run with 44 tests in 8 suites failed after 241.744 seconds with 3 issues.
+JOBE DONE

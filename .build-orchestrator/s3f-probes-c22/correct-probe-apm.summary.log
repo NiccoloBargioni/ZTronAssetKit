@@ -1,0 +1,10 @@
+probe-bench build start 09:32:53 loads { 10.28 59.82 72.68 }
+probe-bench build end 09:32:53 rc=0 loads { 10.28 59.82 72.68 }
+answerPresentMembersTurns start 09:32:53 loads { 10.28 59.82 72.68 }
+answerPresentMembersTurns end 09:33:08 rc=0 loads { 8.65 57.03 71.46 }
+PROBE-C21-APM group at 10,000: the answer turn (bind and answerPresentMembers) [9.460708, 9.467833, 9.3705] ms, best 9.3705 ms (budget 10.0 ms best); runs [turn 9.461 ms; interests 1 -> 0, ids 10000 -> 0; waiters moved to the store 0; load 9.85 58.91 72.28 -> 9.85 58.91 72.28, turn 9.468 ms; interests 1 -> 0, ids 10000 -> 0; waiters moved to the store 0; load 9.85 58.91 72.28 -> 9.85 58.91 72.28, turn 9.370 ms; interests 1 -> 0, ids 10000 -> 0; waiters moved to the store 0; load 9.85 58.91 72.28 -> 9.85 58.91 72.28]
+PROBE-C21-APM groups at 10,000: the answer turn (bind and answerPresentMembers) [11.102625, 11.216375, 11.112917] ms, best 11.102625 ms (budget 10.0 ms best); runs [turn 11.103 ms; interests 10000 -> 0, ids 10000 -> 0; waiters moved to the store 0; load 9.85 58.91 72.28 -> 9.22 57.96 71.87, turn 11.216 ms; interests 10000 -> 0, ids 10000 -> 0; waiters moved to the store 0; load 9.22 57.96 71.87 -> 9.22 57.96 71.87, turn 11.113 ms; interests 10000 -> 0, ids 10000 -> 0; waiters moved to the store 0; load 9.22 57.96 71.87 -> 8.65 57.03 71.46]
+PROBE-C21-APM users at 10,000: the answer turn (bind and answerPresentMembers) [14.22075, 14.248458, 13.9275] ms, best 13.9275 ms (budget 10.0 ms best); runs [turn 14.221 ms; interests 10000 -> 0, ids 10000 -> 0; waiters moved to the store 10000; load 8.65 57.03 71.46 -> 8.65 57.03 71.46, turn 14.248 ms; interests 10000 -> 0, ids 10000 -> 0; waiters moved to the store 10000; load 8.65 57.03 71.46 -> 8.65 57.03 71.46, turn 13.928 ms; interests 10000 -> 0, ids 10000 -> 0; waiters moved to the store 10000; load 8.65 57.03 71.46 -> 8.65 57.03 71.46]
+✔ Test "PROBE-C21-APM: answerPresentMembers' turn at 10,000 present ids" with 3 test cases passed after 13.596 seconds.
+✔ Suite "ProbeC21APM" passed after 13.596 seconds.
+✔ Test run with 1 test in 1 suite passed after 13.596 seconds.

@@ -1,0 +1,7 @@
+load average 31.2 74.0 91.7; root /Users/admin/Documents/ZTronAssetKit/.build-s3-performance/tmp/p13
+X1-interleaved-fresh-utility: unlink p50 0.048 p99 4.008 max 262.03 ms, >2ms 156, >4ms 102, >8ms 66, sum of excess over 1ms 3885 ms | spin(45us cpu) p50 0.045 p99 3.005 max 283.16 ms, >2ms 117, >4ms 98, >8ms 66, sum of excess over 1ms 3587 ms | unlink on-CPU p50 0.048 ms
+X2-interleaved-fresh-default: unlink p50 0.043 p99 0.119 max 5.02 ms, >2ms 15, >4ms 7, >8ms 0, sum of excess over 1ms 64 ms | spin(45us cpu) p50 0.045 p99 0.045 max 2.90 ms, >2ms 2, >4ms 0, >8ms 0, sum of excess over 1ms 7 ms | unlink on-CPU p50 0.043 ms
+X3-interleaved-barrier-utility: unlink p50 0.061 p99 0.203 max 5.71 ms, >2ms 5, >4ms 3, >8ms 0, sum of excess over 1ms 37 ms | spin(45us cpu) p50 0.045 p99 0.154 max 4.29 ms, >2ms 2, >4ms 1, >8ms 0, sum of excess over 1ms 7 ms | unlink on-CPU p50 0.059 ms
+X4-interleaved-settled-utility: unlink p50 0.044 p99 0.085 max 9.28 ms, >2ms 12, >4ms 6, >8ms 1, sum of excess over 1ms 68 ms | spin(45us cpu) p50 0.045 p99 0.054 max 0.62 ms, >2ms 0, >4ms 0, >8ms 0, sum of excess over 1ms 0 ms | unlink on-CPU p50 0.044 ms
+X5-interleaved-fresh-userInteractive: unlink p50 0.046 p99 0.104 max 21.70 ms, >2ms 30, >4ms 19, >8ms 8, sum of excess over 1ms 201 ms | spin(45us cpu) p50 0.045 p99 0.045 max 22.55 ms, >2ms 11, >4ms 8, >8ms 5, sum of excess over 1ms 109 ms | unlink on-CPU p50 0.046 ms
+load average at end 28.4 70.0 89.8

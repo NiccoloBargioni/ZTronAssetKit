@@ -1,0 +1,10 @@
+prof=.build-verify-s3f-c11-correct/out/Products/Debug/codecov/default.profdata first=.build-verify-s3f-c11-correct/out/Products/Debug/ZTronAssetAppleHostedTests.xctest/Contents/MacOS/ZTronAssetAppleHostedTests n=14
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.68% (1247/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.90% (1445/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.24% (8106/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 93.18% (9838/10558) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.24% (26336/27366) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK
+COVERAGE: PASS

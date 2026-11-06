@@ -1,0 +1,28 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" started.
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:274:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:335:9: Expectation failed: nStarted
+↳ N starts for the group's member zz-u once the apply's throttle ended
+↳ nStarted → <not evaluated>
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" with 2 test cases failed after 192.009 seconds with 2 issues.
+↳ /// The new content a follow's visit queues is admitted on the throttle in force at the apply, also when that
+↳ /// throttle ended while the visit was owed: T (1 MB, zz-t) downloads for a prefetch member; D (1 MB, content W)
+↳ /// downloads for U's user waiter and a prefetch member (zz-u). Between v3's fetch and its apply, T gets a 429 with
+↳ /// Retry-After 10 s; v3 moves zz-u to N (16 bytes). Then 11 s pass, so the throttle ends. Visited first, D's visit
+↳ /// created N at the apply under the 10 s throttle: N parked and U was answered `serverUnavailable(10)`; the throttle's
+↳ /// alarm then re-admitted N for the member. Visited after the throttle's end, N started and U was served from it (the
+↳ /// cycle-11 residual R-D, "a visit reads inputs that arrived after it was owed"). Parked on the apply's throttle once
+↳ /// no live throttle is left, N waits for that alarm alone (`fireDue`'s `.throttle` without a live throttle).
+✘ Suite "Engine follow barrier (F-28)" failed after 192.009 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 192.009 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

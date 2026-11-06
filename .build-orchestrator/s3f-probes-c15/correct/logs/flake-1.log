@@ -1,0 +1,100 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 11] ZTronAssetSyncTests-product
+[4 / 13] ZTronAssetSyncTests-product
+[11 / 13] ZTronAssetSyncTests-product
+[15 / 16] ZTronAssetTransportTests-product
+Build complete! (3,88 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC15CorrectFlake" started.
+◇ Test "PROBE-C15C-RETRY-FAULT-RACE (forced)" started.
+◇ Test "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 1 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 4 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 0 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 3 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 5 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 8 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 2 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 9 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 6 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 11 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 7 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 10 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 13 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 12 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 17 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 15 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 16 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 14 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 18 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 20 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 21 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 23 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 19 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+◇ Test case passing 1 argument copy → 22 to "PROBE-C15C-RETRY-FAULT-RACE (stress)" started.
+PROBE-C15C-RETRY-FAULT-RACE stress copy=11: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1058979582ns))), cAttempts: Optional(1)) failedReads=["c-7b64d2a9f8b754453e22db722ec7a089c94cd8b958208709690b505d2815ecfa.1-4.verifying"] n=c-96234560b1beb832af7a801e53c7a34cf4648b30f50837c70c79ddf81748d50d c=c-7b64d2a9f8b754453e22db722ec7a089c94cd8b958208709690b505d2815ecfa
+PROBE-C15C-RETRY-FAULT-RACE stress copy=4: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1213195655ns))), cAttempts: Optional(1)) failedReads=["c-2b179a6209d5b402872baaa3edfc521b406dd1c53f582f4fcedffb0fa3bd860c.1-4.verifying"] n=c-9077da14616104151ac439b05452a0c4f545dfa31a78a837de1709b36d6f5d6a c=c-2b179a6209d5b402872baaa3edfc521b406dd1c53f582f4fcedffb0fa3bd860c
+PROBE-C15C-RETRY-FAULT-RACE stress copy=9: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1239727837ns))), cAttempts: Optional(1)) failedReads=["c-6217a85c218aedb1b8ec77bdbe87f63b358d9ba18d57d9839c353b55e13aeb91.1-4.verifying"] n=c-5d5d18136cb69779a58cbf494b9a94c1050872250cfa31890c5aaa9d9d67c5cf c=c-6217a85c218aedb1b8ec77bdbe87f63b358d9ba18d57d9839c353b55e13aeb91
+PROBE-C15C-RETRY-FAULT-RACE stress copy=8: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1173931779ns))), cAttempts: Optional(1)) failedReads=["c-55928376c2b0ee8ddc749f9ad77c0a6c7061ba1c04c62f96f125672e92424bb6.1-4.verifying"] n=c-9a751c53a7742cc332a695f1ea1c7c2693a684792a3d4e29d0e560ef32503bb4 c=c-55928376c2b0ee8ddc749f9ad77c0a6c7061ba1c04c62f96f125672e92424bb6
+PROBE-C15C-RETRY-FAULT-RACE stress copy=2: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1206334862ns))), cAttempts: Optional(1)) failedReads=["c-a023b7543a4faa8ebfb72e710dd4ae70b3949fc8cecf5943c16e006c1f27aeb5.1-4.verifying"] n=c-f762bea99eabf42a272b7a94bc8feb1888248c6f79374dade72074fef73779cc c=c-a023b7543a4faa8ebfb72e710dd4ae70b3949fc8cecf5943c16e006c1f27aeb5
+PROBE-C15C-RETRY-FAULT-RACE stress copy=5: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1117759930ns))), cAttempts: Optional(1)) failedReads=["c-3d8f1babea5e0ddd2a1ab11a1be88770ca8e34da783432dced80e4a38d4686f8.1-4.verifying"] n=c-ce2367fc716d11d6631fbf5d22bda5a64194facae35ae8817890fd1ce102be5f c=c-3d8f1babea5e0ddd2a1ab11a1be88770ca8e34da783432dced80e4a38d4686f8
+PROBE-C15C-RETRY-FAULT-RACE stress copy=12: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1146430472ns))), cAttempts: Optional(1)) failedReads=["c-454ddb091aed229cd4cfa1cddb5564f248ae4a3e2430519f9270af22f9dc0b30.1-4.verifying"] n=c-d005ab2f2f191c3913df35ddc0531f4ae7b4fd6f1450090d7d983c602fb02127 c=c-454ddb091aed229cd4cfa1cddb5564f248ae4a3e2430519f9270af22f9dc0b30
+PROBE-C15C-RETRY-FAULT-RACE stress copy=1: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1237224504ns))), cAttempts: Optional(1)) failedReads=["c-25100be880b96b010b83cc0b5a4e621e0058b0b7f13c93596d3fc2e290a2cf67.1-4.verifying"] n=c-60deca6f36816ba027682fcd798d20d3fcb3700f53462f31bcb55e2d67290f55 c=c-25100be880b96b010b83cc0b5a4e621e0058b0b7f13c93596d3fc2e290a2cf67
+PROBE-C15C-RETRY-FAULT-RACE stress copy=16: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1144238394ns))), cAttempts: Optional(1)) failedReads=["c-ce3b7bb25477e84a849dd56a26cd0bc27898e8249ab251910818f46bd2970b91.1-4.verifying"] n=c-c2bf0db8c1a371349492d600787a0898ead0a8d65708f70d4ab00a3c4493b591 c=c-ce3b7bb25477e84a849dd56a26cd0bc27898e8249ab251910818f46bd2970b91
+PROBE-C15C-RETRY-FAULT-RACE stress copy=6: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1172248774ns))), cAttempts: Optional(1)) failedReads=["c-7b45d4a6804ffb94ba38a2fd7781b14ee8582397f4a4cede922eb524ffe69266.1-4.verifying"] n=c-f0f97ebcb9b5ac138567e7b9e7468130a69e5dc68001aa831ba3f4ca2c7e1770 c=c-7b45d4a6804ffb94ba38a2fd7781b14ee8582397f4a4cede922eb524ffe69266
+PROBE-C15C-RETRY-FAULT-RACE stress copy=15: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1190557402ns))), cAttempts: Optional(1)) failedReads=["c-c5fbb4991b1184269b77d5811f59cc7f4972d1cfa9602326a399989ad57c2cb7.1-4.verifying"] n=c-9dab06a6fc1ea6f6697c87104f8ce155ecdec816be236f894318caa778179dd0 c=c-c5fbb4991b1184269b77d5811f59cc7f4972d1cfa9602326a399989ad57c2cb7
+PROBE-C15C-RETRY-FAULT-RACE stress copy=0: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1214490699ns))), cAttempts: Optional(1)) failedReads=["c-dc6cbcf8fcd7fe5a7503801beabaa121d42c10befaea77f372ffcd526ed9b742.1-4.verifying"] n=c-bc95954ae33935f4a830cc730b37382bfc9ebefb1737969b8cee9d7261049d5c c=c-dc6cbcf8fcd7fe5a7503801beabaa121d42c10befaea77f372ffcd526ed9b742
+PROBE-C15C-RETRY-FAULT-RACE stress copy=13: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1141349063ns))), cAttempts: Optional(1)) failedReads=["c-2552a03be90b6d4972e819b6c197bb95c2b7630de4f544d983340ec2f9e963c7.1-4.verifying"] n=c-6f621ce1e838af3eadf184610a48134bd0aad9a6505c3b41b410c6544c2d0ee8 c=c-2552a03be90b6d4972e819b6c197bb95c2b7630de4f544d983340ec2f9e963c7
+PROBE-C15C-RETRY-FAULT-RACE stress copy=3: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1043735513ns))), cAttempts: Optional(1)) failedReads=["c-2cd9dcecd0ef8387d5f66b91b3f51f20b7d5e3c6fcd0607f172eba0c8f50c118.1-4.verifying"] n=c-30314c47e60d81f8f22b1209d952beb478c2e18add4b54c68cd379203fcf57ac c=c-2cd9dcecd0ef8387d5f66b91b3f51f20b7d5e3c6fcd0607f172eba0c8f50c118
+PROBE-C15C-RETRY-FAULT-RACE stress copy=7: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1116851099ns))), cAttempts: Optional(1)) failedReads=["c-44b438ae74eed817878a669f1572c75604f08059d02e0000dd5de7e3dd6e55f8.1-4.verifying"] n=c-d50514911c46c46649c339e81d75adb4c92634d5f3e1b09fd18bab5a2bf2ff4c c=c-44b438ae74eed817878a669f1572c75604f08059d02e0000dd5de7e3dd6e55f8
+PROBE-C15C-RETRY-FAULT-RACE stress copy=20: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1025689926ns))), cAttempts: Optional(1)) failedReads=["c-161bf198a72cee15c86b78a2200c465a70642928bf2eb8af60a6428efe7739e6.1-4.verifying"] n=c-199954e7a730382380b5f3ee073a3c46a689fd7f254a5b0128f4bb6d9f664807 c=c-161bf198a72cee15c86b78a2200c465a70642928bf2eb8af60a6428efe7739e6
+PROBE-C15C-RETRY-FAULT-RACE stress copy=17: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1039750048ns))), cAttempts: Optional(1)) failedReads=["c-ce2a00c746b16201039ce58018071293d40a53b72c52d42c5207dbd2a644fa4c.1-4.verifying"] n=c-0430250e3844b31e27e3a800ebd844bf0761f012d22882cd5942cd0bfa585200 c=c-ce2a00c746b16201039ce58018071293d40a53b72c52d42c5207dbd2a644fa4c
+PROBE-C15C-RETRY-FAULT-RACE stress copy=10: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1163952084ns))), cAttempts: Optional(1)) failedReads=["c-9cf5ded4444220a47acb7d87666211a00082a5abad3c6c9ee92ced459dfe4b65.1-4.verifying"] n=c-5e321d9f2686843358d0ee5e52f4291ed9da1a543a581c7169253783a300945f c=c-9cf5ded4444220a47acb7d87666211a00082a5abad3c6c9ee92ced459dfe4b65
+PROBE-C15C-RETRY-FAULT-RACE forced: aResult=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/dc/dc6cbcf8fcd7fe5a7503801beabaa121d42c10befaea77f372ffcd526ed9b742.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) stranded=(n: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1017071680ns))), attempts: Optional(1), interests: Optional(1), c: nil) nStarts=1 failedReads=["c-bc95954ae33935f4a830cc730b37382bfc9ebefb1737969b8cee9d7261049d5c.1-5.verifying"] n=c-bc95954ae33935f4a830cc730b37382bfc9ebefb1737969b8cee9d7261049d5c c=c-dc6cbcf8fcd7fe5a7503801beabaa121d42c10befaea77f372ffcd526ed9b742
+✘ Test "PROBE-C15C-RETRY-FAULT-RACE (forced)" recorded an issue at VerifyC15CorrectFlakeProbe.swift:126:9: Expectation failed: stranded.n == nil
+↳ B is served N by the time C has answered A (the test's expectation); instead N's read took the test's fault and its retry parks with no script: (n: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1017071680ns))), attempts: Optional(1), interests: Optional(1), c: nil) nStarts=1
+↳ stranded.n == nil → false
+↳   stranded.n → .failed(ZTronAssetModel.RetryDisposition.at(1017071680ns))
+↳     some → .failed(ZTronAssetModel.RetryDisposition.at(1017071680ns))
+↳       failed → .at(1017071680ns)
+↳         at → 1017071680ns
+↳           nanoseconds → 1017071680
+PROBE-C15C-RETRY-FAULT-RACE stress copy=23: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1239998153ns))), cAttempts: Optional(1)) failedReads=["c-cbee728ece7b70bd392da430789e28580b740e9ca068ed7d9f94bc7bac791e4d.1-4.verifying"] n=c-4fa47258fcf03c29f52f964cc8825e1f8d47ffda3208c391021428d23cafb96d c=c-cbee728ece7b70bd392da430789e28580b740e9ca068ed7d9f94bc7bac791e4d
+PROBE-C15C-RETRY-FAULT-RACE stress copy=22: (n: Optional(ZTronAssetSync.JobState.queued), nAttempts: Optional(1), c: nil, cAttempts: nil) failedReads=["c-f0a0b9ba949249871482463aee67529eca3110fcc50de28af689b1648bd7d8f4.1-5.verifying"] n=c-f0a0b9ba949249871482463aee67529eca3110fcc50de28af689b1648bd7d8f4 c=c-2bd48d4bb92235355909479a8e03c3651e251d7638550b527d047c38fbd081f5
+✘ Test "PROBE-C15C-RETRY-FAULT-RACE (stress)" recorded an issue with 1 argument copy → 22 at VerifyC15CorrectFlakeProbe.swift:153:9: Expectation failed: state.nAttempts == nil
+↳ copy 22: N's publication is done before the fault, so C's read takes it: (n: Optional(ZTronAssetSync.JobState.queued), nAttempts: Optional(1), c: nil, cAttempts: nil) failedReads=["c-f0a0b9ba949249871482463aee67529eca3110fcc50de28af689b1648bd7d8f4.1-5.verifying"]
+↳ state.nAttempts == nil → false
+↳   state.nAttempts → 1
+↳     some → 1
+PROBE-C15C-RETRY-FAULT-RACE forced: once N's retry has bytes, bResult=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bc95954ae33935f4a830cc730b37382bfc9ebefb1737969b8cee9d7261049d5c.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C15C-RETRY-FAULT-RACE (forced)" failed after 3.027 seconds with 1 issue.
+↳ /// The forced timeline: N's download ends after the fault install (a loaded run's late N), its units run as the
+↳ /// test's releaser runs them, and C's unit is still held. N's first hash read takes the fault, N's retry parks in the
+↳ /// fake (no script left), and B is stranded until the test's time limit. Giving N's retry its bytes then serves B,
+↳ /// so the strand is the test's, not the engine's.
+PROBE-C15C-RETRY-FAULT-RACE stress copy=14: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.downloading), cAttempts: Optional(1)) failedReads=["c-c0eed79c2b66cd57c930ee3519e48c111073160f6bcde6b0117daadf86143e7b.1-4.verifying"] n=c-6f44801362347f3965fb10e57300117455a8b6a57134095aa6fef00b5c376832 c=c-c0eed79c2b66cd57c930ee3519e48c111073160f6bcde6b0117daadf86143e7b
+PROBE-C15C-RETRY-FAULT-RACE stress copy=18: (n: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1046255185ns))), nAttempts: Optional(1), c: nil, cAttempts: nil) failedReads=["c-1bddc3eb8cd4027dd6d70bc625da9aa9766406ac6a5dadad6aa681f13b6f5b74.1-5.verifying"] n=c-1bddc3eb8cd4027dd6d70bc625da9aa9766406ac6a5dadad6aa681f13b6f5b74 c=c-05509c925535ad7985accb491924315ef9bdea1e27a32016c2186b986ef9b93c
+✘ Test "PROBE-C15C-RETRY-FAULT-RACE (stress)" recorded an issue with 1 argument copy → 18 at VerifyC15CorrectFlakeProbe.swift:153:9: Expectation failed: state.nAttempts == nil
+↳ copy 18: N's publication is done before the fault, so C's read takes it: (n: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1046255185ns))), nAttempts: Optional(1), c: nil, cAttempts: nil) failedReads=["c-1bddc3eb8cd4027dd6d70bc625da9aa9766406ac6a5dadad6aa681f13b6f5b74.1-5.verifying"]
+↳ state.nAttempts == nil → false
+↳   state.nAttempts → 1
+↳     some → 1
+PROBE-C15C-RETRY-FAULT-RACE stress copy=19: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.downloading), cAttempts: Optional(1)) failedReads=["c-8253d9e8e7b858fdc7beb8901fcb602eccef44bbceb33c65551cca211b2f9b0c.1-4.verifying"] n=c-29a9765d2869fd9a5c8f1e64b4b1400b1c4d48d37e3c97c63dfc61a2f6290a6a c=c-8253d9e8e7b858fdc7beb8901fcb602eccef44bbceb33c65551cca211b2f9b0c
+PROBE-C15C-RETRY-FAULT-RACE stress copy=21: (n: nil, nAttempts: nil, c: Optional(ZTronAssetSync.JobState.downloading), cAttempts: Optional(1)) failedReads=["c-c4960db6e23918c75a00c20524dc20f471459dd44be7872e05b517dce93c9c2c.1-4.verifying"] n=c-86e3f11a8d09ea8408f6e27f9b73be856464cda96755e13739d2f7de1e23a9e9 c=c-c4960db6e23918c75a00c20524dc20f471459dd44be7872e05b517dce93c9c2c
+✘ Test "PROBE-C15C-RETRY-FAULT-RACE (stress)" with 24 test cases failed after 3.104 seconds with 2 issues.
+↳ /// The test's own timeline, unforced, in 24 concurrent copies (load): records whose read took the fault.
+✘ Suite "VerifyC15CorrectFlake" failed after 3.104 seconds with 3 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 15, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C15C-RETRY-FAULT-RACE: `barrierAnswersAPassedJobsRetryAsVisitedFirst` (sweep-first) installs its `.read`
+↳ /// `.verifying` nth(1) EIO fault for C's hash once the barrier drained, but nothing orders N's publication (started at
+↳ /// once by the follow's visit) before that install. When N's first hash read runs after the install, N takes the fault,
+↳ /// N's retry finds no script left and the fake parks it, so B is never answered and the test hits its 3-minute limit
+↳ /// (syncx-2: `EngineFollowBarrierAnswerTests.swift:721:6: Time limit was exceeded`, `:781:9` B == cancelled).
+✘ Test run with 2 tests in 1 suite failed after 3.105 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+exit=1

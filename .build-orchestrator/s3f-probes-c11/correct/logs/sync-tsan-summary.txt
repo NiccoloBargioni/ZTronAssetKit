@@ -1,0 +1,4 @@
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c11-correct/logs/sync1.log:✔ Test run with 460 tests in 53 suites passed after 42.810 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c11-correct/logs/sync2.log:✔ Test run with 460 tests in 53 suites passed after 41.191 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c11-correct/logs/sync3.log:✔ Test run with 460 tests in 53 suites passed after 40.756 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c11-correct/logs/tsan.log:✔ Test run with 460 tests in 53 suites passed after 205.656 seconds.

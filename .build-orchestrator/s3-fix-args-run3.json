@@ -1,0 +1,27 @@
+{
+ "base": "s3-base",
+ "bar": "strict",
+ "maxCycle": 12,
+ "simSlots": [
+  {
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E"
+  }
+ ],
+ "wps": [
+  {
+   "wp": "s3f",
+   "name": "Stage 3 WP-F (sync engine)",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c8-issues.json",
+   "fromCycle": 9,
+   "maxCycle": 12,
+   "focus": "Stage 3 hardening, continued after cycle 8 with a design ruling. Cycles 1-8 are committed on wp/s3f (see docs/adr-drafts/s3f.md). Cycle 8's verification left 4 blocking issues; they are in the findings file named above, with both lenses' non-blocking issues. The rulings file now ends with S3-R11 (2026-10-30 12:50), which answers the first three issues, and S3-R13. S3-R11 says: implement design D3 'root', the follow barrier, with amendments (a)-(f) and rulings R1 (the class ends at real-world ledger inputs; L4-R7 kept), R2 and R3. S3-R12 answers the fourth issue (hang guards). S3-R13 adds the owner's requirement of 0 warnings at swift-tools-version 6.4, checked in an export; never edit Package.swift. Order of work: first commit S3-R11 item 6's tests, failing at 40ecd95 (CLAUDE.md P3). Then apply /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-design/d-root/design.diff as the starting point. Review it, then add the amendments, each with its failing test first. The design panel's probes and logs are under .build-orchestrator/s3f-design/ (S3-R11 lists them). The original Stage 3 evidence is .build-orchestrator/s3-findings-s3f.json. WP-F's Stage 2 record is docs/adr-drafts/f.md (read by section). The verifiers apply S3-R11 item 3's boundary when judging visit-order differences."
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+release start 1793483519 22:51:59
+release rc=0 end 1793483584 22:53:04 warnings=0
+syncx-1 start 1793483584 22:53:04 load=14.63
+syncx-1 rc=0 end 1793483783 22:56:23 load=15.08
+syncx-2 start 1793483783 22:56:23 load=15.08
+syncx-2 rc=0 end 1793483902 22:58:22 load=7.58
+syncx-3 start 1793483902 22:58:22 load=7.58
+syncx-3 rc=0 end 1793484018 23:00:18 load=8.77

@@ -1,0 +1,4 @@
+✘ Test "R-MAN-2: remotePath must be relative, without parent segments, scheme, authority, control characters, query or fragment" failed after 0.002 seconds with 4 issues.
+✘ Test run with 34 tests in 4 suites failed after 0.502 seconds with 4 issues.
+✔ Test run with 8 tests in 1 suite passed after 0.012 seconds.
+exit 1

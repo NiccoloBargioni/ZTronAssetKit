@@ -1,0 +1,9 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued, which a withdrawal replayed before the batch drops, rides a new job of its content, with the visit-first answers (F-28, D-13, e1-PR)" started.
+E1PR: K [16], W [20, 20, 20]; X at the replay queued at epoch 6 holding ["zz-x"], after it downloading at epoch 8 holding ["zz-a1", "zz-a2", "zz-a3"] (pin epoch Optional(6)); X's content requested 2 times, W's 1
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued, which a withdrawal replayed before the batch drops, rides a new job of its content, with the visit-first answers (F-28, D-13, e1-PR)" passed after 0.584 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 0.585 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.585 seconds.

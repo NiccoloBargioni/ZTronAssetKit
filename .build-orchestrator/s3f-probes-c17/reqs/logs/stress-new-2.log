@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC17ReqsStress" started.
+◇ Test "PROBE-C17R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 2, visit → .sweepFollowsFirst to "PROBE-C17R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 0, visit → .followVisitedFirst to "PROBE-C17R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 0, visit → .sweepFollowsFirst to "PROBE-C17R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 1, visit → .sweepFollowsFirst to "PROBE-C17R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 2, visit → .followVisitedFirst to "PROBE-C17R-NEW-STRESS" started.
+◇ Test case passing 2 arguments copy → 1, visit → .followVisitedFirst to "PROBE-C17R-NEW-STRESS" started.
+✔ Test "PROBE-C17R-NEW-STRESS" with 6 test cases passed after 17.429 seconds.
+✔ Suite "VerifyC17ReqsStress" passed after 17.429 seconds.
+✔ Test run with 1 test in 1 suite passed after 17.429 seconds.

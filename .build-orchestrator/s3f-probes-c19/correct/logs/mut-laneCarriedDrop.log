@@ -1,0 +1,6 @@
+mutant laneCarriedDrop start 22:04:03 load { 37.40 32.23 40.26 }
+occurrences 1
+build exit 0 Build complete! (5,04 s) 22:04:10 load { 36.97 32.23 40.21 }
+run 1 exit 1 ✘ Test run with 2 tests in 1 suite failed after 12.702 seconds with 9 issues. 22:04:26 load { 40.71 33.31 40.46 }
+run 2 exit 1 ✘ Test run with 2 tests in 1 suite failed after 12.467 seconds with 9 issues. 22:04:41 load { 40.28 33.48 40.39 }
+restored identical

@@ -1,0 +1,29 @@
+22:13:09 release start load { 26.66 21.11 29.23 }
+22:14:40 release exit 0 load { 33.74 24.58 29.72 }
+22:14:40 ios start load { 33.74 24.58 29.72 }
+22:15:13 ios exit 0 load { 36.36 26.17 30.09 }
+22:15:13 sync1 start load { 36.36 26.17 30.09 }
+22:20:04 benchbuild start load { 54.03 46.75 38.67 }
+22:24:08 sync1 exit 0 load { 22.34 32.85 34.48 }
+22:24:08 sync2 start load { 22.34 32.85 34.48 }
+22:28:17 benchbuild exit 0 load { 229.05 116.39 67.86 }
+22:28:17 gates done: benchbuild load { 229.05 116.39 67.86 }
+22:30:13 sync2 exit 0 load { 47.88 88.03 63.05 }
+22:30:13 sync3 start load { 47.88 88.03 63.05 }
+22:34:00 sync3 exit 0 load { 7.66 49.85 52.58 }
+22:34:00 sim waiting for lock load { 7.66 49.85 52.58 }
+22:34:00 sim lock taken load { 7.66 49.85 52.58 }
+22:41:35 sim exit 65 load { 10.35 36.17 47.73 }
+22:41:35 sim lock released load { 10.35 36.17 47.73 }
+22:41:36 tsan start load { 10.16 35.70 47.50 }
+22:41:44 stopped gates.sh before its tsan step (to take the bench at the quiet load first)
+22:43:37 bench start load { 3.17 24.58 41.52 }
+22:51:08 bench exit 1 load { 6.80 10.20 26.89 }
+22:51:08 gates done: bench load { 6.80 10.20 26.89 }
+22:51:08 c2 VerifyC18ReqsTurns start load { 6.80 10.20 26.89 }
+22:51:23 c2 VerifyC18ReqsTurns exit 0 load { 6.11 9.88 26.48 }
+22:51:23 c2 VerifyC18ReqsDivergence start load { 6.11 9.88 26.48 }
+22:51:32 c2 VerifyC18ReqsDivergence exit 0 load { 5.78 9.75 26.34 }
+23:02:07 tsan start load { 20.01 18.59 20.61 }
+23:17:22 tsan exit 0 load { 2.02 17.01 26.03 }
+23:17:22 gates done: tsan load { 2.02 17.01 26.03 }

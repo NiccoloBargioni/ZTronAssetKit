@@ -1,0 +1,8 @@
+== base filter=noStaleStartsBetweenFollowTurns|noStaleStartsOverFollow|notFoundBeforeVisit|notFoundDuringFollowNoSeam rc=1 hung=False elapsed=143.1s log=base-1793300473.log
+  ✔ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" passed after 0.774 seconds.
+  ✔ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" passed after 6.338 seconds.
+  ✔ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" passed after 8.018 seconds.
+  ✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" recorded an issue at VerifyC2CorrectProbes.swift:15:6: Time limit was exceeded: 120.000 seconds
+  ✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" failed after 128.071 seconds with 1 issue.
+  ✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 128.072 seconds with 1 issue.
+  ✘ Test run with 4 tests in 1 suite failed after 128.072 seconds with 1 issue.

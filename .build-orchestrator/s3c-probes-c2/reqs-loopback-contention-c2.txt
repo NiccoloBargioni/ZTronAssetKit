@@ -1,0 +1,10 @@
+.build-verify-s3c-c2-reqs/tsan-loopback.log:✔ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" passed after 0.422 seconds.
+.build-verify-s3c-c2-reqs/tsan-loopback.log:✔ Test run with 26 tests in 1 suite passed after 0.423 seconds.
+.build-verify-s3c-c2-reqs/storage2.log:✔ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" passed after 14.516 seconds.
+.build-verify-s3c-c2-reqs/storage2.log:✔ Test run with 484 tests in 64 suites passed after 224.439 seconds.
+.build-verify-s3c-c2-reqs/storage1.log:✔ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" passed after 18.652 seconds.
+.build-verify-s3c-c2-reqs/storage1.log:✔ Test run with 484 tests in 64 suites passed after 280.330 seconds.
+.build-verify-s3c-c2-reqs/tsan.log:✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" failed after 92.732 seconds with 1 issue.
+.build-verify-s3c-c2-reqs/tsan.log:✘ Test run with 484 tests in 64 suites failed after 1149.838 seconds with 1 issue.
+.build-verify-s3c-c2-reqs/storage3.log:✔ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" passed after 15.648 seconds.
+.build-verify-s3c-c2-reqs/storage3.log:✔ Test run with 484 tests in 64 suites passed after 223.900 seconds.

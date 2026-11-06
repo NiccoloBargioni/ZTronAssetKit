@@ -1,0 +1,38 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test "PROBE-C10-DOUBLE-PLACE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-DOUBLE-PLACE" started.
+PROBE-C10-DOUBLE-PLACE followVisitedFirst before: (owed: false, p: Optional(ZTronAssetSync.JobState.downloading), c: nil, b: nil)
+PROBE-C10-DOUBLE-PLACE followVisitedFirst mid: (p: Optional(ZTronAssetSync.JobState.verifying), places: nil)
+PROBE-C10-DOUBLE-PLACE followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) w=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3c/3c734bffa01955b09b7b32d570b798c0d33ad5b4e88cd1648c9a4d0b1a908d0c.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) pIndex=Optional(3) xIndex=Optional(4)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-DOUBLE-PLACE" started.
+✘ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:486:9: Expectation failed: kIndex != nil && zIndex != nil && kIndex! < zIndex!
+↳ K, created by J's visit before Z, starts first (visit-first): k=Optional(3) z=Optional(2)
+↳ kIndex != nil && zIndex != nil && kIndex! < zIndex! → false
+↳   kIndex != nil && zIndex != nil → true
+↳   kIndex! < zIndex! → false
+PROBE-C10-DOUBLE-PLACE sweepFollowsFirst before: (owed: true, p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.policy(ZTronAssetModel.PolicyBlock.constrainedNetwork))), c: Optional(ZTronAssetSync.JobState.downloading), b: Optional(ZTronAssetSync.JobState.queued))
+PROBE-C10-DOUBLE-PLACE sweepFollowsFirst mid: (p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.policy(ZTronAssetModel.PolicyBlock.constrainedNetwork))), places: nil)
+PROBE-C10-DOUBLE-PLACE sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) w=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3c/3c734bffa01955b09b7b32d570b798c0d33ad5b4e88cd1648c9a4d0b1a908d0c.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) pIndex=Optional(3) xIndex=Optional(4)
+✘ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" with 2 test cases failed after 0.740 seconds with 1 issue.
+↳ /// A request that arrives while the follow owes a visit joins the job the visit creates, at the place the visit gave
+↳ /// it: one slot, which H's held user transfer takes; J (zz-j) and X (zz-x) are queued prefetch requests. v3 moves zz-j
+↳ /// onto the content of zz-r and zz-x onto a new content Z, and the follow owes both visits; then a prefetch request R
+↳ /// for zz-r arrives. Visited first, J's visit created zz-r's job K, X's visit created Z's after it, and R joined K: K
+↳ /// starts before Z. Behind the barrier R created K, whose place waited for the drain, behind Z's.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.740 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✔ Test "PROBE-C10-DOUBLE-PLACE" with 2 test cases passed after 0.754 seconds.
+✔ Suite "VerifyC10CorrectProbes" passed after 0.754 seconds.
+✘ Test run with 2 tests in 2 suites failed after 0.754 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

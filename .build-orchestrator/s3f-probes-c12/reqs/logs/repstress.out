@@ -1,0 +1,36 @@
+reps 1-4 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.632 seconds.
+reps 1-3 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.632 seconds.
+reps 1-1 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.653 seconds.
+reps 1-5 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.615 seconds.
+reps 1-6 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.616 seconds.
+reps 1-2 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.612 seconds.
+round 1 done 02:42:05 { 15.40 39.56 57.12 }
+reps 2-3 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.616 seconds.
+reps 2-2 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.620 seconds.
+reps 2-5 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.618 seconds.
+reps 2-4 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.620 seconds.
+reps 2-1 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.626 seconds.
+reps 2-6 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.616 seconds.
+round 2 done 02:42:16 { 12.67 37.77 56.17 }
+reps 3-2 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.614 seconds.
+reps 3-6 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.615 seconds.
+reps 3-5 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.614 seconds.
+reps 3-1 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.615 seconds.
+reps 3-3 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.619 seconds.
+reps 3-4 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.612 seconds.
+round 3 done 02:42:28 { 11.11 36.61 55.54 }
+reps 4-6 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.616 seconds.
+reps 4-4 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.612 seconds.
+reps 4-2 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.616 seconds.
+reps 4-1 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.615 seconds.
+reps 4-3 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.626 seconds.
+reps 4-5 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.620 seconds.
+round 4 done 02:42:39 { 9.71 35.47 54.92 }
+reps 5-1 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.613 seconds.
+reps 5-5 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.616 seconds.
+reps 5-6 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.632 seconds.
+reps 5-4 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.647 seconds.
+reps 5-3 exit 0 :: ✔ Test run with 1 test in 1 suite passed after 0.664 seconds.
+reps 5-2 exit 1 :: ✘ Test run with 1 test in 1 suite failed after 64.002 seconds with 2 issues.
+round 5 done 02:43:55 { 42.51 38.35 54.27 }
+=== stress done

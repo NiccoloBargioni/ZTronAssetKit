@@ -1,0 +1,9 @@
+ 5:42  up 4 days, 18:05, 2 users, load averages: 346.02 248.48 146.51
+PROBE-C6-READDROP visitFirst=true before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), ids: Optional(1), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insuff
+PROBE-C6-READDROP visitFirst=false before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), ids: Optional(2), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.i
+✔ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" with 2 test cases passed after 14.438 seconds.
+✔ Test "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" with 2 test cases passed after 5.717 seconds.
+✔ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" with 2 test cases passed after 4.543 seconds.
+✔ Test run with 411 tests in 53 suites passed after 40.139 seconds.
+exit 0
+ 5:42  up 4 days, 18:06, 2 users, load averages: 328.44 256.56 154.17

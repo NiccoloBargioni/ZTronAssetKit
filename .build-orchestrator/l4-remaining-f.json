@@ -1,0 +1,218 @@
+{
+ "source": "Level 4 main run wf_3286fe9b-a79, verification round 3 (unfixed)",
+ "issues": [
+  {
+   "lens": "reqs",
+   "blocking": true,
+   "area": "flaky requirement test on the iOS Simulator (R-SYN-12)",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift:87-112 (`R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource`)",
+   "problem": "The test failed in simulator run 1 and passed in simulator run 2. xcresult for run 1: 997 tests, 996 passed, 1 failed, failure 'Expectation failed: progress.count >= 2 / progress.count \u2192 1: progress flows'. The lower bound counts events that the collector Task has actually consumed. Under backpressure (ARCHITECTURE \u00a77.9), progress coalesces newest-wins in one slot per key, and that key retires with the transfer. So a collector that is not scheduled during the 50 rounds sees at most one event. The engine is behaving correctly here; the oracle depends on scheduling. I proved the mechanism in a scratch copy: a variant whose collector starts pulling only after the rounds (a starved pool) failed 2 of 2 runs at the same expectation. On macOS the test passed 3 of 3 runs and under TSan.",
+   "fix": "Make the lower bound deterministic. After each round's release and clock advance, wait until the stream has drained, for example `await engine.awaitCondition { $0.state.subscribers.values.allSatisfy { $0.liveCount == 0 } }`, so the collector consumes each emission before the next one is offered. Alternatively, assert the lower bound on the engine's offered or published progress count rather than on consumed events. Keep the `<= ceiling` bound. Then rerun the simulator command.",
+   "id": "L4-V3-00"
+  },
+  {
+   "lens": "reqs",
+   "blocking": true,
+   "area": "time budget under TSan: a test timed out (flake)",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineRunPathTests.swift:361 (`R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished`, .timeLimit(.minutes(1)), 500 iterations)",
+   "problem": "TSan full-suite run 2 failed: 'Time limit was exceeded: 60.000 seconds' at :361, then 'Expectation failed: resumed != nil' at :396 because the test was cancelled. The test failed after 64.984 s. The load average rose from 6.65 to 73.85 during that run, because other agents were working. TSan run 1 passed, but the test took 55.882 s, 93 % of its limit, at a load average of about 15-25. Run alone under TSan it takes 3.939 s, and in debug 2.2-13.7 s. The cost comes from contention with the other 202 parallel tests under the sanitizer, which the 1-minute limit does not absorb. TSan reported 0 races in either run.",
+   "fix": "Lower the test's cost under contention. For example, force each of the two orders deterministically with a NextUnitGate or SteppedBlockingExecutor instead of relying on 500 racing iterations. Or reduce the iteration count and yield once per iteration (ios.md item 8). Otherwise give it a limit with real headroom (e.g. .timeLimit(.minutes(3))) and record the in-suite TSan figures in F-17.",
+   "id": "L4-V3-01"
+  },
+  {
+   "lens": "reqs",
+   "blocking": true,
+   "area": "missing requirement test (R-APL-3, SHOULD): orchestrator ruling still outstanding",
+   "location": "Tests/ZTronAssetSyncTests (test absent); docs/adr-drafts/f.md:19-20 (contract change request 1)",
+   "problem": "I scanned every backticked test name in ARCHITECTURE \u00a79, \u00a711 and \u00a713.5 against the 1,017 @Test display names in Tests/. Among names assigned to WP-F, only `R-APL-3: an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released` is missing. The other unmatched names, from R-NET-3, R-SYN-15, R-CLN-11, R-OBS-2/3 and P-9, are marked (G) or live in BenchKit.swift, so they belong to WP-G. .build-orchestrator/ still holds only l2-rulings.md and l3-rulings.md: there is no l4-rulings.md. WP-F cannot reach FakePackBackend without a Package.swift change.",
+   "fix": "The orchestrator rules on contract change request 1. Option (a) adds a test-only ZTronAssetAppleHosted dependency to ZTronAssetSyncTests and moves FakePackBackend into a shared helper. Option (b) reassigns the test to ZTronAssetKitTests. The owning WP then writes the test under the exact \u00a711 name. Until then, record the deferral in TRACEABILITY or VERIFICATION at merge.",
+   "id": "L4-V3-02"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "R-SYN-12 stalled-subscriber budget: the headroom claim holds only when the test runs alone",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift:12-15 (comment and .timeLimit(.minutes(3))); docs/adr-drafts/f.md:131 (F-20 'about ten times the sanitizer figure as headroom')",
+   "problem": "Run alone under TSan the test took 18.756 s, which matches F-20's 17.3 s. In the full TSan suite it took 115.278 s at a load average of about 15-25 and 150.991 s with load rising to 73, against a 180 s limit (84 %). On the simulator it took 33.220 s and 23.843 s, and in debug 5-45 s. The comment in the test still cites '10 s on macOS but 58 s under the thread sanitizer'.",
+   "fix": "Record the in-suite TSan figures in F-17/F-20 and update the comment. If the margin should not depend on host load, lower the test's cost further or widen the limit.",
+   "id": "L4-V3-03"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "coverage per file: margins are thin",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift (90.44 %, 766/847), EngineFailures.swift (90.53 %, 325/359)",
+   "problem": "Every ZTronAssetSync file is at or above 90 %, and the target is at 93.09 % (6102/6555). EngineRuns measured 90.44 % in this run, against 90.91 % recorded in F-20. Scheduling-dependent lines could push it below 90 under a per-file reading.",
+   "fix": "No action required. If the per-file reading is enforced at merge, add behaviour tests for EngineRuns' remaining uncovered paths.",
+   "id": "L4-V3-04"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "design table out of date (ENOSPC on a roomy volume is now retried)",
+   "location": "docs/ARCHITECTURE.md \u00a77.6 `insufficientSpace` row; docs/adr-drafts/f.md:124 (F-20 Space)",
+   "problem": "F-20 adds a third branch to ENOSPC handling. When the fresh read shows the volume holds the job, the engine retries with backoff, where \u00a77.6 says awaitingSpace or insufficientSpace. Three pre-existing WP-F tests were moved to small volumes accordingly; none is a CDN test. The behaviour is recorded only in the WP's draft.",
+   "fix": "At merge, the orchestrator amends the \u00a77.6 row from F-20 (WP-F may not edit ARCHITECTURE).",
+   "id": "L4-V3-05"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "outside WP-F",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift (WP-B P-13); Sources/ZTronAssetKit (WP-G stubs)",
+   "problem": "P-13 failed again in the release benchmark run: 'unit max 9.572666 ms (p50 0.957333 ms, p95 1.729417 ms); budgets 2.0 s, 5.0 ms per batch'. The coverage gate prints `ZTronAssetKit 37.82% FAIL` for WP-G's stub target. Neither concerns WP-F.",
+   "fix": "No WP-F action. The owner ruling on P-13 is pending.",
+   "id": "L4-V3-06"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "correctness / data loss: an interest that follows new content the apply already made present downloads it again, and a 404 on that download marks the present asset failed (T22, \u00a77.1 'only outstanding work has a job', R-NET-6/ADR-032)",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:331-385 (applied/followApplied ignore report.reused and report.relocated); Sources/ZTronAssetSync/Engine/EngineDispatch.swift:777-815 (reroute calls addInterest at :814 for an entry the store already holds); Sources/ZTronAssetSync/Engine/EngineFailures.swift:110-123 (permanentMissing calls store.recordFailure(job.assets, \u2026) at :117)",
+   "problem": "Timeline: a waiter for x@c1 is downloading. A run applies v2, where x's new content equals y's content, which is already present. The store reuses y's blob, so x is present and verified right after the apply (probe printed 'x residency after apply=present(\u2026verified)', plan reuseCount 1). followApplied supersedes x@c1, and reroute calls addInterest on y's transfer. That creates a new job and downloads content the store already holds. PROBE-R3-3 (3 of 3 runs): the waiter succeeded only after 'y-content starts=2' (expected 1). PROBE-R3-3b (3 of 3 runs) is the same, except that redundant fetch answers 404. The engine calls recordFailure([x], identity) on a record that is present. The probe saw 'waiter=failure(notFound) x=failed(notFound) y=present', and a fresh resolve(x) afterwards returned 'failure(notFound)'. A valid local copy is unbound and the asset is unavailable until its entry changes. A CDN that publishes the manifest before the object makes this 404 realistic. The same path applies to prefetch, run and ensure interests rerouted by any apply, including an ensureAvailable apply during a run.",
+   "fix": "In applied(), collect report.reused \u222a report.relocated (the ids the apply made present). In followApplied and reroute, do not call addInterest for those ids; answer them from the store in an owned task (store.location: a waiter gets the location, a group drops the member as done, a run counts the asset as fetched). More generally, never create a job for an id whose record is present at its current identity. As a safety net, call recordFailure only for ids the engine knows are absent, and ask the orchestrator whether WP-C's recordFailure should skip present records. Add PROBE-R3-3 and PROBE-R3-3b as regression tests.",
+   "id": "L4-V3-07"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "round-2 regression: ensureAvailable re-downloads members committed by another interest after its plan (S1-15 materialisation)",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:112-142 (materializeEnsures turns each fetch into a job from state.applied without a presence check); Sources/ZTronAssetSync/Engine/EngineCommands.swift:371-375 (group.fetches = plan.fetches); same window in EngineRuns.swift:429 materializeRun (F-19) and in joinGroup (RE-S30)",
+   "problem": "Round 2 made ensureAvailable materialise its fetches a pipeline at a time. Before that, all fetches registered in one turn and joined existing jobs. Now an asset that another interest commits between the ensure's plan and its materialisation is downloaded again. PROBE-R3-2 (tuning: 1 slot, pipelineDepth 1, lookahead 0; 3 of 3 runs): ensureAvailable([e0, e1]) holds e0 (failed once, waiting for its retry). A prefetch then downloads and commits e1 (probe saw 'e1 residency after the prefetch: present(\u2026verified)'). After e0's retry, the ensure materialises e1 and downloads it again: 'e1 starts=2' (expected 1). The window now spans the whole ensureAvailable call, not just one await. By the same recordFailure path as PROBE-R3-3b (proven there), a 404 on such a redundant fetch marks the present asset failed.",
+   "fix": "Keep a set of ids bound since the plan. committed() fills it from the keys of `locations`, and applied() from report.reused/relocated, for each ensure group (and for the run). materializeEnsures and materializeRun skip fetches in that set and count them as done. This also closes F-19 for runs. Add PROBE-R3-2 as a regression test.",
+   "id": "L4-V3-08"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "space policy (R-SYN-11, S2-23): ensureAvailable writes a doctored free-space reading into the shared headroom ledger, and round 2's re-evaluation then starts opportunistic work",
+   "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:313-335 (space built with volumeOpportunistic: measured.volumeImportant at :319; self.state.freeSpace = space at :333; reconsiderSpaceBlocked() at :335, new in round 2)",
+   "problem": "ensureTask plans user work against important capacity, which is correct for its own plan. But it stores that copy, with opportunistic capacity overwritten by the important figure, as the engine-wide ledger base. Every prefetch or bulk job checked against the ledger until the next real read is therefore admitted against important capacity. Round 2's reconsiderSpaceBlocked() goes further and re-queues the parked ones at once. PROBE-R3-1 (3 of 3 runs): FakeFileSystem has importantCapacity 64 GiB and opportunisticCapacity = reserve + 100 bytes. The store reports 'important=68719476104 opportunistic=268434924 reserve=268435456'. A 300-byte prefetch is parked (blocked). After ensureAvailable(scope: [q]) the probe saw 'p state=downloading starts=1', where the prefetch should stay parked because opportunistic capacity did not change.",
+   "fix": "Keep `measured` as self.state.freeSpace (and reconsider against it). Pass the important-for-opportunistic copy only to the planner and to the ensure's own space decision. Add PROBE-R3-1 as a regression test.",
+   "id": "L4-V3-09"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "staging hygiene (R-CLN-3; extends round-2 PROBE-R2-F): the partial of an attempt that failed with ENOSPC is never discarded",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:140-144 (the .insufficientSpace case goes to spaceFailed without resumePoint or discard) and :281-306 (spaceFailed)",
+   "problem": "The store's staging sink leaves the bytes written before ENOSPC in the attempt's .part (StoreStagingSink.appendPartial does not remove it), and the transport reports .insufficientSpace without discarding it. The engine's ENOSPC path never calls resumePoint(after:) or staging.discard, unlike the transient and pause paths fixed in round 2. The dead partial occupies exactly the space that is short, until a launch or maintenance GC. PROBE-R3-4 (3 of 3 runs): 120 bytes are written into attempt 1's partial and the attempt fails with insufficientSpace(300) on a roomy volume. The retry succeeds and the job ends, but stagingInventory still holds 'c-2ac19\u2026\u200b.1-2.part'.",
+   "fix": "In the .insufficientSpace case, discard request.partialName (and any sidecar) before the free-space read. Alternatively, route it through resumePoint(after:) so a sidecar-backed partial is kept for resume and any other partial is discarded. Add PROBE-R3-4 as a regression test.",
+   "id": "L4-V3-10"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "orchestrator ruling still open (carried from rounds 1 and 2): R-APL-3 end-to-end test absent",
+   "location": "docs/adr-drafts/f.md:20 (contract change request 1); Tests/ZTronAssetSyncTests (test absent)",
+   "problem": "No test is named 'R-APL-3: an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released' (grep over Tests/ finds none). /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/ holds l2-rulings.md and l3-rulings.md, but no level-4 ruling. This is not a WP-F code defect.",
+   "fix": "The orchestrator rules on change request 1. Option (a): a test-only ZTronAssetAppleHosted dependency for ZTronAssetSyncTests, plus a shared FakePackBackend. Option (b): reassign the test to ZTronAssetKitTests. Until then, record the deferral in TRACEABILITY or under 'Not verified' in VERIFICATION.",
+   "id": "L4-V3-11"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "round-2 probes C and G no longer fit the design (fixes confirmed with adapted probes)",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineRegressionRound2Tests.swift (WP versions); scratch probes ZZVerifierR2ProbeTests C and G",
+   "problem": "Run unchanged against HEAD, PROBE-R2-C times out in waitUntil(blocked == 1), because a transient ENOSPC on a roomy volume is now retried rather than parked. PROBE-R2-G times out because the fix makes the late joiner's content download a second time and the probe scripted one attempt. The adapted PROBE-R3-C2 (waits for failed, advances the clock) and PROBE-R3-G2 (scripts a second stage) both pass, so both blocking items are fixed. G's second download in this race is the tradeoff F-20 documents. Avoiding it needs a store call that binds an id to a live blob, which is a contract change.",
+   "fix": "None for WP-F. Optionally list the second-download tradeoff in DECISIONS at merge.",
+   "id": "L4-V3-12"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "headroom ledger: commits between a free-space read and its adoption are lost (S2-09), by reading",
+   "location": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:157-172; Sources/ZTronAssetSync/Engine/EngineCommands.swift:313-334",
+   "problem": "Both the run and ensureAvailable await store.freeSpace(), then await planningView(), and only then set state.freeSpace and committedSinceRead = 0. A publication that commits between the read and the reset adds to committedSinceRead, and the reset drops it. The ledger then overstates headroom by those bytes until the next read. Not proven with a probe.",
+   "fix": "Adopt the read in the turn it returns, before planningView. Alternatively, stamp commits with a sequence and subtract only those after the read.",
+   "id": "L4-V3-13"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "catch-up path skips applied()'s bookkeeping, by reading",
+   "location": "Sources/ZTronAssetSync/Engine/EngineCatchUp.swift:51-63 (catchUpWithStore: adoptApplied with the old ETag, then followApplied)",
+   "problem": "When the store's manifest differs from the engine's copy and no apply is in flight, the engine adopts it but broadcasts no assetRemoved(.pruned) and no snapshotChanged, and leaves the generation and the old ETag unchanged. In production this happens when store.apply throws after its in-memory writes (AssetStore+Apply.swift:67 requireCommittedInternal). A later re-apply of the same manifest reports pruned = [], so those removal events are lost for good. Not proven with a probe.",
+   "fix": "On catch-up, broadcast assetRemoved(.pruned) for ids in the copy but missing from the view, take the view's generation, then send snapshotChanged. Alternatively, in applyAndFollow, re-read the store view after a failed apply and follow it.",
+   "id": "L4-V3-14"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "time budget under TSan with heavy host load",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift (R-SYN-12 10,000-asset test, .timeLimit(.minutes(3)))",
+   "problem": "In this round's TSan run of ZTronAssetSyncTests (0 TSan reports), 'R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync' passed after 147.6 s, 82 % of its limit. The load average was 74, partly from this verifier's own simulator build. F-20 records 17.3 s on a quiet host.",
+   "fix": "Optionally scale the asset count down under the sanitizer, or record the loaded figure in F-17.",
+   "id": "L4-V3-15"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "outside WP-F",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (WP-B P-13); ZTronAssetKit coverage (WP-G)",
+   "problem": "P-13 failed again: 'unit max 12.8075 ms \u2026 budgets 2.0 s, 5.0 ms per batch'. The ZTronAssetKit target's coverage is 37.82 % (FAIL). Both belong to other work packages.",
+   "fix": "No WP-F action.",
+   "id": "L4-V3-16"
+  }
+ ],
+ "author_open": [
+  "The overall coverage gate fails only on ZTronAssetKit at 37.82% (205/542). That is WP-G's facade target, not WP-F's.",
+  "ZTronAssetSync line coverage is 92.00%: above the 90% gate, below the 95% aim. Untested lines are mainly shutdown and cancellation races between awaits, a few StoreError branches in publicationFailed (superseded, unknownAsset, assetFailed, storage-class errors), migration deferral after a throwing migrateLegacy call, and the reclaim-failure path. FakeRemoteSource's reclaimSourceCopies always succeeds, so that path is unreachable with the current fakes.",
+  "R-APL-3 end-to-end test not written; see contract_change_requests.",
+  "Not verified, recorded in docs/adr-drafts/f.md F-14 for VERIFICATION.md (OI-2): FakeFileSystem's barrier equals a full sync, so the engine's durability-ordering claims are checked against that model only. Device-only behaviour is checked through fakes only: real background URLSession relaunch, real On-Demand Resources packs, NWPathMonitor, thermal and Low Power Mode signals. P-11's timed sync includes part of the launch run, so its speedup is a lower bound.",
+  "Proposed REENTRANCY rows f-1 to f-8 (docs/adr-drafts/f.md) must be added to ARCHITECTURE \u00a710 at merge; the code cites them as 'f-n (proposed)'.",
+  "Open question for the orchestrator: diagnostics() and metrics() go through ensureStarted, so a degraded engine answers .storageUnavailable instead of a diagnostic report. R-OBS-3 may want diagnostics while degraded.",
+  "Breaker events share one coalescing slot per origin (R-SYN-12). A subscriber that pulls late may see 'closed' without the 'halfOpen' before it. This is by design and noted in F-4.",
+  "Benchmarks (release, .build-f-perf, run this session after the last commit; all within budget): P-4 11.48 ms (budget 20.0), ratio 2.016 (max 2.5); P-7 4.52 MiB (max 48.0); P-11 speedup 3.69 (min 3.0); P-14 0 timers, 0 tasks. Full lines in bench_lines."
+ ],
+ "history": [
+  {
+   "round": 1,
+   "blocking": 13,
+   "total": 21,
+   "fix": {
+    "quick": "VERIFY: PASS   (SWIFTPM_SCRATCH=.build-f bash Scripts/verify.sh --quick, run after the last commit 7e0b166; per-target runs: 151, 182 (ZTronAssetSyncTests), 440, 84, 12, 3 and 104 tests, all passed)",
+    "open": [
+     "Needs a ruling (F-15): a run whose manifest fetch passed manifestFetchDeadline now ends .complete with manifestFresh == false but writes no stamp, so the sync stays due. The alternative is .completeWithFailures. ARCHITECTURE \u00a77.10's rule 'markSynced only for .complete' would then read 'only for a .complete run with a fresh manifest'.",
+     "Decision to confirm (F-16): an offline run is retried once after the debounce. A second offline run in a row, while the path reads satisfied, then waits for a satisfied-path edge. Waiting for an edge after every offline run (the verifier's first option) broke 'R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished', whose single offline failure must still be retried.",
+     "New, not fixed (found this round, efficiency only): a run's plan is a snapshot. If another interest commits a planned asset after the run's planning view but before the run creates the job, the run downloads it again; the store deduplicates the blob. A rerouted interest whose new content is already present also starts a redundant job. In 'R-CAR-2: an identifier a run's fetched manifest lists is never answered notFound before the run applies it' the redundant attempt hung the run about 1 in 20 suite runs until I scripted a second attempt.",
+     "Declined, outside WP-F: P-13 (WP-B's BenchStorage) should be re-measured on a quiet host. The TRACE gate fails only on WP-G's L5 budgets P-1, P-8, P-9 and P-12.",
+     "Not run against the old code: the F-15 assertion in the timed-out-manifest test and 'R-SYN-4: a resolve that joins a job waiting to be online is answered offline at once' were written after their fixes. I checked by code reading that both would fail on the old code but did not run them there.",
+     "Not verified: the R-SYN-15 test's store-side guarantees were not checked against a mutant. An engine mutant cannot cause a mutation after close because the store itself rejects calls once closed."
+    ],
+    "contract": [
+     "CCR-1, R-APL-3 end to end, unchanged and still blocking pending a ruling. 'R-APL-3: an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released' cannot be written in ZTronAssetSyncTests without a Package.swift change. Option (a): add ZTronAssetAppleHosted as a test-only dependency of ZTronAssetSyncTests and move FakePackBackend into ZTronAssetTestSupport. Option (b): assign the test to ZTronAssetKitTests, with the same move. I recorded the deferral in docs/adr-drafts/f.md. Since this WP may not edit TRACEABILITY.md or VERIFICATION.md, please list the test there as deferred / not verified at merge.",
+     "CircuitBreaker.publicState (EngineSupport.swift, a contract file) is internal again. The contract surface has no addition, so no ruling is needed."
+    ]
+   }
+  },
+  {
+   "round": 2,
+   "blocking": 11,
+   "total": 23,
+   "fix": {
+    "quick": "VERIFY: PASS",
+    "open": [
+     "R-APL-3 end-to-end test is still deferred, pending the orchestrator's ruling on contract change request 1. Both verifier lenses rated this blocking; WP-F cannot fix it without a Package.swift change.",
+     "Declined: an engine-side assertion for R-SYN-15 S1-09 (optional in the finding). M5/M6 pass because close() drains in-flight work, and no check found tells the two orders apart in this scenario. Recorded in f.md F-20.",
+     "Declined: announcing mass prunes in chunks or as one folded event. The per-id assetRemoved event is the contract, and chunking would let snapshotChanged and syncFinished overtake those events. After the in-place fix, 10,000 announcements take about 3.5 ms of one actor turn; 100,000 is extrapolated at about 35 ms but was not measured.",
+     "Kept open: F-19's known issue. A run re-downloads an asset that another interest committed between the run's planning view and its materialisation; the store deduplicates the blob. Accept it in DECISIONS at merge.",
+     "Shared-content joiners (G) cost a second download in the race window. The store has no call that binds an id to a live blob.",
+     "The drained-file change and the discard of a kept staged file in removeJob are verified by reading only: the fakes cannot produce a completion that races the engine's cancel.",
+     "Three of WP-F's own earlier tests were adjusted to the new ENOSPC semantics; the requirement each checks is unchanged and each change is recorded in F-20. They are 'R-SYN-4: a resolve that joins a job blocked for lack of space\u2026' and 'R-SYN-11: a fetch failing with ENOSPC and nothing to reclaim\u2026', both now on a small volume, and 'R-SYN-11: a publication that runs out of space\u2026', which now has two scripted attempts and a driven clock.",
+     "Outside WP-F: P-13 benchmark failure (WP-B), ZTronAssetKit coverage stub (WP-G), and TRACE budgets P-1, P-8, P-9 and P-12 with no benchmark test.",
+     "Finding for the orchestrator: when a store apply's index commit fails, the store's in-memory applied manifest stays at the new manifest while the engine's copy stays at the old one. This was seen while writing the R-CAR-2 test. The engine now absorbs the lag through catch-up and adopting planning views, but WP-B may want to review it."
+    ],
+    "contract": [
+     "Contract change request 1 (unchanged; R-APL-3 end to end, blocking in both lenses): 'R-APL-3: an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released' cannot be written in ZTronAssetSyncTests without a Package.swift change. Option (a): give ZTronAssetSyncTests a test-only ZTronAssetAppleHosted dependency and move FakePackBackend into ZTronAssetTestSupport. Option (b): reassign the test to ZTronAssetKitTests. No L4 ruling exists: .build-orchestrator contains only l2-rulings.md and l3-rulings.md. Until there is one, record the deferral under 'Not verified' in VERIFICATION.md or as deferred in TRACEABILITY.md at merge.",
+     "Optional, not required: an AssetStore call that binds an id to an already-live blob would remove the second download in the narrow shared-content joiner race (PROBE-R2-G, F-20)."
+    ]
+   }
+  },
+  {
+   "round": 3,
+   "blocking": 8,
+   "total": 17
+  }
+ ]
+}

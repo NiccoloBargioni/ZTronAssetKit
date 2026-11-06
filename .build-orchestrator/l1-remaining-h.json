@@ -1,0 +1,130 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "hygiene (verifier incident, not WP-H code)",
+  "location": "~/Library/Developer/Xcode/DerivedData/h-hgsfxwgcziygfseopnrziiztmbdq/Logs/Package/17E79767-D896-4550-AB65-660F87E97C3D.xcactivitylog",
+  "problem": "My scheme listing (`xcodebuild -list`, run without -derivedDataPath) wrote a 268-byte package-resolution log at 17:49:43 into the default DerivedData folder, which is outside the repository. That folder already existed: it was created at 15:57 by an earlier run in this worktree. It also holds a second log, 86AC8219-\u2026.xcactivitylog, written at 17:52:38. None of my commands ran xcodebuild at that time.",
+  "fix": "A human should remove the folder with `rm -rf ~/Library/Developer/Xcode/DerivedData/h-hgsfxwgcziygfseopnrziiztmbdq`. Agents may not delete outside the repository. Verifiers should always pass -derivedDataPath and -resultBundlePath inside their scratch path, including for `xcodebuild -list`."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "contract surface (needs the orchestrator to approve)",
+  "location": "Sources/ZTronAssetTestSupport/RecordingFakes.swift:380-400,635-650,683,697,737,742; Sources/ZTronAssetTestSupport/FakeFileSystem.swift:270,292,306,311,426",
+  "problem": "No contract declaration was removed or changed: I compared every contract file against the contracts tag and found 0 missing. WP-H did add 21 public declarations to contract files. It also replaced the synthesized `DiskImage` ==/hash with explicit ones, and these now include symbolic links and attributes. Both changes are still waiting for orchestrator approval, which the ADR draft already requests.",
+  "fix": "The orchestrator approves them into DECISIONS.md at merge. Alternatively, WP-H declares the additions `package` instead of `public`: every consumer is a test target in the same package, so the public contract surface would stay exactly the contracts tag."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "cross-WP contract (stale-token clause)",
+  "location": "Sources/ZTronAssetTestSupport/FileSystemConformance.swift:328; Sources/ZTronAssetModel/Environment/FileSystem.swift:204",
+  "problem": "The clause 'releasing a stale token leaves a lock taken since then held' binds WP-B's LiveFileSystem.releaseLock. The clause bites: a mutant whose releaseLock ignores the handle fails the R-STO-6 test on the fake. WP-B's planned flock-then-close body would fail the clause on a reused descriptor number. The clause is still not approved in DECISIONS.md or store.md \u00a73.2/\u00a73.3, and the Model doc says only 'Releases a lock; idempotent'.",
+  "fix": "Before WP-B starts, the orchestrator either approves the clause and amends the releaseLock doc (for example: 'releasing a stale token releases nothing; idempotency holds across re-acquisition'), or drops it. Otherwise B's test `R-STO-6: the fake and live file systems agree on the shared conformance contract` will fail."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "iOS gate coverage of TestSupport",
+  "location": "Scripts/verify.sh build_ios (scheme ZTronAssetKit); Tests/ZTronAssetModelTests/ModelContractTests.swift:259",
+  "problem": "The required iOS build passes, but its scheme builds only the ZTronAssetKit product, so ZTronAssetTestSupport is never compiled for iOS by the gate. Its products are dated 15:57, so nothing was rebuilt for this WP. My extra build-for-testing failed in an orchestrator file: ModelContractTests.swift:259 uses Mutex, which needs iOS 18, while the type is gated only for macOS 15. This is not WP-H code, and test targets are not built for iOS by design. I type-checked TestSupport for arm64-apple-ios15.0 directly instead, and it passed (exit 0).",
+  "fix": "Orchestrator: optionally add a TestSupport iOS typecheck step to the gate. Nothing to do for WP-H."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "test name versus assertion (minor)",
+  "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:231; Sources/ZTronAssetTestSupport/LoopbackHTTPServer.swift:107,362",
+  "problem": "The name 'scripted latency is awaited through the injected delay and never sleeps by default' claims a default behaviour the test never runs. The test only uses LoopbackRecordingDelay. The server skips the delay entirely when latency is 0 (line 362), so NoLoopbackDelay.wait (line 107) is never executed: coverage count 0.",
+  "fix": "Add an assertion that a server built with the default delay serves a scripted 5 ms latency without awaiting a sleep. For example, check that `NoLoopbackDelay().wait(nanoseconds: 5_000_000)` completes within the same test. Or drop 'and never sleeps by default' from the name."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "docs accuracy",
+  "location": "docs/adr-drafts/h.md:45; Tests/ZTronAssetStorageTests/TestSupport/FakeDiskImageEditTests.swift:14-35",
+  "problem": "The ADR says the edited-disk test runs 'over 21 kinds of edit', but `Edit.allCases` has 20 cases.",
+  "fix": "Change '21' to '20' in docs/adr-drafts/h.md, or add the missing edit kind."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "fake model limitation (contract-level)",
+  "location": "Sources/ZTronAssetTestSupport/FakeFileSystem.swift:549-564; FSOpRecord (FakeFileSystem.swift:53)",
+  "problem": "`.barrier` and `.full` behave the same: both make the item durable at the call, the simplification store.md \u00a73.4 states. The contract's FSOpRecord does not record SyncLevel either. So neither the fake's op log nor a power-loss replay can show that a commit was durable (.full) rather than ordered. WP-B's `R-CLN-10: a pack is released only after the adopting generation is durably committed` and the durable-commit steps of \u00a74.1/\u00a74.6a will need their own recording wrapper.",
+  "fix": "Orchestrator: tell WP-B to wrap the FileSystem in a level-recording spy, or add a level field to FSOpRecord as a contract change. WP-H cannot change FSOpRecord's initializer."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "ADR-038 wording",
+  "location": "Sources/ZTronAssetTestSupport/FileSystemConformance.swift:475",
+  "problem": "The conformance suite creates the symbolic-link fixture for non-fake conformers with FileManager.default.createSymbolicLink. ADR-038 calls LiveFileSystem 'the only POSIX/FileManager code'. The ADR draft (H-5) documents this, and the package scans treat ZTronAssetTestSupport as a production target, so a future R-STO-6 FileManager scan over Sources/ would flag this line.",
+  "fix": "Orchestrator: when merging H-5, record the exception (test-fixture creation inside the caller's root only) in ADR-038 or any future scan's allow-list."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness (crash of the test process)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/RecordingFakes.swift:504-507 (FakeRemoteSource.run, case .stage)",
+  "problem": "`.stage(Data)` slices the scripted Data with zero-based offsets: `data.subdata(in: Int(offset)..<(Int(offset) + length))`. A Data slice keeps its parent's indices, so any slice whose startIndex is not 0 (`payload.dropFirst(n)`, `payload[a..<b]`, `suffix`) traps on an out-of-bounds range and kills the whole test process. FakeTransferStep is Hashable and its equality ignores indices, and the doc says only \"Write these bytes\", so a slice is a valid input. Proven: probe `ZZ: a stage step scripted with a Data slice stages the slice's bytes` (`.stage(Data([0,1,2,3,4]).dropFirst(2))`, startIndex=2) ended the test helper with \"exited with unexpected signal code 5\".",
+  "fix": "Rebase the slice before slicing, e.g. `case .stage(let scripted): let data = Data(scripted)`, or offset by `data.startIndex` (`data.subdata(in: (data.startIndex + Int(offset))..<(data.startIndex + Int(offset) + length))`). Add a test that stages a `dropFirst` slice. Verified in a scratch copy: the probe passes and all 124 existing tests still pass."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness (crash of the test process)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/LoopbackHTTPServer.swift:471 and :490 (LoopbackHTTPServer.render)",
+  "problem": "With `rangeETag`, a satisfiable Range request slices the body with zero-based indices: `body.subdata(in: range.start..<(last + 1))`. When `LoopbackResponse.body` is a Data slice with a non-zero startIndex and the encoding is identity, this traps inside the server actor and kills the test process. Proven: probe `ZZ: a range request against a body that is a Data slice gets the slice's bytes` (body = 20 bytes `.dropFirst(10)`, `Range: bytes=2-`) ended with \"exited with unexpected signal code 5\".",
+  "fix": "Rebase the body at the top of render: `var body = Data(response.encoding == .gzip ? Gzip.compress(response.body) : response.body)`, or use `body.startIndex + range.start` and `body.startIndex + last + 1`. Add a range test over a sliced body. Verified in a scratch copy: the probe returns 206 with bytes 12...19, and all existing tests pass."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "contract conformance / census (ARCHITECTURE 7.8, Model TransferHandle)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/RecordingFakes.swift:113-122 (FakeTransferHandle.init: no onTermination), :405-408 (FakeRemoteSource.activeTransfers), :587-589 (isStopped)",
+  "problem": "The Model's TransferHandle contract says: \"Terminating the `updates` stream (its consumer cancelled or dropped) cancels the transfer.\" The fake handle installs no onTermination handler. FakeRemoteSource decides that an attempt has stopped only from explicit pause/cancel controls. So when the engine cancels the task that iterates a held attempt's updates, the fake records no cancellation and keeps counting the attempt in `activeTransfers`, the idle census that R-SYN-14, R-SYN-15 and P-14 assert on. An engine that ends a transfer by cancelling its driver task is contract-correct, yet it would never reach `activeTransfers == 0` against this fake. Proven by two probes: (1) script `[.hold]`, transfer, start a consumer Task, cancel it, await it: `controls == []` and `activeTransfers == 1`; (2) a FakeTransferBackend handle whose consumer is cancelled records no `.cancel`.",
+  "fix": "In FakeTransferHandle.init, install `continuation.onTermination = { [weak self] termination in guard case .cancelled = termination, let self else { return }; let first = self.terminated.withLock { ended -> Bool in defer { ended = true }; return !ended }; if first { self.record(.cancel) } }`. It must ignore `.finished`: `end(with:)` calls `finish()` while holding `terminated`, so the handler must not take that lock on `.finished`. Update the class doc (the \"no onTermination handler is installed\" sentence) and add a test that cancelling the consumer of a held attempt drops it from `activeTransfers`. Verified in a scratch copy: both probes pass, the 2,000-race terminal test and all 124 existing tests pass. Ownership note: FakeTransferHandle was declared complete in the contract, but WP-H owns the file, modified this class, and its census depends on it."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness (restart / shutdown semantics)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/RecordingFakes.swift:306-308 (attach), :438-440 (transfer), :474-481 (invalidate)",
+  "problem": "`invalidate()` sets `invalidated` permanently, and nothing clears it. StagingAttachable (which FakeRemoteSource conforms to) documents re-attachment by \"a restarted client\". FakeRemoteSourceFactory returns its one source on every `makeRemoteSource`, and the engine's shutdown calls `remote.invalidate()` (RE-S22). So a client restarted on the same factory and source gets every transfer failed at once with `.cancelled(.byClient)`, while manifest fetches still work. This silently breaks the relaunch scenarios WP-F must write with this fake (R-NET-6 across a relaunch; the three R-NET-3 relaunch tests; R-CLN-3 survival of a handed-off background file), which naturally reuse the source and its `scriptReattached` (\"returned once per launch\"). Proven: probe `ZZ: a FakeRemoteSource re-attached by a restarted client after shutdown stages again` (factory attach sink1, invalidate, factory attach sink2, script `.stage`, transfer) got `[.failed(.cancelled(.byClient))]`, and sink2 is empty.",
+  "fix": "Preferred: `attach(staging:)` revives the source (`self.invalidated = false`; parked attempts and early releases were already cleared by invalidate), documented on `attach` and `invalidate`, with a test that runs a transfer after shutdown and re-attach. `isInvalidated` and the record of a start after shutdown stay observable until the next attach. Alternative, if permanent invalidation is intended: document on FakeRemoteSource and in H-6 that every client lifetime needs a fresh FakeRemoteSource (and factory), and ask the orchestrator to amend StagingAttachable's \"restarted client\" sentence."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "efficiency (O(n^2) appends; C2-adjacent)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/FakeFileSystem.swift:700-711 (apply(write:to:mode:now:in:))",
+  "problem": "`guard let node = state.graph.nodes[id], node.kind == .file` keeps a second reference to the inode's byte array alive, so `state.graph.nodes[id]?.data.append(contentsOf:)` copies the whole file on every append (copy-on-write). Writing a file in k chunks therefore costs O(k\u00b7n), all inside the fake's Mutex on the caller's (cooperative-pool) thread. Measured in a debug build, 256 appends of 256 KiB: the first 8 appends took 1.28 ms, the last 8 took 17.9 ms (ratio 14.03).",
+  "fix": "Read only what is needed without binding the node: `guard state.graph.nodes[id]?.kind == .file else { throw .other(errno: EISDIR) }; let previous = Int64(state.graph.nodes[id]?.data.count ?? 0)`. Verified in a scratch copy: the ratio drops to 0.58 and all tests pass."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "fidelity",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/RecordingFakes.swift:129-133 (FakeTransferHandle.pause) with :554-574 (FakeRemoteSource.stage)",
+  "problem": "`pause()` always ends the stream with `.paused(resumable: true)`, including for an attempt held before any byte was staged. FakeRemoteSource also never writes a ResumeSidecar. The Model says `resumable` is true only \"when a partial plus a validator were kept\", so engine code that branches on `resumable` takes the resumable path against this fake when no partial exists. Also, a resumed AWS-tier stage reports `httpStatus: 200` (:572-573), where the real transport's final status is 206. Not proven to break a consumer.",
+  "fix": "Report `resumable` from whether the attempt staged bytes (FakeRemoteSource can pass that to the handle, or deliver `.paused(resumable:)` itself when it observes the pause), and report 206 when `request.resume != nil` on the AWS tier. Alternatively, document both simplifications on FakeTransferStep and FakeTransferHandle (the pause text is contract wording, so tell the orchestrator)."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "unbounded growth",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/RecordingFakes.swift:269 and :436 (transportLog), :619 and :658 (FakeTransferBackend.made)",
+  "problem": "FakeRemoteSource's transportLog keeps every TransferRequest for the source's lifetime, and FakeTransferBackend keeps every handle it made, so both grow linearly with the number of transfers. The `.stageGenerated` doc claims P-7's \"delta does not grow with catalog size\" measures the engine and the store, not the fake. The fake's own log does grow with the catalog, though by about 200 bytes per start, which is negligible against the 48 MiB budget at 1 GiB. Not proven to fail P-7.",
+  "fix": "Qualify the `.stageGenerated` doc (the source's log grows by one request per start), or have P-7 compare runs on a fresh source per catalog size. Optionally add a counts-only mode."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "cancellation",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/h/Sources/ZTronAssetTestSupport/LoopbackHTTPServer.swift:208-214 (start) and :239 (listenerStateChanged guard)",
+  "problem": "(a) start()'s waiter is not cancellation-aware: a caller cancelled while the listener comes up (for example by a .timeLimit) stays suspended until the listener reports ready or failed, or until stop() runs. (b) After `.ready`, a later `.failed` is ignored because of the `self.port == nil` guard, so start() keeps returning a dead port. Neither was observed to fail.",
+  "fix": "(a) Register waiters by id inside `withTaskCancellationHandler`, with an onCancel Task that removes and resumes that id with CancellationError on the actor (removal-before-resume keeps resumption exactly once). (b) On `.failed` after ready, clear `port` and `listener`, so the next start() makes a new listener."
+ }
+]

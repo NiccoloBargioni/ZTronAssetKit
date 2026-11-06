@@ -1,0 +1,22 @@
+# Confirmer run on s3-base (b5796ba) in a detached worktree; probes copied from .build-orchestrator/s3-probes/conformance/ unchanged
+# probe on s3-base:
+✔ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" passed after 0.007 seconds.
+✔ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" passed after 0.007 seconds.
+✔ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" passed after 0.007 seconds.
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" recorded an issue at S3ConformanceProbeTests.swift:171:9: Expectation failed: state.running <= harness.configuration.power.interactiveConcurrencyAtCritical
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" failed after 0.008 seconds with 1 issue.
+✔ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" passed after 0.009 seconds.
+# with S3-CONF-04.mutant.diff applied, --filter 'ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests':
+=== MUTANT 04 (load 25.14 28.64 30.96)
+exit=1
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" recorded an issue at S3ConformanceProbeTests.swift:131:9: Expectation failed: state.running == harness.configu
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" recorded an issue at S3ConformanceProbeTests.swift:132:9: Expectation failed: await harness.source.starts.coun
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" recorded an issue at S3ConformanceProbeTests.swift:171:9: Expectation failed: state.running <= ha
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" failed after 1.389 seconds with 1 issue.
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" failed after 1.425 seconds with 2 issues.
+✘ Test run with 356 tests in 53 suites failed after 17.024 seconds with 3 issues.
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" recorded an issue at S3ConformanceFallbackProbeTests.swift:32:9: Expectation failed: started.isEmpty
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" failed after 0.629 seconds with 1 issue.
+✘ Test run with 86 tests in 12 suites failed after 3.655 seconds with 1 issue.
+✔ Test run with 71 tests in 10 suites passed after 0.416 seconds.
+# Note: the R-SYN-7 'conditions are unknown' (S3-CONF-04 b) and R-CAR-2 (S3-CONF-07) probes fail on s3-base too; 356 = 351 existing + 5 probes; 86 = 85 existing + 1 probe

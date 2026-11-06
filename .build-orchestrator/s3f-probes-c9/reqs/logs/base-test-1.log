@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+✘ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:673:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+↳ A's user waiter, moved onto P, is answered from P's 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+↳ (try? aResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:674:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+↳ P's prefetch waiter is answered from its 3 MB: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 2500000))
+↳ (try? pResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:679:25: Issue recorded
+↳ R's prefetch waiter is answered insufficientSpace: R does not fit beside P and C: success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/11cec6b44cef42f703f879c0f10555708c9c8415926654aaf9fc273ab8c91ef4.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" with 2 test cases failed after 1.695 seconds with 3 issues.
+↳ /// A space sweep judges the parked job of a moved id's new content at the user place the follow gives it, also when
+↳ /// the moved id's holder is downloading rather than parked: C (5 MB) downloads for A (user) and B (prefetch, same
+↳ /// content), so the follow keeps it running as prefetch work; R (3.5 MB) and P (3 MB), both prefetch, wait
+↳ /// `awaitingSpace` behind C's bytes in flight, R with the earlier ticket. v3 moves A onto P's content while the bounded
+↳ /// follow owes C's visit. The reclaim leaves 6 MB beside C's 5 MB in flight. Visited first, P is user work, judged
+↳ /// first and fits, and R is parked with R's 3.5 MB against the room P leaves. A sweep that followed only its parked
+↳ /// candidates judged P at its prefetch place after R (the close-out cycle-8 requirements lens,
+↳ /// PROBE-C8R-INFLIGHT-PROMOTE).
+✘ Suite "Engine runs" failed after 1.696 seconds with 3 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 1.696 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,32 @@
+31 one-minute tests over 30 s in the paired run
+38.4/38.3 paired | alone 31.057 28.813 16.579 | pre-existing | EngineSafetyTests.swift:61 | R-SYN-3: lane queues stay within twice their live entries while queued jobs move between l
+37.9/37.8 paired | alone 30.856 30.606 17.498 | pre-existing | EngineSingleFlightTests.swift:65 | R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels
+37.4/37.2 paired | alone 30.43 28.154 16.185 | NEW/CHANGED | EngineProbeChainTests.swift:116 | R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leav
+37.0/37.0 paired | alone 30.047 27.913 16.094 | NEW/CHANGED | EngineFollowTests.swift:609 | R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs a
+37.0/36.3 paired | alone 29.953 27.659 15.891 | NEW/CHANGED | EngineFollowTests.swift:346 | R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow s
+37.0/36.9 paired | alone 27.602 25.407 14.561 | pre-existing | EngineLiveTransportTests.swift:254 | R-STO-1: a cancelled, paused or failed foreground transfer leaves no byte outside the stor
+36.6/36.7 paired | alone 30.08 27.65 15.891 | NEW/CHANGED | EngineFollowTests.swift:394 | R-SYN-2: a queued user job of an id the apply dropped does not start while the follow stil
+34.4/36.4 paired | alone 30.041 27.687 15.898 | pre-existing | EngineRegressionCycle21Tests.swift:47 | R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the 
+35.8/35.8 paired | alone 29.435 27.271 15.644 | pre-existing | EngineRunPathTests.swift:295 | R-SYN-5: a run whose transfers open the 5xx breaker ends blocked and the pending run's pro
+35.2/35.1 paired | alone 29.072 26.783 15.548 | NEW/CHANGED | EngineFollowTests.swift:230 | R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's wa
+35.2/34.7 paired | alone 28.967 26.524 15.383 | NEW/CHANGED | EngineFollowTests.swift:488 | R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new cont
+35.2/35.2 paired | alone 29.104 26.749 15.482 | pre-existing | EngineRegressionCycle17Tests.swift:317 | R-SYN-6: a run whose claim a lane-wide park left that a conditions re-admission turn still
+35.1/34.7 paired | alone 29.045 26.77 15.338 | pre-existing | EngineRegressionCycle17Tests.swift:120 | R-SYN-6: a run whose claim parked for space a follow-up free-space sweep still owes a re-c
+35.1/35.0 paired | alone 29.069 26.381 15.531 | NEW/CHANGED | EngineFollowTests.swift:744 | R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queu
+35.1/34.7 paired | alone 28.866 26.58 15.35 | pre-existing | EngineRegressionCycle17Tests.swift:311 | R-SYN-6: a run whose failed-whenOnline claim a network-edge re-admission turn still owes a
+35.0/34.6 paired | alone 28.952 26.565 15.302 | pre-existing | EngineRegressionCycle17Tests.swift:155 | R-SYN-6: a run whose claim parked for space the owed follow-up sweep does not admit settle
+34.7/34.7 paired | alone 28.76 26.286 15.273 | pre-existing | EngineLegacyMigrationTransferTests.swift:896 | R-STO-13: during legacy migration a page a user resolves is in the readers' snapshot at on
+33.6/33.8 paired | alone 28.262 25.919 14.907 | pre-existing | EngineRegressionCycle22Tests.swift:158 | R-SYN-5: prefetch members that wait for a slot and each end without a verdict start no run
+33.4/33.8 paired | alone 28.177 25.071 15.084 | pre-existing | EngineLegacyMigrationTransferTests.swift:260 | R-STO-11: a later launch that resumes an interrupted legacy migration adopts, never downlo
+33.6/28.3 paired | alone 22.043 19.252 11.587 | pre-existing | EngineLiveTransportTests.swift:325 | R-SYN-15: no foreground staging write lands after the store is closed
+32.7/33.1 paired | alone 26.374 24.607 13.772 | pre-existing | EngineLiveTransportTests.swift:198 | R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fres
+33.1/33.0 paired | alone 27.246 25.4 14.457 | NEW/CHANGED | EngineGiveUpInvariantTests.swift:15 | R-CAR-4: invariantViolations reports a registered group in releasing only while its releas
+33.0/33.1 paired | alone 28.04 25.535 14.864 | pre-existing | EngineEventsTests.swift:65 | R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under M
+32.9/33.0 paired | alone 27.085 25.272 14.608 | pre-existing | EngineGroupClaimTests.swift:390 | R-CAR-4: a join's give-up of more than releasesPerTurn claims retires at most releasesPerT
+32.2/32.8 paired | alone 26.982 24.792 14.039 | NEW/CHANGED | EngineRegressionCycle8Tests.swift:261 | R-SYN-11: one space sweep turn parks at most parksPerPump jobs and leaves the rest to its 
+30.7/31.9 paired | alone 24.933 23.515 13.741 | pre-existing | EngineLegacyMigrationTransferTests.swift:1668 | R-STO-11: an id of the same content that joins a job during the answer site's user-initiat
+30.8/30.7 paired | alone 25.603 23.383 13.574 | pre-existing | EngineRegressionCycle22Tests.swift:415 | R-SYN-5: a retry that falls due in the alarm turn of the cooldown's end probes before the 
+30.6/30.1 paired | alone 26.029 23.629 13.711 | pre-existing | EngineLegacyMigrationTransferTests.swift:1605 | R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is
+29.8/30.5 paired | alone 25.107 23.544 13.712 | pre-existing | EngineLegacyMigrationTransferTests.swift:347 | R-STO-11: when legacy migration ends while the run that took the launch run's place is act
+30.5/30.1 paired | alone 24.547 24.078 13.853 | pre-existing | EngineIdleTests.swift:21 | R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes no
+29.8/30.1 paired | alone 25.102 25.486 15.166 | pre-existing | EngineLegacyMigrationTransferTests.swift:850 | R-STO-13: the prior-art files a bulk sync's jobs adopt during legacy migration reach the r

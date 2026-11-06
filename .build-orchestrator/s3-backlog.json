@@ -1,0 +1,2017 @@
+[
+  {
+    "id": "S3-B-001",
+    "title": "R-MAN-1: UTF-16/UTF-32 manifests are rejected although the prior art's JSONDecoder detects them; confirm no published manifest is UTF-16 (NEEDS-HUMAN-REVIEW)",
+    "sources": [
+      "ADR-049 (R-MAN-1 deviation)",
+      "a.md A-4.5, A-15 #9"
+    ],
+    "category": "accepted-deviation",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "A-4.5 stands; no UTF-16/32 path under Sources/ZTronAssetModel/Manifest/Decoding",
+    "action": "ADR-record",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-002",
+    "title": "R-OBS-1 interval seam (LogIntervalName, LogRoute.interval, LogInterval) is a public API addition still awaiting owner review (NEEDS-HUMAN-REVIEW)",
+    "sources": [
+      "ADR-049 (A-7)",
+      "a.md A-7"
+    ],
+    "category": "accepted-deviation",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "no owner ruling recorded in DECISIONS.md or ORCHESTRATION.md",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-003",
+    "title": "Entry-dense manifests (entry array over 2 MiB at about 111 bytes per entry) are rejected with decodedSizeExceeded by the 3.75x allocation bound",
+    "sources": [
+      "ADR-049 (A-8)",
+      "a.md A-8"
+    ],
+    "category": "accepted-deviation",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "A-8's estimate is the shipped design; realistic catalogs (250-350 bytes per entry) are unaffected",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-004",
+    "title": "R-MAN-3 allocation bound was measured on macOS 27 and the iOS 27 simulator only; iOS device allocators are unverified",
+    "sources": [
+      "ADR-049 (Not verified)",
+      "a.md A-8, A-14 #3"
+    ],
+    "category": "device-only",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-005",
+    "title": "R-MAN-3's 1 s time bound is proved only by the release P-3 limit benchmark; debug and TSan unit runs assert linear scaling only, and VERIFICATION/TRACEABILITY must say so",
+    "sources": [
+      "a.md A-5, A-14 #3, A-15 #2",
+      "l1-remaining-a.json [1]"
+    ],
+    "category": "documentation",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "VERIFICATION.md does not exist yet (Stage 5)",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-006",
+    "title": "ManifestFuzzTests 'seeded fuzz ... in linear time' (OI-13) failed once on an efficiency core (6.08 s against a 5.86 s limit); compare the lowest of a few measurements or pin the QoS without loosening the 64x bound",
+    "sources": [
+      "ADR-052 Assignments (environment items, OI-13)",
+      "c.md OI-13"
+    ],
+    "category": "test-or-environment",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetModelTests/Manifest/ManifestFuzzTests.swift:61 is unchanged; no QoS pin or repeat",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-007",
+    "title": "OI-8: the allocation tests read process-wide heap figures and rely on Array/Dictionary ABI layout and malloc_size of reused blocks (checked on macOS 27 and the iOS 27 simulator only)",
+    "sources": [
+      "ADR-052 Assignments (OI-8 audit)",
+      "c.md OI-8, Not verified here"
+    ],
+    "category": "test-or-environment",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "kept by ruling; no change since",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-008",
+    "title": "Model additions declined for now: ManifestEntryViolation.duplicateIdentifier, ManifestLimits.maxPathComponents (cap stays the internal 32) and the optional hashed log description (AssetLog.describe) for ManifestError and QuarantinedEntry",
+    "sources": [
+      "ADR-049 (Declined)",
+      "a.md A-11.2, A-11.3, A-11.7"
+    ],
+    "category": "accepted-deviation",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "no `describe` helper and no maxPathComponents in Sources/ZTronAssetModel",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-009",
+    "title": "AssetEnvironment.live() leaves out a memory-pressure source: on a device a memory warning purges nothing (R-CLN-11) unless the app supplies a UIKit source; DEVICE-TEST-PLAN must say so",
+    "sources": [
+      "ADR-056 (WPI-R3; Assignments, Stage 5)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "a",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetModel/Environment/AssetEnvironment.swift:28,47 memoryPressure is optional with default nil",
+    "action": "device-plan",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-010",
+    "title": "P-13: the longest deletion unit takes 8.7-12.8 ms (one APFS unlink stalls 5-10 ms in the kernel; unit CPU about 1 ms) against batch_ms_max 5 ms, so --perf ends VERIFY: FAIL; owner ruling pending (A: p99 per batch, B: 15 ms) and Stage 5's --full cannot pass without it (NEEDS-HUMAN-REVIEW)",
+    "sources": [
+      "ADR-050 (P-13 proposal)",
+      "ADR-052/053/054/055 Assignments (Owner)",
+      "ORCHESTRATION owner questions",
+      "c.md OI-3",
+      "b.md B-9, B-10"
+    ],
+    "category": "performance-limit",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 still asserts longest <= batchBudget; ADR-055 Open: 8.70 ms at a9e464d",
+    "action": "ADR-record",
+    "verified": "code",
+    "rank": 1
+  },
+  {
+    "id": "S3-B-011",
+    "title": "Actor stretches at maxEntries (100,000) beyond the 10 ms C2 rule: records copy-on-write under a live snapshot about 9.6 ms, present-table copy, startGrace about 39 ms, reaper queue about 23 ms, freeSpace sums, blob-table rehash; eviction and purge(.all) 22-44 ms, 25-30 % worse under load",
+    "sources": [
+      "ADR-052 Assignments (Stage 3 hardening (1), C-22/OI-9)",
+      "l3-rulings.md R4 and OI-9",
+      "c.md C-22, OI-9",
+      "l3-close8-verify-c.json [6],[14]"
+    ],
+    "category": "performance-limit",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "recorded, not asserted, in Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift; SPEC's reference scale is 10,000",
+    "action": "fix",
+    "verified": "doc",
+    "rank": 7
+  },
+  {
+    "id": "S3-B-012",
+    "title": "OI-12: orphan GC's reap window is per run, not per key; on a busy store every run could outlast deletionGrace and collect nothing (liveness only, logged at .info)",
+    "sources": [
+      "ADR-052 Assignments (candidates)",
+      "c.md OI-12"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "no per-key reap exclusion exists in WP-B's reaper",
+    "action": "fix",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-013",
+    "title": "OI-14: a maintenance eviction overlapping a pruning apply can free up to the pruned bytes more than needed, because the prune's releases are not counted in WP-B's release path",
+    "sources": [
+      "ADR-052 Assignments (OI-14)",
+      "c.md OI-14"
+    ],
+    "category": "accepted-deviation",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "never met when maintenance runs apart from a sync's apply",
+    "action": "fix",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-014",
+    "title": "OI-15 / L4-V3-12: a record whose new content is already live in another blob (an evicted record, or a shared-content late joiner) is downloaded again because ruling R3 is read literally",
+    "sources": [
+      "ADR-052 (OI-15)",
+      "ADR-053 Assignments (L4-R24(5))",
+      "l3-rulings.md OI-15",
+      "l4-rulings.md L4-R22/L4-R24"
+    ],
+    "category": "accepted-deviation",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift:301-302 adoptKnownBlob refuses absent(.evicted) for every blob state; probes ZP7-OI1b and ZP8-OI15 reproduce it; a redundant download, never a correctness bug",
+    "action": "fix",
+    "verified": "code",
+    "rank": 12
+  },
+  {
+    "id": "S3-B-015",
+    "title": "FreeSpace.pendingReclaim counts doomed bytes for which nextDeadline() schedules nothing (seen once after an apply that threw: pendingReclaim 300, nextDeadline nil); the engine works around it with a fresh read",
+    "sources": [
+      "ADR-053 Assignments (routed to Stage 3)",
+      "f.md F-25"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "not reproduced on demand (f.md F-25)",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-016",
+    "title": "gainReferenceInPlace copies the blob table per publication in debug and TSan builds; whether release builds copy it is unchecked",
+    "sources": [
+      "l4-rulings.md L4-R24(6)",
+      "ADR-053 Assignments"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Store/AssetStore+References.swift:76 unchanged",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-017",
+    "title": "StoreCrashTests 'R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1...I-5' exceeds its one-minute limit at host loads of 441-834 and is slow under TSan (enumeration 5.6x larger since cycle 5); take verdicts near idle",
+    "sources": [
+      "ADR-055 Assignments (Stage 5, WP-B owner)",
+      "l2-close5-remaining-b.json [1]",
+      "l3-close8-verify-c.json [16]"
+    ],
+    "category": "test-or-environment",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:167; unchanged",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-018",
+    "title": "B-33's index state-space enumeration omits bit rot after load, faults combined with crashes beyond the volume scripts and forged headers with unordered names; forged states keep launchEpoch at the source generation, so rot lowering the newest parsed generation below a committed one is not modelled",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "l2-close5-remaining-b.json [4]",
+      "b.md B-33"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "documented limits of IndexCommitStateSpaceTests",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-019",
+    "title": "Double fault inside one commit unit (index.bin moves to index.prev but reports EIO, and the confirming stat fails too) leaves the ledger believing index.bin holds the committed generation; no harm found (isAbsent treats a failed stat as present)",
+    "sources": [
+      "l2-close5-remaining-b.json [5]",
+      "b.md B-28 cycle-5 amendment"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:259-266 per the finding; recorded, no code change ruled",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-020",
+    "title": "WP-B options declined: B-34's relaxation for an unreadable index.prev beside a valid index.bin, and B-5's exposing the read-only state on OpenReport",
+    "sources": [
+      "ADR-050 Ratified decisions (B-34, B-5)",
+      "b.md B-5, B-34"
+    ],
+    "category": "accepted-deviation",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "OpenReport.degraded suffices (ruling)",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-021",
+    "title": "F_BARRIERFSYNC / F_FULLFSYNC semantics and cost, file protection on a device, iOS 15 runtime behaviour, and P-5/P-13 on a quiet host",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "b.md Not verified here",
+      "ARCHITECTURE §14"
+    ],
+    "category": "device-only",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-022",
+    "title": "A real rename(2) that takes effect and still reports failure, I/O errors from lstat/pread on an index file, LiveFileSystem catch paths APFS in the repository cannot provoke, and how long a real volume keeps a killed process's rename undoable (B-36) are modelled only by the fake",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "b.md B-33, B-34, B-36"
+    ],
+    "category": "device-only",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "fake and test wrapper only",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-023",
+    "title": "T2-06: the R-SYN-1 cross-launch collision case (a persisted epoch unique per launch) is not written",
+    "sources": [
+      "ADR-053 Assignments (§12 names)",
+      "ARCHITECTURE §12.5 T2-06"
+    ],
+    "category": "test-or-environment",
+    "wp": "b",
+    "status": "still-open",
+    "status_evidence": "docs/ARCHITECTURE.md:806 says 'not written at the level-4 merge (Stage 3, ADR-053)'",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-024",
+    "title": "P-5 was not re-measured after the commit unit dropped its header read and the benchmark gained a rename per commit",
+    "sources": [
+      "l2-close5-remaining-b.json [2]",
+      "b.md Not verified here"
+    ],
+    "category": "performance-limit",
+    "wp": "b",
+    "status": "resolved",
+    "status_evidence": "ADR-055 Open: --perf at a9e464d, P-5 durable p95 23.4 ms (budget 40), ordered p95 13.7 ms",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-025",
+    "title": "R8: evicting or purging one blob that more than about 6,500 ids share holds the actor 15.4-16.6 ms in one turn at 10,000 holders, the only WP-C stretch over 10 ms at the reference scale",
+    "sources": [
+      "ADR-052 Assignments (Stage 3 (2))",
+      "l3-rulings.md R8",
+      "c.md C-22 cycle 7",
+      "l3-close8-verify-c.json [2],[11]"
+    ],
+    "category": "performance-limit",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:266 evict(...) removes every holder in one turn; recorded, not asserted, in BenchCleanup",
+    "action": "fix",
+    "verified": "code",
+    "rank": 6
+  },
+  {
+    "id": "S3-B-026",
+    "title": "OI-4: the synchronous dry run evictionPlan(toFree:protecting:) holds the actor about 2.5 ms at 10,000 records and about 38 ms at maxEntries; moving it off the actor needs an async signature (a contract change with WP-F)",
+    "sources": [
+      "ADR-052 Assignments (OI-4)",
+      "c.md OI-4"
+    ],
+    "category": "performance-limit",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Eviction/StoreEviction.swift:14 is still a synchronous package func",
+    "action": "fix",
+    "verified": "code",
+    "rank": 8
+  },
+  {
+    "id": "S3-B-027",
+    "title": "Legacy phase 3 can stay undecided under continuous access stamps or pins: migrateLegacy ends finished:false after three last calls at 10,000 files with about 16,400 stamps (R9, RE-S29); C-24's alternative CCR (a serial bumped only by presence-reducing mutations) would close it",
+    "sources": [
+      "ADR-052 (R9; Assignments WP-F)",
+      "c.md C-24",
+      "l3-close8-verify-c.json [3],[12]"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "files are already adopted; only the stamp migration and tree/key removal wait; actor hold 3.3 ms at 10,000",
+    "action": "fix",
+    "verified": "doc",
+    "rank": 14
+  },
+  {
+    "id": "S3-B-028",
+    "title": "C-12 (NEEDS-HUMAN-REVIEW): a checksum-less legacy file without a valid local checksum is dropped and downloaded again instead of hashed inside open()",
+    "sources": [
+      "ADR-052 (R5 deviations)",
+      "c.md C-12"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "ratified as the safest default",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-029",
+    "title": "C-13 (NEEDS-HUMAN-REVIEW): an undecodable or unusable legacy manifest degrades the launch and adopts nothing; its files stay in the legacy root (a place-without-records primitive would be needed)",
+    "sources": [
+      "ADR-052 (R5 deviations)",
+      "c.md C-13"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "ratified as the safest default",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-030",
+    "title": "C-14 (NEEDS-HUMAN-REVIEW): a legacy root on another volume cannot be renamed into blobs/ (EXDEV); its files are dropped and downloaded again (a store copy primitive would be needed)",
+    "sources": [
+      "ADR-052 (R5 deviations)",
+      "c.md C-14"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "ratified as the safest default",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-031",
+    "title": "OI-11 / C-14 cycle-2 amendment (NEEDS-HUMAN-REVIEW): a legacy file whose read or move fails transiently three times in one lifetime is abandoned and downloaded again, phase 4 then removes manifest.json and the key so it stays unattributed for good, and the kept set lives in memory so a crash can let phase 4 remove a kept file",
+    "sources": [
+      "ADR-052 (R5 deviations)",
+      "c.md OI-11, C-14"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "a persisted per-file count needs a STAMPS field in WP-B's codec (a CCR); not made",
+    "action": "fix",
+    "verified": "doc",
+    "rank": 15
+  },
+  {
+    "id": "S3-B-032",
+    "title": "C-15 (NEEDS-HUMAN-REVIEW): phase 4 removes only what the prior art wrote and never recursively; files it cannot attribute and a non-empty root stay (R-STO-11 says remove the legacy directory)",
+    "sources": [
+      "ADR-052 (R5 deviations)",
+      "c.md C-15"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "ratified as the safest default",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-033",
+    "title": "C-2, C-4, C-6 accepted without review tag: eviction does not rank Apple-adopted assets after ordinary ones; eviction's budget counts pending reclaim while FreeSpace.budgetBytes does not; lastCleanupAt is stamped only by a run that changed something",
+    "sources": [
+      "ADR-052 (accepted without review tag, R5)",
+      "c.md C-2, C-4, C-6"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "by ruling",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-034",
+    "title": "TSan flake in LegacyEdgeTests 'R-STO-11: phase 4 stops listing the legacy tree after the unit in flight once the caller cancels or the store closes': the poll releases heldUnits.first and then reads listings(), a check-then-act race in the test; it fails about 1 fresh TSan launch in 4-5 (listings() is 3) and must be deterministic before Stage 5's --full",
+    "sources": [
+      "ADR-055 Merge rulings (2); Assignments (Stage 3 (2))",
+      "l5k-rulings.md L5K-R27(2)"
+    ],
+    "category": "test-or-environment",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetStorageTests/Cleanup/LegacyEdgeTests.swift:417-446 still polls as described; the reqs verifier's fixes (a) or (b) were not applied",
+    "action": "test",
+    "verified": "code",
+    "rank": 2
+  },
+  {
+    "id": "S3-B-035",
+    "title": "Phase 3's mutation-serial guard assumes WP-B bumps commits.mutationSerial in the turn of every persisted change; it was audited only for quarantine and pin",
+    "sources": [
+      "ADR-052 (Not verified)",
+      "c.md Not verified here (C-24)"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "read in AssetStore+Commit.swift, not audited across every WP-B write",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-036",
+    "title": "Legacy migration on a device: the Caches to Application Support rename on one APFS volume, a root on another volume, LiveLegacyDefaults, Unicode normalisation or case differences between legacy path components and disk names, the overlap guard's identity walks and sandbox stat refusals (/var to /private/var, App Group containers), and phase 3's ordered vs durable commit (OI-2)",
+    "sources": [
+      "ADR-052 (Not verified)",
+      "c.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "fake volume only",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-037",
+    "title": "Deep verification's incarnation check against a real rename-over on APFS: a volume that reuses inode numbers at once could hide a same-size replacement",
+    "sources": [
+      "ADR-052 (Not verified)",
+      "c.md C-8, Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "the fake gives every new file a new inode",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-038",
+    "title": "C-22's actor holds, apply's chunked eviction (c-8), a purge's wait for another reaper's deletion (a kernel-blocked unlink delays it) and the holders-scan prefilter's even-spread assumption were measured on macOS with the fake file system, not on a device",
+    "sources": [
+      "ADR-052 (Not verified)",
+      "c.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "macOS 27 release probes only",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-039",
+    "title": "LegacyPhases.swift:426-431's comment above L5K-R17's wait omits the return when a processing it waited for put its file back in the queue (ARCHITECTURE §4.7 (3))",
+    "sources": [
+      "ADR-055 Assignments (comments only)"
+    ],
+    "category": "documentation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift:426-431 text unchanged",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-040",
+    "title": "recordIntegrityFailure has no presence guard (recordFailure got one in L4-R16): one await separates the engine's presence read from the store write, and a legacy adoption or an apply's adoption of an orphaned blob of the same content can bind the id inside it",
+    "sources": [
+      "l4-rulings.md L4-R24(3)",
+      "ADR-053 Assignments",
+      "f.md F-14, F-22"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetStorage/Integrity/StoreIntegrity.swift:54-79 checks identity and .failed only; recordFailure guards at :101-107",
+    "action": "fix",
+    "verified": "code",
+    "rank": 11
+  },
+  {
+    "id": "S3-B-041",
+    "title": "Dooms exception to L5K-R20: a doom's removal-only install runs ahead of recordFailure's and recordIntegrityFailure's ordered commit (IntegrityBookkeeping.swift is unchanged); I-3 keeps the bytes until a snapshot without the asset is acknowledged",
+    "sources": [
+      "ADR-055 Merge rulings (4)",
+      "l5k-rulings.md L5K-R27(4)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "recorded in ADR-055; no code change ruled",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-042",
+    "title": "LegacyOnDemandRaceTests: waiterTakesOverACancelledProcessing and the other tracked-call reads (.task.value at :46-47, :91-92, :128-129, :163-164, :252, :289-290, :329-330) are not preceded by a 'both calls ended' CorePoll, so a lost resume hangs past the time limit (mutant M8 ran over 5 minutes)",
+    "sources": [
+      "ADR-055 Assignments (Stage 3 (1))",
+      "l5k-rulings.md L5K-R27(1)",
+      "l5k-close4-remaining-k.json L5K-C4-12"
+    ],
+    "category": "test-or-environment",
+    "wp": "c",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetStorageTests/Cleanup/LegacyOnDemandRaceTests.swift; closeWhileTheBatchWaits (:342) and closeResumesAWaitingAsker (:175) already poll (:203, :371)",
+    "action": "test",
+    "verified": "code",
+    "rank": 18
+  },
+  {
+    "id": "S3-B-043",
+    "title": "OI-5 / OI-7: ARCHITECTURE §14 gave LiveLegacyDefaults as 3 untested lines and §1.2 omitted BenchCleanup.swift",
+    "sources": [
+      "ADR-052 Assignments",
+      "c.md OI-5, OI-6, OI-7"
+    ],
+    "category": "documentation",
+    "wp": "c",
+    "status": "resolved",
+    "status_evidence": "docs/ARCHITECTURE.md:966 now says 11 of 14 lines; §1.2's L3 row lists BenchCleanup.swift",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-044",
+    "title": "WP-C assignment: the B-36 test (a phase-1 commit before open()'s barrier with a pending promotion and a failed root sync)",
+    "sources": [
+      "ADR-050 Assignments (WP-C)",
+      "l2-close5-remaining-b.json [3]"
+    ],
+    "category": "test-or-environment",
+    "wp": "c",
+    "status": "resolved",
+    "status_evidence": "Tests/ZTronAssetStorageTests/Cleanup/LegacyCommitTests.swift:13",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-045",
+    "title": "WP-A's A-4.12 obligation: legacy path-like text must be covered by WP-C's R-SEC-2 test",
+    "sources": [
+      "a.md A-4.12, A-13 #15, A-14 #7"
+    ],
+    "category": "test-or-environment",
+    "wp": "c",
+    "status": "resolved",
+    "status_evidence": "Tests/ZTronAssetStorageTests/Cleanup/LegacyMigrationTests.swift:136 'R-SEC-2: a legacy entry whose directory component is a symbolic link is dropped...'",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-046",
+    "title": "D-19.1 / D-20.3: does nsurlsessiond ever finish a fresh background download with a ranged 206 after an internal retry? Today's code then fails the attempt with unexpectedStatus(206) after the whole download; a device check is due before background transfers ship",
+    "sources": [
+      "ADR-050 (D-19.1; Not verified)",
+      "d.md D-19, D-20.3, Not verified here",
+      "ARCHITECTURE §14"
+    ],
+    "category": "device-only",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": 16
+  },
+  {
+    "id": "S3-B-047",
+    "title": "D-19.2: the OS keeps taskDescription (the ztak1 tag with its resume flag) across relaunch for a task created by downloadTask(withResumeData:)",
+    "sources": [
+      "ADR-050 (D-19.2; Not verified)",
+      "d.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-048",
+    "title": "D-19.2 (NEEDS-HUMAN-REVIEW): the 'created from resume data' flag travels in the persisted task tag 'ztak1 <name> <size|-> [resume]' (at most 256 bytes), so every later build must decode it",
+    "sources": [
+      "ADR-050 (heading, D-19.2)",
+      "d.md D-19.2"
+    ],
+    "category": "accepted-deviation",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "orchestrator ruling at the Level 2 close; awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-049",
+    "title": "Background resume data end to end: a 206 with Content-Range moving the whole body, and the errors for stale or unusable resume data (-1002, 416, a 206 without range)",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "d.md ruling 2, Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-050",
+    "title": "LiveBackgroundSessionDriver on a device: task creation vs invalidate() ordering, the order of didFinishDownloadingTo / didCompleteWithError / cancelByProducingResumeData, urlSessionDidFinishEvents timing and relaunch re-attachment; its resumeData use (BackgroundSessionBackend.swift:58-60) has no test (mutant ME survives)",
+    "sources": [
+      "d.md Not verified here, D-20.1",
+      "l2-close5-remaining-d.json [1]",
+      "ARCHITECTURE §14"
+    ],
+    "category": "device-only",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "coverage-excluded device-only file",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-051",
+    "title": "Real NWPathMonitor transitions, a notification arriving between NWPathMonitor.start and its first update (D-18.5), and HTTP/2 connection reuse against CloudFront (P-10 is HTTP/1.1 keep-alive on loopback)",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "d.md Not verified here",
+      "ARCHITECTURE §14"
+    ],
+    "category": "device-only",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-052",
+    "title": "D-10 (NEEDS-HUMAN-REVIEW): an explicit shutdown() cancels in-flight background downloads (the Model's drop-to-cancel rule; ADR-039 amendment)",
+    "sources": [
+      "ADR-050 (D-10)",
+      "d.md D-10"
+    ],
+    "category": "accepted-deviation",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-053",
+    "title": "Public BackgroundSessionDriver.startDownload(_:name:priority:expectedBytes:resumeData:) gained a resumeData parameter (NEEDS-HUMAN-REVIEW, public API change; no R-CAR-6 shim affected)",
+    "sources": [
+      "ADR-050 (Ratified contract changes)",
+      "d.md D-14"
+    ],
+    "category": "accepted-deviation",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-054",
+    "title": "R-NET-3's run-time half: an app that attests BackgroundTransferPolicy.enabled without wiring the background-events hook is not detected (CCR-G1 declined, L5-R5); revisit only with a detection that cannot misfire on an early finish (for example a finish that no hook call claims for the whole background wake)",
+    "sources": [
+      "ADR-054 (Owner information; Assignments (6))",
+      "g.md Not verified here",
+      "l5-rulings.md L5-R5"
+    ],
+    "category": "accepted-deviation",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetKitTests/CompositionTests.swift:39-44 states the declined detection; goes to the device test plan",
+    "action": "device-plan",
+    "verified": "code",
+    "rank": 17
+  },
+  {
+    "id": "S3-B-055",
+    "title": "OI-10: loopback tests time out under host load (ForegroundBackendTests.swift:162-164 and :200-202 failed once on the simulator at load 468.9); decide whether request timeouts are injected or scale with load, without loosening an assertion",
+    "sources": [
+      "ADR-052 Assignments (OI-10)",
+      "ADR-053 Assignments (environment item)",
+      "c.md OI-10"
+    ],
+    "category": "test-or-environment",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "tests unchanged; no timeout seam added",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-056",
+    "title": "WP-D options declined: D-17.5 (apply the joining job's lane priority when start joins a live task), D-17.6 (prove 'without polling' in the conditions test), D-18.3 (change the failure of a direct start of an unbounded job)",
+    "sources": [
+      "d.md D-17.5, D-17.6, D-18.3"
+    ],
+    "category": "accepted-deviation",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "declined at review rounds 2 and 3",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-057",
+    "title": "S2-19: 'R-SYN-14: no task outlives a transfer in the live foreground backend' is not written",
+    "sources": [
+      "ADR-053 Assignments (§12 names)",
+      "ARCHITECTURE §12.4 S2-19"
+    ],
+    "category": "test-or-environment",
+    "wp": "d",
+    "status": "still-open",
+    "status_evidence": "no test carries that name (grep over Tests/ finds none); docs/ARCHITECTURE.md:787",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-058",
+    "title": "D-18.4 (optional): the Int64 edge rows of TransportContractTests' size-guard table",
+    "sources": [
+      "ADR-050 (Deferred)",
+      "d.md D-18.4"
+    ],
+    "category": "test-or-environment",
+    "wp": "d",
+    "status": "resolved",
+    "status_evidence": "Tests/ZTronAssetTransportTests/ArithmeticSafetyTests.swift:111 'R-NET-7: the size guard decides at the edges of Int64 without trapping'",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-059",
+    "title": "E-10: released-pack tracking per catalog generation stays in memory (persisting it needs a store field and is deferred); the optional AdoptionReport digest field is declined",
+    "sources": [
+      "ADR-050 (Deferred; Declined)",
+      "e.md E-10"
+    ],
+    "category": "accepted-deviation",
+    "wp": "e",
+    "status": "still-open",
+    "status_evidence": "by ruling",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-060",
+    "title": "LiveAssetPackBackend against real Apple-hosted packs: installedBytes is approximated by downloadSize (UNVERIFIED, feeds StorageReport.sourceCopyBytes), the concrete BackgroundAssets error types including a full disk reaching the engine as insufficientSpace (E-5), the networks pack downloads use and the cellular-data setting (E-17)",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "e.md E-5, E-12, E-17, Requests for the orchestrator"
+    ],
+    "category": "device-only",
+    "wp": "e",
+    "status": "still-open",
+    "status_evidence": "coverage-excluded device-only file",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-061",
+    "title": "Cancellation of ensureLocalAvailability/statusUpdates (abandoned pack flights per swipe, E-6) and a removal that fails and leaves the pack installed (E-12) on real packs",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "e.md E-6, E-12, Requests (fix round 2)"
+    ],
+    "category": "device-only",
+    "wp": "e",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-062",
+    "title": "E-8 / E-9 residue checked at source level only: a stopped copy that outlives invalidate() is left to staging GC and the source test asserts only that the file is left; a consumer that drops the stream between the stop check and the yield is tested only through deliver on an already-ended stream (PackTransfer.swift)",
+    "sources": [
+      "ADR-050 (Not verified)",
+      "e.md E-8, E-9"
+    ],
+    "category": "test-or-environment",
+    "wp": "e",
+    "status": "still-open",
+    "status_evidence": "no deterministic seam reaches the race",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-063",
+    "title": "L4-R22: a chain of half-open probes ending without a verdict re-admits every parked job on each exit, so the total is quadratic (1,000 parked 2.6-3.6 s; 10,000 about 161 s; every turn stays within C2); lazy re-admission with an ordered index (O(log n) per exit) and a new bound on the total are assigned to Stage 3 (battery, SPEC goal 4)",
+    "sources": [
+      "ADR-053 Assignments (Stage 3 hardening)",
+      "l4-rulings.md L4-R22",
+      "f.md F-41"
+    ],
+    "category": "performance-limit",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetKitBenchmarks/BenchSync.swift:328 holds only the baseline test",
+    "action": "fix",
+    "verified": "code",
+    "rank": 3
+  },
+  {
+    "id": "S3-B-064",
+    "title": "L4-R24(1): reserveManifestProbe() runs before state.run = run, so condition observers can see a half-started run inside startRun (test seams only); move it after the assignment and before spawn (F-42: reserving after spawn fails the start-turn test) and add an observer-side invariantViolations() assertion",
+    "sources": [
+      "ADR-053 Assignments (L4-R24(1))",
+      "l4-rulings.md L4-R24(1)"
+    ],
+    "category": "proven-open-bug",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetSync/Engine/EngineRuns.swift:89-90 (reserve, then assign) with the comment 'before the run is in place'",
+    "action": "fix",
+    "verified": "code",
+    "rank": 10
+  },
+  {
+    "id": "S3-B-065",
+    "title": "L4-R24(4): a re-join that changes lane, or comes from user work, still goes to the back of the queue through relane",
+    "sources": [
+      "ADR-053 Assignments (L4-R24(4))",
+      "l4-rulings.md L4-R24(4)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:131,179,257",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-066",
+    "title": "ENOSPC with a pending reclaim waits 'awaitingSpace', counted against the retry budget with no timed backoff, so attempts can run back to back (PROBE-C6R-1: 2 starts in 0.0 s); F-27(c)'s backoff deadline is not taken and may be revisited if a device test shows churn",
+    "sources": [
+      "ADR-053 Assignments; Acknowledged (3); Open",
+      "f.md F-27, F-28",
+      "l4-rulings.md L4-R4"
+    ],
+    "category": "accepted-deviation",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "confirmed at merge (L4-R26); needs a device test",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-067",
+    "title": "A job that fits alone but not behind the jobs admitted ahead of it stays parked insufficientSpace until a later free-space read when that job ends without committing (other parked jobs wait for the next read; runs re-check at settlement)",
+    "sources": [
+      "ADR-053 Acknowledged at merge (5)",
+      "f.md F-28, F-38"
+    ],
+    "category": "accepted-deviation",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "confirmed at merge",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-068",
+    "title": "Sync-1 regression names not written at the level-4 merge: S1-01 (two: 'R-SYN-4: a job whose last interest left during verification is not retried after an integrity failure' and 'R-SYN-2: a stale commit with no interests removes the job and frees its pipeline slot'), S1-07, S1-11, S1-12 and S1-15's run form",
+    "sources": [
+      "ADR-053 Assignments (§12 names)",
+      "l4-rulings.md L4-R25",
+      "ARCHITECTURE §12.3"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "docs/ARCHITECTURE.md:749,755,759,760,763 say 'not written'; grep over Tests/ finds none of the names",
+    "action": "test",
+    "verified": "code",
+    "rank": 4
+  },
+  {
+    "id": "S3-B-069",
+    "title": "Sync-2 regression names not written: S2-09 ('R-SYN-11: committed bytes stay in the headroom ledger so the reserve is never crossed'), S2-10 ('R-SYN-3: a user-initiated job starts while bulk work fills the verify and commit pipeline') and the ensureAvailable form of S2-01 ('R-SYN-10: ensureAvailable completes after a breaker recovers from an abandoned probe', a critical finding)",
+    "sources": [
+      "ADR-053 Assignments (§12 names)",
+      "ARCHITECTURE §12.4"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "docs/ARCHITECTURE.md:769,777,778; no such test names in Tests/",
+    "action": "test",
+    "verified": "code",
+    "rank": 5
+  },
+  {
+    "id": "S3-B-070",
+    "title": "S1-09's replaced-alarm and replaced-watcher halves have no test of their own, and there is no engine-side assertion for R-SYN-15's join-before-close order (mutants M5/M6 pass because close() drains)",
+    "sources": [
+      "ADR-053 Assignments (§12 names; engine-side assertion)",
+      "ARCHITECTURE §12.3 S1-09"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "docs/ARCHITECTURE.md:757; model invariant unfiredDeadline only catches part",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-071",
+    "title": "Binding-ledger windows without a deterministic probe: the resolve-registration and prefetch-join ledger checks (mutants M-RESOLVEREG and M-JOIN pass the suite; they now cost only a job and a read), the ledger's invalidation after a store mutation that throws (shown for a failed index commit only), and the followStoreView / ledgerForgets guards pinned at function level only",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-14, F-23, F-24"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "by construction; no seam inside the window",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-072",
+    "title": "A 404 job's waiters for an id bound during recordFailure's await are answered notFound (resolveAll with .failed(.notFound)) while the store serves it; a caller that asks again is answered from the store",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-14, F-32"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "by reading only; no probe produced it",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-073",
+    "title": "A holder gained between blobHolders and the quarantine is neither announced nor healed (f-12)",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-23, f-12"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "unproven; recorded residue",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-074",
+    "title": "Two committed applies followed out of order: the real-priority form (a higher-priority continuation overtaking on a busy actor) is covered only by a test seam (takeApplyTurn, f-13)",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-14, F-25"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "the seam stands in; the fix does not depend on priorities",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-075",
+    "title": "Space interleavings pinned by no test: two alarm runs whose store work overlaps (storeWorkRuns), a settlement read racing a newly armed store deadline (the 'continue' after spaceWakeExpected), a purge's reaper against the engine's alarm on a busy actor, and bytes reclaimed by maintenance re-checked only at the next deadline or read",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-14, F-25, F-26, F-27"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "no seam arms a deadline inside the read",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-076",
+    "title": "joinGroup's branch for a manifest copy that changes between two join batches of a prefetch group is uncovered (count 0); it needs a seam inside the join",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-28"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "by construction, not produced",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-077",
+    "title": "C2 turns that are linear and unmeasured at 10,000 members: the first turn of each re-admission event (collect and sort, a few ms), registerGroup's de-duplication and sort (about 3 ms), retries that fall due together in one fireDue, and shutdown",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-28, F-29"
+    ],
+    "category": "performance-limit",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "estimates only",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-078",
+    "title": "The 10,000-id prune announcement takes about 3.5 ms in one turn and is estimated, not measured, at about 35 ms at maxEntries (F-20)",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-20"
+    ],
+    "category": "performance-limit",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "estimate only",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-079",
+    "title": "Engine test fidelity gaps: the model tests have no liveness phase (ALARM-STUCK passes at its seed, F-34), six F-40 site changes have no reachable difference and no test (the gate model's outcome kinds were not extended, F-41), and the harness priority floor no longer reproduces production's utility/default QoS gap",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-33, F-34, F-41"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "documented in ARCHITECTURE §14",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-080",
+    "title": "Shutdown-time races hardened but not produced: a 404 whose presence reads overlap shutdown, a transfer request after shutdown began, and a completion racing the engine's cancel when a kept drained file is discarded (by reading only)",
+    "sources": [
+      "ADR-053 Not verified",
+      "f.md F-14, F-32"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "no probe produced them",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-081",
+    "title": "L5-R16 (accepted for Level 5): a job only a claim keeps ends on its first failed attempt as failed(.nextRun) with a spurious assetFailed and the successor's join starts a fresh transfer; a claim should inherit the held lane's retry policy",
+    "sources": [
+      "ADR-054 Assignments (Stage 3 (1))",
+      "l5-rulings.md L5-R16",
+      "g.md L5-C1-05"
+    ],
+    "category": "proven-open-bug",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetSync/Engine/EngineFailures.swift unchanged since l5-merged (HEAD adds only docs and a workflow)",
+    "action": "fix",
+    "verified": "doc",
+    "rank": 9
+  },
+  {
+    "id": "S3-B-082",
+    "title": "L5-R22(4): invariantViolations() reports a large give-up's leftover claims (a registered token in releasing) as 'released and registered'; flag it only while its Release holds members or pending interests, and add the E2-shape test",
+    "sources": [
+      "ADR-054 Merge rulings (4); Assignments (5)",
+      "l5-rulings.md L5-R22(4)"
+    ],
+    "category": "proven-open-bug",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:1788-1790 flags every registered token in releasing; no production caller",
+    "action": "fix",
+    "verified": "code",
+    "rank": 19
+  },
+  {
+    "id": "S3-B-083",
+    "title": "G-13's 'no give-up after a running join's read' invariant is argued, not tested, and the merge of a large give-up into a later large release has no test; a claimed-only job's failure path and a claim naming the content its member had when claimed (a changed member is protected again only once its join reaches it) are shown by reading only",
+    "sources": [
+      "ADR-054 Assignments (WP-F / Stage 3 notes); Not verified",
+      "g.md G-13, Not verified here"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "no running engine reaches the give-up",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-084",
+    "title": "releasesPerTurn's doc estimates about 1 us per removal while WP-G's probe measured about 8.5 us per retirement (a 512-member turn 4.30-4.60 ms); every chunked turn measured stays within C2, so the doc awaits a re-measurement",
+    "sources": [
+      "ADR-054 Assignments (WP-F / Stage 3 notes)"
+    ],
+    "category": "documentation",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:363 still says about 1 us",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-085",
+    "title": "EngineDispatch.swift:743-744's REENTRANCY comment is incomplete since L5K-R25: the lifecycle, the epoch and the attempt are also re-checked before remote.transfer (:750-763)",
+    "sources": [
+      "ADR-055 Assignments (comments only)"
+    ],
+    "category": "documentation",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:743-744 text unchanged",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-086",
+    "title": "L5K-R25's next-id fallback in the answer site (EnginePresence) is defensive and unpinned: no seam reaches its second iteration",
+    "sources": [
+      "ADR-055 Merge rulings (5), Accepted exceptions",
+      "l5k-rulings.md L5K-R27(5)"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "recorded in ADR-055 and ARCHITECTURE §14",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-087",
+    "title": "L5K-R2 test-determinism class: engine and migration tests reach their races by scheduling (the L5K-R17 test does not assert its premise; 'one adoption per file' is reached in almost every macOS launch), and the L5K-R21 tests' gated planner blocks one cooperative thread (a single-thread host would deadlock)",
+    "sources": [
+      "ADR-055 Not verified",
+      "l5k-close1-remaining-k.json [1],[3]",
+      "l5k-close3-remaining-k.json [3]",
+      "k.md Not verified here"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "still-open",
+    "status_evidence": "documented; no supported host has one cooperative thread",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-088",
+    "title": "L5-C2-02: give-up leftovers kept in releasing[token] for a still-registered group could make its jobs look released-only",
+    "sources": [
+      "l5-close2-remaining-g.json [2]",
+      "ADR-054 Merge rulings"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "f",
+    "status": "resolved",
+    "status_evidence": "Tests/ZTronAssetSyncTests/Engine/EngineGroupClaimTests.swift:438 giveUpLeftoversNeverMakeAJoinedJobReleasedOnly (L5-R21 guard in isReleasedOnly)",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-089",
+    "title": "WP-F assignments from ADR-050/052: R-NET-8 engine half, R-APL-3 end to end, R-CLN-8 engine re-download, SyncEngine.waitUntil ending on cancellation",
+    "sources": [
+      "ADR-050/052 Assignments (WP-F)",
+      "ADR-053 Amendment"
+    ],
+    "category": "test-or-environment",
+    "wp": "f",
+    "status": "resolved",
+    "status_evidence": "EngineLiveTransportTests.swift:198, EngineAppleTierTests.swift:25, EngineStoreTests.swift:198, EngineIdleTests.swift:46 (all under Tests/ZTronAssetSyncTests/Engine)",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-090",
+    "title": "L5-R22(1): the events exit in next() for a consumer that stopped during its registration runs but is not pinned (mutant M05 survives); pin it with a test read for a started pump or a census of the replacement's registrations",
+    "sources": [
+      "ADR-054 Merge rulings (1); Assignments (2)",
+      "l5-rulings.md L5-R22(1)"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "no test added since l5g-merged",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-091",
+    "title": "L5-R22(2): tighten the EventContinuityModel (stamp performMaintenance and sync(.force) calls; owe the registration engine's clientStarted when the follow turn preceded its start); two tolerance rows are measurement limits of the model, not product promises",
+    "sources": [
+      "ADR-054 Merge rulings (2); Assignments (3)",
+      "l5-rulings.md L5-R22(2)"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "EventContinuityModelTests tolerance table E1...E10 unchanged",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-092",
+    "title": "L5-R22(3): sync's L5-R20 trigger list is pinned only for .storageUnavailable (mutant M01s survives); add a forced-sync test ending .insufficientSpace or .serverUnavailable on a healthy root (one root check, result returned as given, no reopen)",
+    "sources": [
+      "ADR-054 Merge rulings (3); Assignments (4)",
+      "l5-rulings.md L5-R22(3)"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "no test added since l5g-merged",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-093",
+    "title": "ADR-050's deferred optional P-9 case: a timed release survey (sliced) at 100,000 manifest entries (E-16) was never written",
+    "sources": [
+      "ADR-050 (Deferred)",
+      "ADR-054 Assignments (7)",
+      "e.md E-16"
+    ],
+    "category": "performance-limit",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetKitBenchmarks/BenchKit.swift:249 has only the 64-resolve heartbeat P-9; no 100,000-entry case",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-094",
+    "title": "Replaced-root limits (L5-R4, L5-R20): a call that succeeds on a replaced root no commit has yet detected does not reopen until a qualifying failure or a commit; a root check whose own stat fails records nothing; a root that vanishes between withAsset's read of unavailableReason and its lease leases from the vanished store",
+    "sources": [
+      "ADR-054 Not verified",
+      "g.md Not verified here",
+      "l5-close2-remaining-g.json [1]"
+    ],
+    "category": "accepted-deviation",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "accepted under L5-R4; the check costs one lstat per qualifying failure",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-095",
+    "title": "Untested facade interleavings: a reopen landing between two hops of one facade call (subscribe()'s registration, the background-events hand-off, the diagnostic report's three reads), and a stream registration overlapping the client's shutdown (ClientLifecycle.register answered .shutDown) are shown by reading only",
+    "sources": [
+      "ADR-054 Not verified",
+      "g.md Not verified here (G-5, G-16)"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "no seam reaches them",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-096",
+    "title": "AssetClient.swift:144-149: no test exhausts the three-reopen limit; llvm-cov shows an underflowed 18.4E counter there, so the Kit coverage is overstated by about 0.27 %",
+    "sources": [
+      "l5-close2-remaining-g.json [7]",
+      "g.md Deliberately untested lines"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "recorded as deliberately untested; Kit coverage still passes (97.83 %)",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-097",
+    "title": "R-CAR-5's lost update was never reproduced: no seam reaches it, and the record-first order (G-3) removes the window by construction",
+    "sources": [
+      "ADR-054 Not verified",
+      "g.md G-3"
+    ],
+    "category": "unproven-suspicion",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "unproven by design",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-098",
+    "title": "A real rootVanished on a device (iOS purging a Caches root while the app runs) and the reopen's behaviour there, including the root check's cost",
+    "sources": [
+      "ADR-054 Not verified",
+      "g.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-099",
+    "title": "UIKit's background-events hook end to end (the facade test calls handleBackgroundEvents directly) and the live MainBundleLookup against an app bundle with resources",
+    "sources": [
+      "ADR-054 Not verified",
+      "g.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-100",
+    "title": "P-8 and P-9 on a device (macOS host only), the claims' and L5-R15's C2 figures (macOS 27 at load about 4.9, not a device), and the benchmark bundle on the iOS Simulator (built, not run, ADR-051)",
+    "sources": [
+      "ADR-054 Not verified",
+      "g.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "g",
+    "status": "still-open",
+    "status_evidence": "no device or simulator run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-101",
+    "title": "The Level 2 close's assignment: KitContractTests' GatedRegistry.waitUntil must end on its caller's cancellation",
+    "sources": [
+      "ADR-050 (Resolved at the Level 2 close, Assigned to WP-G)"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "resolved",
+    "status_evidence": "Tests/ZTronAssetKitTests/KitContractTests.swift:90-94 (the CensusWaiting pattern); ADR-054 G-8",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-102",
+    "title": "WP-G assignments from ADR-050: R-NET-3 attestation fallback test and B-17's mirror reset before the replacement store's first install",
+    "sources": [
+      "ADR-050 Assignments (WP-G)",
+      "ADR-054 Amendment"
+    ],
+    "category": "test-or-environment",
+    "wp": "g",
+    "status": "resolved",
+    "status_evidence": "Tests/ZTronAssetKitTests/CompositionTests.swift:46 and FacadeReopenTests.swift:15",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-103",
+    "title": "Optional comment-only edits of test files before l5g-merged: CompositionTests.swift:39-44 ('ADR-026 option E', CCR-G1), FacadeReopenTests.swift:96-99 (unavailableReason) and :709-711 ('only .storageUnavailable and .shutDown')",
+    "sources": [
+      "ADR-054 Assignments (Orchestrator)"
+    ],
+    "category": "documentation",
+    "wp": "g",
+    "status": "resolved",
+    "status_evidence": "the files now cite ADR-026 (c) and the declined CCR-G1 (CompositionTests.swift:39-44), verifyRootNow() (FacadeReopenTests.swift:96-99) and mayStemFromFileSystem (:709-711)",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-104",
+    "title": "L4-R24(2): ManualTimeSource.advance(to:) lands 1 ns short of a boundary in about 2.9 % of gaps because MonotonicInstant.adding(seconds:) truncates a Double; WP-F's tests use exact moves meanwhile",
+    "sources": [
+      "ADR-053 Assignments (L4-R24(2))",
+      "l4-rulings.md L4-R24(2)"
+    ],
+    "category": "proven-open-bug",
+    "wp": "h",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetTestSupport/ManualTimeSource.swift:144-149 goes through seconds(since:); Sources/ZTronAssetModel/Environment/Time.swift:26-37 truncates UInt64(delta)",
+    "action": "fix",
+    "verified": "code",
+    "rank": 13
+  },
+  {
+    "id": "S3-B-105",
+    "title": "FakeFileSystem makes .barrier and .full identical and FSOpRecord carries no SyncLevel, so ordered-vs-durable commits (phase 3's durable commit before the UserDefaults key removal, R-CLN-10, the engine's publication acknowledgement order) are provable only by reading (OI-2); a level-recording FileSystem spy or an FSOpRecord level (a contract change) would close it",
+    "sources": [
+      "ADR-049 (Fake fidelity limits)",
+      "ADR-052 Assignments (OI-2)",
+      "ADR-053 Not verified",
+      "l1-remaining-h.json [6]"
+    ],
+    "category": "test-or-environment",
+    "wp": "h",
+    "status": "still-open",
+    "status_evidence": "Sources/ZTronAssetTestSupport/FakeFileSystem.swift:53-75 FSOpRecord has no level; :355-356 documents the simplification",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-106",
+    "title": "Fake fidelity limits documented on the types: FakeTransferBackend retains every handle, so drop-to-cancel is observable only through FakeRemoteSource; the conformance suite creates its symbolic-link fixture with FileManager (an accepted exception to ADR-038)",
+    "sources": [
+      "ADR-049 (Fake fidelity limits)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "h",
+    "status": "still-open",
+    "status_evidence": "documented",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-107",
+    "title": "'Test support: start racing stop ends every start exactly once...' (LoopbackHTTPServerTests.swift:400, one-minute limit) exceeds its limit under TSan at loads of 17-834; its TSan headroom must be measured on an idle host, one agent at a time",
+    "sources": [
+      "ADR-052 Assignments (Stage 3 hardening (4))",
+      "ADR-055 Assignments (Stage 5, WP-H owner)",
+      "l2fu.md item 2"
+    ],
+    "category": "test-or-environment",
+    "wp": "h",
+    "status": "still-open",
+    "status_evidence": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 unchanged",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-108",
+    "title": "The loopback server's refusal of a LAN address is not probed: the ::1 probe stands in for it and assumes lo0 carries ::1 (a getifaddrs probe needs mutable pointers, C1)",
+    "sources": [
+      "ADR-051 Not verified",
+      "ios.md item 5"
+    ],
+    "category": "test-or-environment",
+    "wp": "h",
+    "status": "still-open",
+    "status_evidence": "documented",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-109",
+    "title": "L1 follow-ups: every TestSupport census wait (waitForHeldUnits, waitForSleepers, ...) must end when its caller is cancelled",
+    "sources": [
+      "l2-close5-remaining-b.json [0],[6]",
+      "l2fu.md item 1",
+      "l2close.md"
+    ],
+    "category": "test-or-environment",
+    "wp": "h",
+    "status": "resolved",
+    "status_evidence": "Sources/ZTronAssetTestSupport/SteppedBlockingExecutor.swift:9-10, :98-108 (CensusWaiting, requireHeldUnits throws CancellationError)",
+    "action": "none",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-110",
+    "title": "L5K-R24's lag: the commit path, ensureAvailable's present members, the resolve fast hit and ledger joins may answer a user-initiated asker up to about two install intervals (0.2 s) before the readers' snapshot holds the asset; an optional package AssetStore.installIfDue() with the answer-site check (and an authorised EngineDispatch.swift) would close it if a device test shows it matters",
+    "sources": [
+      "ADR-055 Merge rulings (3); Assignments (3); Owner options",
+      "l5k-rulings.md L5K-R24, L5K-R27(3)",
+      "k.md L5K-R24"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "no installIfDue anywhere in Sources/; MIGRATION.md §4 records the lag; probe K4-COMMITPROMO showed unseenAtReturn=1",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-111",
+    "title": "K-13 owner options not added: a public read of the client's applied manifest (for example AssetClient.manifestEntries(scope:)) so cachedAsset(forIdentifier:) and verifyFullyAvailable() work without a keyless provider fetch, and an awaitable legacy-migration report for MIGRATION.md step 3",
+    "sources": [
+      "ADR-055 Owner options and information",
+      "k.md K-13"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "public API additions no requirement needs",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-112",
+    "title": "K-2 (NEEDS-HUMAN-REVIEW): CDNAssetResolver.installed is a @MainActor property over a write-once install point (first installation wins; installed = nil changes nothing)",
+    "sources": [
+      "ADR-055 Owner decisions (K-2)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "approved as the safest default (L5K-R8); awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-113",
+    "title": "K-3 (NEEDS-HUMAN-REVIEW): the CDNLocalStore lookups are @MainActor with no I/O; a nonisolated caller needs await MainActor.run",
+    "sources": [
+      "ADR-055 Owner decisions (K-3)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "approved as the safest default; awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-114",
+    "title": "K-5 (NEEDS-HUMAN-REVIEW): StaticManifestCDNProvider and BackgroundAssetsCDNProvider no longer download (downloadAsset is deprecated); the provider's own fetch sends no app key, so verifyFullyAvailable() through the keyless provider fails with the origin's 403 (option (b), a key-taking initialiser, declined)",
+    "sources": [
+      "ADR-055 Owner decisions (K-5)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "approved as the safest default; awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-115",
+    "title": "K-6 (NEEDS-HUMAN-REVIEW, storage location): the deprecated initialisers share one client per install point; CDNLocalStore(baseDirectory: X) roots the store at .custom(X's parent)/ZTronAssetKit/v1 beside the legacy root X, so directories with one parent share one root",
+    "sources": [
+      "ADR-055 Owner decisions (K-6)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "approved as the safest default; awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-116",
+    "title": "K-15 (NEEDS-HUMAN-REVIEW): on a launch during legacy migration the lookups miss a prior-art file until the snapshot holding its adoption is installed; a resolve adopts it on demand; the shims cannot close the window without main-thread I/O",
+    "sources": [
+      "ADR-055 Owner decisions (K-15)"
+    ],
+    "category": "accepted-deviation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "approved as the safest default; awaiting owner review",
+    "action": "ADR-record",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-117",
+    "title": "Shims across a facade reopen are uncovered: no shim test or MIGRATION.md passage describes the lookups' nil between the mirror reset and the replacement's first install, or the coordinator's subscription across a reopen",
+    "sources": [
+      "ADR-055 Not verified (found at the merge)",
+      "ADR-054 Assignments (WP-K note)"
+    ],
+    "category": "documentation",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "docs/MIGRATION.md has no passage on reopen (grep finds none); no Tests/ZTronAssetCompatibilityTests case",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-118",
+    "title": "The shims at run time below the iOS 17 test-bundle target and at the iOS 15 floor: they ran on the iOS 27 simulator and macOS 27 only; their iOS 15 compile is the typecheck recorded at 409db9a",
+    "sources": [
+      "ADR-055 Not verified",
+      "k.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "no iOS 15/16 simulator boots on this host",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-119",
+    "title": "Live shim paths: NetworkAvailabilityMonitor.shared over the live reachability conformer, StaticManifestCDNProvider against a real origin and the 403 a keyless client gets, defaultAppVersion() inside an app bundle, BackgroundAssetsCDNProvider on a device, and CDNLocalStore(baseDirectory:) over the live file system in an app container",
+    "sources": [
+      "ADR-055 Not verified",
+      "k.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "fakes only",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-120",
+    "title": "Q-10: the adoption inside ZTronCarouselCore was never built or tested (ADR-006: MIGRATION.md describes it; nothing outside this repository was written)",
+    "sources": [
+      "ADR-055 Not verified",
+      "ADR-055 Owner adoption",
+      "k.md Not verified here"
+    ],
+    "category": "device-only",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "Stage 4 cancelled",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-121",
+    "title": "Migration window and device costs: K-15's window length over a real prior-art tree, the cost of L5K-R16/18/20/21/23's extra reads, re-arms and installs, the main actor's enqueue order that legacyStoreAdoptsThePriorArtFiles relies on, one adoption per file with live executors, crossed deadline answers under production priorities",
+    "sources": [
+      "ADR-055 Not verified",
+      "k.md Not verified here (cycles 1-5)"
+    ],
+    "category": "device-only",
+    "wp": "k",
+    "status": "still-open",
+    "status_evidence": "no benchmark exists (L5K-R11)",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-122",
+    "title": "WPI-R5 (NEEDS-HUMAN-REVIEW): a consumer needs a Swift 6.2+ toolchain, a lower bound from three unguarded @concurrent functions and SE-0461's status line; only Swift 6.4 built the package and no 6.2 or 6.3 toolchain was tried",
+    "sources": [
+      "ADR-056 (WPI-R5; Not verified)",
+      "i.md I-1, Left for the orchestrator 9",
+      "README.md:16-20"
+    ],
+    "category": "accepted-deviation",
+    "wp": "i",
+    "status": "still-open",
+    "status_evidence": "@concurrent at Sources/ZTronAssetSync/Engine/EngineLifecycle.swift:350, EngineRuns.swift:312, EngineCommands.swift:1186; no #if guard; README.md:16-20 states the floor",
+    "action": "ADR-record",
+    "verified": "code",
+    "rank": 20
+  },
+  {
+    "id": "S3-B-123",
+    "title": "The README check scripts (check_links.py, extract_qs.py, extract_snippets.py, split_hunks.py) lived only in the git-ignored .worktrees/i/.build-i/tools/ and the scratch packages pointed at that worktree; .worktrees/ is now empty, so the quick-start and snippet re-check must be rebuilt from I-2 and I-3 before any public-signature change",
+    "sources": [
+      "ADR-056 Assignments (Stage 5, public signatures)",
+      "i.md I-2, I-3"
+    ],
+    "category": "test-or-environment",
+    "wp": "i",
+    "status": "still-open",
+    "status_evidence": ".worktrees/ is empty and .build-i does not exist at HEAD",
+    "action": "test",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-124",
+    "title": "README evidence gaps: the quick start was compiled verbatim and cross-built for iOS 15 but never run; five other snippets compiled only over stubs, not under -warnings-as-errors; the Installation fragment (README.md:39-47) was not compiled; the README's simulator commands were not re-run",
+    "sources": [
+      "ADR-056 Not verified",
+      "i.md I-2, I-3, I-6"
+    ],
+    "category": "test-or-environment",
+    "wp": "i",
+    "status": "still-open",
+    "status_evidence": "no gate fails when the README drifts",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-125",
+    "title": "When docs/MUTATION-PROBES.md (Stage 3) and VERIFICATION.md, DEVICE-TEST-PLAN.md, RESIDUAL-RISKS.md (Stage 5) exist, add a README documentation-map row for each (I-7), recorded as the orchestrator's edit",
+    "sources": [
+      "ADR-056 Assignments (Stage 3 and Stage 5)",
+      "i.md I-7"
+    ],
+    "category": "documentation",
+    "wp": "i",
+    "status": "still-open",
+    "status_evidence": "none of the four files exists yet",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-126",
+    "title": "README sentences to update once the owner rules on a NEEDS-HUMAN-REVIEW decision (storage location, pack retention, background transfers, fallback chain, migration deviations, shims, consumer toolchain), and at release the .package(url:from:) form in README.md:39-47 and docs/MIGRATION.md:12-13",
+    "sources": [
+      "ADR-056 Assignments (When the owner rules, and at release)"
+    ],
+    "category": "documentation",
+    "wp": "i",
+    "status": "still-open",
+    "status_evidence": "owner rulings pending",
+    "action": "fix",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-127",
+    "title": "The Apple-hosting setup the README (README.md:306-330) and MIGRATION.md step 3 ask of the app (the StoreKit downloader extension on iOS 26, download policies as build-time data, Info.plist keys, the App Group) is not verified beyond APPLE-API-VERIFICATION §1.7; no key is named and nothing ran on a device",
+    "sources": [
+      "ADR-056 Not verified"
+    ],
+    "category": "device-only",
+    "wp": "i",
+    "status": "still-open",
+    "status_evidence": "no device run exists",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-128",
+    "title": "CLAUDE.md's Commands do not mention the simulator run (ADR-051); agents may not edit CLAUDE.md, so adding it is the owner's choice",
+    "sources": [
+      "ADR-051 Open",
+      "ORCHESTRATION open question 5"
+    ],
+    "category": "documentation",
+    "wp": "orch",
+    "status": "still-open",
+    "status_evidence": "CLAUDE.md unchanged",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-129",
+    "title": "Orchestrator-owned simulator commands: assetkit-stage2-l3-close.js:33 lacks -collect-test-diagnostics never and cites 'docs/adr-drafts/ios.md convention'; assetkit-stage2-level.js:94 still says 'at the iOS 15 floor'",
+    "sources": [
+      "ADR-051 Open"
+    ],
+    "category": "documentation",
+    "wp": "orch",
+    "status": "still-open",
+    "status_evidence": ".claude/workflows/assetkit-stage2-l3-close.js has 0 matches for the flag; assetkit-stage2-level.js:94 and assetkit-closeout.js:50 now carry it",
+    "action": "fix",
+    "verified": "code",
+    "rank": null
+  },
+  {
+    "id": "S3-B-130",
+    "title": "Tests run on the iOS 27.0 Simulator only: none below iOS 17, the Mutex-gated ones need iOS 18 and the Apple-tier ones iOS 26; no iOS 15 simulator boots on this host, so iOS 15 runtime behaviour is unverified",
+    "sources": [
+      "ADR-051 Not verified",
+      "ARCHITECTURE §14"
+    ],
+    "category": "device-only",
+    "wp": "orch",
+    "status": "still-open",
+    "status_evidence": "toolchain/host limit",
+    "action": "device-plan",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-131",
+    "title": "The benchmark bundle is built but never run on the simulator; the ungated-.timeLimit rule holds for this Xcode only (a toolchain that builds test bundles at the package floor needs iOS 16.0 beside macOS 13.0); the runner-crash restart behaviour is taken from xcodebuild's message",
+    "sources": [
+      "ADR-051 Not verified"
+    ],
+    "category": "test-or-environment",
+    "wp": "orch",
+    "status": "still-open",
+    "status_evidence": "every toolchain change must re-run the simulator build",
+    "action": "test",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-132",
+    "title": "Outside-repository leftovers only the owner may delete: CFNetworkDownload_*.tmp, ResultBundle_*.xcresult, Swift macro-expansion dumps in the per-user temp folder, and ~/Library/Developer/Xcode/DerivedData/{l2fu-*,ZTronAssetKit-*,h-*}",
+    "sources": [
+      "ADR-049 (Hygiene)",
+      "ARCHITECTURE §15",
+      "ORCHESTRATION open question 6",
+      "l1-remaining-h.json [0]"
+    ],
+    "category": "test-or-environment",
+    "wp": "orch",
+    "status": "still-open",
+    "status_evidence": "agents may not delete outside the repository",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  },
+  {
+    "id": "S3-B-133",
+    "title": "verify.sh writes .verify-logs inside the worktree, so concurrent verifiers overwrite each other's logs and a --quick summary can print another run's failures; Scripts/ is frozen (G1), so verdicts come from exit status",
+    "sources": [
+      "ADR-052 Process",
+      "l3-close8-verify-c.json [9]",
+      "l5k-close4-remaining-k.json L5K-C4-09"
+    ],
+    "category": "test-or-environment",
+    "wp": "orch",
+    "status": "still-open",
+    "status_evidence": "frozen harness; process rule only",
+    "action": "none",
+    "verified": "doc",
+    "rank": null
+  }
+]

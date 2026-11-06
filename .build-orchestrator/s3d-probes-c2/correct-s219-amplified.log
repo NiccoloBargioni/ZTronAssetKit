@@ -1,0 +1,8 @@
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" recorded an issue at ForegroundBackendTests.swift:277:9: Expectation failed: edges.began == expected.count && edges.ended == expected.count
+↳ edges.began == expected.count && edges.ended == expected.count → false
+↳   edges.began == expected.count → true
+↳   edges.ended == expected.count → false
+↳ /// sync-2 S2-19 (ARCHITECTURE §12.4): a per-transfer control reader over a stream nobody finishes leaks one task
+↳ /// per transfer, and the engine's own reader leaks if the update stream outlives its terminal element. ADR-021

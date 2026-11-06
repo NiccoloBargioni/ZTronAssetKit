@@ -1,0 +1,36 @@
+18:23:03 release start load { 3.56 9.40 11.79 }
+18:23:06 tsan start load { 3.84 9.36 11.76 }
+18:26:36 release exit 0 load { 288.54 131.36 61.88 }
+18:26:36 gatespy start load { 288.54 131.36 61.88 }
+18:26:37 gatespy exit 0 load { 288.54 131.36 61.88 }
+18:26:37 quick waiting for lock load { 288.54 131.36 61.88 }
+18:26:37 quick lock taken load { 288.54 131.36 61.88 }
+lane C start 18:37:00 { 29.33 89.40 84.65 }
+18:37:00 ios start load { 29.33 89.40 84.65 }
+18:37:28 ios exit 0 load { 31.26 83.86 82.79 }
+18:37:28 simbuild start load { 31.26 83.86 82.79 }
+18:40:09 simbuild exit 0 load { 111.79 96.77 87.99 }
+18:40:09 sim waiting for lock load { 111.79 96.77 87.99 }
+18:45:53 quick exit 0 load { 49.92 88.81 87.95 }
+18:45:53 quick lock released load { 49.92 88.81 87.95 }
+18:45:53 cov export start: 8 bundles load { 49.92 88.81 87.95 }
+18:45:54 cov export exit 0 load { 49.92 88.81 87.95 }
+18:45:54 cov gate exit 0 load { 49.92 88.81 87.95 }
+18:45:55 sim lock taken load { 49.92 88.81 87.95 }
+18:45:56 covdiff exit 0 load { 46.56 87.47 87.48 }
+18:45:56 sync1 start load { 46.56 87.47 87.48 }
+19:02:59 sim exit 0 load { 155.22 266.88 252.28 }
+19:03:00 sim lock released load { 155.22 266.88 252.28 }
+19:03:02 sim summary exit 0 load { 143.11 262.51 250.83 }
+19:03:02 gates done: ios simbuild sim load { 143.11 262.51 250.83 }
+19:07:03 sync1 exit 0 load { 238.89 223.19 233.62 }
+19:07:03 sync2 start load { 238.89 223.19 233.62 }
+19:18:36 sync2 exit 0 load { 103.64 122.64 190.27 }
+19:18:36 sync3 start load { 103.64 122.64 190.27 }
+19:26:00 sync3 exit 0 load { 4.85 38.44 120.84 }
+19:26:01 tools64 build-tests start load { 4.85 38.44 120.84 }
+19:26:51 tsan exit 0 load { 27.46 39.17 116.39 }
+19:26:51 gates done: tsan load { 27.46 39.17 116.39 }
+19:27:36 tools64 build-tests exit 0 load { 61.58 46.22 114.99 }
+19:28:31 tools64 release exit 0 load { 41.21 43.75 109.80 }
+19:28:31 gates done: release gatespy quick cov sync tools64 load { 41.21 43.75 109.80 }

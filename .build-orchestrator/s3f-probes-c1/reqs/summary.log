@@ -1,0 +1,122 @@
+[S3F-1-firstReadingNoEdge] exit=1
+    ✘ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" recorded an issue at EngineFirstReadingTests.swift:158:13: Expectation failed: after != .failed(.whenOnline)
+    ✘ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" failed after 0.068 seconds with 1 issue.
+    ✘ Test "R-SYN-13: an offline failure that arrives after the engine's first conditions reading showed a satisfied path is retried at once" recorded an issue at EngineFirstReadingTests.swift:186:9: Expectation failed: (try? answer.get()) != nil
+    ✘ Test "R-SYN-13: an offline failure that arrives after the engine's first conditions reading showed a satisfied path is retried at once" recorded an issue at EngineFirstReadingTests.swift:187:9: Expectation failed: await rig.source.starts.count == 2
+    ✘ Test "R-SYN-13: an offline failure that arrives after the engine's first conditions reading showed a satisfied path is retried at once" failed after 0.070 seconds with 2 issues.
+    ✔ Test "R-SYN-13: an unsatisfied first conditions reading retries nothing and the satisfied reading after it retries the asset once" passed after 0.071 seconds.
+    ✘ Suite "Engine conditions" failed after 0.071 seconds with 3 issues.
+    ✘ Test run with 3 tests in 1 suite failed after 0.071 seconds with 3 issues.
+[S3F-3-CONF-03] exit=1
+    ✘ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" recorded an issue at EngineRunIntegrityCapTests.swift:40:25: Issue recorded
+    ✘ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" failed after 0.022 seconds with 1 issue.
+    ✘ Suite "Engine failure paths" failed after 0.022 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.023 seconds with 1 issue.
+[S3F-6-progressInPlace] exit=1
+    ✘ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" recorded an issue at EngineEventOrderTests.swift:32:13: Expectation failed: finished < started && started < progress
+    ✘ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" failed after 0.001 seconds with 1 issue.
+    ✘ Test "R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress" recorded an issue at EngineEventOrderTests.swift:72:13: Expectation failed: started < progress
+    ✘ Test "R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress" failed after 0.017 seconds with 1 issue.
+    ✘ Suite "Engine events" failed after 0.018 seconds with 2 issues.
+    ✘ Test run with 2 tests in 1 suite failed after 0.018 seconds with 2 issues.
+[S3F-7-CONF-04] exit=1
+    ✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" recorded an issue at EngineGateConformanceTests.swift:70:9: Expectation failed: state.running == cap
+    ✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" recorded an issue at EngineGateConformanceTests.swift:71:9: Expectation failed: await harness.source.starts.count == cap
+    ✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" failed after 0.012 seconds with 2 issues.
+    ✘ Suite "Engine conditions" failed after 0.012 seconds with 2 issues.
+    ✘ Test run with 1 test in 1 suite failed after 0.012 seconds with 2 issues.
+[S3F-8-CONF-02] exit=1
+    ✘ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" recorded an issue at EngineGateConformanceTests.swift:28:9: Expectation failed: request.allowsUpdateCheck == false
+    ✘ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" failed after 0.010 seconds with 1 issue.
+    ✘ Suite "Engine conditions" failed after 0.010 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.011 seconds with 1 issue.
+[S3F-9-CONF-05] exit=1
+    ✘ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" recorded an issue at EngineGateConformanceTests.swift:100:9: Expectation failed: result == .failure(.authRejected(.confirmed))
+    ✘ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" failed after 0.012 seconds with 1 issue.
+    ✘ Suite "Engine failure paths" failed after 0.012 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.013 seconds with 1 issue.
+[M-N-09] exit=1
+    ✔ Test "R-SYN-3: a queued bulk job a user-initiated request joins is promoted and starts before the bulk job queued ahead of it" passed after 0.013 seconds.
+    ✘ Test "R-SYN-3: a queued bulk job a prefetch request joins is promoted and starts before the bulk job queued ahead of it" recorded an issue at EngineBoundaryTests.swift:42:9: Expectation failed: Array(result.starts.prefix(2)) == result.order
+    ✘ Test "R-SYN-3: a queued bulk job a prefetch request joins is promoted and starts before the bulk job queued ahead of it" failed after 0.014 seconds with 1 issue.
+    ✘ Suite "Engine lanes" failed after 0.014 seconds with 1 issue.
+    ✘ Test run with 2 tests in 1 suite failed after 0.014 seconds with 1 issue.
+[M-N-12] exit=1
+    ✘ Test "R-SYN-3: a queued bulk job a prefetch request joins is promoted and starts before the bulk job queued ahead of it" recorded an issue at EngineBoundaryTests.swift:42:9: Expectation failed: Array(result.starts.prefix(2)) == result.order
+    ✘ Test "R-SYN-3: a queued bulk job a user-initiated request joins is promoted and starts before the bulk job queued ahead of it" recorded an issue at EngineBoundaryTests.swift:50:9: Expectation failed: Array(result.starts.prefix(2)) == result.order
+    ✘ Test "R-SYN-3: a queued bulk job a prefetch request joins is promoted and starts before the bulk job queued ahead of it" failed after 0.012 seconds with 1 issue.
+    ✘ Test "R-SYN-3: a queued bulk job a user-initiated request joins is promoted and starts before the bulk job queued ahead of it" failed after 0.012 seconds with 1 issue.
+    ✘ Suite "Engine lanes" failed after 0.013 seconds with 2 issues.
+    ✘ Test run with 2 tests in 1 suite failed after 0.013 seconds with 2 issues.
+[M-N-14] exit=1
+    ✘ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" recorded an issue at EngineBoundaryTests.swift:73:13: Expectation failed: largest > previous
+    ✘ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" recorded an issue at EngineBoundaryTests.swift:73:13: Expectation failed: largest > previous
+    ✘ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" recorded an issue at EngineBoundaryTests.swift:73:13: Expectation failed: largest > previous
+    ✘ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" recorded an issue at EngineBoundaryTests.swift:73:13: Expectation failed: largest > previous
+    ✘ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" recorded an issue at EngineBoundaryTests.swift:73:13: Expectation failed: largest > previous
+    ✘ Test "R-SYN-5: the backoff ceiling doubles with every attempt, so some key draws above the previous attempt's ceiling" failed after 0.003 seconds with 5 issues.
+    ✘ Suite "Engine support values" failed after 0.004 seconds with 5 issues.
+    ✘ Test run with 1 test in 1 suite failed after 0.004 seconds with 5 issues.
+[M-N-16] exit=1
+    ✘ Test "R-SYN-5: a window whose 5xx share equals serverErrorRatio exactly opens the breaker" recorded an issue at EngineBoundaryTests.swift:94:9: Expectation failed: breaker.state == .open(cause: .serverErrors, until: now.adding(seconds: 30), trips: 1)
+    ✘ Test "R-SYN-5: a window whose 5xx share equals serverErrorRatio exactly opens the breaker" failed after 0.001 seconds with 1 issue.
+    ✘ Suite "Engine support values" failed after 0.001 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue.
+[M-N-20] exit=1
+    ✘ Test "R-SYN-5: a Retry-After equal to maxRetryAfter is honoured, one above it defers to the next run" recorded an issue at EngineBoundaryTests.swift:102:25: Expectation failed: Backoff.delay(attempt: 1, retryAfter: policy.maxRetryAfter, policy: policy, seed: 1, key: 1)
+    ✘ Test "R-SYN-5: a Retry-After equal to maxRetryAfter is honoured, one above it defers to the next run" failed after 0.001 seconds with 1 issue.
+    ✘ Suite "Engine support values" failed after 0.002 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.002 seconds with 1 issue.
+[M-N-39] exit=1
+    ✘ Test "R-SYN-5: a later transfer 429 with a shorter Retry-After never shortens the origin's throttle" recorded an issue at EngineBoundaryTests.swift:137:9: Expectation failed: end == throttledAt.adding(seconds: 60)
+    ✘ Test "R-SYN-5: a later transfer 429 with a shorter Retry-After never shortens the origin's throttle" recorded an issue at EngineBoundaryTests.swift:139:9: Expectation failed: harness.time.nextDeadline == throttledAt.adding(seconds: 60)
+    ✘ Test "R-SYN-5: a later transfer 429 with a shorter Retry-After never shortens the origin's throttle" failed after 0.007 seconds with 2 issues.
+    ✘ Suite "Engine recovery" failed after 0.007 seconds with 2 issues.
+    ✘ Test run with 1 test in 1 suite failed after 0.007 seconds with 2 issues.
+[S3-B-064-reserveBeforeRun] exit=1
+    ✘ Test "R-SYN-5: a run that starts while the half-open breaker admits only a probe holds it for its manifest fetch from its start turn" recorded an issue at EngineRegressionCycle22Tests.swift:292:9: Expectation failed: watch.violations.isEmpty
+    ✘ Test "R-SYN-5: a run that starts while the half-open breaker admits only a probe holds it for its manifest fetch from its start turn" failed after 0.013 seconds with 1 issue.
+    ✘ Suite "Engine regressions, close-out cycle 22" failed after 0.013 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.013 seconds with 1 issue.
+[S3-B-065-relaneBack] exit=1
+    ✘ Test "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" recorded an issue with 1 argument rejoin → laneChange at EngineRejoinLaneTests.swift:73:9: Expectation failed: turn.1 == expected
+    ✘ Test "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" recorded an issue with 1 argument rejoin → userWork at EngineRejoinLaneTests.swift:73:9: Expectation failed: turn.1 == expected
+    ✘ Test "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" with 2 test cases failed after 0.124 seconds with 2 issues.
+    ✘ Suite "Engine lanes" failed after 0.124 seconds with 2 issues.
+    ✘ Test run with 1 test in 1 suite failed after 0.124 seconds with 2 issues.
+[S3-B-081-claimNoRetry] exit=1
+    ✘ Test "R-CAR-4: a job only a claim keeps backs off after a transient failure under its held lane's retry policy instead of failing at once" recorded an issue at EngineClaimRetryTests.swift:40:25: Issue recorded
+    ✘ Test "R-CAR-4: a job only a claim keeps backs off after a transient failure under its held lane's retry policy instead of failing at once" failed after 0.006 seconds with 1 issue.
+    ✘ Suite "Engine group claims" failed after 0.007 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.007 seconds with 1 issue.
+[S3-B-082-flagLeftover] exit=1
+    ✘ Test "R-CAR-4: invariantViolations reports a registered group in releasing only while its release holds members, not a large give-up's leftover claims" recorded an issue at EngineGiveUpInvariantTests.swift:39:9: Expectation failed: giveUp.violations.isEmpty
+    ✘ Test "R-CAR-4: invariantViolations reports a registered group in releasing only while its release holds members, not a large give-up's leftover claims" failed after 0.112 seconds with 1 issue.
+    ✘ Suite "Engine group claims" failed after 0.112 seconds with 1 issue.
+    ✘ Test run with 1 test in 1 suite failed after 0.112 seconds with 1 issue.
+[S3-B-077-fireDueNoLimit] exit=0
+    ✔ Test "R-SYN-11: the planning policy takes eviction permission, unverified admission and the prefix rule from StoragePolicy" passed after 0.406 seconds.
+    ✔ Test "R-SYN-2: the transition table admits exactly the listed transitions" passed after 0.406 seconds.
+    ✔ Test "R-SYN-5: backoff delays are full jitter keyed by asset and attempt and reproducible from the seed" passed after 0.412 seconds.
+    ✔ Test "R-SYN-6: a parked claim counts as owed a re-queue exactly when a follow-up re-admission turn will take it" passed after 0.415 seconds.
+    ✔ Test "R-OBS-3: every engine error maps to the failure class the diagnostics report" passed after 0.426 seconds.
+    ✔ Test "R-SYN-9: refresh policies decide due-ness exhaustively including app-version change and clock skew" passed after 0.431 seconds.
+    ✔ Test "R-SYN-3: owned tasks are spawned at their lane's task priority, and the test harnesses' floor only raises it" passed after 0.438 seconds.
+    ✔ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" passed after 0.438 seconds.
+    ✔ Test "R-SYN-3: lane queues put entries back at their places, in place order, whatever the order they come back in" passed after 0.439 seconds.
+    ✔ Test "R-SYN-5: a Retry-After equal to maxRetryAfter is honoured, one above it defers to the next run" passed after 0.455 seconds.
+    ✔ Test "R-SYN-7: an unsatisfied path blocks bulk and prefetch but admits user-initiated work" passed after 0.456 seconds.
+    ✔ Test "R-SYN-5: sustained 5xx opens the breaker and a single half-open probe closes it" passed after 0.456 seconds.
+    ✔ Test "R-SYN-5: a silent probe is abandoned after the watchdog and the next transfer probes" passed after 0.457 seconds.
+    ✔ Test "R-SYN-5: a same-cause probe failure re-opens with a doubled cooldown" passed after 0.457 seconds.
+[S3F-4-settleNoYield] exit=0
+    ✔ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" passed after 0.178 seconds.
+    ✔ Test run with 1 test in 1 suite passed after 0.179 seconds.
+[S1-11-strand] exit=-15
+[S1-07-noPause] exit=1
+    ✘ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" recorded an issue at EngineSync1RegressionTests.swift:128:6: Time limit was exceeded: 60.000 seconds
+    ✘ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" recorded an issue at EngineSync1RegressionTests.swift:160:9: Expectation failed: paused.count == 1
+    ✘ Test "R-SYN-7: a user resolve of a policy-blocked bulk asset starts at once and its demotion pauses it again" failed after 63.997 seconds with 2 issues.
+    ✘ Suite "Engine regressions" failed after 63.998 seconds with 2 issues.
+    ✘ Test run with 1 test in 1 suite failed after 63.998 seconds with 2 issues.
+DONE

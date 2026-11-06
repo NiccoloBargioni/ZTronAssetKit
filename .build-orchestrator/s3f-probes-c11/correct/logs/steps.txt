@@ -1,0 +1,24 @@
+== quick start 22:21:05 load { 10.50 15.25 38.00 }
+== quick end 22:30:52 rc=0 load { 65.46 67.87 59.52 }
+== cov start 22:30:52 load { 65.46 67.87 59.52 }
+== cov end 22:30:52 rc=0 load { 65.46 67.87 59.52 }
+== release start 22:30:52 load { 65.46 67.87 59.52 }
+== release end 22:31:31 rc=0 load { 37.33 60.28 57.11 }
+== gates start 22:31:31 load { 37.33 60.28 57.11 }
+== gates end 22:31:32 rc=0 load { 37.33 60.28 57.11 }
+== sync1 start 22:31:32 load { 37.33 60.28 57.11 }
+== sync1 end 22:33:18 rc=0 load { 32.20 54.12 55.21 }
+== sync2 start 22:33:18 load { 32.20 54.12 55.21 }
+== sync2 end 22:34:01 rc=0 load { 21.78 48.58 53.12 }
+== sync3 start 22:34:01 load { 21.78 48.58 53.12 }
+== sync3 end 22:34:45 rc=0 load { 16.27 43.57 51.06 }
+== tsan start 22:34:45 load { 16.27 43.57 51.06 }
+== tsan end 22:40:03 rc=0 load { 3.95 24.35 40.71 }
+ALLDONE
+== ios start 22:40:03 load { 3.95 24.35 40.71 }
+== ios end 22:40:18 rc=0 load { 6.42 23.87 40.24 }
+== sim start 22:40:18 load { 6.42 23.87 40.24 }
+== sim end 22:45:39 rc=0 load { 40.28 74.89 62.76 }
+== perf start 22:45:40 load { 40.28 74.89 62.76 }
+== perf end 22:52:24 rc=1 load { 4.59 25.73 42.77 }
+ALLDONE2

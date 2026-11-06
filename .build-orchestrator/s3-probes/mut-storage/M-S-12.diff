@@ -1,0 +1,12 @@
+diff --git a/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift b/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
+index d0ce85b..1ce2a30 100644
+--- a/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
++++ b/Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift
+@@ -173,7 +173,6 @@ enum IndexCommitUnit {
+         }
+         do throws(FileSystemError) {
+             try IndexCommitUnit.writeTemporary(data, layout: layout, committedFile: outcome.committedFile, fileSystem: fileSystem)
+-            try fileSystem.synchronizeFile(at: temporary, level: level)
+         } catch {
+             try? fileSystem.removeItem(at: temporary)
+             outcome.result = .failure(.fileSystem(error))

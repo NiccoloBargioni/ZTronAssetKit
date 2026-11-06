@@ -1,0 +1,16 @@
+== sync-1.log
+matched 496, unmatched 56 (max 1.51 s); over half: 0; failed: 0
+  14.1 % 8.47 s of 60 s passed: R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended
+  14.0 % 8.42 s of 60 s passed: R-SYN-16: a heal whose re-download fails ends, and the engine forgets it
+== sync-2.log
+matched 496, unmatched 56 (max 1.46 s); over half: 0; failed: 0
+  15.1 % 9.06 s of 60 s passed: R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content
+  15.0 % 9.02 s of 60 s passed: R-SYN-16: a heal whose re-download fails ends, and the engine forgets it
+== sync-3.log
+matched 496, unmatched 56 (max 0.92 s); over half: 0; failed: 0
+  10.3 % 37.20 s of 360 s passed: R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-a
+  10.2 % 30.75 s of 300 s passed: R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs
+== tsan.log
+matched 496, unmatched 56 (max 1.66 s); over half: 0; failed: 0
+  27.6 % 49.67 s of 180 s passed: R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)
+  24.1 % 14.46 s of 60 s passed: R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended

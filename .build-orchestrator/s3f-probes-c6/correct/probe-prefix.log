@@ -1,0 +1,63 @@
+ 5:31  up 4 days, 17:54, 2 users, load averages: 25.14 32.42 64.50
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Suite "VerifyC6CorrectProbes" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+✘ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowTests.swift:845:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ K's waiter is answered from its 3 MB, with 6 MB of room for user work: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+PROBE-C6-READDROP visitFirst=true before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), ids: Optional(1), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace))) after=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.downloading), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274435456, volumeOpportunistic: 268435456, usedBytes: 316, pendingReclaim: 0, budgetBytes: 137217886, reserveBytes: 268435456)), violations: 0)
+✘ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases failed after 0.877 seconds with 1 issue.
+↳ /// A space sweep that follows a job before re-queuing it judges the job again on the lane the follow leaves it, and
+↳ /// neither re-queues it nor counts its bytes ahead of the jobs behind it when it no longer fits. Content C (5 MB) is
+↳ /// listed by A, which has a user waiter, and by B, a prefetch group's member, so its job is user-lane; K (3 MB, a user
+↳ /// waiter) waits behind it. Both wait `awaitingSpace`: 2 MB of room for user work, none for prefetch work (the
+↳ /// opportunistic volume is 6 MB smaller), and 4 MB of a pruned blob pending the reclaim. A forced sync moves A to a
+↳ /// 16-byte content while 2,100 changed entries sort before it, so the bounded follow owes C's visit (its turns held).
+↳ /// The reclaim leaves 6 MB for user work and still none for prefetch work. Followed first, C's job is prefetch-lane
+↳ /// and parked, and K is fetched. Judged on its pre-follow user lane, the sweep found that C fits, followed it (A
+↳ /// left, B stayed: prefetch), re-queued it anyway and counted its 5 MB ahead: K was judged against 1 MB, parked
+↳ /// `insufficientSpace`, and its fail-fast answered K's waiter `insufficientSpace(required: 3000000, available:
+↳ /// 999000)` although 6 MB were free and the gate then parked C's job (F-22: the figures are the room the asset
+↳ /// lacks; the close-out cycle-5 correctness lens, PROBE-C5-LANEDROP). At `s3-base` the follow moved every job in the
+↳ /// apply's turn, so no sweep could act between the two.
+✘ Suite "Engine runs" failed after 0.877 seconds with 1 issue.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" started.
+PROBE-C6-READDROP visitFirst=false before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), ids: Optional(2), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace))) after=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 274435456, volumeOpportunistic: 268435456, usedBytes: 300, pendingReclaim: 0, budgetBytes: 137217878, reserveBytes: 268435456)), violations: 0)
+✘ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" recorded an issue with 1 argument visitFirst → false at VerifyC6CorrectProbes.swift:112:9: Expectation failed: after.k != .blocked(.insufficientSpace)
+↳ K (3 MB, user lane) fits 6 MB of room for user work: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace))
+↳ after.k != .blocked(.insufficientSpace) → false
+↳   after.k → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳     some → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳       blocked → .insufficientSpace
+↳   .blocked(.insufficientSpace) → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳     some → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳       blocked → .insufficientSpace
+✘ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" with 2 test cases failed after 1.627 seconds with 1 issue.
+✘ Suite "VerifyC6CorrectProbes" failed after 1.628 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 6, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C6-READDROP: the cycle-5 lane-drop defect reproduced through a different sweep and different interests. A
+↳ /// free-space read's `.read` sweep (`refreshFreeSpace` -> `reconsiderSpaceBlocked`), not the reclaim's `.reclaimed` one,
+↳ /// and only group interests (no waiter, so no fail-fast hides the outcome). Content C (5 MB) is wanted by A through a
+↳ /// user-lane group and by B through a prefetch group, so its job is user-lane; K (3 MB) is wanted by a user-lane group.
+↳ /// Both are parked `insufficientSpace` (2 MB of important room, none opportunistic, nothing pending reclaim). A forced
+↳ /// sync moves A to a 16-byte content while 2,100 changed fillers sort before it, so the bounded follow owes C's visit
+↳ /// (held). The volume then gains room: 6 MB important, still none opportunistic, and a free-space read sweeps.
+↳ ///
+↳ /// Right outcome (the one the sweep gives when the follow visited first): C's job is prefetch-lane, does not fit and stays
+↳ /// parked; K fits the 6 MB and is re-queued. Pre-fix (`39dadd4` / `48c8dfc`): the sweep judged C on its user lane (fits),
+↳ /// followed it (A leaves, lane drops to prefetch), re-queued it and counted its 5 MB ahead, so K was judged against 1 MB
+↳ /// and left parked although 6 MB are free; the gate then parks C again.
+✘ Test run with 2 tests in 2 suites failed after 1.628 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+exit 1
+ 5:31  up 4 days, 17:54, 2 users, load averages: 24.73 32.21 64.24

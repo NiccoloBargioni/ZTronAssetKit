@@ -1,0 +1,62 @@
+== run01a: unmodified s3-base + probe (release)
+10:19  up 3 days, 22:43, 2 users, load averages: 37.82 32.76 31.70
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 4.91 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.424875, 4.980667, 4.91]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 2.132 seconds.
+C2 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 20.367042 ms (budgets 50.0 ms median, 10.0 ms best); runs [20.367042, 19.653541, 21.18375]; at 1,000: 1.788583 ms, ratio 11.387250130410498; the 10,000-member group without waiters: 14.268334 ms
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:30:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" failed after 37.599 seconds with 1 issue.
+↳ /// S3-PERF probe: C2 at SPEC §6's reference scale when the engine shuts down under a 10,000-member prefetch group
+✘ Suite "SyncBenchmarks" failed after 39.731 seconds with 1 issue.
+✘ Suite ZTronAssetKitBenchmarks failed after 39.731 seconds with 1 issue.
+✘ Test run with 2 tests in 2 suites failed after 39.732 seconds with 1 issue.
+10:25  up 3 days, 22:48, 2 users, load averages: 71.52 54.93 42.04
+== run0102b: wall-time instrumentation
+10:32  up 3 days, 22:55, 2 users, load averages: 59.67 56.41 47.72
+S3CONF shutdown first turn: jobs 1000 waiters 1000: total 1.860375 ms (tasks+notify 0.011584, sorted job cancel 0.702041, resumeEverything 1.14675)
+S3CONF shutdown first turn: jobs 10000 waiters 10000: total 23.252375 ms (tasks+notify 0.031291, sorted job cancel 9.982542, resumeEverything 13.238542)
+S3CONF shutdown first turn: jobs 10000 waiters 10000: total 19.563791 ms (tasks+notify 0.02425, sorted job cancel 6.464333, resumeEverything 13.075208)
+S3CONF shutdown first turn: jobs 10000 waiters 10000: total 19.1945 ms (tasks+notify 0.017292, sorted job cancel 6.409833, resumeEverything 12.767375)
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 13.658667 ms (tasks+notify 0.014125, sorted job cancel 6.381458, resumeEverything 7.263084)
+C2 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 20.470833 ms (budgets 50.0 ms median, 10.0 ms best); runs [24.266458, 20.470833, 20.126458]; at 1,000: 1.80425 ms, ratio 11.345896078703062; the 10,000-member group without waiters: 13.613625 ms
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:30:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" failed after 29.676 seconds with 1 issue.
+↳ /// S3-PERF probe: C2 at SPEC §6's reference scale when the engine shuts down under a 10,000-member prefetch group
+S3CONF shutdown first turn: jobs 1000 waiters 0: total 1.635 ms (tasks+notify 0.017916, sorted job cancel 0.698959, resumeEverything 0.918125)
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 14.005875 ms (tasks+notify 0.014375, sorted job cancel 6.4355, resumeEverything 7.556)
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 14.472084 ms (tasks+notify 0.022792, sorted job cancel 7.391292, resumeEverything 7.058)
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 23.32825 ms (tasks+notify 0.024542, sorted job cancel 10.308375, resumeEverything 12.995333)
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:87:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" failed after 3.020 seconds with 1 issue.
+↳ /// S3-PERF probe: C2 at SPEC §6's reference scale when a sync run applies a new manifest (one entry added) while a
+✘ Suite "SyncBenchmarks" failed after 32.697 seconds with 2 issues.
+✘ Suite ZTronAssetKitBenchmarks failed after 32.698 seconds with 2 issues.
+✘ Test run with 2 tests in 2 suites failed after 32.698 seconds with 2 issues.
+10:32  up 3 days, 22:56, 2 users, load averages: 64.93 58.08 48.73
+== run0102c: wall + thread-CPU instrumentation
+10:34  up 3 days, 22:57, 2 users, load averages: 83.11 66.12 52.83
+S3CONF shutdown first turn: jobs 0 waiters 0: total 0.026959 ms (tasks+notify 0.005375, sorted job cancel 0.000292, resumeEverything 0.021292); thread CPU 0.027792 ms
+S3CONF shutdown first turn: jobs 0 waiters 0: total 0.010791 ms (tasks+notify 0.001833, sorted job cancel 0.000375, resumeEverything 0.008583); thread CPU 0.011583 ms
+S3CONF shutdown first turn: jobs 0 waiters 0: total 0.009958 ms (tasks+notify 0.00175, sorted job cancel 0.000333, resumeEverything 0.007875); thread CPU 0.01075 ms
+S3CONF shutdown first turn: jobs 0 waiters 0: total 0.010041 ms (tasks+notify 0.002, sorted job cancel 0.000333, resumeEverything 0.007708); thread CPU 0.010834 ms
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 5.010875 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.020916, 4.980875, 5.010875]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 3.414 seconds.
+S3CONF shutdown first turn: jobs 1000 waiters 1000: total 1.672958 ms (tasks+notify 0.025208, sorted job cancel 0.562917, resumeEverything 1.084833); thread CPU 1.673375 ms
+S3CONF shutdown first turn: jobs 10000 waiters 10000: total 19.181125 ms (tasks+notify 0.021541, sorted job cancel 6.372875, resumeEverything 12.786709); thread CPU 19.182625 ms
+S3CONF shutdown first turn: jobs 10000 waiters 10000: total 19.730542 ms (tasks+notify 0.018417, sorted job cancel 6.7695, resumeEverything 12.942625); thread CPU 19.731959 ms
+S3CONF shutdown first turn: jobs 10000 waiters 10000: total 19.679542 ms (tasks+notify 0.015625, sorted job cancel 6.512084, resumeEverything 13.151833); thread CPU 19.681125 ms
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 13.479166 ms (tasks+notify 0.019125, sorted job cancel 6.2835, resumeEverything 7.176541); thread CPU 13.4805 ms
+C2 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 20.586125 ms (budgets 50.0 ms median, 10.0 ms best); runs [20.081916, 20.731541, 20.586125]; at 1,000: 2.001458 ms, ratio 10.285564323608089; the 10,000-member group without waiters: 13.497333 ms
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:30:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" failed after 50.545 seconds with 1 issue.
+↳ /// S3-PERF probe: C2 at SPEC §6's reference scale when the engine shuts down under a 10,000-member prefetch group
+S3CONF shutdown first turn: jobs 1000 waiters 0: total 1.894833 ms (tasks+notify 0.019708, sorted job cancel 0.93225, resumeEverything 0.942875); thread CPU 1.895791 ms
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 17.991958 ms (tasks+notify 0.02075, sorted job cancel 10.098542, resumeEverything 7.872666); thread CPU 17.985875 ms
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 14.526666 ms (tasks+notify 0.022041, sorted job cancel 7.3935, resumeEverything 7.111125); thread CPU 14.524 ms
+S3CONF shutdown first turn: jobs 10000 waiters 0: total 17.468791 ms (tasks+notify 0.022583, sorted job cancel 9.748208, resumeEverything 7.698); thread CPU 17.425125 ms
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:87:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" failed after 8.681 seconds with 1 issue.
+↳ /// S3-PERF probe: C2 at SPEC §6's reference scale when a sync run applies a new manifest (one entry added) while a
+✘ Suite "SyncBenchmarks" failed after 62.641 seconds with 2 issues.
+✘ Suite ZTronAssetKitBenchmarks failed after 62.642 seconds with 2 issues.
+✘ Test run with 3 tests in 2 suites failed after 62.642 seconds with 2 issues.
+10:35  up 3 days, 22:58, 2 users, load averages: 93.21 72.24 56.09

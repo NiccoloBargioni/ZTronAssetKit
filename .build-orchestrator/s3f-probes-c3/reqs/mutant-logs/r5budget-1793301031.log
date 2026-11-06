@@ -1,0 +1,43 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (11,19 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine commands" started.
+◇ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" started.
+◇ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection stops before eviction and verification and reports the budget exhausted" started.
+✔ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection stops before eviction and verification and reports the budget exhausted" passed after 0.015 seconds.
+✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" recorded an issue at EngineMaintenanceStepTests.swift:136:9: Expectation failed: report.budgetExhausted && report.evictedBytes == 0
+↳ no eviction ran after the deadline: MaintenanceReport(gcBytes: 0, evictedBytes: 129, verifiedBytes: 0, corruptFound: 0, budgetExhausted: true)
+↳ report.budgetExhausted && report.evictedBytes == 0 → false
+↳   report.budgetExhausted → true
+↳   report.evictedBytes == 0 → false
+✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" recorded an issue at EngineMaintenanceStepTests.swift:138:9: Expectation failed: catalog.allSatisfy { view.records[$0.0.identifier]?.referencedBlob != nil }
+↳ every asset is still present
+↳ catalog.allSatisfy { view.records[$0.0.identifier]?.referencedBlob != nil } → <not evaluated>
+✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" recorded an issue at EngineMaintenanceStepTests.swift:140:9: Expectation failed: full.evictedBytes > 0
+↳ with time to spare eviction frees what the stopped maintenance kept: MaintenanceReport(gcBytes: 0, evictedBytes: 0, verifiedBytes: 0, corruptFound: 0, budgetExhausted: false)
+↳ full.evictedBytes > 0 → false
+↳   full.evictedBytes → 0
+✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" failed after 0.021 seconds with 3 issues.
+↳ /// The deadline check after orphan collection keeps eviction from running too: on a store over its byte budget whose
+↳ /// assets are out of the retention scope, so that eviction would free them, a maintenance whose time budget runs out
+↳ /// while orphan collection runs evicts nothing and keeps every asset. A maintenance with time to spare then evicts
+↳ /// them, so the first one stopped before a step that had work to do (the close-out cycle-2 requirements lens: with
+↳ /// nothing to evict, a maintenance that skipped this check reported the same).
+✘ Suite "Engine commands" failed after 0.021 seconds with 3 issues.
+↳ /// The engine's commands: refresh, availability, leases, pins, purge, memory pressure, background events and
+↳ /// diagnostics (R-SYN-9, R-SYN-10, R-CAR-8, R-CLN-4, R-CLN-6, R-CLN-11, R-NET-3, R-OBS-2, R-OBS-3).
+✘ Test run with 2 tests in 1 suite failed after 0.021 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

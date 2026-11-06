@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+index 9a91ef8..7d2d14c 100644
+--- a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
++++ b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+@@ -82,7 +82,7 @@ public enum TransferClassifier {
+                 resumed: resumed
+             )
+             return .authentication(.forbiddenAmbiguous(evidence))
+-        case 404, 410:
++        case 404:
+             return .permanentMissing(httpStatus: status)
+         case 408:
+             return .transient(.timedOut, retryAfter: facts.retryAfter)

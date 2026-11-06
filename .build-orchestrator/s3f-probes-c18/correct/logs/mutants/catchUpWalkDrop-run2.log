@@ -1,0 +1,123 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+↳ v3's visit joined W to P's publication and v4's visit passed it, so P's integrity failure answers W (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); Z started 1 times
+↳ outcome.w == .failure(.integrityFailure) → false
+↳   outcome.w → success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-x
+↳         rawValue → "zz-x"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d17342a85dd8689aa0bdd27041f73fd24a60ab3018a44ff9d4c45bfc9a2c758d.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 48
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+↳ v3's visit joined W to P's publication and v4's visit passed it, so P's integrity failure answers W (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/1161f95e91bac35c8dadf7d3d412b16515d6c33284f0ba2040631fc04325c841.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); Z started 1 times
+↳ outcome.w == .failure(.integrityFailure) → false
+↳   outcome.w → success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/1161f95e91bac35c8dadf7d3d412b16515d6c33284f0ba2040631fc04325c841.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/1161f95e91bac35c8dadf7d3d412b16515d6c33284f0ba2040631fc04325c841.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-x
+↳         rawValue → "zz-x"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/1161f95e91bac35c8dadf7d3d412b16515d6c33284f0ba2040631fc04325c841.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/1161f95e91bac35c8dadf7d3d412b16515d6c33284f0ba2040631fc04325c841.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 48
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" with 4 test cases failed after 6.399 seconds with 2 issues.
+↳ /// The same, v4 reaching the engine through the store's catch-up (`publicationHop(_:_:next: .onwardCaughtUp)`): the
+↳ /// catch-up's follow walks the publications in flight under the outgoing copy as the apply's does
+↳ /// (`followStoreView`).
+✘ Suite "Engine follow barrier (F-28)" failed after 6.399 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 6.399 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

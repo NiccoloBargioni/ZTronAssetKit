@@ -1,0 +1,22 @@
+[03:10:27 { 109.88 72.93 67.22 }] build prefix
+build prefix exit 0
+test prefix run1 exit 1 [03:14:23 { 84.55 74.62 68.91 }]
+test prefix run2 exit 1 [03:14:28 { 84.90 74.86 69.03 }]
+[03:14:28 { 84.90 74.86 69.03 }] build noRequeueBudget
+build noRequeueBudget exit 0
+test noRequeueBudget run1 exit 1 [03:15:19 { 81.52 75.12 69.44 }]
+test noRequeueBudget run2 exit 1 [03:15:25 { 81.48 75.22 69.50 }]
+[03:15:25 { 81.48 75.22 69.50 }] build noParkBudget
+build noParkBudget exit 0
+test noParkBudget run1 exit 1 [03:15:40 { 81.40 75.55 69.72 }]
+test noParkBudget run2 exit 1 [03:15:46 { 81.45 75.66 69.80 }]
+[03:15:46 { 81.45 75.66 69.80 }] build offByOne
+build offByOne exit 0
+test offByOne run1 exit 1 [03:16:01 { 74.21 74.36 69.44 }]
+test offByOne run2 exit 1 [03:16:04 { 71.23 73.74 69.25 }]
+[03:16:04 { 71.23 73.74 69.25 }] build head
+build head exit 0
+test head run1 exit 0 [03:16:14 { 70.48 73.50 69.21 }]
+test head run2 exit 0 [03:16:17 { 70.48 73.50 69.21 }]
+restored head
+DONE

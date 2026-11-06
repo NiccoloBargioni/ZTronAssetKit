@@ -1,0 +1,34 @@
+S3-STAB-02 independent confirmation (confirm-stability agent). Worktree at s3-base; logs in /Users/admin/Documents/ZTronAssetKit/.build-s3-confirm-stability.
+
+== Replay probes S3-STAB-02.swift (unchanged from the hunter's), debug, load ~24 (probes-debug.log):
+S3StabilityPollProbes.swift:127:9  R-CLN-2: (S3-STAB-02) sweepChunksReleaseActor's poll stops t | Expectation failed: !held.isEmpty && table[planted[0]] != nil && table[planted[1]] == nil && table[planted[2]] == nil
+S3StabilityPollProbes.swift:92:9  R-CLN-12: (S3-STAB-02) cancelledCollection's poll leaves a s | Expectation failed: an error was expected but none was thrown and "CleanupResult(bytesFreed: 150, filesRemoved: 3, bytes
+S3StabilityPollProbes.swift:95:9  R-CLN-12: (S3-STAB-02) cancelledCollection's poll leaves a s | Expectation failed: remaining.count < garbage.count && !remaining.isEmpty
+S3StabilityPollProbes.swift:59:9  R-CLN-4: (S3-STAB-02) chunkYieldRevalidates' poll stops evic | Expectation failed: await harness.isPresent(assets[2].id, at: assets[2].key)
+(no issue at :33, the 'stale read' precondition of losingRound)
+== Replays under TSan, 5 repetitions: see S3-STAB-01-results.txt (5/5 for each site).
+
+== NATURAL failures of the UNCHANGED originals (no probe code involved).
+-- debug, --repetitions 1000 of 11 tests (chunkYieldRevalidates|chunkCountsRecords|evictionDuringReusingPublication|applyPlanInChunksRevalidates|applyPlanChunksAtBlobBoundaries|applyPlanAtChunkYield|cancelledCollection x2|cancelledStagingGCStamps|sweepChunksReleaseActor), load ~20-22, a TSan build running alongside (class-unfixed-debug.log):
+test starts: 11002  issues: 3
+✘ Test "R-CLN-4: eviction releases the actor between chunks and re-validates every later candidate: one accessed or leased meanwhile is kept" recorded an issue at EvictionTests.swift:73:9: Expectation failed: await harness.isPresent(assets[2].id, at: assets[2].key)
+↳ nothing after the chunk is marked yet
+↳ await harness.isPresent(assets[2].id, at: assets[2].key) → <not evaluated>
+✘ Test "R-CLN-4: eviction releases the actor between chunks and re-validates every later candidate: one accessed or leased meanwhile is kept" recorded an issue at EvictionTests.swift:75:9: Expectation failed: await harness.store.location(for: assets[2].id, extensions: [], recordingAccess: true) != nil
+↳ // Meanwhile the app reads y2 and holds y3 open.
+↳ await harness.store.location(for: assets[2].id, extensions: [], recordingAccess: true) != nil → <not evaluated>
+✘ Test "R-CLN-4: eviction releases the actor between chunks and re-validates every later candidate: one accessed or leased meanwhile is kept" recorded an issue at EvictionTests.swift:50:6: Caught error: .notPresent(y3)
+◇ Test "R-CLN-4: eviction releases the actor between chunks and re-validates every later candidate: one accessed or leased meanwhile is kept" started (repetition 651).
+◇ Test "R-SYN-11: apply passes its eviction plan to the hook in chunks of whole blobs, each ending at the first blob boundary at or past a chunk's records" started (repetition 888).
+
+-- TSan, --repetitions 400 of the same filter, load ~17-20 (class-unfixed-tsan.log):
+test starts: 4402  issues: 2  TSan reports: 0
+✘ Test "R-CLN-4: bytes apply's eviction plan dooms while quota eviction releases the actor between chunks count toward its need" recorded an issue at EvictionOverlapTests.swift:114:9: Expectation failed: plan.victims.map(\.id) == [EvictionOverlapTests.assets
+↳ plan.victims.map(\.id) == [EvictionOverlapTests.assets[2].id, EvictionOverlapTests.assets[3].id] → false
+↳   plan.victims.map(\.id) → [o4, o5]
+↳   [EvictionOverlapTests.assets[2].id, EvictionOverlapTests.assets[3].id] → [o2, o3]
+--
+✘ Test "R-CLN-4: bytes apply's eviction plan dooms while quota eviction releases the actor between chunks count toward its need" recorded an issue at EvictionOverlapTests.swift:114:9: Expectation failed: plan.victims.map(\.id) == [EvictionOverlapTests.assets
+↳ plan.victims.map(\.id) == [EvictionOverlapTests.assets[2].id, EvictionOverlapTests.assets[3].id] → false
+↳   plan.victims.map(\.id) → [o4, o5]
+↳   [EvictionOverlapTests.assets[2].id, EvictionOverlapTests.assets[3].id] → [o2, o3]

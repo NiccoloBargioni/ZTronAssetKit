@@ -1,0 +1,78 @@
+== M0 build-exit=0 0 errors
+== M0 test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 0.579 seconds. | load averages: 23.04 39.49 47.23
+MUTANT MC applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MC build-exit=0 0 errors
+== MC test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.596 seconds with 1 issue. | load averages: 21.60 38.91 46.98
+MUTANT MD applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MD build-exit=0 0 errors
+== MD test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.592 seconds with 1 issue. | load averages: 21.31 38.57 46.81
+MUTANT MA applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MA build-exit=0 0 errors
+== MA test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.572 seconds with 4 issues. | load averages: 20.16 38.04 46.58
+MUTANT MF applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MF build-exit=0 0 errors
+== MF test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.597 seconds with 5 issues. | load averages: 18.87 37.48 46.33
+MUTANT MG applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MG build-exit=0 0 errors
+== MG test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.555 seconds with 4 issues. | load averages: 18.87 37.48 46.33
+MUTANT MG2 applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MG2 build-exit=0 0 errors
+== MG2 test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.631 seconds with 4 issues. | load averages: 18.32 37.05 46.13
+MUTANT MH applied to Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift
+== MH build-exit=0 0 errors
+== MH test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.586 seconds with 3 issues. | load averages: 17.17 36.50 45.88
+MUTANT MI applied to Sources/ZTronAssetTransport/Session/TransferHandles.swift
+== MI build-exit=0 0 errors
+== MI test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.627 seconds with 1 issue. | load averages: 17.16 36.18 45.71
+MUTANT MJ applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MJ build-exit=0 0 errors
+== MJ test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 0.548 seconds. | load averages: 16.42 35.71 45.49
+MUTANT MK applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MK build-exit=0 0 errors
+== MK test-exit=0 ✔ Test run with 161 tests in 17 suites passed after 0.593 seconds. | load averages: 15.75 35.25 45.27
+MUTANT MB applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== MB build-exit=0 0 errors
+== MB test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 0.572 seconds with 2 issues. | load averages: 15.75 35.25 45.27
+MUTANT ME applied to Sources/ZTronAssetTransport/Background/BackgroundSupport.swift
+== ME build-exit=0 0 errors
+== ME test-exit=1 ✘ Test run with 161 tests in 17 suites failed after 64.012 seconds with 12 issues. | load averages: 40.14 36.77 44.94
+== RUN DONE M0 MC MD MA MF MG MG2 MH MI MJ MK MB ME
+== M0-p build-exit=0 0 errors
+== M0-p test-exit=0 ✔ Test run with 163 tests in 18 suites passed after 2.672 seconds. | load averages: 509.07 229.83 121.50
+MUTANT MJ applied (1 edit(s))
+== MJ-p build-exit=0 0 errors
+== MJ-p test-exit=1 ✘ Test run with 163 tests in 18 suites failed after 1.469 seconds with 1 issue. | load averages: 515.33 240.34 126.50
+MUTANT MK applied (1 edit(s))
+== MK-p build-exit=0 0 errors
+== MK-p test-exit=1 ✘ Test run with 163 tests in 18 suites failed after 1.206 seconds with 1 issue. | load averages: 526.14 251.71 131.86
+MUTANT MB3 applied (5 edit(s))
+== MB3-p build-exit=0 0 errors
+== MB3-p test-exit=1 ✘ Test run with 163 tests in 18 suites failed after 64.009 seconds with 5 issues. | load averages: 449.57 299.02 160.55
+== RUN DONE M0 MJ MK MB3
+MUTANT MB3 applied (5 edit(s))
+== MB3-ord1 build-exit=0 0 errors
+== MB3-ord1 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 63.998 seconds with 2 issues. | load averages: 271.72 276.70 163.71
+== RUN DONE MB3
+MUTANT MB3 applied (5 edit(s))
+== MB3-ord2 build-exit=0 0 errors
+== MB3-ord2 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 63.985 seconds with 3 issues. | load averages: 151.50 244.52 160.19
+== RUN DONE MB3
+MUTANT MB3 applied (5 edit(s))
+== MB3-ord3 build-exit=0 0 errors
+== MB3-ord3 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 64.000 seconds with 2 issues. | load averages: 59.64 196.90 148.83
+== RUN DONE MB3
+== M0-pr1 build-exit=0 0 errors
+== M0-pr1 test-exit=0 ✔ Test run with 2 tests in 1 suite passed after 0.029 seconds. | load averages: 53.91 191.16 147.35
+== RUN DONE M0
+== M0-pr2 build-exit=0 0 errors
+== M0-pr2 test-exit=0 ✔ Test run with 2 tests in 1 suite passed after 0.011 seconds. | load averages: 51.35 188.35 146.62
+== RUN DONE M0
+== M0-pr3 build-exit=0 0 errors
+== M0-pr3 test-exit=0 ✔ Test run with 2 tests in 1 suite passed after 0.012 seconds. | load averages: 51.35 188.35 146.62
+== RUN DONE M0
+== M0-pr4 build-exit=0 0 errors
+== M0-pr4 test-exit=0 ✔ Test run with 2 tests in 1 suite passed after 0.012 seconds. | load averages: 48.84 185.55 145.88
+== RUN DONE M0
+== M0-pr5 build-exit=0 0 errors
+== M0-pr5 test-exit=0 ✔ Test run with 2 tests in 1 suite passed after 0.012 seconds. | load averages: 47.73 183.05 145.23
+== RUN DONE M0

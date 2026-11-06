@@ -1,0 +1,36 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:307:9: Expectation failed: after.x == .downloading && after.y == .queued
+↳ X, parked with its elder ticket, is re-admitted and starts before Y (visit-first): (x: Optional(ZTronAssetSync.JobState.queued), y: Optional(ZTronAssetSync.JobState.downloading))
+↳ after.x == .downloading && after.y == .queued → false
+↳   after.x == .downloading → false
+↳   after.y == .queued → <not evaluated>
+✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:308:9: Expectation failed: next.first == bx.transferID
+↳ the next start is X's: [c-ebc6c6c2221a0973e4cca2b1c4ec8d1bfe9d27dc03167ed084408e1bb2b0ee57]
+↳ next.first == bx.transferID → false
+↳   next.first → c-ebc6c6c2221a0973e4cca2b1c4ec8d1bfe9d27dc03167ed084408e1bb2b0ee57
+↳     some → c-ebc6c6c2221a0973e4cca2b1c4ec8d1bfe9d27dc03167ed084408e1bb2b0ee57
+↳       rawValue → "c-ebc6c6c2221a0973e4cca2b1c4ec8d1bfe9d27dc03167ed084408e1bb2b0ee57"
+↳   bx.transferID → c-753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366
+↳     rawValue → "c-753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366"
+✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" with 2 test cases failed after 2.896 seconds with 2 issues.
+↳ /// A policy pause that ends while the follow owes a visit, on a lane the conditions still refuse after the visits,
+↳ /// parks its job with the place it had, as a visit-first engine's pause did: under Low Data Mode, X (1 MB) downloads
+↳ /// for U's user waiter (b-x) and a prefetch member (zz-x); Y (zz-y), a later member, waits (the policy parks it once a
+↳ /// slot frees); H holds the other of two slots. v3 moves b-x to new content M, so the follow's first turn lowers X to the prefetch lane and
+↳ /// pauses it; the pause ends while the rest of the follow is owed. Visited first, X was parked on its policy with its
+↳ /// ticket, ahead of Y's, so when the network is unrestricted again X is re-admitted, and starts, before Y. Queued at
+↳ /// the front instead, X took a fresh ticket, the gate parked it behind Y, and Y started first.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.896 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.897 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

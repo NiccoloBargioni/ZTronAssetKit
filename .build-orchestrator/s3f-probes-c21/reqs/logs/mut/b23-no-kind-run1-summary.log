@@ -1,0 +1,953 @@
+◇ Test case passing 1 argument wait → serverError to "R-SYN-5: a Retry-After beyond maxRetryAfter fails the waiter with that wait and ends the job for the run, holding nothing" started.
+◇ Test case passing 1 argument wait → throttled to "R-SYN-5: a Retry-After beyond maxRetryAfter fails the waiter with that wait and ends the job for the run, holding nothing" started.
+◇ Test case passing 1 argument gate → .throttle to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work" started.
+◇ Test case passing 1 argument gate → .breaker to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened while the alarm's turn runs the store's due work" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: the plan is identical for equal inputs built in different dictionary orders" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590337 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590338 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: every identifier lands in exactly one plan bucket" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590339 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590340 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument order → gateFirst to "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590341 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument order → runFirst to "R-SYN-6: a pending run whose gate opens while the blocked run is still finishing starts once it has finished" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590342 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590343 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590344 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590345 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590346 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590347 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: plan totals equal the sums of their lists" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590348 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590349 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590350 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590351 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590352 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590353 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: narrowing the scope only removes fetches" started.
+◇ Test case passing 1 argument seed → 1592590354 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590355 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590356 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590357 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590358 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590359 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590360 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590361 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-1: fetch order is stable and essential-first" started.
+◇ Test case passing 1 argument seed → 1592590362 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590363 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590364 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590365 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590366 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590367 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590368 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590369 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590370 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590371 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590372 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590373 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590374 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590375 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument seed → 1592590376 to "R-SYN-11: more free space never worsens the space assessment" started.
+◇ Test case passing 1 argument caller → resolve to "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument caller → run to "R-SYN-11: a volume that keeps answering ENOSPC while it reads roomy ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument second → later to "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never" started.
+◇ Test case passing 1 argument second → same to "R-SYN-12: two committed applies are followed in the store's order, so a prune is announced once and a later apply's additions never" started.
+◇ Test case passing 1 argument seed → 178 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 0 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 195 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 1 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument seed → 212 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 161 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument seed → 229 to "R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 2 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 3 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 4 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 5 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 7 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 8 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument iteration → 9 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument gate → .throttle to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened before the alarm's turn starts it" started.
+◇ Test case passing 1 argument iteration → 10 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument gate → .breaker to "R-SYN-2: the invariant check accepts a pending run whose gate the clock opened before the alarm's turn starts it" started.
+◇ Test case passing 1 argument iteration → 11 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument viaEnsure → false to "R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)" started.
+◇ Test case passing 1 argument viaEnsure → true to "R-STO-11: an id of the same content that joins a job during the job's pre-transfer read is asked too, so its prior-art file is adopted and nothing is downloaded, whether a prefetch group or ensureAvailable joins (L5K-R23, P1-LATEJOIN)" started.
+◇ Test case passing 1 argument iteration → 6 to "R-SYN-10: ensureAvailable cancelled as its last member commits resumes exactly once" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep counts a followed job it re-queues ahead of the next parked job, which is parked in the sweep's turn when the room left does not hold it (F-22)" started.
+◇ Test case passing 1 argument failure → .notFound to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .serverErrorAtCap to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .noSpace to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep's park branch judges a job its follow lowers to prefetch at its prefetch place, so the user job behind it is admitted first (F-28)" started.
+◇ Test case passing 1 argument swept → .waiterReparked to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument swept → .ensureReparked to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test case passing 1 argument swept → .waiterRequeued to "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges the parked job its follow raises to user work at its user place, before prefetch work (F-28)" started.
+◇ Test case passing 1 argument concurrency → 1 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument concurrency → 2 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument concurrency → 4 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument concurrency → 7 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument concurrency → 16 to "R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…16" started.
+◇ Test case passing 1 argument rejoin → laneChange to "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" started.
+◇ Test case passing 1 argument rejoin → userWork to "R-SYN-3: members of a released handle that regain a user-initiated interest keep their queue positions instead of going to the back" started.
+◇ Test case passing 1 argument reason → .notFound to "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test case passing 1 argument reason → .unreadable to "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test case passing 1 argument count → 200 to "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since" started.
+◇ Test case passing 1 argument count → 576 to "R-SYN-3: lane queues stay within twice their live entries after a released handle's queued members leave, with nothing queued since" started.
+◇ Test case passing 1 argument place → inPlace to "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work" started.
+◇ Test case passing 1 argument place → setAside to "R-SYN-3: members of a released handle that regain an interest keep their queue order and never pass earlier queued work" started.
+◇ Test case passing 1 argument failure → .integrity to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument failure → .rejected to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument failure → .authentication to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument failure → .serverError to "R-SYN-6: a run reports each asset it could not fetch with its failure class" started.
+◇ Test case passing 1 argument second → same to "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits" started.
+◇ Test case passing 1 argument second → later to "R-SYN-12: a prune an apply wrote before it threw is announced when a concurrent apply of that manifest or a later one that also drops it commits" started.
+◇ Test case passing 1 argument drop → failedApply to "R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger" started.
+◇ Test case passing 1 argument drop → maintenance to "R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger" started.
+◇ Test case passing 2 arguments source → transport, cap → 3 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 2 arguments source → transport, cap → 1 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 1 argument cap → 1 to "R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content" started.
+◇ Test case passing 2 arguments source → publication, cap → 1 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 1 argument cap → 3 to "R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content" started.
+◇ Test case passing 2 arguments source → publication, cap → 3 to "R-INT-3: an integrity failure never counts against an asset the store bound to that content while the transfer ran" started.
+◇ Test case passing 1 argument seed → 4609 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument seed → 4610 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument seed → 4611 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument seed → 4612 to "R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release turn keep every engine invariant and leave no job" started.
+◇ Test case passing 1 argument caller → resolve to "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument caller → ensure to "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument caller → run to "R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it has not scheduled to reclaim ends in insufficientSpace once the retry budget is spent" started.
+◇ Test case passing 1 argument seed → 81 to "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test case passing 1 argument seed → 82 to "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test case passing 1 argument seed → 83 to "R-SYN-5: the breaker's parked order always yields its smallest entry by rank, then ticket" started.
+◇ Test case passing 1 argument seed → 1 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 2 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 3 to "R-SYN-12: a subscriber queue's order stays within twice its live slots however many subjects move" started.
+◇ Test case passing 1 argument seed → 97 to "R-SYN-6: the heap of owed moves and re-routes yields its elements in order, and a removal by predicate keeps the rest in order" started.
+◇ Test case passing 1 argument seed → 98 to "R-SYN-6: the heap of owed moves and re-routes yields its elements in order, and a removal by predicate keeps the rest in order" started.
+◇ Test case passing 1 argument seed → 99 to "R-SYN-6: the heap of owed moves and re-routes yields its elements in order, and a removal by predicate keeps the rest in order" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .publication to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .applyBetween to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .publicationApply to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .publication to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .publicationApply to "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .notFoundGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .timeoutGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .notFoundUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .timeoutUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the joins behind an ENOSPC's waiting verdict join its retry at the drain, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the joins behind an ENOSPC's waiting verdict join its retry at the drain, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, move → .toC to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, move → .stays to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, move → .toC to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, move → .stays to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .verdicts to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .verdictsAfterARest to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .verdicts to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, when → .afterVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, when → .beforeVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .published to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .insufficientSpace to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .published to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an interest a passed publication holds keeps that publication's outcome when the content its id moved to ends an attempt (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an interest a passed publication holds keeps that publication's outcome when the content its id moved to ends an attempt (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join whose job a later apply passed publishing ends at that job's commit under a copy that dropped its id, though a later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join whose job a later apply passed publishing ends at that job's commit under a copy that dropped its id, though a later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the storage failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the storage failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join, whose publishing job a later apply passed, follows the copy as the commit re-routes the job's interests (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join, whose publishing job a later apply passed, follows the copy as the commit re-routes the job's interests (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .sameFollow to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .afterTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .beforeTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .afterTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .beforeTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .sameFollow to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .afterTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .beforeTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .afterTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .beforeTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, followUpsFirst → false to "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, followUpsFirst → true to "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false to "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true to "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a move re-routes its holder's interests by token and then id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a move re-routes its holder's interests by token and then id (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, bounded → false to "R-SYN-6: a move re-routes every interest that holds a moved id, the one promoted when the id's first holder left among them (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, bounded → true to "R-SYN-6: a move re-routes every interest that holds a moved id, the one promoted when the id's first holder left among them (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, bounded → false to "R-SYN-6: a move re-routes every interest that holds a moved id, the one promoted when the id's first holder left among them (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, bounded → true to "R-SYN-6: a move re-routes every interest that holds a moved id, the one promoted when the id's first holder left among them (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: one-id moves owed off one holder take at most a turn's ids a turn, the apply's turn at most half of them (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: one-id moves owed off one holder take at most a turn's ids a turn, the apply's turn at most half of them (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .groupReleased to "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .memberPurged to "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .mappedBack to "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .groupReleased to "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .memberPurged to "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .mappedBack to "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome when its verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome when its verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome though a later apply moves it again (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome though a later apply moves it again (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 counts the interest the drain takes off a waiting verdict's job and re-routes onto it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 counts the interest the drain takes off a waiting verdict's job and re-routes onto it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .publicationHeld to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurn to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 counts a user interest an owed move brings onto a job whose verdict waits, on the content a later apply moves it to (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .publicationHeld to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurn to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .publicationHeld to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurn to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .owedTurnFromJ to "R-SYN-5: a 429 leaves out a user interest an owed move brings onto a job whose waiting verdict answers it (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 beyond maxRetryAfter during an owed follow fails its job with the throttle's answer (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 beyond maxRetryAfter during an owed follow fails its job with the throttle's answer (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: an offline failure after an edge during an owed follow is retried at once (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: an offline failure after an edge during an owed follow is retried at once (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a conditions element during an owed follow pauses on its own conditions, not a later element's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a conditions element during an owed follow pauses on its own conditions, not a later element's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request during an owed follow is answered on the breaker as it stood at the request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request during an owed follow is answered on the breaker as it stood at the request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, keptLane → .bulk to "R-SYN-12: a commit that owes its re-routes announces the ids it bound by the lane of the interests it answers, as one that re-routes at once (F-28, C2)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, keptLane → .prefetch to "R-SYN-12: a commit that owes its re-routes announces the ids it bound by the lane of the interests it answers, as one that re-routes at once (F-28, C2)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, keptLane → .bulk to "R-SYN-12: a commit that owes its re-routes announces the ids it bound by the lane of the interests it answers, as one that re-routes at once (F-28, C2)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, keptLane → .prefetch to "R-SYN-12: a commit that owes its re-routes announces the ids it bound by the lane of the interests it answers, as one that re-routes at once (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit that re-routes at once an id its binding captured and the store refused holds the fresh job until the copy catches up (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit that re-routes at once an id its binding captured and the store refused holds the fresh job until the copy catches up (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit that owes the re-routes of ids its binding captured and the store refused holds the fresh job until the copy catches up (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit that owes the re-routes of ids its binding captured and the store refused holds the fresh job until the copy catches up (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit holds nothing for the manifest for the ids an apply moved away (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit holds nothing for the manifest for the ids an apply moved away (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit holds nothing for the manifest for an id its job took after the binding was captured (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit holds nothing for the manifest for an id its job took after the binding was captured (F-20, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit keeps a token's bound id and re-routes its unbound one (reqs #7, C1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit keeps a token's bound id and re-routes its unbound one (reqs #7, C1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit's re-routes that do not fit its turn are owed as one batch and made at most a drain turn's ids a turn (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit's re-routes that do not fit its turn are owed as one batch and made at most a drain turn's ids a turn (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed batch whose last ids spend a drain turn's exactly ends in that turn (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed batch whose last ids spend a drain turn's exactly ends in that turn (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: two commits that owe their re-routes while the drain is held each owe a batch, made a drain turn each (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: two commits that owe their re-routes while the drain is held each owe a batch, made a drain turn each (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit whose answers and re-routes are one more than its turn's ids owes its re-routes (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit whose answers and re-routes are one more than its turn's ids owes its re-routes (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit whose answers and re-routes fit its turn's ids re-routes at once and owes nothing (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit whose answers and re-routes fit its turn's ids re-routes at once and owes nothing (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit with nothing to re-route owes no batch, whatever it answers (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit with nothing to re-route owes no batch, whatever it answers (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the drain re-routes an owed id with all its tokens in one turn, counting ids, not interests (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the drain re-routes an owed id with all its tokens in one turn, counting ids, not interests (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an owing take-off's batch waits behind its verdict's visit, ahead of the verdict's joins, their overflow and later events (F-28, T-COMPOSE)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an owing take-off's batch waits behind its verdict's visit, ahead of the verdict's joins, their overflow and later events (F-28, T-COMPOSE)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, point → .beforeSite to "R-SYN-11: a heal of an id whose owed re-route ends its interest is forgotten as the commit's own re-route forgets it, unless it lands between the two answers (F-28, T21)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, point → .between to "R-SYN-11: a heal of an id whose owed re-route ends its interest is forgotten as the commit's own re-route forgets it, unless it lands between the two answers (F-28, T21)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, point → .afterReplay to "R-SYN-11: a heal of an id whose owed re-route ends its interest is forgotten as the commit's own re-route forgets it, unless it lands between the two answers (F-28, T21)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, point → .beforeSite to "R-SYN-11: a heal of an id whose owed re-route ends its interest is forgotten as the commit's own re-route forgets it, unless it lands between the two answers (F-28, T21)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, point → .between to "R-SYN-11: a heal of an id whose owed re-route ends its interest is forgotten as the commit's own re-route forgets it, unless it lands between the two answers (F-28, T21)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, point → .afterReplay to "R-SYN-11: a heal of an id whose owed re-route ends its interest is forgotten as the commit's own re-route forgets it, unless it lands between the two answers (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a publication that begins while re-routes are owed waits for them and binds the ids they bring (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a publication that begins while re-routes are owed waits for them and binds the ids they bring (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a publication held by two owed batches stays held until the last one ends (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a publication held by two owed batches stays held until the last one ends (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: two owed batches replay in their owing order around a verdict between them (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: two owed batches replay in their owing order around a verdict between them (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a publication that begins while re-routes are owed binds their ids though the gate closed before the site (F-28, RR21-WINDOW-GATE)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a publication that begins while re-routes are owed binds their ids though the gate closed before the site (F-28, RR21-WINDOW-GATE)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route of an id the owing instant's copy dropped ends its interest though a later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route of an id the owing instant's copy dropped ends its interest though a later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job a later apply passed publishing gets that publication's integrity failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job a later apply passed publishing gets that publication's integrity failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job a later apply passed publishing gets that publication's storage failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job a later apply passed publishing gets that publication's storage failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job whose verdict waits behind it gets that verdict though a later apply moved its id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job whose verdict waits behind it gets that verdict though a later apply moved its id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a verdict that waited ahead of an owed batch pins none of its re-routes (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a verdict that waited ahead of an owed batch pins none of its re-routes (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job that committed before the replay follows the copy then (F-28, T22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job that committed before the replay follows the copy then (F-28, T22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route follows each later apply's move and is pinned where a later one passed the job publishing (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route follows each later apply's move and is pinned where a later one passed the job publishing (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose id a later apply dropped ends its interest though a still later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose id a later apply dropped ends its interest though a still later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a verdict deferred before an apply that moved the owed ids onto its job does not pin them at the next apply (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a verdict deferred before an apply that moved the owed ids onto its job does not pin them at the next apply (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .userTarget to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .movedOn to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .cancelled to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .dropped to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .present to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .released to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .userTarget to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .movedOn to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .cancelled to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .dropped to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .present to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .released to "R-SYN-5: a 429 while re-routes are owed is decided on the lane their replay gives the job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a cancel and a release while re-routes are owed leave nothing of theirs on the replay's job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a cancel and a release while re-routes are owed leave nothing of theirs on the replay's job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: shutdown while re-routes are owed ends their batch and answers every waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: shutdown while re-routes are owed ends their batch and answers every waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a second owed batch whose pinned job committed follows the copy at that commit once the first is replayed whole (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a second owed batch whose pinned job committed follows the copy at that commit once the first is replayed whole (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .breakerOpen to "R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .offline to "R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .insufficientSpace to "R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .breakerOpen to "R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .offline to "R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .insufficientSpace to "R-SYN-11: owed re-routes onto a present content are answered from the store at the replay, as the commit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-14: the conditions watcher stays while owed re-routes wait, so their replay parks on the policy as the commit's re-routes did (F-28, T-WATCH)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-14: the conditions watcher stays while owed re-routes wait, so their replay parks on the policy as the commit's re-routes did (F-28, T-WATCH)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay follows the copy then (F-28, T22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay follows the copy then (F-28, T22)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, partial → false to "R-SYN-11: a run's claims whose re-routes a commit owes leave the job and settle the run only once the replay claims the new one (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, partial → true to "R-SYN-11: a run's claims whose re-routes a commit owes leave the job and settle the run only once the replay claims the new one (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, partial → false to "R-SYN-11: a run's claims whose re-routes a commit owes leave the job and settle the run only once the replay claims the new one (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, partial → true to "R-SYN-11: a run's claims whose re-routes a commit owes leave the job and settle the run only once the replay claims the new one (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run whose other job's verdict replays in the owed batch's drain turn settles only after the batch (F-28, RR21-RUN-MIDDRAIN)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run whose other job's verdict replays in the owed batch's drain turn settles only after the batch (F-28, RR21-RUN-MIDDRAIN)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded publication's re-routes that do not fit its turn are owed as one batch and made at most a drain turn's ids a turn (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded publication's re-routes that do not fit its turn are owed as one batch and made at most a drain turn's ids a turn (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded publication counts its pairs, not its ids, against its turn's ids (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded publication counts its pairs, not its ids, against its turn's ids (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded publication whose pairs fit its turn's ids re-routes at once and owes nothing (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded publication whose pairs fit its turn's ids re-routes at once and owes nothing (F-28, C2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit that re-routes at once the ids the copy still maps to its content holds the fresh job until the copy catches up (F-20)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit that re-routes at once the ids the copy still maps to its content holds the fresh job until the copy catches up (F-20)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit that owes the re-routes of the ids the copy still maps to its content holds the fresh job until the copy catches up (F-20)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit that owes the re-routes of the ids the copy still maps to its content holds the fresh job until the copy catches up (F-20)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit's owed re-route pinned to a job a later apply passed publishing gets that publication's integrity failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit's owed re-route pinned to a job a later apply passed publishing gets that publication's integrity failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit's owed re-route pinned to a job a later apply passed publishing gets that publication's storage failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit's owed re-route pinned to a job a later apply passed publishing gets that publication's storage failure (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a publication that begins while a superseded exit's re-routes are owed binds their ids though the gate closed before the exit (F-28, RR21-WINDOW-GATE)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a publication that begins while a superseded exit's re-routes are owed binds their ids though the gate closed before the exit (F-28, RR21-WINDOW-GATE)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .breakerOpen to "R-SYN-11: a superseded exit's owed re-routes onto a present content are answered from the store at the replay, as the exit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .offline to "R-SYN-11: a superseded exit's owed re-routes onto a present content are answered from the store at the replay, as the exit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .insufficientSpace to "R-SYN-11: a superseded exit's owed re-routes onto a present content are answered from the store at the replay, as the exit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .breakerOpen to "R-SYN-11: a superseded exit's owed re-routes onto a present content are answered from the store at the replay, as the exit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .offline to "R-SYN-11: a superseded exit's owed re-routes onto a present content are answered from the store at the replay, as the exit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .insufficientSpace to "R-SYN-11: a superseded exit's owed re-routes onto a present content are answered from the store at the replay, as the exit answered them at once (F-28, RR21-PRESENT-PRUNE)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit's owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit's owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit's owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit's owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a superseded exit's owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a superseded exit's owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a verdict's visit and an owed batch behind it in one drain batch share the drain turn's ids (C2, F-28, T-shared)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a verdict's visit and an owed batch behind it in one drain batch share the drain turn's ids (C2, F-28, T-shared)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .breakerOpen to "R-SYN-11: a waiting verdict's owed take-off onto a present content is answered from the store at the replay, as the visits answered it (F-28, RR21-PRESENT-PRUNE, site 2)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .offline to "R-SYN-11: a waiting verdict's owed take-off onto a present content is answered from the store at the replay, as the visits answered it (F-28, RR21-PRESENT-PRUNE, site 2)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, gate → .insufficientSpace to "R-SYN-11: a waiting verdict's owed take-off onto a present content is answered from the store at the replay, as the visits answered it (F-28, RR21-PRESENT-PRUNE, site 2)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .breakerOpen to "R-SYN-11: a waiting verdict's owed take-off onto a present content is answered from the store at the replay, as the visits answered it (F-28, RR21-PRESENT-PRUNE, site 2)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .offline to "R-SYN-11: a waiting verdict's owed take-off onto a present content is answered from the store at the replay, as the visits answered it (F-28, RR21-PRESENT-PRUNE, site 2)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, gate → .insufficientSpace to "R-SYN-11: a waiting verdict's owed take-off onto a present content is answered from the store at the replay, as the visits answered it (F-28, RR21-PRESENT-PRUNE, site 2)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .atTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .atTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .pastTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .pastTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .atTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .atTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .pastTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .pastTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-11: a waiting verdict's take-off that does not fit the drain turn's ids owes its re-routes as one batch right behind the verdict, with the visit-first answers (C2, F-28, rr21-T3)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .spaceRetry to "R-SYN-11: a waiting verdict's take-off that does not fit the drain turn's ids owes its re-routes as one batch right behind the verdict, with the visit-first answers (C2, F-28, rr21-T3)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-11: a waiting verdict's take-off that does not fit the drain turn's ids owes its re-routes as one batch right behind the verdict, with the visit-first answers (C2, F-28, rr21-T3)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .spaceRetry to "R-SYN-11: a waiting verdict's take-off that does not fit the drain turn's ids owes its re-routes as one batch right behind the verdict, with the visit-first answers (C2, F-28, rr21-T3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the take-offs of two verdicts in one drain batch share the turn's ids: the first is charged, the second owed (C2, F-28, rr21-T3-two)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the take-offs of two verdicts in one drain batch share the turn's ids: the first is charged, the second owed (C2, F-28, rr21-T3-two)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a take-off that owes its re-routes spends the verdict's turn, so the visit after the verdict moves its ids before the batch replays (C2, F-28, RR21-VERDICT-ZERO)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a take-off that owes its re-routes spends the verdict's turn, so the visit after the verdict moves its ids before the batch replays (C2, F-28, RR21-VERDICT-ZERO)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC verdict's take-off that owes its re-routes spends the verdict's turn, so the visit after the verdict moves its ids before the batch replays (C2, F-28, RR21-VERDICT-ZERO)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC verdict's take-off that owes its re-routes spends the verdict's turn, so the visit after the verdict moves its ids before the batch replays (C2, F-28, RR21-VERDICT-ZERO)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a take-off that empties a job a claim keeps leaves it the lane of its greatest token's interest, as the visit-first move does (F-28, RR21-HELDLANE)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a take-off that empties a job a claim keeps leaves it the lane of its greatest token's interest, as the visit-first move does (F-28, RR21-HELDLANE)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a take-off that empties a job a claim keeps leaves it its greatest token's lane, below the job's lane before the take-off, as the visit-first move does (F-28, RR21-HELDLANE)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a take-off that empties a job a claim keeps leaves it its greatest token's lane, below the job's lane before the take-off, as the visit-first move does (F-28, RR21-HELDLANE)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a visit's rest waits for the moves a turn's holders leave owed, so the 404 that ended the moves' job answers every member with one request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a visit's rest waits for the moves a turn's holders leave owed, so the 404 that ended the moves' job answers every member with one request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim that a visit re-routed behind a waiting verdict is fetched after it, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claims the drain takes off a waiting verdict's job and owes as one batch are fetched after it, as visited first (F-28, rr21-C6)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claims the drain takes off a waiting verdict's job and owes as one batch are fetched after it, as visited first (F-28, rr21-C6)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceEnds to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceApplies to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergencePublishes to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .attemptEnd to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceBystander to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceEnds to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceApplies to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergencePublishes to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .attemptEnd to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceBystander to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceEnds to "R-SYN-11: shutdown while a publication waits for an owed move or a visit's rest completes and answers every waiter (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergencePublishes to "R-SYN-11: shutdown while a publication waits for an owed move or a visit's rest completes and answers every waiter (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceEnds to "R-SYN-11: shutdown while a publication waits for an owed move or a visit's rest completes and answers every waiter (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergencePublishes to "R-SYN-11: shutdown while a publication waits for an owed move or a visit's rest completes and answers every waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the drain's visit after a verdict that moves more ids than a turn moves makes them all before the next waiting event (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the drain's visit after a verdict that moves more ids than a turn moves makes them all before the next waiting event (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, walked → false to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, walked → true to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, walked → false to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, walked → true to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a follow's visit for an apply after a publication's failure joins a user interest that skips the backoff, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a follow's visit for an apply after a publication's failure joins a user interest that skips the backoff, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a visit re-routing more ids than a turn moves spends the re-route at its last, for the same follow's later visits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a visit re-routing more ids than a turn moves spends the re-route at its last, for the same follow's later visits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: ids one holder gives to two running publications get each its publication's outcome, one owed move per publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: ids one holder gives to two running publications get each its publication's outcome, one owed move per publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleFailFastLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAfterDateLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFastLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued passes it while no apply followed its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued passes it while no apply followed its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an apply inside a publication failure's bookkeeping moves the job's moved ids, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an apply inside a publication failure's bookkeeping moves the job's moved ids, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit of more interests than a turn answers owes their answers and resumes them a turn's worth a turn (C2, T-A1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit of more interests than a turn answers owes their answers and resumes them a turn's worth a turn (C2, T-A1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit of more interests than a turn answers owes a settled ensure's resume with its waiters' answers (C2, T-A1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit of more interests than a turn answers owes a settled ensure's resume with its waiters' answers (C2, T-A1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit of as many interests as a turn answers answers them in its own turn (C2, T-A5)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit of as many interests as a turn answers answers them in its own turn (C2, T-A5)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, turns → 0 to "R-SYN-15: a shutdown while a commit's answers are owed answers the callers still owed with the commit's answers (T-A3)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, turns → 1 to "R-SYN-15: a shutdown while a commit's answers are owed answers the callers still owed with the commit's answers (T-A3)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, turns → 0 to "R-SYN-15: a shutdown while a commit's answers are owed answers the callers still owed with the commit's answers (T-A3)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, turns → 1 to "R-SYN-15: a shutdown while a commit's answers are owed answers the callers still owed with the commit's answers (T-A3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a caller cancelled while its answer is owed gets the commit's answer (T-A2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a caller cancelled while its answer is owed gets the commit's answer (T-A2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the invariants report owed answers with no follow-up, a head past them and an owed waiter still registered (T-A4)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the invariants report owed answers with no follow-up, a head past them and an owed waiter still registered (T-A4)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges the parked job a follow raises to user work at its user place when the moved id's holder is in flight (F-28)" started.
+✔ Test run with 681 tests in 56 suites passed after 346.162 seconds.

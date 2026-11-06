@@ -1,0 +1,98 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "requirements/tests: R-MAN-3 allocation bound (4x)",
+  "location": "Sources/ZTronAssetModel/Manifest/Decoding/ManifestFootprint.swift:21 (limit = 3 x payload); Tests/ZTronAssetModelTests/Manifest/ManifestFuzzTests.swift:220-295 (forEachLimitCase corpus); docs/adr-drafts/a.md:60 and ManifestFootprint.swift:15 / DecodeMeasurement.swift:30-31 (the headroom claim)",
+  "problem": "The decoder accepts payloads whose heap growth is more than 4x the payload, measured with the WP's own DecodeMeasurement (copied unchanged into a scratch release probe). That is the metric the R-MAN-3 test asserts. Reproduction: 100,000 entries of the form {\"identifier\":\"<base-36 index, inline>\",\"fileExtension\":\"p\",\"remotePath\":\"r\",\"localPathComponents\":[\"<16-byte string>\"],\"tags\":[\"<16-byte string>\"]}, built by String concatenation like ManifestCorpus does, then padded with spaces to the estimate's limit (the paddedToEstimateLimit trick). Result: 14,391,638 B, accepted 100000 / quarantined 0, retained = peak 60,169,200 B = 4.18x. The same shape with three 16-byte path components and no tags: 15,991,638 B, 4.06x. Each result was reproduced 2-3 times, including with the unpadded payload freed first. Cause: the 14,400,032-byte entries array is served from a cached free block with malloc_size 25,165,824, which is 1.75x the request. ADR A-8 and the doc comments say such a block is reused only down to about two thirds of its size (up to 1.49x), and that the 25% headroom below 4x covers this; both claims are refuted. When the same payloads are read from a file in a clean process, they measure exactly the estimate (3.00x), so the model is exact and the excess comes only from the allocator reusing large blocks the process freed earlier. A download that grows a buffer before decoding leaves the same kind of freed blocks. The test corpus never contains these shapes: its worst limit case is 3.47x, identical in all 4 of my runs. Other accepted shapes the corpus also misses: one to four 16-byte strings in per-entry arrays, padded to the limit, measure 3.58-3.69x even when that reuse is small. So the test cannot see an over-4x outcome that the decoder allows.",
+  "fix": "Option (a), make the bound hold under the asserted metric: in ManifestFootprint, count every allocation above 15 KiB at 1.75x its block, i.e. reserve 0.75 x (entries array + positions table + any other large buffer) on top of the 3x cap. Or lower the cap so that estimate + 0.75 x largest buffers <= 4x. Then add the two reproducer shapes above, plus 'three 16-byte path components (or tags) with three 16-byte strings, 60,000 entries, padded to the estimate's limit', as R-MAN-3 limit cases and P-3 limit benchmarks. Generate them by concatenation so freed blocks are present. Option (b), if the orchestrator rules that R-MAN-3 means bytes requested rather than in-use growth: record that in DECISIONS.md; assert the requested-bytes bound in a history-free measurement (estimate exactness, as the clean-process probe shows 3.00x); fix the 'two thirds / 1.49x' text in ADR A-8, ManifestFootprint.swift and DecodeMeasurement.swift to the measured 1.75x. Either way, correct the ADR's claim that minimal 16-byte entries at 3.47x are the highest case."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirements: R-MAN-3 time bound evidence",
+  "location": "Tests/ZTronAssetModelTests/Manifest/ManifestFuzzTests.swift:86-88 (1 s asserted only when optimised); Tests/ZTronAssetKitBenchmarks/BenchModel.swift:32-120",
+  "problem": "The R-MAN-3 test's display name claims 'within 1 s', but in the harness's unit runs (debug, TSan) the 1 s bound is never asserted. Only linear scaling is checked (debug CPU per limit case up to 3.51 s). The release P-3 limit benchmark is the real time proof; it passed: worst 330.58 ms CPU against an 817.54 ms threshold. My wall-time probe agrees: 333-336 ms worst, dense 32 MiB 200-207 ms. This is already dispositioned in A-5 / A-14 #3, but the orchestrator still has to record it.",
+  "fix": "Orchestrator: at merge, record in TRACEABILITY.md / VERIFICATION.md that R-MAN-3's time bound is proved by 'P-3: the reference decode rate holds for fuzzed manifests at the 32 MiB payload limit\u2026' in --perf, and that allocation on an iOS device is not verified."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirements: R-MAN-2 vs R-MAN-3, payloadTooLarge overload",
+  "location": "Sources/ZTronAssetModel/Manifest/ManifestError.swift:3-6; docs/adr-drafts/a.md:61,71,74",
+  "problem": "A manifest dense with quarantined elements is rejected whole as payloadTooLarge (20,000 x {} is rejected; pinned by the test 'R-MAN-3: quarantine diagnostics count against the allocation bound\u2026'). R-MAN-2 says per-entry violations quarantine only that entry. The same case also carries an estimated size, not the payload size. Both still wait on an orchestrator decision (A-11.1, A-11.4); WP-F and WP-G will map payloadTooLarge without knowing it has two meanings.",
+  "fix": "Orchestrator, before L4: either accept A-11.1 (decodedSizeExceeded) and A-11.4 (bounded quarantine list), or record the overload and the whole-manifest rejection in DECISIONS.md and ARCHITECTURE section 7.6."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests: R-MAN-7 'value types' half",
+  "location": "Tests/ZTronAssetModelTests/ModelValueTests.swift:25-66",
+  "problem": "The test checks Codable round-trips (all 54 Codable Model types are sampled, which I confirmed with a scan), Hashable agreement, sending to tasks, and Sendable at compile time. It never asserts that Model types are value types. A Model struct turned into a final class would still pass. Today no class exists in Sources/ZTronAssetModel (my grep found none), so nothing is broken.",
+  "fix": "Add `#expect(Mirror(reflecting: value).displayStyle != .class)` to `sample(_:)`, or a scan in EnvironmentScanTests that fails on any `class` declaration in Sources/ZTronAssetModel outside Live*/System* conformers."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests: no-sleep rule (C4) and coverage misses",
+  "location": "Tests/ZTronAssetModelTests/ModelBehaviourTests.swift:122-146; uncovered: AssetLog.swift:23-25,78-81,308-318; JSONCursor.swift:221,230,270,438,553; ManifestParser.swift:275,555; Time.swift:80-82,105",
+  "problem": "(1) The live-clock test enters the real Task.sleep, via LiveTimeSource.sleep, in a cancelled task. It is deterministic, since cancellation ends it at once, and it reads only CLOCK_MONOTONIC and CLOCK_UPTIME_RAW, never the wall clock. Still, it is the one WP-A test that reaches a real sleep. (2) Coverage passes; for reference, these are the uncovered lines and regions in the WP's own files: the OSLogSink and logger lines, the OSLogMessage autoclosures of the disabled signposter (AssetLog.swift:308-318), LiveTimeSource.now(), and defensive or unreachable decoder branches. All are covered by A-12 except the signposter message autoclosures, which A-12 mentions only implicitly.",
+  "fix": "Keep the live-clock test, but have the orchestrator list it in ARCHITECTURE section 14 next to LiveTimeSource.now() as the one sanctioned touch of a live conformer. Add the AssetLog.swift:308-318 message autoclosures to A-12's list of deliberately untested lines."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness: envelope verdict order (R-MAN-2, A-4.9)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestParser.swift:197 (thrown from the in-place parse at :129-131); the claim it breaks is at :92-94 and docs/adr-drafts/a.md:35",
+  "problem": "The verdict on an envelope can depend on member order. When a supported version comes before `assets`, `assets` is parsed in place, and a `tooManyEntries` there is thrown before later members are read. So a later member that is not JSON, or is nested too deeply, is never reported. Probe output with maxEntries 1 and maxNestingDepth 4: `{\"schemaVersion\":1,\"assets\":[e1,e2],\"x\":[1,]}` gives tooManyEntries(count: 2, limit: 1), but the same members ordered `x, schemaVersion, assets` give undecodable(notJSON). The same split happens with `\"x\":[[[[[1]]]]]` (tooManyEntries vs nestingTooDeep) and `\"x\":\"\\ud800\"`. This contradicts the doc comment (\"never depends on the order of its members ... the whole document must be JSON within the nesting limit\" first) and A-4.9 (\"since fix round 2 the verdict never depends on it\"). The documented exception only covers shape violations. Both outcomes reject the manifest, so only the reported error case changes.",
+  "fix": "In parseEnvelope, catch tooManyEntries from the in-place parseAssets, finish validating the rest of the array (skipValue each remaining element), and rethrow after requireEnd() and the version checks. Or have parseAssets record the overflow and keep skipping elements before throwing. Alternatively, narrow the doc comment and A-4.9: an in-place tooManyEntries takes precedence over every later error, notJSON and nestingTooDeep included."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness: error precedence of duplicates (R-MAN-2, A-4.3)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/ValidatedManifest.swift:117 (the survey runs first) and /Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestParser.swift:256-261 (duplicates are checked only in the build pass)",
+  "problem": "Under `.reject`, a duplicate identifier is detected only by the build pass. Any error the survey pass finds later in the document therefore wins, even when the duplicate comes first. Example: `[a, a, b, ... past maxEntries]` throws tooManyEntries, while A-4.3 says `.reject` throws duplicateIdentifier at the second occurrence. The same applies to the estimate's payloadTooLarge. Proven by the independent-oracle probe: 1,017 of 40,000 random manifests differ, and every difference is this pair (oracle duplicateIdentifier, decoder tooManyEntries). Both outcomes reject the manifest.",
+  "fix": "State the precedence in A-4.3 and in the ManifestDecoder.decode doc: survey-pass errors (notJSON, nestingTooDeep, tooManyEntries, shape, unsupported version, payloadTooLarge) are reported before duplicateIdentifier. Alternatively, detect `.reject` duplicates in the survey with the same SurveyedIdentifier set used for `.keepFirst`."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness: decoder vs violations(of:) disagreement",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestParser.swift:479 vs /Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift:251",
+  "problem": "stringArray caps tags with `count == maxCount`, but areValidTags uses `tags.count <= limits.maxTagsPerEntry`. With a negative maxTagsPerEntry the decoder accepts any number of tags, while ManifestDecoder.violations(of:) reports tagInvalid for the same entry. ManifestRules is documented as the shared rule set so that the two \"can never disagree\". Probe output: `NEGATIVE TAG LIMIT accepted=true tags=[\"x\", \"y\"] violations(of:)=[tagInvalid]`. This needs a nonsensical configuration, so it is low severity.",
+  "fix": "Use `if count >= maxCount` in stringArray. That also covers maxPathComponents."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "compatibility: prior-art leniency (R-MAN-1)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/Decoding/JSONCursor.swift:103-117 (continueContainer) and the element/member loops in ManifestParser.swift:195-201, :221-235",
+  "problem": "The prior art decodes with plain `JSONDecoder().decode([CDNAsset].self, from:)` (ZTronCarouselCore StaticManifestCDNProvider.swift:35). On this host that decoder accepts a trailing comma in arrays and objects (`[{...},]` and `[{...,}]` both decode), and it accepts UTF-16LE with a BOM. The new decoder rejects the whole manifest as undecodable(notJSON) in all three cases (probe COMPAT lines). A-4.5 records UTF-8-only as a deliberate choice, but the trailing-comma difference is recorded nowhere. R-MAN-1 requires that every manifest published today still decodes. No shipped fixture has a trailing comma (checked), so this is a risk, not an observed failure.",
+  "fix": "Either accept one trailing comma before `]` or `}`: in continueContainer and skipValue, after a comma, peek past whitespace for the closing byte. Or record the strict-RFC choice in A-4.5 as an R-MAN-1 deviation, so the orchestrator can confirm that no published manifest contains one."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "forbidden APIs: R-ENV-1/C4 scan coverage (binds every WP)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Tests/ZTronAssetModelTests/Environment/EnvironmentScanTests.swift:12-18",
+  "problem": "The R-ENV-1 source scan does not flag several real-clock and system-randomness calls. Its exact pattern list and predicate, run over a sample, leave all of these unflagged: `NSDate()`, `mach_continuous_time()`, `ids.randomElement()`, `ids.shuffled()`, `copy.shuffle()`, `gettimeofday(&tv, nil)`, `time(nil)`, `SecRandomCopyBytes(...)`, `CACurrentMediaTime()`. randomElement, shuffled and shuffle draw from SystemRandomNumberGenerator implicitly, so a later WP could break C4 (for example a random tie-break or jitter) and still pass the \u00a711 R-ENV-1 test.",
+  "fix": "Add `NSDate()`, `mach_continuous_time`, `mach_approximate_time`, `gettimeofday(`, `time(nil)`, `CACurrentMediaTime`, `SecRandomCopyBytes`, `drand48`, `random()`. Treat `.randomElement()`, `.shuffled()` and `.shuffle()` like `.random(`: forbidden unless the line contains `using:`. Extend the self-test sample with each pattern."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "security/privacy: R-OBS-1 identifier hashing scan (binds every WP)",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Tests/ZTronAssetModelTests/Logging/LogScanTests.swift:218 (namesIdentifier)",
+  "problem": "The scan flags an interpolation only when it names id, ids, identifier(s), assetID, rawValue, remotePath, url, URL, appKey or key. Values whose description carries a raw identifier pass unflagged. For example, `route.log(.sync, .error, \"manifest rejected: \\(error); first quarantine \\(manifest.quarantined.first!)\")` renders `duplicateIdentifier(bo7.secret.asset)` and `QuarantinedEntry(... identifier: Optional(bo7.secret.asset) ...)` into a `.public` line. The probe shows interpolations=[\"error\", \"manifest.quarantined.first!\"] and flagged=[]. A loop variable named `asset` or `subject` that holds an AssetID passes the same way.",
+  "fix": "Add `error`, `entry`, `entries`, `asset`, `assets`, `quarantined`, `manifest`, `subject` and `subjects` to the identifying names, or allow only an approved set of interpolations (counts, enums, `hashed(...)`). Record the remaining limit in A-9. Optionally ask the orchestrator for hashed descriptions on ManifestError and QuarantinedEntry."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "allocation bound: R-MAN-3 at small sizes",
+  "location": "/Users/admin/Documents/ZTronAssetKit/.worktrees/a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestFootprint.swift:19-24",
+  "problem": "`limit(payloadBytes:)` never goes below a 64 KiB floor. Payloads under about 16 KiB can therefore allocate up to 64 KiB, far more than R-MAN-3's \"never allocates more than 4x the payload\". Measured retained heap: 100 x `{}` (301 B) 6,240 B = 20.7x; 1,000 x `{}` (3,001 B) 49,248 B = 16.4x; 1,300 x `{}` (3,901 B) 65,632 B = 16.8x. The \u00a711 R-MAN-3 test asserts 4x only at limit scale. A-8 mentions that 1,000 x `{}` fits the floor, but nowhere is this recorded as a scoping of R-MAN-3.",
+  "fix": "Either record the interpretation for DECISIONS.md (4x applies at or above 16 KiB; below that, at most 64 KiB in absolute terms), or replace the floor with 3x payload plus a small constant (about 2 KiB, enough for one entry's fixed costs). With that change, small quarantine-dense payloads are rejected as payloadTooLarge, the same as large ones."
+ }
+]

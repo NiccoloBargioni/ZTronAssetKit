@@ -1,0 +1,29 @@
+--- ../EngineJobs.head.swift	2026-10-30 04:18:22
++++ Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 04:18:30
+@@ -730,6 +730,26 @@
+                 if self.followBeforeActing(transfer) {
+                     // Superseded: the ids went to their new content's jobs, which the gate admits on their own.
+                     requeues += 1
++                    continue
++                }
++                // PROTOTYPE (verifier, PROBE-C5-LANEDROP): a follow that kept some ids may have lowered the job's lane (the
++                // moved interests set it), and with it the volume its verdict read: judge it again before it is re-queued
++                // and counted ahead of the jobs behind it.
++                if let current = self.state.jobs[transfer], current.assets != job.assets, let late = self.spaceBlock(current, ahead: ahead) {
++                    if reason == .awaitingSpace {
++                        if late == .awaitingSpace, sweep == .reclaimed || self.spaceWakeExpected {
++                            waiting = true
++                        } else {
++                            if case .insufficientSpace? = current.lastError {
++                                // An earlier ENOSPC's figures stay, as in the park branch below.
++                            } else if let space = self.state.freeSpace, ahead > 0 {
++                                let available = max(0, self.headroom(for: current, in: space).subtractingClamped(ahead))
++                                self.state.jobs[transfer]?.lastError = .insufficientSpace(required: current.entry.byteSize ?? 0, available: available)
++                            }
++                            self.park(transfer, reason: .insufficientSpace)
++                            parks += 1
++                        }
++                    }
+                     continue
+                 }
+                 if self.transition(transfer, to: .queued) {

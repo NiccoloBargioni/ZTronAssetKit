@@ -1,0 +1,10 @@
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.63% (1441/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.42% (8121/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 93.97% (10076/10723) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.57% (26586/27531) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK
+COVERAGE: PASS
+gate-exit=0

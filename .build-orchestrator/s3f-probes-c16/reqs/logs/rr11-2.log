@@ -1,0 +1,30 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16ReqsProbes" started.
+◇ Test "PROBE-C16R-RR11-RETRY-AFTER" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16R-RR11-RETRY-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16R-RR11-RETRY-AFTER" started.
+✘ Test "PROBE-C16R-RR11-RETRY-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16ReqsProbes.swift:143:9: Expectation failed: after429.throttled
+↳ PROBE-C16R-RR11-RETRY-AFTER: J's 429 throttles the origin on J's own prefetch lane, B answered by O's verdict (visit-first): sweepFollowsFirst: at O's verdict (waiting: true, oState: "failed(ZTronAssetModel.RetryDisposition.nextRun)", oInterests: 2); after J's 429 (throttled: false, jState: "failed(ZTronAssetModel.RetryDisposition.nextRun)", jLane: "prefetch"); A failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); B failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); P failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ after429.throttled → false
+↳   after429 → (throttled: false, jState: "failed(ZTronAssetModel.RetryDisposition.nextRun)", jLane: "prefetch")
+↳     throttled → false
+↳     jState → "failed(ZTronAssetModel.RetryDisposition.nextRun)"
+↳     jLane → "prefetch"
+↳   throttled → false
+✘ Test "PROBE-C16R-RR11-RETRY-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16ReqsProbes.swift:144:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(jBytes.count)
+↳ PROBE-C16R-RR11-RETRY-AFTER: P is served J after the throttle (visit-first): sweepFollowsFirst: at O's verdict (waiting: true, oState: "failed(ZTronAssetModel.RetryDisposition.nextRun)", oInterests: 2); after J's 429 (throttled: false, jState: "failed(ZTronAssetModel.RetryDisposition.nextRun)", jLane: "prefetch"); A failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); B failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))); P failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == Int64(jBytes.count) → <not evaluated>
+✘ Test "PROBE-C16R-RR11-RETRY-AFTER" with 2 test cases failed after 0.593 seconds with 2 issues.
+↳ /// PROBE-C16R-RR11-RETRY-AFTER: `verdictLane`'s scenario (VerdictLaneTests `:38`) with O's attempt ending in a 503
+↳ /// whose `Retry-After` (120 s) exceeds the user lane's cap (30 s, `shortInteractiveRetry`): `retryLater` finds no delay
+↳ /// (`Backoff.delay` is `nil`) and answers every interest of O (`resolveAll`), A and B. Visited first, O's verdict
+↳ /// answered B at its arrival and v4's visit found B answered: J's 429 (`Retry-After` 60 s) reads J's own prefetch
+↳ /// lane and throttles the origin (R-SYN-5), and P, J's prefetch waiter, is served after the throttle. The draft's
+↳ /// RR-11 records this verdict as counted "as none" by `verdictAnswers`, not probed.
+✘ Suite "VerifyC16ReqsProbes" failed after 0.593 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, requirements lens). Never committed.
+✘ Test run with 1 test in 1 suite failed after 0.593 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

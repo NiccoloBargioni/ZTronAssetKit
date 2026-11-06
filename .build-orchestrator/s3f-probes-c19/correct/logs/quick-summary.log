@@ -1,0 +1,19 @@
+start 21:31:50 load { 188.86 96.45 62.98 }
+::: STEP harness
+::: OK   harness
+::: STEP toolchain
+::: OK   toolchain
+::: STEP build-debug
+::: OK   build-debug
+::: STEP tests
+✔ Test run with 151 tests in 16 suites passed after 0.536 seconds.
+✔ Test run with 552 tests in 53 suites passed after 163.862 seconds.
+✔ Test run with 459 tests in 60 suites passed after 96.675 seconds.
+✔ Test run with 84 tests in 18 suites passed after 90.425 seconds.
+✔ Test run with 85 tests in 11 suites passed after 4.737 seconds.
+✔ Test run with 71 tests in 10 suites passed after 2.674 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.956 seconds.
+::: OK   tests
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+exit 0 end 21:39:15 load { 32.95 55.53 57.37 }

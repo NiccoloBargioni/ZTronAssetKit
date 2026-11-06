@@ -1,0 +1,4 @@
+✔ Test run with 34 tests in 4 suites passed after 0.675 seconds.
+✘ Test "R-ENV-1: advance(to:) lands exactly on the target instant, moves the awake clock by the same nanoseconds and wakes a sleeper there" failed after 0.095 seconds with 1763 issues.
+✘ Test run with 8 tests in 1 suite failed after 0.096 seconds with 1763 issues.
+exit 1

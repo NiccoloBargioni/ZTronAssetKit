@@ -1,0 +1,11 @@
+◇ Test "probe: clamped window equals the reference for every current and radius, repeated ids included" started.
+◇ Test "probe: Int.max over a 200,000-page carousel at both ends returns every page once" started.
+✔ Test "R-CAR-3: a window radius beyond the carousel, Int.max included, walks only the carousel's ids and yields the whole carousel once" passed after 0.001 seconds.
+✔ Suite "Facade prefetch" passed after 0.001 seconds.
+probe: 200,000 pages, current 0, radius Int.max: 200000 targets in 0.748935375 seconds
+probe: 200,000 pages, current 100000, radius Int.max: 200000 targets in 0.54043675 seconds
+probe: 200,000 pages, current 199999, radius Int.max: 200000 targets in 0.644785084 seconds
+✔ Test "probe: Int.max over a 200,000-page carousel at both ends returns every page once" passed after 2.213 seconds.
+✔ Test "probe: clamped window equals the reference for every current and radius, repeated ids included" passed after 2.742 seconds.
+✔ Suite "Verify S3G C1 prefetch probe" passed after 2.742 seconds.
+✔ Test run with 3 tests in 2 suites passed after 2.743 seconds.

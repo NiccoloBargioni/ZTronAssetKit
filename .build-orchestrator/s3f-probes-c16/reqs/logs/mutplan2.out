@@ -1,0 +1,11 @@
+followAfterVerdictEpochDrop: build rc=0 (6 s)
+  run1 rc=1 ✘ Test run with 109 tests in 1 suite failed after 124.170 seconds with 1 issue.
+    ✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+  run2 rc=0 ✔ Test run with 109 tests in 1 suite passed after 100.725 seconds.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+deferralFollowOwedDrop: build rc=0 (4 s)
+  run1 rc=0 ✔ Test run with 109 tests in 1 suite passed after 103.942 seconds.
+  run2 rc=1 ✘ Test run with 109 tests in 1 suite failed after 92.922 seconds with 1 issue.
+    ✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+PLAN2 DONE 23:01:47

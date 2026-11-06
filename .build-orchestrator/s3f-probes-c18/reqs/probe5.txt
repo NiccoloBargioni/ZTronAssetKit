@@ -1,0 +1,4 @@
+09:07:33 run sharedConvergenceProbe start load={ 3.31 9.38 24.99 }
+09:07:36 run sharedConvergenceProbe exit 1 load={ 3.31 9.38 24.99 }
+09:07:36 run divergenceProbe start load={ 3.31 9.38 24.99 }
+09:07:44 run divergenceProbe exit 1 load={ 3.34 9.19 24.73 }

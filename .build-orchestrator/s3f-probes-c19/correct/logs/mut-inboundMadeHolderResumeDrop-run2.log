@@ -1,0 +1,48 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:197:17: Expectation failed: waits == 0
+↳ no publication still waits once the follow ended: 1
+↳ waits == 0 → false
+↳   waits → 1
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" started.
+✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:197:17: Expectation failed: waits == 0
+↳ no publication still waits once the follow ended: 1
+↳ waits == 0 → false
+↳   waits → 1
+✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" with 4 test cases failed after 2.911 seconds with 2 issues.
+↳ /// An interest an apply moves onto a publishing job's content gets that publication's outcome, though the next apply
+↳ /// maps its id back to its own content and its own job's bytes arrive first (`publicationHop(_:_:next: .back)`):
+↳ /// visited first, v3's visits had moved W and the holders ahead onto P's publication and superseded H. Behind the
+↳ /// barrier, H's publication waits for the move off its job (`inboundBlocks`), which its attempt's end left owed;
+↳ /// binding at once, it served W H's bytes.
+◇ Test "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .smallPublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .largePublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+✘ Test "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:197:17: Expectation failed: waits == 0
+↳ no publication still waits once the follow ended: 1
+↳ waits == 0 → false
+↳   waits → 1
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher to "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" started.
+✘ Test "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:197:17: Expectation failed: waits == 0
+↳ no publication still waits once the follow ended: 1
+↳ waits == 0 → false
+↳   waits → 1
+✘ Test "R-INT-3: a publication that waits for a move off its job binds the id it keeps once the move is made (F-28)" with 4 test cases failed after 3.077 seconds with 2 issues.
+↳ /// The same with zz-h on H's content too (`publicationHop(_:_:next: .backKeeping)`): H's publication waits for the
+↳ /// move off its job and binds zz-h once the follow's turn made it, serving V, as a visit-first engine's H, which v3's
+↳ /// visit left holding zz-h, published it; W and the holders ahead get P's integrity failure.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.989 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 5.989 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

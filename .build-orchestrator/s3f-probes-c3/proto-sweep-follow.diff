@@ -1,0 +1,12 @@
+--- ../Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-29 19:07:57
++++ pkg/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-29 20:18:01
+@@ -708,7 +708,8 @@
+                 break
+             }
+             let transfer = candidate.transfer
+-            guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
++            // PROTOTYPE (verifier): the ids an owed follow moved leave before the sweep answers or re-queues the job.
++            guard !self.followBeforeActing(transfer), let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
+                 continue
+             }
+             guard let verdict = self.spaceBlock(job, ahead: ahead) else {

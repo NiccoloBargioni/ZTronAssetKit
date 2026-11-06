@@ -1,0 +1,14 @@
+^D◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "PROBE-C22-PUBLISH" started.
+PROBE-C22-PUBLISH ids 6 bytes, fresh queue: publish best 1.257 median 1.282 ms (live 10000); a1 best 0.963 median 0.970 ms (live 10000); a1+a2 best 0.568 median 0.572 ms (live 10000); publishAll best 1.118 median 1.125 ms (live 10000); load 6.49 7.80 6.30
+PROBE-C22-PUBLISH ids 6 bytes, re-announcement: publish best 1.270 median 1.344 ms (live 10000); a1 best 0.749 median 0.792 ms (live 10000); a1+a2 best 0.753 median 0.792 ms (live 10000); publishAll best 1.316 median 1.391 ms (live 10000); load 6.49 7.80 6.30
+PROBE-C22-PUBLISH ids 22 bytes, fresh queue: publish best 3.456 median 3.474 ms (live 10000); a1 best 2.085 median 2.160 ms (live 10000); a1+a2 best 1.071 median 1.103 ms (live 10000); publishAll best 1.905 median 1.932 ms (live 10000); load 6.49 7.80 6.30
+PROBE-C22-PUBLISH ids 22 bytes, re-announcement: publish best 9.378 median 9.465 ms (live 10000); a1 best 4.782 median 4.798 ms (live 10000); a1+a2 best 4.794 median 4.801 ms (live 10000); publishAll best 5.621 median 5.634 ms (live 10000); load 6.49 7.80 6.30
+✔ Test "PROBE-C22-PUBLISH" passed after 0.596 seconds.
+✔ Suite "SyncBenchmarks" passed after 0.596 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 0.596 seconds.
+✔ Test run with 1 test in 2 suites passed after 0.596 seconds.

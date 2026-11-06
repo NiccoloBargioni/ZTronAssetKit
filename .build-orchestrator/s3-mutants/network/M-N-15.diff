@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..019f554 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -473,7 +473,7 @@ package struct CircuitBreaker: Sendable, Hashable {
+             if !self.authSuspects.contains(asset) {
+                 self.authSuspects.append(asset)
+             }
+-            if self.authSuspects.count >= max(1, self.policy.authDistinctAssets) {
++            if self.authSuspects.count > max(1, self.policy.authDistinctAssets) {
+                 self.open(.authentication, trips: self.carriedTrips + 1, at: now, seed: seed)
+             }
+         case .failure(_, .serverErrors, _):

@@ -1,0 +1,4 @@
+start 14:35:39 load 11.34 25.28 32.48
+exit=0
+end 14:43:28 load 198.50 304.83 186.08
+{'result': 'Passed', 'totalTestCount': 1320, 'passedTests': 1320, 'failedTests': 0, 'skippedTests': 0}

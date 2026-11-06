@@ -1,0 +1,53 @@
+# challenge:reindex-pair
+
+Read-only analysis for ruling S3-R26 (workflow wf_72146a41-b2b, on 8e1fb24). UNCONFIRMED marks what the agent read but did not run.
+
+## verdict
+
+WEAKENED
+
+## correctedVerdict
+
+FEASIBLE_WITHOUT_SPLIT
+
+## correctedConfidence
+
+0.6
+
+## refutations
+
+- CODE PATHS CONFIRMED (worktree at 8e1fb24). MOVE: continueInbound binds `let holder = self.state.jobs[move.holder]` (EngineFollow.swift:1220). It takes the intersection at :1226 and calls startMove at :1227. The fit path calls move (EngineMoves.swift:141-142). In move: subtract at EngineFollow.swift:944 (copy-on-write while holder/job are alive), sort of interests at :945, `interest.assets.sorted() where moved.contains` at :946, removeAsset at :947 and reroute at :948. DEFER: addInterest's branch (EngineJobs.swift:117-121) calls deferBehindVerdict (EngineFollow.swift:964-978). It makes a local copy at :965, runs a backward lastIndex at :966-973, inserts at :976 and inserts the stamp at :977. Both are O(1) apart from the scan and the shifts: worldStamp at :250-262 is O(1), and deferToFollow at :233-236 appends. The remainder path is EngineFollow.swift:820-847 → continueMove (EngineMoves.swift:179-226), 512 ids per turn (:126).
+- MOVE ATTRIBUTION: credible, but the analyst gave no real evidence for it, and it is INFERRED. Supporting evidence the analyst did not cite: the probe's ids are `String(format: "zz-h%05d")` (VerifyC20CorrectProbes.swift:343), 9 bytes each, so they are small strings. The two 10,000-id copy-on-write Set copies (:944, :947) therefore retain nothing and cost only tens of µs. That leaves almost all of the ~4.7 ms per move to the sort and filter at :946, which compares with the generic utf8.lexicographicallyPrecedes (AssetID.swift:76). With production ids longer than 15 bytes, the copies would also pay about 10,000 retains per move. M1 removes those as well. No profile exists.
+- DEFER FIGURE OVERSTATED AS 'already passes 40': rel-deferq.log's three runs are 39.55, 59.92 and 49.89 ms. The 1-minute load was 9.82, but the 5- and 15-minute loads were 85.52 and 315.77, so the machine was still unloading. The quiet reqs runs are 35.78 ms (load 1.46), 36.52 ms (1.96) and 37.91 ms (4.36; reqs/logs/probe*.log line 11, probe*-load.txt). At 8e1fb24, defer is about 36-38 ms when quiet. That is 2-4 ms under 40 and fails 32, so a fix is required, not optional.
+- MOVE-M1 (c) AS WRITTEN IS WASTEFUL: it builds and sorts a row for every token on each move, which is O(T log T) per move. Filtering first is enough: keep only the tokens whose interest holds a moved id, then sort that short list. Keeping today's empty check for every token (:949-951) also keeps an O(T) walk per move, so it gains nothing over relying on I3. Writers keep I3 at EngineCommands.swift:1032-1035, EngineDispatch.swift:1113-1118, EngineMoves.swift:210-216 and EngineFollow.swift:563/950 (read; there is no invariant clause for it). Either way, M1 in the per-id grouping stays O(T) per move: about 0.25-0.4 ms (INFERRED: 10,000 dictionary-entry visits plus a hash of a 1-element Set each). With a per-id base of about 7-9 ms (INFERRED), k=64 ≈ 23-35 ms (marginal) and k=256 ≈ 70-110 ms (fails). The analyst's conclusion holds: per-id k≥~64 needs the index. Neither grouping is measured at k>1 after any fix.
+- MOVE-M1 OMISSION: startMove/move change signature, so follow's visit path must change too. Today follow passes its live `job` copy (EngineFollow.swift:903, :915). M1(b) says nothing about it. This is not in the measured shape, but a careless edit can leave the copy alive across the mutations. B9 (integrate-c21.md) covers this; M1 does not.
+- DEFER-D1 RISK THE ANALYST UNDERSTATES: the claim that the stride becomes 8 B is plausible. EventAfterFollow (EngineFollow.swift:1405-1435) has 9 payload cases and 1 empty case, `throttleAnswers`. With all of them indirect, the enum should be one box pointer with the tag in spare bits. But that is INFERRED, and so is the claim that 'the scan reads the tag without dereferencing'. If the lastIndex predicate gets an owned copy of each element, every boxed element costs a retain and a release (about 5-10 ns). The backward scan over E_after would then be no cheaper than today's 7.3 ns per element. Only the memmove would shrink. D1 without D1+ is therefore not safely ≤32 ms when E_after reaches 20k or more (tail events). With D1+ (firstIndex), the scan's cost depends only on E_before. Only measurement settles this.
+- D1+ UNIQUENESS IS UNPROVEN: the verdict events come from two places. defersFailure (EngineFollow.swift:449-468) sets verdictsAfterFollow and moves the job to failed. spaceFailed (EngineFailures.swift:568-574) only records the deferral and appends .spaceFailure: no verdictsAfterFollow, no failed state. The verdicts clause (EngineCommands.swift:2018-2019, :2043) checks only .attemptFailed against a key set, so nothing checks that a .spaceFailure and a later .attemptFailed (or a second .spaceFailure) never share (transfer, epoch). Only a debug assertion or a test settles it. Until then, lastIndex→firstIndex is not proven Equivalent.
+- DEFER-A characterisation is fair. It adds a second store for waiting joins that purges, followedLane and shutdown must walk between follow turns, and new followBarrierViolations clauses (K1-K4). Under this task's definition it is not a non-splitting fix.
+- MISSED (MOVE, per-id grouping): a per-turn memo, cheaper than a persistent index. continueInbound already has the turn's owed moves (inboundMoves). Building asset→tokens once per holder per turn costs O(T) about once, and each move then costs O(holders). Every candidate token is re-validated live through `interests[token]?.assets.contains`. The memo dies at the end of the turn, so no event can land in it. Risk: a false negative, if a token gains a moved id on the same holder in the same turn. Reroute goes to the entry under move.copy (EngineDispatch.swift:1153), so this looks unreachable, but that is INFERRED, not proven. About 3 branches against B-reduced's 10-12. B-reduced remains the safer choice.
+
+## missedFix
+
+MOVE: a per-turn memo in continueInbound, as an alternative to B-reduced for the per-id grouping. Before the move loop (EngineFollow.swift:1214), for each holder that the turn's owed moves come off, scan its interests once. The scan builds [AssetID: [InterestToken]] for the moved ids that the turn's budget covers. Each move then visits only its memo tokens, sorted, re-validated live with `self.state.jobs[h]?.interests[t]?.assets.contains(a)`, and passes stubs to reroute. This is O(T + k·h) per turn instead of O(k·T), with no persistent index, no I1 clause, and about 3 branches instead of 10-12. The memo is dropped at the end of the turn, so nothing can land in it. Risk (INFERRED): a token gaining a moved id on the same holder within the turn would be missed. Prove that unreachable, or prefer B-reduced. DEFER: no cheaper fix than D1 plus D1+. A batched per-turn insert(contentsOf:) would remove the O(512×E) factor, but it needs a pending buffer within the turn, so I exclude it under the strict definition.
+
+## answerRisks
+
+- D1 changes only the representation. Its order, positions, stamps and clauses are unchanged, so it carries no answer risk. D1+ (firstIndex) is answer-neutral only if each (transfer, epoch) has exactly one verdict event. That is unproven, because spaceFailed's .spaceFailure (EngineFailures.swift:572) is not tracked in verdictsAfterFollow. If two verdict events can share one (transfer, epoch), firstIndex places joins behind the earlier one, which changes the drain order and possibly caller answers in sweep-first.
+- M1 carries low risk. It must preserve the (token asc, asset asc) pair sequence (:945-946) and take the snapshot before :944. If it drops the empty check for every token, it relies on I3, which no clause checks today. If it keeps the check, it gains nothing in the per-id case.
+- B-reduced adds new invariantViolations clauses: I1, and I3 if added. Whether additions count as 'changing a clause' needs a ruling.
+- Four arms of B-reduced can be killed only by unit tests: NB5, NB7, NB8 and setInterest's replace arm. Under S3-R16 1(e) ('both orders'), those unit-only kills need a ruling, on the f066083 precedent. S3-R19 item 3's precedent instead removes unreachable arms, and removing them could break I1 in states the engine never reaches.
+- The B7 and B8 behaviour changes must stay out, as the analyst said: B7 changes what readers of the bounded path observe, and B8 changes Q1's start count.
+- Process risk: c2Budget = 10.0 lives in Tests/ZTronAssetKitBenchmarks/BenchSync.swift:129, and CLAUDE.md C2 says ~10 ms. Moving to 40 ms weakens a test (G3), and rulings S3-R5 and S3-R20 to S3-R25 must be amended. Only the owner can do either, explicitly.
+- Noise: rel-deferq.log shows a spread of 39.55 to 59.92 ms within one best-of-3. A 32 ms target needs quiet loads (5-minute load too, not only the 1-minute) or the pins will flap.
+
+## cycleEstimate
+
+My estimate is 3-5 fix-and-verify cycles for the pair (pessimistic: 4). Reasoning:
+- DEFER-D1 plus D1+: 1 cycle. It adds 0 decision branches, so no G4 drop-mutant work. It needs new BenchSync pins (group, users, tail-events) and a uniqueness assertion or test for (transfer, epoch) before firstIndex. If the measured stride or scan cost disappoints (the retain-per-element risk), add a second cycle.
+- MOVE-M1: 1-2 cycles. It adds about 0-1 branches, but the signatures of startMove, move and follow change. The order-preservation test is T2-like and must assert Job.epoch, not source.starts. M1 fixes the group shape only.
+- MOVE-B-reduced, needed if the per-id grouping at k≥~64 is in scope: 2-4 cycles. It adds about 10-12 branches plus the I1 clause, 4 of them with unit-only kills that need an S3-R16 1(e) ruling first; without that ruling each cycle's reqs lens will reopen them. NB3's promote arm needs T3 with the waiter joining first, which has been a cycle-killer before.
+- With M1 plus D1 alone, if a measured per-id k=256 pin comes in under 32 ms (unlikely, INFERRED 70-110 ms): 2-3 cycles.
+History on this work package (20 cycles at 10 ms, each split reopening 1(a) and 1(e)) argues for the upper end.
+What would settle it, each release, best of 3, with 1- and 5-minute loads both ≤10:
+(1) MemoryLayout<EventAfterFollow>.stride, and PROBE-C20C-DEFER-BEHIND plus PROBE-C20R-DEFER-BEHIND-C2 with D1, with and without D1+, plus a 10,000-tail-event variant;
+(2) PROBE-C20C-MANY-MOVES k=1/16/64/256 with filter-first M1, in the group grouping and in a new per-id grouping (10,000 awaitAsset waiters on H). Measure the per-id grouping at 8e1fb24 first; it is unmeasured.

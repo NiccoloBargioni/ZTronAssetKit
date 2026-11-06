@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:227:9: Expectation failed: after.n == .downloading && after.r == .queued
+↳ R's fresh attempt waits in the queue behind N, queued at P's visit (visit-first): (n: Optional(ZTronAssetSync.JobState.downloading), r: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+↳ after.n == .downloading && after.r == .queued → false
+↳   after.n == .downloading → true
+↳   after.r == .queued → false
+✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:189:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:233:9: Expectation failed: (try? pResult.get())?.byteSize == 16 && (try? rResult.get())?.byteSize == 16
+↳ P is served from N and R from its fresh attempt: success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f4/f4da976583e19bedbdab603c6a140a119c912c1cfbbdef32bdc06820f18ecc8d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? pResult.get())?.byteSize == 16 && (try? rResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" with 2 test cases failed after 192.010 seconds with 3 issues.
+↳ /// An attempt the transport cancels on its own while the follow owes a visit is re-queued behind the places the
+↳ /// visits give: one slot. R (zz-r, a user waiter) holds it; P (zz-p, a user waiter) waits in the queue. v3 moves zz-p to
+↳ /// new content N; then R's attempt ends `cancelled(byClient)` (a cancel the engine did not ask for: a fresh attempt,
+↳ /// ARCHITECTURE §7.6). Visited first, P's visit queued N at the apply and R's fresh attempt was queued behind it, so
+↳ /// the freed slot goes to N. Re-queued at the cancel, R took the earlier place; a drain that dropped the re-queue left
+↳ /// R failed with nobody to re-admit it.
+✘ Suite "Engine follow barrier (F-28)" failed after 192.010 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 192.010 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

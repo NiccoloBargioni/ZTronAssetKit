@@ -1,0 +1,66 @@
+=== quick 02:23:47 { 26.23 15.04 20.55 }
+quick exit 1
+VERIFY: FAIL (1 failed: tests)
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/chainA.sh: line 14: 60435 Terminated: 15          sample > $L/load-quick.txt
+=== release 02:37:56 { 11.64 58.77 67.64 }
+release exit 0
+release warnings 0
+Build complete! (35,97 s)
+=== gates 02:38:33 { 9.11 52.95 65.16 }
+gates exit 0
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+=== sync1 02:38:33 { 9.11 52.95 65.16 }
+sync1 exit 1
+✘ Test run with 474 tests in 53 suites failed after 489.596 seconds with 4 issues.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/chainA.sh: line 24: 70568 Terminated: 15          sample > $L/load-sync$i.txt
+timeouts 2
+=== sync2 02:47:53 { 138.11 105.21 81.17 }
+sync2 exit 1
+✘ Test run with 474 tests in 53 suites failed after 454.133 seconds with 4 issues.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/chainA.sh: line 24: 77700 Terminated: 15          sample > $L/load-sync$i.txt
+timeouts 2
+=== sync3 02:55:32 { 20.40 45.42 60.59 }
+sync3 exit 0
+✔ Test run with 474 tests in 53 suites passed after 49.024 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/chainA.sh: line 24: 81102 Terminated: 15          sample > $L/load-sync$i.txt
+timeouts 0
+=== coverage 02:56:24 { 14.84 40.12 57.70 }
+cov test exit 0
+✔ Test run with 104 tests in 14 suites passed after 0.504 seconds.
+bins: .build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetAppleHostedTests.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetCompatibilityTests.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetKitBenchmarks.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetKitTests.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetModelTests.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetStorageTests.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetSyncTests.xctest
+.build-verify-s3f-c12-reqs/out/Products/Debug/ZTronAssetTransportTests.xctest
+prof .build-verify-s3f-c12-reqs/out/Products/Debug/codecov/default.profdata
+export exit 0
+cov gate exit 0
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.68% (1247/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.90% (1445/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.38% (8118/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 93.24% (10060/10789) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.28% (26570/27597) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK
+COVERAGE: PASS
+=== tsan 03:01:49 { 41.16 40.39 51.97 }
+tsan exit 0
+✔ Test run with 474 tests in 53 suites passed after 303.854 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/chainA.sh: line 50: 83486 Terminated: 15          sample > $L/load-tsan.txt
+tsan reports 0 timeouts 0
+=== t64 03:08:48 { 33.09 30.13 42.30 }
+// swift-tools-version: 6.4
+t64 build-tests exit 0
+t64 warnings 0 errors 0
+Build complete! (93,71 s)
+t64 release exit 0
+t64 release warnings 0
+Build complete! (40,80 s)
+=== done 03:11:06 { 28.64 33.34 42.02 }

@@ -1,0 +1,66 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:42:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:42:6: Time limit was exceeded: 180.000 seconds
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst before: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst before: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+DBG waiting=false run=Optional(run-3) pending=false zzA=false interests=Optional(2) conditions=Optional(ZTronAssetModel.DeviceConditions(network: ZTronAssetModel.NetworkConditions(satisfied: true, expensive: false, constrained: true), power: ZTronAssetModel.PowerConditions(lowPowerMode: false, thermal: ZTronAssetModel.ThermalLevel.nominal)))
+DBG waiting=false run=Optional(run-3) pending=false zzA=false interests=Optional(2) conditions=Optional(ZTronAssetModel.DeviceConditions(network: ZTronAssetModel.NetworkConditions(satisfied: true, expensive: false, constrained: true), power: ZTronAssetModel.PowerConditions(lowPowerMode: false, thermal: ZTronAssetModel.ThermalLevel.nominal)))
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst after: (lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading), policyPause: nil) pauses=0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:82:9: Expectation failed: pauses == 1
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C's visit, lowering it under Low Data Mode, pauses it once (visit-first): 0 pause(s)
+↳ pauses == 1 → false
+↳   pauses → 0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:73:13: Expectation failed: before.owed && before.lane == .userInitiated && before.c == .downloading
+↳ setup: C runs on the user lane and its visit is owed: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+↳ before.owed && before.lane == .userInitiated && before.c == .downloading → false
+↳   before.owed && before.lane == .userInitiated → false
+↳   before.c == .downloading → <not evaluated>
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst after: (lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading), policyPause: nil) pauses=0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:84:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A is served from W: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:82:9: Expectation failed: pauses == 1
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C's visit, lowering it under Low Data Mode, pauses it once (visit-first): 0 pause(s)
+↳ pauses == 1 → false
+↳   pauses → 0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:84:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A is served from W: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst: pauses=0 starts=1 a=failure(ZTronAssetModel.AssetError.cancelled)
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:94:9: Expectation failed: starts == 2
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C, paused by its demotion, starts again once the network is unrestricted (visit-first): 1
+↳ starts == 2 → false
+↳   starts → 1
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst: pauses=0 starts=1 a=failure(ZTronAssetModel.AssetError.cancelled)
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:94:9: Expectation failed: starts == 2
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C, paused by its demotion, starts again once the network is unrestricted (visit-first): 1
+↳ starts == 2 → false
+↳   starts → 1
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:118:13: Expectation failed: outcome.completeReport != nil
+↳ .failed(ZTronAssetModel.AssetError.cancelled)
+↳ outcome.completeReport != nil → false
+↳   outcome.completeReport → nil
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierTests.swift:118:13: Expectation failed: outcome.completeReport != nil
+↳ .failed(ZTronAssetModel.AssetError.cancelled)
+↳ outcome.completeReport != nil → false
+↳   outcome.completeReport → nil
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" with 2 test cases failed after 192.115 seconds with 11 issues.
+↳ /// PROBE-C11R-UNCONSTRAIN-DEMOTE (the draft's residual R-D, "a visit reads inputs that arrived after it was owed"):
+↳ /// under Low Data Mode, C (1 MB, content X) downloads for A's user waiter (zz-a) and a prefetch member P (zz-p).
+↳ /// v3 moves zz-a to a 16-byte content W while the follow owes C's visit. The network then becomes unrestricted.
+↳ /// Visit-first: C's visit lowers it to the prefetch lane while Low Data Mode still holds, so `relane`'s demotion
+↳ /// pause (`pauseIfRefused`) pauses it (1 pause), and the later unrestricted element re-admits it (2 starts). Behind
+↳ /// the barrier the unrestricted conditions are already in `state.conditions` when the visit runs, so the demotion
+↳ /// pause reads them and does not pause C (0 pauses, 1 start); the deferred conditions pass (snapshot unrestricted)
+↳ /// pauses nothing either.
+✘ Suite "Engine runs" failed after 192.116 seconds with 11 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 192.116 seconds with 11 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

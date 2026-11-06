@@ -1,0 +1,8 @@
+reapScaling (StorageBenchmarks, release -enable-testing) on the scratch copy, S3MUT=REAP restores s3-base's reap(maxKeys:) (ArraySlice + queue.insert);
+interleaved runs, 2026-10-29 ~12:30-12:36, host load (1-min) 85 -> 358 -> 231 -> 155:
+1 S3MUT=REAP  : 10k 0.417 s, 20k 1.158 s, 40k 4.816 s; 40k/20k = 4.158 (max 2.5) -> FAIL (BenchStorage.swift:283 ratio <= ratioMax); control 20k 1.118 s, 40k 1.949 s
+2 fixed       : 10k 0.399 s, 20k 0.462 s, 40k 1.021 s; 40k/20k = 2.213 -> pass; control 20k 0.505 s, 40k 0.979 s
+3 S3MUT=REAP  : 10k 0.373 s, 20k 1.389 s, 40k 2.771 s; 40k/20k = 1.996 -> PASS (original defect survives); control 20k 0.429 s, 40k 0.843 s
+4 fixed       : 10k 0.175 s, 20k 0.334 s, 40k 0.674 s; 40k/20k = 2.019 -> pass; control 20k 0.348 s, 40k 0.686 s
+Reclaim / same-size 20-key control at 40k: REAP 2.47x and 3.29x; fixed 1.04x and 0.98x.
+Debug (deterministic) suites with S3MUT=REAP: DeletionUnitTests|StoreDeletionTests 10/10 passed, including both ReapQueue structural tests.

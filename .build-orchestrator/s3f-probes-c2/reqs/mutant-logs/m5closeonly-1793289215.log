@@ -1,0 +1,33 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+Build complete! (3,14 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine idle and shutdown" started.
+◇ Suite "Engine regressions" started.
+◇ Test "R-SYN-15: no store mutation or commit happens after close returns" started.
+◇ Test "R-SYN-14: waitUntil ends when its caller is cancelled, with the predicate unmet, and a later mutation resumes only the waiters still registered" started.
+◇ Test "R-SYN-12: clientShutDown is the last event every subscriber receives" started.
+◇ Test "R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes nothing" started.
+◇ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" started.
+◇ Test "R-SYN-15: shutdown in created never opens the store and every API fails with shutDown" started.
+◇ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" started.
+◇ Test "R-SYN-15: concurrent shutdown calls are idempotent" started.
+◇ Test "R-SYN-15: shutdown mid-flight cancels every transfer, finishes every stream and leaves zero owned tasks, sleepers and observers" started.
+✔ Test "R-SYN-15: shutdown in created never opens the store and every API fails with shutDown" passed after 0.003 seconds.
+✔ Test "R-SYN-15: concurrent shutdown calls are idempotent" passed after 0.009 seconds.
+✔ Test "R-SYN-14: waitUntil ends when its caller is cancelled, with the predicate unmet, and a later mutation resumes only the waiters still registered" passed after 0.014 seconds.
+✔ Test "R-SYN-12: clientShutDown is the last event every subscriber receives" passed after 0.014 seconds.
+✔ Test "R-SYN-15: shutdown mid-flight cancels every transfer, finishes every stream and leaves zero owned tasks, sleepers and observers" passed after 0.014 seconds.
+✔ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" passed after 0.016 seconds.
+✔ Suite "Engine regressions" passed after 0.016 seconds.
+✔ Test "R-SYN-15: no store mutation or commit happens after close returns" passed after 0.019 seconds.
+✔ Test "R-SYN-14: after a sync quiesces the engine owns zero timers and zero tasks and observes nothing" passed after 0.019 seconds.
+✔ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" passed after 0.149 seconds.
+✔ Suite "Engine idle and shutdown" passed after 0.149 seconds.
+✔ Test run with 9 tests in 2 suites passed after 0.149 seconds.

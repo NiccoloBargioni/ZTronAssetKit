@@ -1,0 +1,44 @@
+load before: { 28.07 32.68 21.74 }
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyDC2Probe" started.
+◇ Test "VERIFY-D-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" started.
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 744, changeEvery 2, handles 1
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-D-C2 10,000 members, changeEvery 20, 1 handle(s): runs [13.018541, 10.05025, 16.468875] ms, best 10.05025 ms; follow+deferred wall [156.366875, 147.650834, 256.994291] ms
+✘ Test "VERIFY-D-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" recorded an issue at VerifyDC2Probe.swift:32:17: Expectation failed: (runs.min() ?? .infinity) <= 10.0
+↳ changeEvery 20, 1 handle(s): [13.018541, 10.05025, 16.468875]
+↳ (runs.min() ?? .infinity) <= 10.0 → false
+↳   (runs.min() ?? .infinity) → 10.05025
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-D-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-D-C2 10,000 members, changeEvery 20, 2 handle(s): runs [10.653125, 13.020792, 14.626291] ms, best 10.653125 ms; follow+deferred wall [178.306541, 169.190291, 197.43125] ms
+✘ Test "VERIFY-D-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" recorded an issue at VerifyDC2Probe.swift:32:17: Expectation failed: (runs.min() ?? .infinity) <= 10.0
+↳ changeEvery 20, 2 handle(s): [10.653125, 13.020792, 14.626291]
+↳ (runs.min() ?? .infinity) <= 10.0 → false
+↳   (runs.min() ?? .infinity) → 10.653125
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-D-C2 10,000 members, changeEvery 1, 1 handle(s): runs [6.32725, 7.880875, 7.013791] ms, best 6.32725 ms; follow+deferred wall [99.360583, 112.194542, 150.02925] ms
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-D-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-D-C2 10,000 members, changeEvery 1, 2 handle(s): runs [7.995709, 4.412125, 4.44925] ms, best 4.412125 ms; follow+deferred wall [143.287917, 111.863916, 113.252166] ms
+✘ Test "VERIFY-D-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" failed after 24.396 seconds with 2 issues.
+✘ Suite "VerifyDC2Probe" failed after 24.396 seconds with 2 issues.
+↳ /// Design probe (s3f structural design D1 "defer"); never committed as is. VERIFY-C8-C2-MIXED and the committed
+↳ /// `reclaimDuringFollowTurns` with the measured window extended for D1: a reclaim while the follow is owed asks for a sweep
+↳ /// that waits for the follow's end, so the window holds the reclaim's turn, the follow's remaining turns (released inside
+↳ /// the window), the turn that takes the deferred sweep, and the pump turns that gate the jobs the follow created, until
+↳ /// no member waits `awaitingSpace`. `changeEvery` 20 is the cycle-8 mixed shape (about 244 holders owed), 1 the committed
+↳ /// benchmark's (every member changed). Also prints the wall time from the follow's release to the end of the deferred
+↳ /// decisions: the window in which a start the ledger judges waits (user waiters' latency, D1).
+✘ Test run with 1 test in 1 suite failed after 24.396 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+load after: { 22.14 30.84 21.45 }

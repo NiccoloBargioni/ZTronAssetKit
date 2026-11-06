@@ -1,0 +1,14 @@
+PROBE-C21C-PURGE-QUEUED shared=false warm-up 1,000: longest actor wait 4.84 ms; jobs 1000 (ids 1000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=false 10,000 run 0: longest actor wait 57.43 ms; jobs 10000 (ids 10000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=false 10,000 run 1: longest actor wait 55.96 ms; jobs 10000 (ids 10000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=false 10,000 run 2: longest actor wait 58.37 ms; jobs 10000 (ids 10000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=false: waits [57.430334, 55.957875, 58.3685] ms, best 55.957875 ms (c2Budget 10 ms)
+✘ Test "PROBE-C21C-PURGE-QUEUED" recorded an issue with 1 argument shared → false at VerifyC21CorrectPurgeProbes.swift:172:9: Expectation failed: (waits.min() ?? .infinity) <= 10.0
+PROBE-C21C-PURGE-QUEUED shared=true warm-up 1,000: longest actor wait 1.13 ms; jobs 1 (ids 1000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=true 10,000 run 0: longest actor wait 12.03 ms; jobs 1 (ids 10000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=true 10,000 run 1: longest actor wait 12.46 ms; jobs 1 (ids 10000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=true 10,000 run 2: longest actor wait 13.62 ms; jobs 1 (ids 10000) -> 0; purge success(ZTronAssetModel.PurgeResult(bytesFreed: 0, bytesDefe; violations [] load { 4.85 38.44 120.84 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-QUEUED shared=true: waits [12.028083, 12.457792, 13.623084] ms, best 12.028083 ms (c2Budget 10 ms)
+✘ Test "PROBE-C21C-PURGE-QUEUED" recorded an issue with 1 argument shared → true at VerifyC21CorrectPurgeProbes.swift:172:9: Expectation failed: (waits.min() ?? .infinity) <= 10.0
+✘ Test "PROBE-C21C-PURGE-QUEUED" with 2 test cases failed after 1.712 seconds with 2 issues.
+✘ Test run with 1 test in 1 suite failed after 1.712 seconds with 2 issues.

@@ -1,0 +1,47 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+◇ Test case passing 1 argument shape → .waiters to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns waiters at 10,000: heartbeat [7.698792, 7.853375, 7.389042] ms, best 7.389042 ms (budget 10.0 ms best); the commit's own turn [7.693583, 7.8465, 7.383958] ms, best 7.383958 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 7.70 ms, turn 7.69 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.39 8.35 12.53 -> 3.52 8.29 12.48, heartbeat 7.85 ms, turn 7.85 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.52 8.29 12.48 -> 3.52 8.29 12.48, heartbeat 7.39 ms, turn 7.38 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.52 8.29 12.48 -> 3.52 8.29 12.48]
+◇ Test case passing 1 argument shape → .waitersStalledSubscriber to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns waitersStalledSubscriber at 10,000: heartbeat [10.58325, 10.765208, 10.580791] ms, best 10.580791 ms (budget 10.0 ms best); the commit's own turn [10.577417, 10.759542, 10.5755] ms, best 10.5755 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 10.58 ms, turn 10.58 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 3.52 8.29 12.48 -> 3.52 8.29 12.48, heartbeat 10.77 ms, turn 10.76 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 3.52 8.29 12.48 -> 3.52 8.29 12.48, heartbeat 10.58 ms, turn 10.58 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 3.52 8.29 12.48 -> 3.52 8.29 12.48]
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .waitersStalledSubscriber at BenchSyncCycle21.swift:153:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [10.58325, 10.765208, 10.580791]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 10.580791
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .groupStalledSubscriber to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns groupStalledSubscriber at 10,000: heartbeat [9.388667, 8.720792, 8.895583] ms, best 8.720792 ms (budget 10.0 ms best); the commit's own turn [9.382875, 8.716625, 8.891] ms, best 8.716625 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 9.39 ms, turn 9.38 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 3.52 8.29 12.48 -> 3.72 8.25 12.45, heartbeat 8.72 ms, turn 8.72 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 3.72 8.25 12.45 -> 3.72 8.25 12.45, heartbeat 8.90 ms, turn 8.89 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 3.72 8.25 12.45 -> 3.72 8.25 12.45]
+◇ Test case passing 1 argument shape → .manyGroups to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns manyGroups at 10,000: heartbeat [9.821, 9.496083, 9.39775] ms, best 9.39775 ms (budget 10.0 ms best); the commit's own turn [9.816375, 9.490042, 9.393625] ms, best 9.393625 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 9.82 ms, turn 9.82 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.72 8.25 12.45 -> 3.58 8.15 12.38, heartbeat 9.50 ms, turn 9.49 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.58 8.15 12.38 -> 3.45 8.05 12.32, heartbeat 9.40 ms, turn 9.39 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.45 8.05 12.32 -> 3.50 7.98 12.27]
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" with 4 test cases failed after 20.691 seconds with 1 issue.
+↳ /// C2 of a commit that binds and answers 10,000 ids (`SyncBench.commitTurn`; ruling S3-R26 item 4, the cycle-20
+↳ /// verifiers' correct #5 and reqs #10), in four groupings: a user waiter per id, the same with a stalled subscriber,
+↳ /// one prefetch group with a stalled subscriber, and 10,000 one-member prefetch groups. The heartbeat over the commit
+↳ /// is the gate, best of three against C2; the commit's own turn is also timed inside the actor
+↳ /// (`EngineState.commitTurnMarksForTests`), which decides item 4's Phase 2 trigger (7.0 ms).
+✘ Suite "SyncBenchmarks" failed after 20.691 seconds with 1 issue.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+✘ Suite ZTronAssetKitBenchmarks failed after 20.692 seconds with 1 issue.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 1 test in 2 suites failed after 20.692 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

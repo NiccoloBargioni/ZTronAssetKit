@@ -1,0 +1,10 @@
+start 22:08:43 load { 9.75 18.58 31.87 }
+✔ Test run with 151 tests in 16 suites passed after 0.599 seconds.
+✘ Test run with 552 tests in 53 suites failed after 336.355 seconds with 1 issue.
+✔ Test run with 459 tests in 60 suites passed after 211.439 seconds.
+✔ Test run with 84 tests in 18 suites passed after 183.490 seconds.
+✔ Test run with 85 tests in 11 suites passed after 13.755 seconds.
+✔ Test run with 71 tests in 10 suites passed after 6.172 seconds.
+✔ Test run with 104 tests in 14 suites passed after 1.253 seconds.
+test exit 1 end 22:22:33 load { 30.52 38.54 36.52 }
+lock removed 22:22:33

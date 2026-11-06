@@ -1,0 +1,175 @@
+== R1J-serial-before-token applied
+== R1J-serial-before-token-whole build-exit=0 0 errors
+== R1J-serial-before-token-whole run1 test-exit=1 ✘ Test run with 165 tests in 17 suites failed after 3.152 seconds with 3 issues. | wall 19s | load averages: 213.33 90.73 65.16
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks" recorded an issue at BackgroundInterleavingTests.swift:553:9: Expectation failed: changes == [0.75]
+↳ the current attach's promotion lands and the replaced handle's demotion changes nothing: []
+↳ changes == [0.75] → false
+↳   changes → []
+✘ Test "R-NET-10: a replaced handle's priority request never supersedes the current attach's request while that one lists the tasks" recorded an issue at BackgroundInterleavingTests.swift:554:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.75]
+↳ await coordinator.liveTransfers().map(\.priority) == [0.75] → <not evaluated>
+== R1K-if-not-while applied
+== R1K-if-not-while-whole build-exit=0 0 errors
+== R1K-if-not-while-whole run1 test-exit=1 ✘ Test run with 165 tests in 17 suites failed after 2.874 seconds with 2 issues. | wall 20s | load averages: 414.18 157.46 90.76
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a priority rewrite that itself lands after a newer write is followed by the newest value" recorded an issue at BackgroundInterleavingTests.swift:591:9: Expectation failed: changes.last == 0.5
+↳ the newest request was prefetch (0.5), the OS task ends at Optional(0.25); changes [0.25, 0.75, 0.5, 0.25]
+↳ changes.last == 0.5 → false
+↳   changes.last → 0.25
+↳     some → 0.25
+↳     some → 0.5
+== MK-deinit-finishes-nothing applied
+== MK-deinit-finishes-nothing-whole build-exit=0 0 errors
+== MK-deinit-finishes-nothing-whole run1 test-exit=1 ✘ Test run with 165 tests in 17 suites failed after 64.003 seconds with 2 issues. | wall 80s | load averages: 569.84 286.02 148.30
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-SYN-14: a dropped background handle's control task ends at once while its transfer goes on" recorded an issue at BackgroundControlTaskTests.swift:80:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-14: a dropped background handle's control task ends at once while its transfer goes on" recorded an issue at BackgroundControlTaskTests.swift:96:9: Expectation failed: !Task.isCancelled
+↳ the control task outlived its handle
+↳ !Task.isCancelled → true
+↳   Task.isCancelled → false
+↳     Task → Task<Never, Never>
+== MG-task-inside-drain applied
+== MG-task-inside-drain-whole build-exit=0 0 errors
+== MG-task-inside-drain-whole run1 test-exit=1 ✘ Test run with 165 tests in 17 suites failed after 1.351 seconds with 4 issues. | wall 7s | load averages: 562.56 293.79 152.66
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" recorded an issue at BackgroundInterleavingTests.swift:463:9: Expectation failed: Array(changes.prefix(2)) == [0.25, 0.75]
+↳ // The race was staged: the replaced attach's promotion landed after the joining handle's demotion.
+↳ writes in landing order: [0.25]
+↳ Array(changes.prefix(2)) == [0.25, 0.75] → false
+↳   Array(changes.prefix(2)) → [0.25]
+✘ Test "R-NET-10: a priority write that lands after its transfer finished is followed by no other write" recorded an issue at BackgroundInterleavingTests.swift:492:9: Expectation failed: changes == [0.25, 0.75]
+== R1C-no-rewrite-loop applied
+== R1C-no-rewrite-loop-whole build-exit=0 0 errors
+== R1C-no-rewrite-loop-whole run1 test-exit=1 ✘ Test run with 165 tests in 17 suites failed after 64.012 seconds with 7 issues. | wall 69s | load averages: 446.12 320.15 175.44
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" recorded an issue at BackgroundInterleavingTests.swift:464:9: Expectation failed: changes.last == 0.25
+↳ the newest request was the joining handle's bulk (0.25), the OS task ends at Optional(0.75); changes [0.25, 0.75]
+↳ changes.last == 0.25 → false
+↳   changes.last → 0.75
+↳     some → 0.75
+↳     some → 0.25
+== R1A-no-serial-guard applied
+== R1A-no-serial-guard-whole build-exit=0 0 errors
+== R1A-no-serial-guard-whole run1 test-exit=1 ✘ Test run with 165 tests in 17 suites failed after 1.022 seconds with 4 issues. | wall 6s | load averages: 432.59 321.41 177.58
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at BackgroundInterleavingTests.swift:361:9: Expectation failed: changes.last == 0.25
+↳ the newest request was bulk (0.25), the OS task ends at Optional(0.75); changes [0.25, 0.75]
+↳ changes.last == 0.25 → false
+↳   changes.last → 0.75
+↳     some → 0.75
+↳     some → 0.25
+== RUN DONE whole R1J-serial-before-token R1K-if-not-while MK-deinit-finishes-nothing MG-task-inside-drain R1C-no-rewrite-loop R1A-no-serial-guard
+== MG-task-inside-drain applied
+== MG-task-inside-drain-fifo build-exit=0 0 errors
+== MG-task-inside-drain-fifo run1 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.049 seconds. | wall 4s | load averages: 394.41 318.59 179.10
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== MG-task-inside-drain-fifo run2 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.009 seconds. | wall 4s | load averages: 394.41 318.59 179.10
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== MG-task-inside-drain-fifo run3 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.012 seconds. | wall 4s | load averages: 379.96 316.85 179.30
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== MG-task-inside-drain-fifo run4 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.035 seconds. | wall 6s | load averages: 366.11 315.03 179.46
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== MG-task-inside-drain-fifo run5 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 63.994 seconds with 4 issues. | wall 67s | load averages: 128.95 255.40 167.74
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+↳ only this check's own listing reached the driver while the first change was held: [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+↳ early == [.listing] → false
+↳   early → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+↳   [.listing] → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+== RUN DONE fifo MG-task-inside-drain
+== AMP-delay-interval-end applied
+== AMP-delay-interval-end-s219 build-exit=0 0 errors
+== AMP-delay-interval-end-s219 run1 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.244 seconds. | wall 3s | load averages: 118.95 251.23 166.78
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== AMP-delay-interval-end-s219 run2 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.240 seconds. | wall 3s | load averages: 109.74 247.12 165.83
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== AMP-delay-interval-end-s219 run3 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.244 seconds. | wall 3s | load averages: 109.74 247.12 165.83
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== AMP-plus-old-order applied
+== AMP-plus-old-order-s219 build-exit=0 0 errors
+== AMP-plus-old-order-s219 run1 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 0.251 seconds with 1 issue. | wall 4s | load averages: 96.16 239.68 164.13
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" recorded an issue at ForegroundBackendTests.swift:277:9: Expectation failed: earlyEdges.began == expected.count && earlyEdges.ended == expected.count
+↳ earlyEdges.began == expected.count && earlyEdges.ended == expected.count → false
+↳   earlyEdges.began == expected.count → true
+↳   earlyEdges.ended == expected.count → false
+↳ /// sync-2 S2-19 (ARCHITECTURE §12.4): a per-transfer control reader over a stream nobody finishes leaks one task
+↳ /// per transfer, and the engine's own reader leaks if the update stream outlives its terminal element. ADR-021
+== AMP-plus-old-order-s219 run2 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 0.247 seconds with 1 issue. | wall 4s | load averages: 90.86 236.20 163.35
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" recorded an issue at ForegroundBackendTests.swift:277:9: Expectation failed: earlyEdges.began == expected.count && earlyEdges.ended == expected.count
+↳ earlyEdges.began == expected.count && earlyEdges.ended == expected.count → false
+↳   earlyEdges.began == expected.count → true
+↳   earlyEdges.ended == expected.count → false
+↳ /// sync-2 S2-19 (ARCHITECTURE §12.4): a per-transfer control reader over a stream nobody finishes leaks one task
+↳ /// per transfer, and the engine's own reader leaks if the update stream outlives its terminal element. ADR-021
+== AMP-plus-old-order-s219 run3 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 0.243 seconds with 1 issue. | wall 3s | load averages: 90.86 236.20 163.35
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" recorded an issue at ForegroundBackendTests.swift:277:9: Expectation failed: earlyEdges.began == expected.count && earlyEdges.ended == expected.count
+↳ earlyEdges.began == expected.count && earlyEdges.ended == expected.count → false
+↳   earlyEdges.began == expected.count → true
+↳   earlyEdges.ended == expected.count → false
+↳ /// sync-2 S2-19 (ARCHITECTURE §12.4): a per-transfer control reader over a stream nobody finishes leaks one task
+↳ /// per transfer, and the engine's own reader leaks if the update stream outlives its terminal element. ADR-021
+== RUN DONE s219 AMP-delay-interval-end AMP-plus-old-order
+CHAIN-DONE
+== MG-task-inside-drain applied
+== MG-task-inside-drain-fifo-lowload build-exit=0 0 errors
+== MG-task-inside-drain-fifo-lowload run1 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 64.000 seconds with 4 issues. | wall 67s | load averages: 3.52 40.36 102.21
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+↳ only this check's own listing reached the driver while the first change was held: [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.priority(0.25)]
+↳ early == [.listing] → false
+↳   early → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.priority(0.25)]
+↳   [.listing] → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+== MG-task-inside-drain-fifo-lowload run2 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 64.001 seconds with 4 issues. | wall 66s | load averages: 7.82 34.21 95.33
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+↳ only this check's own listing reached the driver while the first change was held: [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+↳ early == [.listing] → false
+↳   early → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+↳   [.listing] → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+== MG-task-inside-drain-fifo-lowload run3 test-exit=0 ✔ Test run with 1 test in 1 suite passed after 0.016 seconds. | wall 3s | load averages: 9.44 34.10 94.94
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+== MG-task-inside-drain-fifo-lowload run4 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 63.990 seconds with 4 issues. | wall 68s | load averages: 30.65 34.82 90.69
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+↳ only this check's own listing reached the driver while the first change was held: [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.priority(0.25)]
+↳ early == [.listing] → false
+↳   early → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.priority(0.25)]
+↳   [.listing] → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+== MG-task-inside-drain-fifo-lowload run5 test-exit=1 ✘ Test run with 1 test in 1 suite failed after 63.996 seconds with 4 issues. | wall 70s | load averages: 66.40 44.73 90.00
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+↳ only this check's own listing reached the driver while the first change was held: [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.priority(0.25)]
+↳ early == [.listing] → false
+↳   early → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing, ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.priority(0.25)]
+↳   [.listing] → [ZTronAssetTransportTests.FakeBackgroundSessionDriver.Call.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+== RUN DONE fifo-lowload MG-task-inside-drain

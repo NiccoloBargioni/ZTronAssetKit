@@ -1,0 +1,132 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[127 / 304]
+[128 / 305] ZTronAssetModel
+[137 / 351]
+[138 / 351]
+[143 / 351]
+[147 / 351]
+[148 / 351]
+[152 / 351]
+[154 / 351]
+[157 / 351]
+[161 / 351]
+[163 / 351]
+[164 / 351]
+[174 / 351] ZTronAssetModel
+[181 / 352]
+[183 / 354] ZTronAssetModel
+[189 / 378] ZTronAssetModel
+[198 / 387] ZTronAssetStorage
+[200 / 387] ZTronAssetAppleHosted
+[213 / 387] ZTronAssetStorage
+[214 / 387] ZTronAssetTransport
+[216 / 387] ZTronAssetTransport
+[222 / 387] ZTronAssetStorage
+[224 / 387] ZTronAssetTransport
+[225 / 387] ZTronAssetTransport
+[227 / 387] ZTronAssetTestSupport
+[230 / 387] ZTronAssetAppleHosted
+[232 / 387] ZTronAssetAppleHosted
+[236 / 387] ZTronAssetAppleHosted
+[237 / 387]
+[239 / 388]
+[240 / 389] ZTronAssetTestSupport
+[244 / 398] ZTronAssetTestSupport
+[246 / 407] ZTronAssetSync
+[247 / 407] ZTronAssetTestSupport
+[250 / 407] ZTronAssetTestSupport
+[252 / 407] ZTronAssetSync
+[265 / 407] ZTronAssetSync
+[266 / 407] ZTronAssetSync
+[267 / 407] ZTronAssetTestSupport
+[270 / 407] ZTronAssetSync
+[275 / 407] ZTronAssetTransportTests-product
+[285 / 408] ZTronAssetKit
+[288 / 417] ZTronAssetKit
+[290 / 417] ZTronAssetKit
+[300 / 417] ZTronAssetKitTests-product
+[302 / 417] ZTronAssetKit
+[312 / 418] ZTronAssetKit
+[317 / 421] ZTronAssetAppleHostedTests-product
+[318 / 432]
+[321 / 450] ZTronAssetKit
+[322 / 459] ZTronAssetSync
+[323 / 459]
+[328 / 459] ZTronAssetSync
+[329 / 459] ZTronAssetSync
+[330 / 459] ZTronAssetSync
+[332 / 459] ZTronAssetTransportTests-product
+[332 / 459] ZTronAssetAppleHostedTests-product
+[333 / 459] ZTronAssetAppleHostedTests-product
+[334 / 459] ZTronAssetAppleHostedTests-product
+[336 / 459] ZTronAssetModelTests-product
+[347 / 459] ZTronAssetAppleHostedTests-product
+[349 / 459] ZTronAssetTransportTests-product
+[354 / 459] ZTronAssetTransportTests-product
+[356 / 459] ZTronAssetTransportTests-product
+[358 / 459] ZTronAssetTransportTests-product
+[359 / 459] ZTronAssetTransportTests-product
+[361 / 459] ZTronAssetStorageTests-product
+[362 / 459] ZTronAssetStorageTests-product
+[362 / 459] ZTronAssetTransportTests-product
+[364 / 459] ZTronAssetTransportTests-product
+[370 / 459] ZTronAssetStorageTests-product
+[371 / 459] ZTronAssetTransportTests-product
+[372 / 459] ZTronAssetStorageTests-product
+[373 / 459] ZTronAssetStorageTests-product
+[374 / 459] ZTronAssetModelTests-product
+[375 / 459] ZTronAssetModelTests-product
+[377 / 459] ZTronAssetModelTests-product
+[377 / 459] ZTronAssetStorageTests-product
+[379 / 459] ZTronAssetModelTests-product
+[380 / 459] ZTronAssetStorageTests-product
+[382 / 459] ZTronAssetAppleHostedTests-product
+[383 / 459]
+[386 / 459]
+[393 / 460]
+[402 / 461] ZTronAssetModelTests-product
+[405 / 470] ZTronAssetSyncTests-product
+[406 / 479] ZTronAssetKitTests-product
+[406 / 479] ZTronAssetAppleHostedTests-product
+[408 / 479] ZTronAssetSyncTests-product
+[409 / 479] ZTronAssetSyncTests-product
+[410 / 479] ZTronAssetSyncTests-product
+[410 / 479] ZTronAssetAppleHostedTests-product
+[412 / 479] ZTronAssetSyncTests-product
+[423 / 479] ZTronAssetSyncTests-product
+[425 / 479] ZTronAssetSyncTests-product
+[427 / 479] ZTronAssetKitTests-product
+[428 / 479] ZTronAssetKitTests-product
+[430 / 479] ZTronAssetKitTests-product
+[432 / 479] ZTronAssetKitTests-product
+[432 / 479] ZTronAssetSyncTests-product
+[433 / 479] ZTronAssetKitTests-product
+[436 / 481] ZTronAssetKitBenchmarks-product
+[438 / 481] ZTronAssetStorageTests-product
+[440 / 499] ZTronAssetKitBenchmarks-product
+[442 / 499] ZTronAssetKitBenchmarks-product
+[442 / 499] ZTronAssetKitTests-product
+[445 / 499] ZTronAssetSyncTests-product
+[454 / 499] ZTronAssetCompatibilityTests-product
+[459 / 499] ZTronAssetKitBenchmarks-product
+[460 / 499] ZTronAssetKitBenchmarks-product
+[461 / 499] ZTronAssetCompatibilityTests-product
+[462 / 499] ZTronAssetSyncTests-product
+[465 / 499] ZTronAssetCompatibilityTests-product
+[466 / 499] ZTronAssetKitTests-product
+[467 / 499] ZTronAssetCompatibilityTests-product
+[469 / 499] ZTronAssetCompatibilityTests-product
+[470 / 499] ZTronAssetKitTests-product
+[474 / 499] ZTronAssetKitTests-product
+[481 / 499] ZTronAssetKitBenchmarks-product
+[483 / 499] ZTronAssetCompatibilityTests-product
+[483 / 499] ZTronAssetSyncTests-product
+[485 / 499] ZTronAssetSyncTests-product
+[487 / 499] ZTronAssetCompatibilityTests-product
+[489 / 499] ZTronAssetCompatibilityTests-product
+[493 / 499] ZTronAssetKitBenchmarks-product
+[495 / 499] ZTronAssetKitBenchmarks-product
+Build complete! (76,70 s)

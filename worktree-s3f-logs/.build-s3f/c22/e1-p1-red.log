@@ -1,0 +1,38 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+✘ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReroutePinSpaceTests.swift:110:9: Expectation failed: Self.isNoSpace(run.v2) && layer.w.allSatisfy { $0 == run.v2 }
+↳ V2 and W1…W3 get the ENOSPC's space figures (visit-first): X at the drain's end failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"]; after the read X failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"], W failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a2", "zz-a3"]; X started 2 times, W 1; K [16], W [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)], others [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)]; violations []
+↳ Self.isNoSpace(run.v2) && layer.w.allSatisfy { $0 == run.v2 } → false
+↳   Self.isNoSpace(run.v2) → false
+↳   layer.w.allSatisfy { $0 == run.v2 } → <not evaluated>
+✘ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReroutePinSpaceTests.swift:111:9: Expectation failed: Self.sizes([layer.k]) == [16] && run.xStarts == 1 && run.wStarts == 0
+↳ K gets O's bytes, X starts once and W never (visit-first): X at the drain's end failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"]; after the read X failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"], W failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a2", "zz-a3"]; X started 2 times, W 1; K [16], W [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)], others [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)]; violations []
+↳ Self.sizes([layer.k]) == [16] && run.xStarts == 1 && run.wStarts == 0 → false
+↳   Self.sizes([layer.k]) == [16] && run.xStarts == 1 → false
+↳   run.wStarts == 0 → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+✘ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReroutePinSpaceTests.swift:110:9: Expectation failed: Self.isNoSpace(run.v2) && layer.w.allSatisfy { $0 == run.v2 }
+↳ V2 and W1…W3 get the ENOSPC's space figures (visit-first): X at the drain's end failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"]; after the read X failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"], W failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a2", "zz-a3"]; X started 2 times, W 1; K [16], W [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)], others [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)]; violations []
+↳ Self.isNoSpace(run.v2) && layer.w.allSatisfy { $0 == run.v2 } → false
+↳   Self.isNoSpace(run.v2) → false
+↳   layer.w.allSatisfy { $0 == run.v2 } → <not evaluated>
+✘ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReroutePinSpaceTests.swift:111:9: Expectation failed: Self.sizes([layer.k]) == [16] && run.xStarts == 1 && run.wStarts == 0
+↳ K gets O's bytes, X starts once and W never (visit-first): X at the drain's end failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"]; after the read X failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a1", "zz-x"], W failed(ZTronAssetModel.RetryDisposition.untilEntryChanges) holding ["zz-a2", "zz-a3"]; X started 2 times, W 1; K [16], W [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)], others [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)]; violations []
+↳ Self.sizes([layer.k]) == [16] && run.xStarts == 1 && run.wStarts == 0 → false
+↳   Self.sizes([layer.k]) == [16] && run.xStarts == 1 → false
+↳   run.wStarts == 0 → <not evaluated>
+✘ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" with 2 test cases failed after 1.213 seconds with 4 issues.
+↳ /// e1-P1: the drain's replay inside X's free-space read joins W1…W3 onto X, failed with its end recorded and its
+↳ /// verdict to come. Visited first, the verdict answered them with the space figures, as it answered V2.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.213 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.213 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

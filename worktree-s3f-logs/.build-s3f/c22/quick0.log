@@ -1,0 +1,25 @@
+start 23:22:30 HEAD d5b2ab9 load { 3.00 2.51 2.54 }
+::: STEP harness
+GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f
+HARNESS: unchanged since harness-frozen
+::: OK   harness
+::: STEP toolchain
+swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+toolchain OK: Swift 6.4 >= 6.3
+::: OK   toolchain
+::: STEP build-debug
+Build complete! (8,29 s)
+::: OK   build-debug
+::: STEP tests
+Build complete! (11,91 s)
+✔ Test run with 151 tests in 16 suites passed after 0.541 seconds.
+✔ Test run with 681 tests in 56 suites passed after 331.478 seconds.
+✔ Test run with 459 tests in 60 suites passed after 63.804 seconds.
+✔ Test run with 84 tests in 18 suites passed after 61.166 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.233 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.339 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.412 seconds.
+::: OK   tests
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+end 23:30:37 load { 6.70 5.90 4.27 }

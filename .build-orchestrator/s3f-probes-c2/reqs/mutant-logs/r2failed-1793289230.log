@@ -1,0 +1,37 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetKit-product
+Build complete! (3,90 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine failure paths" started.
+◇ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" started.
+◇ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" started.
+✘ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" recorded an issue at EnginePublicationRefusalTests.swift:35:9: Expectation failed: answer == .failure(.integrityFailure)
+↳ failure(ZTronAssetModel.AssetError.notFound)
+↳ answer == .failure(.integrityFailure) → false
+↳   answer → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✔ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" passed after 0.010 seconds.
+✘ Test "R-INT-5: with unverified assets disallowed a resolve of a checksum-less entry fails integrityFailure at publication and is not retried" failed after 0.010 seconds with 1 issue.
+↳ /// R-INT-5 under `allowUnverifiedAssets = false`: a user resolve of a checksum-less entry downloads it, and the store
+↳ /// refuses the publication (`unverifiedRejected`, before any hashing). The waiter gets `integrityFailure`, the job
+↳ /// fails until the entry changes and is removed, and the asset is not downloaded again.
+✔ Test "R-CAR-2: a publication the store refuses as an unknown asset answers the waiter notFound and does not retry the transfer" passed after 0.011 seconds.
+✘ Suite "Engine failure paths" failed after 0.011 seconds with 1 issue.
+↳ /// Failure paths of ARCHITECTURE §7.6 and §7.7, reconcile-time job changes (T21, T22), the manifest deadline,
+↳ /// launch reconciliation and a store that cannot open.
+✘ Test run with 3 tests in 1 suite failed after 0.011 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,139 @@
+### 20:08:10 load { 400.30 311.49 178.59 }
+== base filter=noStaleStartsBetweenFollowTurns rc=0 hung=False elapsed=5.7s log=base-1793300892.log
+  ✔ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" passed after 0.375 seconds.
+  ✔ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" passed after 0.376 seconds.
+  ✔ Test run with 1 test in 1 suite passed after 0.376 seconds.
+### 20:08:36 load { 276.41 290.00 175.41 }
+MUTANT noyield: Sources/ZTronAssetSync/Engine/EngineShutdown.swift (2 match(es), applied all)
+== noyield filter=shutdownDrainsOverSeveralTurns rc=1 hung=False elapsed=3.7s log=noyield-1793300917.log
+  ✘ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" recorded an issue at EngineShutdownDrainTests.swift:62:9: Expectation failed: seen.contains { $0 > 0 && $0 < slices.count }
+  ✘ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" failed after 0.172 seconds with 1 issue.
+  ✘ Suite "Engine idle and shutdown" failed after 0.173 seconds with 1 issue.
+  ✘ Test run with 1 test in 1 suite failed after 0.173 seconds with 1 issue.
+### 20:08:47 load { 241.57 282.09 173.94 }
+MUTANT m5closeonly: Sources/ZTronAssetSync/Engine/EngineLifecycle.swift (1 match(es), applied 0)
+== m5closeonly filter=shutdownJoinsBeforeClosing rc=1 hung=False elapsed=3.3s log=m5closeonly-1793300927.log
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" recorded an issue at EngineSync1HalvesTests.swift:223:9: Expectation failed: openWhileJoining
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" failed after 0.013 seconds with 1 issue.
+  ✘ Suite "Engine regressions" failed after 0.013 seconds with 1 issue.
+  ✘ Test run with 1 test in 1 suite failed after 0.013 seconds with 1 issue.
+### 20:08:56 load { 225.19 278.02 173.14 }
+MUTANT m5: Sources/ZTronAssetSync/Engine/EngineLifecycle.swift (1 match(es), applied 0)
+MUTANT m5: Sources/ZTronAssetSync/Engine/EngineLifecycle.swift (1 match(es), applied 0)
+== m5 filter=shutdownJoinsBeforeClosing rc=1 hung=False elapsed=3.7s log=m5-1793300936.log
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" recorded an issue at EngineSync1HalvesTests.swift:222:9: Expectation failed: record.tasksAtMark.allSatisfy { $0 == 0 }
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" recorded an issue at EngineSync1HalvesTests.swift:223:9: Expectation failed: openWhileJoining
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" failed after 0.016 seconds with 2 issues.
+  ✘ Suite "Engine regressions" failed after 0.016 seconds with 2 issues.
+  ✘ Test run with 1 test in 1 suite failed after 0.017 seconds with 2 issues.
+### 20:09:06 load { 179.78 265.40 170.47 }
+MUTANT m6: Sources/ZTronAssetSync/Engine/EngineLifecycle.swift (1 match(es), applied 0)
+== m6 filter=shutdownJoinsBeforeClosing rc=1 hung=False elapsed=3.7s log=m6-1793300946.log
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" recorded an issue at EngineSync1HalvesTests.swift:222:9: Expectation failed: record.tasksAtMark.allSatisfy { $0 == 0 }
+  ✘ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" failed after 0.018 seconds with 1 issue.
+  ✘ Suite "Engine regressions" failed after 0.018 seconds with 1 issue.
+  ✘ Test run with 1 test in 1 suite failed after 0.019 seconds with 1 issue.
+### 20:09:15 load { 166.34 261.19 169.54 }
+MUTANT r3cancel: Sources/ZTronAssetSync/Engine/EngineFailures.swift (1 match(es), applied 0)
+== r3cancel filter=uncommandedClientCancelRequeues rc=1 hung=False elapsed=67.8s log=r3cancel-1793300956.log
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:105:6: Time limit was exceeded: 60.000 seconds
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:135:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:136:9: Expectation failed: await harness.source.starts.count == 2
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:146:9: Expectation failed: after.retries == FailureCounts()
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:154:9: Expectation failed: !record.states.contains { $0.kind == .failed }
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:155:9: Expectation failed: record.attempts == 0
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:156:9: Expectation failed: record.retries == 0
+  ✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" failed after 64.002 seconds with 7 issues.
+  ✘ Suite "Engine failure paths" failed after 64.002 seconds with 7 issues.
+  ✘ Test run with 1 test in 1 suite failed after 64.002 seconds with 7 issues.
+### 20:10:30 load { 55.70 205.70 156.18 }
+MUTANT r5budget: Sources/ZTronAssetSync/Engine/EngineCommands.swift (3 match(es), applied 1)
+== r5budget filter=maintenanceStopsBeforeEviction|maintenanceStopsBetweenSteps rc=1 hung=False elapsed=3.7s log=r5budget-1793301031.log
+  ✔ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection stops before eviction and verification and reports the budget exhausted" passed after 0.015 seconds.
+  ✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" recorded an issue at EngineMaintenanceStepTests.swift:136:9: Expectation failed: report.budgetExhausted && report.evictedBytes == 0
+  ✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" recorded an issue at EngineMaintenanceStepTests.swift:138:9: Expectation failed: catalog.allSatisfy { view.records[$0.0.identifier]?.referencedBlob != nil }
+  ✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" recorded an issue at EngineMaintenanceStepTests.swift:140:9: Expectation failed: full.evictedBytes > 0
+  ✘ Test "R-SYN-16: maintenance whose time budget runs out during orphan collection evicts nothing from a store over its budget" failed after 0.021 seconds with 3 issues.
+  ✘ Suite "Engine commands" failed after 0.021 seconds with 3 issues.
+  ✘ Test run with 2 tests in 1 suite failed after 0.021 seconds with 3 issues.
+### 20:10:47 load { 46.04 193.80 153.07 }
+MUTANT r2split: Sources/ZTronAssetSync/Engine/EngineDispatch.swift (1 match(es), applied 0)
+== r2split filter=failedRecordPublicationRefused rc=1 hung=False elapsed=4.2s log=r2split-1793301048.log
+  ✘ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" recorded an issue with 1 argument reason → .unreadable at EnginePublicationRefusalTests.swift:91:9: Expectation failed: answer == .failure(expected)
+  ✘ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" with 2 test cases failed after 0.011 seconds with 1 issue.
+  ✘ Suite "Engine failure paths" failed after 0.012 seconds with 1 issue.
+  ✘ Test run with 1 test in 1 suite failed after 0.012 seconds with 1 issue.
+### 20:11:02 load { 40.11 185.26 150.73 }
+MUTANT noFix: Sources/ZTronAssetSync/Engine/EngineJobs.swift (1 match(es), applied 0)
+MUTANT noFix: Sources/ZTronAssetSync/Engine/EngineFailures.swift (1 match(es), applied 0)
+MUTANT noFix: Sources/ZTronAssetSync/Engine/EngineFailures.swift (1 match(es), applied 0)
+MUTANT noFix: Sources/ZTronAssetSync/Engine/EngineDispatch.swift (1 match(es), applied 0)
+== noFix filter=replacedContentFailure|noReplacedContentStarts|droppedUserJobWaitsForTheFollow|noStaleStarts|notFoundBeforeVisit|notFoundDuringFollowNoSeam rc=1 hung=False elapsed=9.0s log=noFix-1793301063.log
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:434:9: Expectation failed: between.queued == .queued
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:435:9: Expectation failed: between.steady == .downloading
+  ✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:121:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .notFound at EngineFollowTests.swift:275:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:443:9: Expectation failed: !(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID)
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .notFound at EngineFollowTests.swift:276:9: Expectation failed: await harness.source.starts.map(\.id).contains(replacement.transferID)
+  ✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" failed after 1.096 seconds with 1 issue.
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" failed after 1.147 seconds with 4 issues.
+  ✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" recorded an issue at EngineFollowTests.swift:369:9: Expectation failed: between.downloading.allSatisfy { !old.contains($0) }
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .noSpace at EngineFollowTests.swift:275:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .noSpace at EngineFollowTests.swift:276:9: Expectation failed: await harness.source.starts.map(\.id).contains(replacement.transferID)
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .serverErrorAtCap at EngineFollowTests.swift:275:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .serverErrorAtCap at EngineFollowTests.swift:276:9: Expectation failed: await harness.source.starts.map(\.id).contains(replacement.transferID)
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" with 3 test cases failed after 1.397 seconds with 6 issues.
+  ✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" failed after 1.449 seconds with 3 issues.
+  ✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" recorded an issue at VerifyC2CorrectProbes.swift:43:9: Expectation failed: staleBetween.isEmpty
+  ✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" failed after 1.845 seconds with 1 issue.
+  ✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" recorded an issue at EngineFollowTests.swift:323:9: Expectation failed: after.pending == [replacement.transferID]
+  ✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" recorded an issue at EngineFollowTests.swift:324:9: Expectation failed: after.new
+  ✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" failed after 3.181 seconds with 2 issues.
+  ✘ Suite "Engine runs" failed after 3.181 seconds with 15 issues.
+  ✘ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:159:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" failed after 4.233 seconds with 1 issue.
+  ✘ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" recorded an issue at VerifyC2CorrectProbes.swift:78:9: Expectation failed: stale.isEmpty
+  ✘ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" failed after 4.433 seconds with 1 issue.
+  ✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 4.434 seconds with 4 issues.
+  ✘ Test run with 8 tests in 2 suites failed after 4.434 seconds with 19 issues.
+### 20:11:21 load { 38.36 177.73 148.65 }
+MUTANT noResolveAllHook: Sources/ZTronAssetSync/Engine/EngineJobs.swift (1 match(es), applied 0)
+== noResolveAllHook filter=replacedContentFailure|noReplacedContentStarts|droppedUserJobWaitsForTheFollow|noStaleStarts|notFoundBeforeVisit|notFoundDuringFollowNoSeam rc=1 hung=False elapsed=12.8s log=noResolveAllHook-1793301081.log
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .notFound at EngineFollowTests.swift:275:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" recorded an issue with 1 argument failure → .notFound at EngineFollowTests.swift:276:9: Expectation failed: await harness.source.starts.map(\.id).contains(replacement.transferID)
+  ✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:121:9: Expectation failed: (try? answer.get()) != nil
+  ✔ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" passed after 1.744 seconds.
+  ✘ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" failed after 1.806 seconds with 1 issue.
+  ✘ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" with 3 test cases failed after 2.021 seconds with 2 issues.
+  ✔ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" passed after 2.118 seconds.
+  ✔ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" passed after 2.128 seconds.
+  ✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" recorded an issue at EngineFollowTests.swift:323:9: Expectation failed: after.pending == [replacement.transferID]
+  ✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" recorded an issue at EngineFollowTests.swift:324:9: Expectation failed: after.new
+  ✘ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" failed after 4.825 seconds with 2 issues.
+  ✘ Suite "Engine runs" failed after 4.826 seconds with 4 issues.
+  ✘ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" recorded an issue at VerifyC2CorrectProbes.swift:159:9: Expectation failed: (try? answer.get()) != nil
+  ✘ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" failed after 5.723 seconds with 1 issue.
+  ✔ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" passed after 6.074 seconds.
+  ✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 6.075 seconds with 2 issues.
+  ✘ Test run with 8 tests in 2 suites failed after 6.075 seconds with 6 issues.
+### 20:11:46 load { 50.98 167.21 145.83 }
+MUTANT noDispatchStall: Sources/ZTronAssetSync/Engine/EngineDispatch.swift (1 match(es), applied 0)
+== noDispatchStall filter=replacedContentFailure|noReplacedContentStarts|droppedUserJobWaitsForTheFollow|noStaleStarts|notFoundBeforeVisit|notFoundDuringFollowNoSeam rc=1 hung=False elapsed=12.5s log=noDispatchStall-1793301107.log
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:434:9: Expectation failed: between.queued == .queued
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:435:9: Expectation failed: between.steady == .downloading
+  ✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" recorded an issue at EngineFollowTests.swift:369:9: Expectation failed: between.downloading.allSatisfy { !old.contains($0) }
+  ✔ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" passed after 1.868 seconds.
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:443:9: Expectation failed: !(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID)
+  ✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" failed after 1.954 seconds with 4 issues.
+  ✔ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" with 3 test cases passed after 2.044 seconds.
+  ✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" failed after 2.049 seconds with 3 issues.
+  ✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" recorded an issue at VerifyC2CorrectProbes.swift:43:9: Expectation failed: staleBetween.isEmpty
+  ✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" failed after 2.579 seconds with 1 issue.
+  ✔ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" passed after 4.596 seconds.
+  ✘ Suite "Engine runs" failed after 4.596 seconds with 7 issues.
+  ✔ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" passed after 5.753 seconds.
+  ✘ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" recorded an issue at VerifyC2CorrectProbes.swift:78:9: Expectation failed: stale.isEmpty
+  ✘ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" failed after 6.297 seconds with 1 issue.
+  ✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 6.298 seconds with 2 issues.
+  ✘ Test run with 8 tests in 2 suites failed after 6.299 seconds with 9 issues.
+### done 20:12:16 load { 61.89 158.86 143.55 }

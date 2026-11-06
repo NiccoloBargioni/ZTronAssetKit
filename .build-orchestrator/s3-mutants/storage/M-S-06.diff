@@ -1,0 +1,12 @@
+diff --git a/Sources/ZTronAssetStorage/Cleanup/StorePurge.swift b/Sources/ZTronAssetStorage/Cleanup/StorePurge.swift
+index 75df81c..2321c13 100644
+--- a/Sources/ZTronAssetStorage/Cleanup/StorePurge.swift
++++ b/Sources/ZTronAssetStorage/Cleanup/StorePurge.swift
+@@ -86,7 +86,6 @@ extension AssetStore {
+         guard self.state.core.stamp != nil || !self.state.core.syncDue else {
+             return false
+         }
+-        self.state.core.stamp = nil
+         self.state.core.syncDue = true
+         self.markDirty(.soon)
+         return true

@@ -1,0 +1,8 @@
+mutants start 08:54:47 load { 38.61 28.82 24.68 }
+v-e1r1-no-enoent-record run1: rc=1 211s load { 35.75 28.39 24.56 } -> { 26.52 29.41 25.83 } | Test run with 7 tests in 1 suite failed after 206.958 seconds with 23 issues. | issues=2 timelimit-mentions=0 | ['EngineFollowBarrierRequeueRemovalTests.swift:19:6', 'EngineFollowBarrierRequeueRemovalTests.swift:164:9']
+v-e1r1-no-enoent-record run2: rc=1 226s load { 26.52 29.41 25.83 } -> { 87.73 46.76 33.06 } | Test run with 7 tests in 1 suite failed after 223.809 seconds with 23 issues. | issues=2 timelimit-mentions=0 | ['EngineFollowBarrierRequeueRemovalTests.swift:19:6', 'EngineFollowBarrierRequeueRemovalTests.swift:164:9']
+v-e1r1-kept-returns-nil run1: rc=1 26s load { 96.17 49.94 34.35 } -> { 84.68 51.13 35.24 } | Test run with 7 tests in 1 suite failed after 22.096 seconds with 8 issues. | issues=0 timelimit-mentions=0 | []
+v-e1r1-kept-returns-nil run2: rc=1 23s load { 84.68 51.13 35.24 } -> { 68.11 49.87 35.24 } | Test run with 7 tests in 1 suite failed after 20.624 seconds with 8 issues. | issues=0 timelimit-mentions=0 | []
+v-e1ps-no-supersede-record run1: rc=1 7s load { 62.90 49.09 35.05 } -> { 58.34 48.38 34.88 } | Test run with 2 tests in 1 suite failed after 3.979 seconds with 8 issues. | issues=0 timelimit-mentions=0 | []
+v-e1ps-no-supersede-record run2: rc=1 6s load { 58.34 48.38 34.88 } -> { 53.91 47.62 34.70 } | Test run with 2 tests in 1 suite failed after 3.901 seconds with 8 issues. | issues=0 timelimit-mentions=0 | []
+v-e1p1-rule-false run1: rc=1 387s load { 49.91 46.90 34.52 } -> { 12.93 20.49 25.36 } | Test run with 3 tests in 1 suite failed after 384.051 seconds with 12 issues. | issues=0 timelimit-mentions=0 | []

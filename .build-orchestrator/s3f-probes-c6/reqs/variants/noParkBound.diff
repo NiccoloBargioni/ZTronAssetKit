@@ -1,0 +1,11 @@
+--- .build-verify-s3f-c6-reqs/variants/EngineJobs.head.swift	2026-10-30 05:20:41
++++ .build-verify-s3f-c6-reqs/variants/EngineJobs.noParkBound.swift	2026-10-30 05:20:41
+@@ -768,7 +768,7 @@
+                 waiting = true
+                 continue
+             }
+-            guard parks < Self.parksPerPump, self.followFits(job, follows: &follows) else {
++            guard self.followFits(job, follows: &follows) else {
+                 self.scheduleSpaceSweepFollowUp(sweep)
+                 break
+             }

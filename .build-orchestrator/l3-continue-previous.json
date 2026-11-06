@@ -1,0 +1,98 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "C2 at maxEntries (ruling R4: record what remains linear)",
+  "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:156 (holders(of:known:) fallback scan); reached from Sources/ZTronAssetStorage/Integrity/StoreIntegrity.swift:23 (reportUnreadable passes known: [id]); docs/adr-drafts/c.md C-21 amendment and C-22",
+  "problem": "When the known holders do not match the blob's reference count, holders(of:known:) scans every record in one actor turn. This happens with a shared blob quarantined through reportUnreadable, or an eviction candidate re-bound after the snapshot. I measured it with a release scratch probe (thread CPU, 5 samples): 0.93 ms at 10,000 records, but 9.47-12.16 ms at 100,000. C-22 does not record this stretch. Its 'quarantine of one blob 5.4 ms' at 100,000 covers only the single-holder fast path (0.002 ms). C2 at 10,000 still holds.",
+  "fix": "Add this figure to C-22's 'What stays linear on the actor at maxEntries' list, and to the C-21 amendment. Or make the shared-blob case O(holders): for example, reportUnreadable could compute the holders in a bulk unit from a records snapshot and re-validate them on the actor, as deep verification already does."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "ownership / \u00a71.2 write set (OI-7)",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift (new file)",
+  "problem": "WP-C's L3 row in ARCHITECTURE \u00a71.2 lists no benchmark file, so this path is outside WP-C's \u00a71.2 write set. It is not a WP-B file, it holds the C2 measurement that ruling R4 requires, and it is nested in the parent suite without editing the shared ZTronAssetKitBenchmarks.swift. No merge conflict is possible.",
+  "fix": "Orchestrator, at merge: add BenchCleanup.swift (WP-C's C2 measurement) to \u00a71.2's L3 benchmark column."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "C2 at maxEntries (recorded residue)",
+  "location": "docs/adr-drafts/c.md C-22 (a) and (b); Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift operationHoldsAtScale",
+  "problem": "At 100,000 assets the probe still measures 21.9 ms for quota eviction of half and 23.0 ms for purge(.all). The cause is the copy-on-write of `records` (9.64 ms thread CPU) taken while a unit's closure still holds the snapshot, plus WP-B's present-table copy (3.29 ms). Ruling R4 allows this when it is recorded, and it is recorded with figures that match mine.",
+  "fix": "Orchestrator / WP-B follow-up (optional): release the unit closure, and with it the captured snapshot, before resuming the actor in runUnit / DispatchBlockingExecutor. That would remove (a) without an unsafe construct."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "coverage exemption (OI-5)",
+  "location": "Sources/ZTronAssetStorage/Migration/LiveLegacyDefaults.swift (3/14 lines, 21.43%); docs/ARCHITECTURE.md \u00a714",
+  "problem": "This is the only WP-C file under 90%. It is a contract file left untested on purpose: writing real defaults is outside the repository (\u00a714). \u00a714 still says '3 lines', but 11 of 14 lines are uncovered. WP-C's total is 96.77% and the Storage gate passes.",
+  "fix": "Orchestrator: change \u00a714's figure to '11 of 14 lines uncovered' (OI-5)."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / I-2 (orphan GC dooms instead of unlinking, CCR-1 / ruling R2)",
+  "location": "Sources/ZTronAssetStorage/Cleanup/OrphanCollection.swift:21-27 (the blob-table and publishing snapshot is taken only after listBlobFiles finishes) and :46-49 (the doom turn checks only that the key is unknown now); Sources/ZTronAssetStorage/Store/StoreInternals.swift:94-104 (doomOrphans); affected caller: Store/AssetStore+Apply.swift:270 (adoptKnownBlob rescues a doomed-unreferenced key without I/O)",
+  "problem": "A key can be on the listing yet gone from both the disk and the blob table by the doom turn. doomOrphans then inserts a doomed(.unreferenced) entry with droppedInGeneration 0 and its bytes counted as freed. WP-B assumes a rescuable doomed key's file is complete (I-2), so a later rescue binds a record to a missing file. Timeline: (1) apply removes entry `gone`, so its blob K becomes doomed and no record expects it. (2) collectGarbage lists K's fan-out and sees the file, which is older than orphanGrace. (3) Between two listing units, runDueWork reaps K: the file is unlinked and blobTable[K] is cleared. (4) The snapshot taken after the listing shows K unknown, so K is swept and doomed: a phantom. (5) A manifest that lists `gone` again is applied, and adoptKnownBlob rescues K with no I/O; the record is now present and the file missing. Two overlapping GC runs reach the same state when the first run's doom is reaped during the second run's listing. Before the close-out this was harmless: the old code unlinked, and unlinking a missing file does nothing. Proven by ZProbe-phantom[apply], output in the evidence. The window lasts until the reaper processes the phantom key: deletionGrace plus a fresh acknowledgement, which can be long while the app is in the background.",
+  "fix": "Take the blob table's key set (or a WP-B reap counter plus the set of keys reaped since) before listBlobFiles submits its first unit. Doom only keys that were unknown both before the listing and in the doom turn. Serialize orphan GC runs with a CleanupState flag: a concurrent call returns an empty result or waits, so no run re-dooms a key another run doomed and the reaper removed. Add ZProbe-phantom as a regression test, failing first: hold the metadata executor after the doomed key's fan-out is listed, run settleDeletions, release, re-apply, then assert blobTable[K] == nil and CoreInvariants.violations is empty."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / R-STO-11 (legacy phase 2 under transient I/O; same class as round-3 #11)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift:214-221 (a hashFile error other than a lifecycle error returns .dropped) and :227-237 (a failed adoptVerifiedFile returns .dropped); phase 4 in LegacyUnits.swift removeLegacyTree then removes every path the manifest attributes",
+  "problem": "Round 3 made a failed read or listing in phases 1 and 4 decide nothing, but phase 2 still counts a transient EIO, ENOSPC or EPERM on one legacy file as a drop. The file is not requeued. Phase 3 then sees the entry missing, so it writes no stamp and makes a sync due, and phase 4 deletes the legacy file. The asset, whose checksum would have verified, is downloaded again. R-STO-11 requires every verifying file to be moved, not re-downloaded. Ruling R5 accepted only C-14's other-volume drop, not this case. Proven by ZProbe-hash: one FaultRule .read .nth(1) .io on the first entry's file (icon.heic).",
+  "fix": "In processLegacyFile, separate a FileSystemError other than .notFound from a failed digest, a size mismatch or a vanished file. Return a new outcome such as .deferred that puts the file back at the head of the queue and ends the batch call, as lifecycle errors already do, so phases 3 and 4 never run while a file is deferred. Bound the retries so a permanently unreadable file cannot block migration forever: count failures per file and drop after N attempts or lifetimes, or keep such files out of phase 4's removal set, like C-15's kept files. Add ZProbe-hash as a regression test, failing first."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "security / overlap guard residual (round-3 #16)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPlacement.swift:83-104 (resolves only compares the item one level below each prefix with outer's direct child of the same name)",
+  "problem": "resolves(inner, into: outer) catches only a prefix of inner that resolves exactly to outer. A link that resolves to a subdirectory of outer still hides the overlap. Proven on the fake file system, both migrated (`pending=true phase=inProgress`): (a) /fake-volume/alias-child \u2192 R/x with the store base /fake-volume/alias-child/app, so the store lies inside the legacy root; (b) /fake-volume/alias-in-store \u2192 <container>/sub with the legacy root /fake-volume/alias-in-store/CDNAssets, so the root lies inside the store. C-13's claim that a symbolic link in either path cannot hide the overlap is therefore inaccurate. Non-blocking: since round 2, phase 4 removes only manifest-attributed paths, and I found no path to data loss; the remaining cost is phases 1 and 4 listing the store's tree.",
+  "fix": "Compare fully resolved paths. In the metadata unit, resolve each path component by component (URL.resolvingSymlinksInPath(), or a FileSystem primitive that reads a link's destination), then compare the components and identity chains of the resolved paths. Add both placements to LegacyRootTests.overlappingRootSkipped, and correct the wording of C-13."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "robustness / overlap guard error mapping (device behaviour not verified)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPlacement.swift:93-97 and :112-118 (every error except notFound/ENOTDIR yields nil); LegacyPhases.swift:23-26 (`guard let overlaps else { return false }`, no log)",
+  "problem": "The C-13 amendment says a stat that fails with an I/O error decides nothing. The code instead treats any error on any ancestor of either path as decide nothing, including .permissionDenied (EACCES/EPERM). It does so on every launch and without logging. Round 2's identities() ignored ancestor errors. Proven on the fake file system by ZProbe-perm (EPERM on the stat of `Caches`): `denied stats=2 pending=false phase=notStarted key=Optional(\"1.4+77\")`. If the iOS sandbox refuses metadata reads of ancestors above the app container, legacy migration would silently never run on a device. Not verified on a device.",
+  "fix": "Map only .io, plus a failed stat of the root itself, to 'decide nothing'. Treat .permissionDenied on an ancestor or sibling as no match, as identities() does. Log when the overlap check decides nothing. List the device check under 'Not verified'."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "semantics / concurrency (purge(.evictable) chunks, new in the close-out)",
+  "location": "Sources/ZTronAssetStorage/Cleanup/StorePurge.swift:45-47 (chunks are cut by record count over a selection sorted by id, :224) and :92-110 (purgeChunk re-validates each record on its own)",
+  "problem": "The selection's rule says a blob shared with a pinned, essential or leased record stays with all its records. Chunking breaks that under concurrency. Proven with the chunk seam at 1: blob K is shared by p0 and p1, and p1 is pinned during the yield between chunks. Result: p0 is absent(.purged), p1 is present and pinned, and K stays live (`PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 1)`). No sequential order of the purge and the pin produces this. No invariant breaks: p0 later downloads bytes already on disk, because purged records are never adopted. At the production chunk size of 1,000, this needs a blob's records to straddle a chunk boundary.",
+  "fix": "Group the selection by blob off the actor and cut chunks only at blob boundaries. For .evictable, re-validate every current holder of the blob in its chunk's turn using holders(of:known:), and skip the whole blob if any holder is no longer evictable. Add the probe as a test."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "C2 / orphan GC doom turn (a new stretch introduced by the close-out)",
+  "location": "Sources/ZTronAssetStorage/Cleanup/OrphanCollection.swift:45-58 (one turn over decision.unknown plus doomOrphans); Store/StoreInternals.swift:97 (sorts every swept key on the actor)",
+  "problem": "Measured as thread CPU of exactly that turn (release, this Mac, best and worst of 3): 9.710/9.869 ms for 10,000 swept orphans and 107.3/112.7 ms for 100,000. My probe's longest hold for GC of 10,000 orphans at 10,000 assets was 7.0 ms (one run). This turn replaced round 2's per-unit removal, and C-22 records it only for 100 orphans. It is at the edge of the budget at the benchmark scale on this Mac and would exceed it on a slower device.",
+  "fix": "Doom in chunks of at most 1,000 keys, releasing the actor between chunks with the no-op metadata unit and re-checking each key in its chunk's turn. Do any sorting in the decision unit, off the actor. Record the figures in C-22."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "C2 record accuracy at maxEntries (ruling R4)",
+  "location": "docs/adr-drafts/c.md C-22 (`purge(.all) 22.8 ms`); Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift operationHoldsAtScale (it purges the 50,000 records left after eviction)",
+  "problem": "On a full 100,000-asset store my probe measured longest holds of 33.6\u201333.7 ms for purge(.all) and 33.2\u201334.8 ms for purge(.evictable) (two passes, load falling from 14 to 4). C-22 records 22.8 ms, measured on the half of the store left after eviction. My other figures match C-22: eviction of half 21.6\u201322.7 ms, report 8.0, quarantine 5.0\u20136.2, a full verification pass 3.6, GC of 100 orphans 2.2\u20132.4. The extra ~10 ms is not attributed; my unmeasured guess is WP-B's reap queue (filter and sort over about 100,000 deletable keys) plus the first-chunk copies.",
+  "fix": "Record the full-store figures in C-22 and attribute the extra time, for example with thread CPU of the reaper's queue construction over 100,000 deletable keys. If it is the reaper's sort, route a chunked or lazy deletable queue to WP-B."
+ },
+ {
+  "lens": "orchestrator",
+  "blocking": true,
+  "area": "OI-8: owner requirement (every test passes on the iOS Simulator) - flaky WP-A test there",
+  "location": "Tests/ZTronAssetModelTests (WP-A): 'R-MAN-3: the table estimate bounds the storage of a dictionary from AssetID to Int reserved for any count'",
+  "problem": "Failed twice on the iOS 27 simulator in close-out cycle 1 (process-wide heap-growth measurement: 'under -> [(count: 1, measured: 544, estimated: 128)]', then measured 19680; a ZTronAssetModelTests-only run failed too: count 3, measured 3392, estimated 192) and passed in cycle 2's run. The measurement is not deterministic on the simulator.",
+  "fix": "ORCHESTRATOR-AUTHORISED edit of this one WP-A test (and of WP-A's test helper it uses, if needed): find why the simulator's allocator reports extra growth (e.g. unrelated allocations of other concurrently running suites counted process-wide, malloc zone granularity, first-use allocations) and make the measurement deterministic on both platforms WITHOUT weakening the bound it asserts (e.g. measure the dictionary's own allocation with a dedicated zone or an allocation-counting seam, serialise the measurement, warm up once, or measure many trials and assert on the minimum when interference only ever adds). Show it passing 20 consecutive times on your simulator and on macOS, and failing against a mutant that breaks the estimate. Record the cause and the fix in docs/adr-drafts/c.md (OI-8)."
+ }
+]

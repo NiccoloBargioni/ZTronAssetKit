@@ -1,0 +1,319 @@
+[
+ {
+  "blocking": false,
+  "area": "REQUIRED S3AH-1",
+  "location": "Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift:164 (visitRemotePathViolations) vs Sources/ZTronAssetTransport/Policy/RequestFactory.swift:72 (RemoteURL.make)",
+  "problem": "S3-SECU-02: RemoteURL.make (ADR draft D-6) rejects `rejected(.invalidURL)` for empty components, `.` (also `%2E`), `\\`, `?` and `#`. Fix round 3 (orchestrator decision 3) made the Model quarantine `?` and `#` 'instead of failing every fetch in the transport (TR1-10)', but did not do the same for the other spellings. The decoder still accepts `media//a.png`, `media/./a.png`, `./a.png`, `media/%2E/a.png`, `media\\a.png` and `media/`. Such an entry is applied and planned, then fails at once on every attempt. ARCHITECTURE \u00a77.6 maps `rejected(violation)` to `failed(.nextRun)` and answers waiters `.serverUnavailable(retryAfter: nil)`. So the entry is retried every run and misreported as a server problem instead of being quarantined with a diagnostic. The prior art fetched `a//b.png` with appendingPathComponent, so a manifest that relies on it decodes but no longer behaves as before. This is not a traversal: no such path can leave the base. It is a robustness and consistency gap that the recorded decision did not cover.",
+  "fix": "The decoder refuses (as the existing per-entry path violation, quarantined) every remote path the transport refuses: empty segment, '.' segment, backslash, trailing slash, and their percent-encoded forms (`%2E`), so no accepted entry fails on every fetch. One rule, in the model; the transport keeps its check as defence. Test each form.",
+  "detail": {
+   "id": "S3-SECU-02",
+   "kind": "hunt",
+   "lens": "security",
+   "location": "Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift:164 (visitRemotePathViolations) vs Sources/ZTronAssetTransport/Policy/RequestFactory.swift:72 (RemoteURL.make)",
+   "requirements": "R-MAN-2 (per-entry violations quarantine the entry with a diagnostic), R-MAN-1 (manifests behave as before), TR1-10, ADR draft A-4.7 / orchestrator decision 3, ADR draft D-6",
+   "problem": "RemoteURL.make (ADR draft D-6) rejects `rejected(.invalidURL)` for empty components, `.` (also `%2E`), `\\`, `?` and `#`. Fix round 3 (orchestrator decision 3) made the Model quarantine `?` and `#` 'instead of failing every fetch in the transport (TR1-10)', but did not do the same for the other spellings. The decoder still accepts `media//a.png`, `media/./a.png`, `./a.png`, `media/%2E/a.png`, `media\\a.png` and `media/`. Such an entry is applied and planned, then fails at once on every attempt. ARCHITECTURE \u00a77.6 maps `rejected(violation)` to `failed(.nextRun)` and answers waiters `.serverUnavailable(retryAfter: nil)`. So the entry is retried every run and misreported as a server problem instead of being quarantined with a diagnostic. The prior art fetched `a//b.png` with appendingPathComponent, so a manifest that relies on it decodes but no longer behaves as before. This is not a traversal: no such path can leave the base. It is a robustness and consistency gap that the recorded decision did not cover.",
+   "evidence": ".build-orchestrator/s3-probes/security/S3-SECU-02.swift and S3-SECU-02-03.log. Failing lines: '\u2718 Test \"R-MAN-2: a remote path the transport refuses on every fetch is quarantined by the decoder\" with 6 test cases failed after 0.001 seconds with 12 issues.' For the argument \"media//a.png\": 'Expectation failed: manifest.entries.map(\\.identifier) == [\"ok\"] \u2026 media//a.png was accepted although no fetch of it can ever be made \u2026 \u2192 [ok, x]' and 'manifest.quarantinedCount \u2192 0'. The transport side is already proven by the passing ForegroundBackendTests.invalidPaths ('R-NET-4: a remote path that could leave the base path is refused as an invalid URL', arguments \"a//b\", \"a\\\\b\", \"a/%2E/b\"; 151/151 transport tests passed, also under TSan). For \"./a.png\" and \"media/\", RemoteURL.make returns nil on the decoded \".\" and on the empty last component (RequestFactory.swift:74-80).",
+   "repro": "Copy S3-SECU-02.swift to Tests/ZTronAssetModelTests/Manifest/S3SecurityModelProbeTests.swift, then: swift test --scratch-path <scratch> --skip Benchmarks --filter S3SecurityModelProbeTests",
+   "fix": "Add one RemotePathViolation (for example `.emptyOrDotSegment` plus `.backslash`, or extend `.parentSegment`'s pass) so that the decoder quarantines exactly what RemoteURL.make refuses: an empty segment, a `.` segment (also `%2e`), and a `\\`. Keep `%3F` allowed, as in A-4.7. Alternatively relax RemoteURL.make to the Model's rules and record the choice in an ADR. Either way, add a test that every path the decoder accepts yields a URL from RemoteURL.make.",
+   "confirmer": {
+    "id": "S3-SECU-02",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "a",
+    "reason": "I reproduced this at s3-base. The hunter's model probe failed with 12 issues: all 6 paths were accepted (entries [ok, x], quarantinedCount 0). My own probe (S3-SECU-02.swift in the transport tests) decodes each path with ManifestDecoder and then calls the real internal RemoteURL.make. For media//a.png, media/./a.png, ./a.png, media/%2E/a.png, media\\a.png and media/, it reports 'decoder accepted=true, RemoteURL.make=nil'. The control path media/ok.png passes. I checked the code. HTTPRemoteSource.transfer:182 returns `.failed(.rejected(.invalidURL))` when RemoteURL.make returns nil. EngineFailures.swift:192-194 maps `.rejected` to `failed(.nextRun)` and gives waiters `.serverUnavailable(retryAfter: nil)`. The breaker outcome is neutral. Nothing in Sync or Storage checks remotePath beforehand. So the entry is planned, fails at once on every run, and is misreported as a server problem. Why it is not blocking: the SPEC's R-MAN-2 remotePath violation list (relative, \u22641,024 bytes, no `..`, scheme, authority or control character) does not include these spellings, so the decoder meets the MUST. Draft A-4.7 explicitly says '`.` \u2026 stay allowed' in the Model. Draft D-6 records that the transport rejects empty, `.` and `\\` components. There is no crash, no data loss and no traversal; only the Model/transport mismatch for these spellings went unhandled. This is a confirmed consistency/robustness gap and NON-blocking. The owner is WP-A (Sources/ZTronAssetModel/**). The alternative fix would touch WP-D's RequestFactory.swift. Evidence: .build-orchestrator/s3-probes/confirm-security/S3-SECU-02.swift, S3-SECU-02-03-model-probe.swift, S3-SECU-02-03.log and S3-SECU-02-03-confirm.log."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3AH-2",
+  "location": "Sources/ZTronAssetModel/Identity/TransferID.swift (TransferAttempt.init?(token:)) and Sources/ZTronAssetModel/Identity/StagingFileName.swift:36",
+  "problem": "S3-SECU-03: TransferAttempt(token:) accepts leading zeros (`01-2`, `1-02`) and TransferID(rawValue:) accepts any `c-[a-z0-9-]*`, not only `c-<64 hex>`. So StagingFileName(parsing:) is not 'nil for anything that is not exactly one of our names' (its own doc). A foreign `c-<h>.01-2.part` parses as ours, and its rawValue is `c-<h>.1-2.part`, which is a different file. StagingCollection.garbage then applies age rules instead of 'foreign: always removed'. listStaging (AssetStore+Reads.swift:172) keys the inventory by the parsed name, so two directory entries collapse onto one key, and stagingURL(name) addresses the canonical file, not the listed one. BackgroundTaskTag(decoding:) inherits the same leniency. Only a file planted inside the app's container can reach this, and no data is lost: age-based GC removes it eventually. Robustness only.",
+  "fix": "`StagingFileName(parsing:)` and `TransferAttempt(token:)` accept only canonical forms (no leading zeros), so a parsed name's `rawValue` names the same file. AUTHORISED: bodies of the contract files `Sources/ZTronAssetModel/Identity/TransferID.swift` and `Identity/StagingFileName.swift`, no signature change.",
+  "detail": {
+   "id": "S3-SECU-03",
+   "kind": "hunt",
+   "lens": "security",
+   "location": "Sources/ZTronAssetModel/Identity/TransferID.swift (TransferAttempt.init?(token:)) and Sources/ZTronAssetModel/Identity/StagingFileName.swift:36",
+   "requirements": "R-SEC-2 (names under the root), R-CLN-3 (anything under staging/ that does not parse is foreign and collected), ADR-013",
+   "problem": "TransferAttempt(token:) accepts leading zeros (`01-2`, `1-02`) and TransferID(rawValue:) accepts any `c-[a-z0-9-]*`, not only `c-<64 hex>`. So StagingFileName(parsing:) is not 'nil for anything that is not exactly one of our names' (its own doc). A foreign `c-<h>.01-2.part` parses as ours, and its rawValue is `c-<h>.1-2.part`, which is a different file. StagingCollection.garbage then applies age rules instead of 'foreign: always removed'. listStaging (AssetStore+Reads.swift:172) keys the inventory by the parsed name, so two directory entries collapse onto one key, and stagingURL(name) addresses the canonical file, not the listed one. BackgroundTaskTag(decoding:) inherits the same leniency. Only a file planted inside the app's container can reach this, and no data is lost: age-based GC removes it eventually. Robustness only.",
+   "evidence": ".build-orchestrator/s3-probes/security/S3-SECU-03.swift (same probe file as -02) and S3-SECU-02-03.log. The run shows '\u2718 Test \"R-SEC-2: staging names parse only in the canonical spelling the module writes\" recorded an issue with 1 argument fileName \u2192 \"c-aaaa\u2026aaaa.1-02.part\" \u2026 \u21b3 c-aaaa\u2026aaaa.1-02.part parsed as c-aaaa\u2026aaaa.1-2.part', and the same for \".01-2.part\".",
+   "repro": "swift test --scratch-path <scratch> --skip Benchmarks --filter S3SecurityModelProbeTests",
+   "fix": "In StagingFileName(parsing:), require `parsed.rawValue == fileName`, or make TransferAttempt(token:) reject leading zeros. Make TransferID(rawValue:) require exactly 64 lowercase hex digits after `c-`/`l-` (ContentHash(hex:)). Commit the probe as the regression test.",
+   "confirmer": {
+    "id": "S3-SECU-03",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "a",
+    "reason": "I reproduced this at s3-base. In the hunter's probe, 'c-<64a>.01-2.part' and 'c-<64a>.1-02.part' both parse as 'c-<64a>.1-2.part'. The cause is that TransferAttempt(token:) (TransferID.swift:125-136) accepts leading zeros, which contradicts StagingFileName(parsing:)'s own doc ('nil for anything that is not exactly one of our names'). My probe (S3-SECU-03.swift) adds two results. StagingCollection.garbage keeps a fresh non-canonical name under the age rules instead of 'foreign names always'. And two different directory entries parse to the same key, so listStaging's inventory collapses them. One part of the claim is refuted: TransferID(rawValue:) accepting any `c-[a-z0-9-]*` matches its documented contract ('1\u202696 bytes of [0-9a-z-] with a known prefix'), and the probe's 'c-zz.1-2.part' case round-trips and passes. Impact: StagingCollection removes files by the listed item.name, so age-based GC still deletes the file. On the launch adoptStaged path, publish addresses the canonical name and discards on failure. The only way to reach this is a file planted inside the app's own container, not a path derived from manifest text, so the R-SEC-2 MUST (no escape from the root) and I-4 still hold. This is a robustness gap and NON-blocking. The owner is WP-A (Sources/ZTronAssetModel/Identity/**). Evidence: .build-orchestrator/s3-probes/confirm-security/S3-SECU-03.swift, S3-SECU-02-03-model-probe.swift and the two logs."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3AH-3",
+  "location": "Sources/ZTronAssetTestSupport/ManualTimeSource.swift:144-149 goes through seconds(since:); Sources/ZTronAssetModel/Environment/Time.swift:26-37 truncates UInt64(delta)",
+  "problem": "S3-B-104: L4-R24(2): ManualTimeSource.advance(to:) lands 1 ns short of a boundary in about 2.9 % of gaps because MonotonicInstant.adding(seconds:) truncates a Double; WP-F's tests use exact moves meanwhile",
+  "fix": "L4-R24(2): `ManualTimeSource.advance(to:)` lands exactly on the target instant (`Sources/ZTronAssetTestSupport/ManualTimeSource.swift:144-149`; `MonotonicInstant.adding(seconds:)` truncates a Double, `Sources/ZTronAssetModel/Environment/Time.swift:26-37`). AUTHORISED: the body of the contract file `Environment/Time.swift`, no signature change. Test over a seeded set of gaps; then run the WHOLE suite to show no test relied on the 1 ns shortfall.",
+  "detail": {
+   "id": "S3-B-104",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetTestSupport/ManualTimeSource.swift:144-149 goes through seconds(since:); Sources/ZTronAssetModel/Environment/Time.swift:26-37 truncates UInt64(delta)",
+   "problem": "L4-R24(2): ManualTimeSource.advance(to:) lands 1 ns short of a boundary in about 2.9 % of gaps because MonotonicInstant.adding(seconds:) truncates a Double; WP-F's tests use exact moves meanwhile",
+   "category": "proven-open-bug",
+   "sources": [
+    "ADR-053 Assignments (L4-R24(2))",
+    "l4-rulings.md L4-R24(2)"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3AH-4",
+  "location": "Tests/ZTronAssetModelTests/Manifest/ManifestFuzzTests.swift:61 is unchanged; no QoS pin or repeat",
+  "problem": "S3-B-006: ManifestFuzzTests 'seeded fuzz ... in linear time' (OI-13) failed once on an efficiency core (6.08 s against a 5.86 s limit); compare the lowest of a few measurements or pin the QoS without loosening the 64x bound",
+  "fix": "OI-13: `ManifestFuzzTests`' linear-time check (`ManifestFuzzTests.swift:61`) must not fail on an efficiency core: compare the lowest of a few measurements or pin the QoS, without loosening the 64x bound.",
+  "detail": {
+   "id": "S3-B-006",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetModelTests/Manifest/ManifestFuzzTests.swift:61 is unchanged; no QoS pin or repeat",
+   "problem": "ManifestFuzzTests 'seeded fuzz ... in linear time' (OI-13) failed once on an efficiency core (6.08 s against a 5.86 s limit); compare the lowest of a few measurements or pin the QoS without loosening the 64x bound",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-052 Assignments (environment items, OI-13)",
+    "c.md OI-13"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3AH-5",
+  "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 unchanged",
+  "problem": "S3-B-107: 'Test support: start racing stop ends every start exactly once...' (LoopbackHTTPServerTests.swift:400, one-minute limit) exceeds its limit under TSan at loads of 17-834; its TSan headroom must be measured on an idle host, one agent at a time",
+  "fix": "`LoopbackHTTPServerTests` 'start racing stop\u2026' (`Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400`) under TSan: S3-R4.",
+  "detail": {
+   "id": "S3-B-107",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 unchanged",
+   "problem": "'Test support: start racing stop ends every start exactly once...' (LoopbackHTTPServerTests.swift:400, one-minute limit) exceeds its limit under TSan at loads of 17-834; its TSan headroom must be measured on an idle host, one agent at a time",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-052 Assignments (Stage 3 hardening (4))",
+    "ADR-055 Assignments (Stage 5, WP-H owner)",
+    "l2fu.md item 2"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "Sources/ZTronAssetTestSupport/FakeFileSystem.swift:53-75 FSOpRecord has no level; :355-356 documents the simplification",
+  "problem": "S3-B-105: FakeFileSystem makes .barrier and .full identical and FSOpRecord carries no SyncLevel, so ordered-vs-durable commits (phase 3's durable commit before the UserDefaults key removal, R-CLN-10, the engine's publication acknowledgement order) are provable only by reading (OI-2); a level-recording FileSystem spy or an FSOpRecord level (a contract change) would close it",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-105",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetTestSupport/FakeFileSystem.swift:53-75 FSOpRecord has no level; :355-356 documents the simplification",
+   "problem": "FakeFileSystem makes .barrier and .full identical and FSOpRecord carries no SyncLevel, so ordered-vs-durable commits (phase 3's durable commit before the UserDefaults key removal, R-CLN-10, the engine's publication acknowledgement order) are provable only by reading (OI-2); a level-recording FileSystem spy or an FSOpRecord level (a contract change) would close it",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-049 (Fake fidelity limits)",
+    "ADR-052 Assignments (OI-2)",
+    "ADR-053 Not verified",
+    "l1-remaining-h.json [6]"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "documented",
+  "problem": "S3-B-106: Fake fidelity limits documented on the types: FakeTransferBackend retains every handle, so drop-to-cancel is observable only through FakeRemoteSource; the conformance suite creates its symbolic-link fixture with FileManager (an accepted exception to ADR-038)",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-106",
+   "kind": "backlog",
+   "location": "documented",
+   "problem": "Fake fidelity limits documented on the types: FakeTransferBackend retains every handle, so drop-to-cancel is observable only through FakeRemoteSource; the conformance suite creates its symbolic-link fixture with FileManager (an accepted exception to ADR-038)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-049 (Fake fidelity limits)"
+   ],
+   "proposed": "none"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "documented",
+  "problem": "S3-B-108: The loopback server's refusal of a LAN address is not probed: the ::1 probe stands in for it and assumes lo0 carries ::1 (a getifaddrs probe needs mutable pointers, C1)",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-108",
+   "kind": "backlog",
+   "location": "documented",
+   "problem": "The loopback server's refusal of a LAN address is not probed: the ::1 probe stands in for it and assumes lo0 carries ::1 (a getifaddrs probe needs mutable pointers, C1)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-051 Not verified",
+    "ios.md item 5"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "kept by ruling; no change since",
+  "problem": "S3-B-007: OI-8: the allocation tests read process-wide heap figures and rely on Array/Dictionary ABI layout and malloc_size of reused blocks (checked on macOS 27 and the iOS 27 simulator only)",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-007",
+   "kind": "backlog",
+   "location": "kept by ruling; no change since",
+   "problem": "OI-8: the allocation tests read process-wide heap figures and rely on Array/Dictionary ABI layout and malloc_size of reused blocks (checked on macOS 27 and the iOS 27 simulator only)",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-052 Assignments (OI-8 audit)",
+    "c.md OI-8, Not verified here"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "A-4.5 stands; no UTF-16/32 path under Sources/ZTronAssetModel/Manifest/Decoding",
+  "problem": "S3-B-001: R-MAN-1: UTF-16/UTF-32 manifests are rejected although the prior art's JSONDecoder detects them; confirm no published manifest is UTF-16 (NEEDS-HUMAN-REVIEW)",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-001",
+   "kind": "backlog",
+   "location": "A-4.5 stands; no UTF-16/32 path under Sources/ZTronAssetModel/Manifest/Decoding",
+   "problem": "R-MAN-1: UTF-16/UTF-32 manifests are rejected although the prior art's JSONDecoder detects them; confirm no published manifest is UTF-16 (NEEDS-HUMAN-REVIEW)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-049 (R-MAN-1 deviation)",
+    "a.md A-4.5, A-15 #9"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "no owner ruling recorded in DECISIONS.md or ORCHESTRATION.md",
+  "problem": "S3-B-002: R-OBS-1 interval seam (LogIntervalName, LogRoute.interval, LogInterval) is a public API addition still awaiting owner review (NEEDS-HUMAN-REVIEW)",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-002",
+   "kind": "backlog",
+   "location": "no owner ruling recorded in DECISIONS.md or ORCHESTRATION.md",
+   "problem": "R-OBS-1 interval seam (LogIntervalName, LogRoute.interval, LogInterval) is a public API addition still awaiting owner review (NEEDS-HUMAN-REVIEW)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-049 (A-7)",
+    "a.md A-7"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "A-8's estimate is the shipped design; realistic catalogs (250-350 bytes per entry) are unaffected",
+  "problem": "S3-B-003: Entry-dense manifests (entry array over 2 MiB at about 111 bytes per entry) are rejected with decodedSizeExceeded by the 3.75x allocation bound",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-003",
+   "kind": "backlog",
+   "location": "A-8's estimate is the shipped design; realistic catalogs (250-350 bytes per entry) are unaffected",
+   "problem": "Entry-dense manifests (entry array over 2 MiB at about 111 bytes per entry) are rejected with decodedSizeExceeded by the 3.75x allocation bound",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-049 (A-8)",
+    "a.md A-8"
+   ],
+   "proposed": "none"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "no device run exists",
+  "problem": "S3-B-004: R-MAN-3 allocation bound was measured on macOS 27 and the iOS 27 simulator only; iOS device allocators are unverified",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-004",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "R-MAN-3 allocation bound was measured on macOS 27 and the iOS 27 simulator only; iOS device allocators are unverified",
+   "category": "device-only",
+   "sources": [
+    "ADR-049 (Not verified)",
+    "a.md A-8, A-14 #3"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "VERIFICATION.md does not exist yet (Stage 5)",
+  "problem": "S3-B-005: R-MAN-3's 1 s time bound is proved only by the release P-3 limit benchmark; debug and TSan unit runs assert linear scaling only, and VERIFICATION/TRACEABILITY must say so",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-005",
+   "kind": "backlog",
+   "location": "VERIFICATION.md does not exist yet (Stage 5)",
+   "problem": "R-MAN-3's 1 s time bound is proved only by the release P-3 limit benchmark; debug and TSan unit runs assert linear scaling only, and VERIFICATION/TRACEABILITY must say so",
+   "category": "documentation",
+   "sources": [
+    "a.md A-5, A-14 #3, A-15 #2",
+    "l1-remaining-a.json [1]"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "no `describe` helper and no maxPathComponents in Sources/ZTronAssetModel",
+  "problem": "S3-B-008: Model additions declined for now: ManifestEntryViolation.duplicateIdentifier, ManifestLimits.maxPathComponents (cap stays the internal 32) and the optional hashed log description (AssetLog.describe) for ManifestError and QuarantinedEntry",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-008",
+   "kind": "backlog",
+   "location": "no `describe` helper and no maxPathComponents in Sources/ZTronAssetModel",
+   "problem": "Model additions declined for now: ManifestEntryViolation.duplicateIdentifier, ManifestLimits.maxPathComponents (cap stays the internal 32) and the optional hashed log description (AssetLog.describe) for ManifestError and QuarantinedEntry",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-049 (Declined)",
+    "a.md A-11.2, A-11.3, A-11.7"
+   ],
+   "proposed": "none"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3AH-6",
+  "location": "Sources/ZTronAssetModel/Environment/AssetEnvironment.swift:28,47 memoryPressure is optional with default nil",
+  "problem": "S3-B-009: AssetEnvironment.live() leaves out a memory-pressure source: on a device a memory warning purges nothing (R-CLN-11) unless the app supplies a UIKit source; DEVICE-TEST-PLAN must say so",
+  "fix": "Record. S3-B-105 (a level-recording FileSystem spy or an `FSOpRecord` level) is a contract change, declined for Stage 3. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-009",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetModel/Environment/AssetEnvironment.swift:28,47 memoryPressure is optional with default nil",
+   "problem": "AssetEnvironment.live() leaves out a memory-pressure source: on a device a memory warning purges nothing (R-CLN-11) unless the app supplies a UIKit source; DEVICE-TEST-PLAN must say so",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-056 (WPI-R3; Assignments, Stage 5)"
+   ],
+   "proposed": "device-plan"
+  }
+ }
+]

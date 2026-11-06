@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift
+index 6b47c7f..e6e1663 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift
+@@ -85,7 +85,7 @@ extension AssetStore {
+     private func startGrace(acknowledgedVersion: UInt64, at uptime: MonotonicInstant) {
+         let eligibleAt = uptime.adding(seconds: self.configuration.policy.deletionGrace)
+         for (key, blobState) in self.state.core.blobTable {
+-            guard case .doomed(var info) = blobState, info.eligibleAt == nil, info.sinceSnapshotVersion <= acknowledgedVersion else {
++            guard case .doomed(var info) = blobState, info.eligibleAt == nil else {
+                 continue
+             }
+             info.eligibleAt = eligibleAt

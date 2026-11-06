@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+index 9a91ef8..60df58f 100644
+--- a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
++++ b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+@@ -63,7 +63,7 @@ public enum TransferClassifier {
+             }
+             return facts.contentRangeStart == nil ? .transient(.resumeRejected, retryAfter: nil) : nil
+         case 304:
+-            return sentConditional ? nil : .rejected(.unexpectedNotModified)
++            return nil
+         case 300...399:
+             // A redirect delivered as the final response was refused or had no usable `Location`; the delegate
+             // recomputes the precise refusal when it can (transport.md §5.2).

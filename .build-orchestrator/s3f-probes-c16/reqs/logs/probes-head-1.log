@@ -1,0 +1,109 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC15CorrectWindow" started.
+◇ Suite "VerifyC15CorrectNew" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15C-INTEGRITY-WINDOW" started.
+◇ Test "PROBE-C15C-ENOSPC-PASSED" started.
+◇ Test "PROBE-C15R-LANE-WALK" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-ENOSPC-PASSED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-INTEGRITY-WINDOW" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-LANE-WALK" started.
+PROBE-C15R-LANE-WALK followVisitedFirst between the drain turns: (owed: false, barrier: false, events: 0, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cPasses: Optional(true), cFailed: true, jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst after the apply: (owed: false, c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])))
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst after the drain: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, n: nil)
+PROBE-C15R-LANE-WALK followVisitedFirst throttle at J's 429: Optional(61000000000ns)
+PROBE-C15C-INTEGRITY-WINDOW followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-LANE-WALK" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-INTEGRITY-WINDOW" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-ENOSPC-PASSED" started.
+PROBE-C15R-LANE-WALK sweepFollowsFirst between the drain turns: (owed: false, barrier: true, events: 1, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cPasses: Optional(false), cFailed: true, jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C15R-LANE-WALK sweepFollowsFirst throttle at J's 429: Optional(61000000000ns)
+PROBE-C15C-INTEGRITY-WINDOW sweepFollowsFirst window=true steps=4 state=(owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: nil, holdsB: true)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst after the apply: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])))
+✔ Test "PROBE-C15R-LANE-WALK" with 2 test cases passed after 0.930 seconds.
+◇ Test "PROBE-C15R-REROUTE-STALE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-REROUTE-STALE" started.
+PROBE-C15C-INTEGRITY-WINDOW sweepFollowsFirst after the follow: (c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), holdsB: true, n: nil, barrier: false)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst the ENOSPC waits: (owed: false, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1218960514ns))), verdict: nil, cOwedVisit: false, holdsB: true)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst after the drain: (c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1218960514ns))), holdsB: true, n: nil)
+PROBE-C15C-INTEGRITY-WINDOW sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+✔ Test "PROBE-C15C-INTEGRITY-WINDOW" with 2 test cases passed after 0.989 seconds.
+✔ Suite "VerifyC15CorrectWindow" passed after 0.989 seconds.
+✔ Test "PROBE-C15C-ENOSPC-PASSED" with 2 test cases passed after 0.991 seconds.
+◇ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+PROBE-C15R-REROUTE-STALE followVisitedFirst after v3: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a]), reroute: Optional([]), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C15R-REROUTE-STALE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), interests: Optional(2), n: nil)
+PROBE-C15C-VERDICT-ACROSS-APPLY followVisitedFirst after the 404: (owed: false, c: nil, verdict: nil)
+PROBE-C15R-REROUTE-STALE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), n2: nil)
+PROBE-C15C-VERDICT-ACROSS-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+PROBE-C15R-REROUTE-STALE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-REROUTE-STALE" started.
+PROBE-C15C-VERDICT-ACROSS-APPLY sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4)))
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst after v3: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a]), reroute: Optional([]), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), interests: Optional(2), n: nil)
+PROBE-C15C-VERDICT-ACROSS-APPLY sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" with 2 test cases passed after 1.063 seconds.
+◇ Test "PROBE-C15C-STALE-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-STALE-REROUTE" started.
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), cAssets: Optional([zz-a, zz-b]), n2: nil)
+PROBE-C15R-REROUTE-STALE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15R-REROUTE-STALE" with 2 test cases passed after 1.192 seconds.
+◇ Test "PROBE-C15R-VERDICT-LATER-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-VERDICT-LATER-APPLY" started.
+PROBE-C15C-STALE-REROUTE followVisitedFirst C publishing: (owed: false, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([])), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C15C-STALE-REROUTE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])), n: nil, barrier: false)
+PROBE-C15R-VERDICT-LATER-APPLY followVisitedFirst after the 404: (owed: false, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: nil)
+PROBE-C15C-STALE-REROUTE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+PROBE-C15R-VERDICT-LATER-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+PROBE-C15C-STALE-REROUTE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-VERDICT-LATER-APPLY" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-STALE-REROUTE" started.
+PROBE-C15R-VERDICT-LATER-APPLY sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: nil)
+✘ Test "PROBE-C15R-VERDICT-LATER-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:125:17: Expectation failed: atFail.owed && atFail.verdict != nil
+↳ setup: the 404's verdict waits for v3's follow: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: nil)
+↳ atFail.owed && atFail.verdict != nil → false
+↳   atFail.owed → true
+↳   atFail.verdict != nil → false
+✘ Test "PROBE-C15R-VERDICT-LATER-APPLY" with 2 test cases failed after 0.910 seconds with 1 issue.
+↳ /// PROBE-C15R-VERDICT-LATER-APPLY (the cycle-15 draft's "Put to the orchestrator: a verdict that waits across a
+↳ /// later apply", unprobed there). C (100 kB) downloads for A (zz-a) and B (zz-b), both users. v3 changes only the
+↳ /// fillers. C gets a 404 while v3's follow is owed (sweep-first: its verdict waits). Then v4 moves zz-b to N (16 B)
+↳ /// while v3's follow still owes its visits. Visit-first, the 404 answered A and B `notFound` before v4 existed.
+◇ Test "PROBE-C15R-SPACE-EPOCH" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-SPACE-EPOCH" started.
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst C publishing: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([zz-b])), n: nil)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([zz-b])), n: nil, barrier: false)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15C-STALE-REROUTE" with 2 test cases passed after 1.189 seconds.
+✔ Suite "VerifyC15CorrectNew" passed after 3.245 seconds.
+PROBE-C15R-SPACE-EPOCH followVisitedFirst after the drain: (c: Optional(ZTronAssetSync.JobState.verifying), lastError: nil)
+PROBE-C15R-SPACE-EPOCH followVisitedFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-SPACE-EPOCH" started.
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst before the ENOSPC: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), found: false)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst after the ENOSPC: (waits: false, c: Optional(ZTronAssetSync.JobState.downloading), epoch: Optional(611))
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst after the drain: (c: Optional(ZTronAssetSync.JobState.downloading), lastError: nil)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C15R-SPACE-EPOCH" with 2 test cases passed after 1.462 seconds.
+◇ Test "PROBE-C15R-AWAIT-WINDOW" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-AWAIT-WINDOW" started.
+PROBE-C15R-AWAIT-WINDOW followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-AWAIT-WINDOW" started.
+PROBE-C15R-AWAIT-WINDOW sweepFollowsFirst in the window: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4)), holdsB: true) heldUnits=0
+PROBE-C15R-AWAIT-WINDOW sweepFollowsFirst after the turn that finds C: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4)), holdsB: true, visited: true)
+PROBE-C15R-AWAIT-WINDOW sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15R-AWAIT-WINDOW" with 2 test cases passed after 0.911 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.407 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 9 tests in 3 suites failed after 5.408 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

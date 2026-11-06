@@ -1,0 +1,67 @@
+=== MG vs handleControlsInOrder, low load (6 runs)
+MUTANT MG-task-inside-drain applied
+build exit=0
+-- run 1 load 14.14 101.56 144.63: ✘ Test run with 1 test in 1 suite failed after 63.997 seconds with 4 issues. early-fail=2
+-- run 2 load 7.42 82.47 134.27: ✘ Test run with 1 test in 1 suite failed after 63.992 seconds with 4 issues. early-fail=2
+-- run 3 load 20.83 70.22 125.51: ✘ Test run with 1 test in 1 suite failed after 63.990 seconds with 4 issues. early-fail=2
+-- run 4 load 14.79 59.36 117.40: ✘ Test run with 1 test in 1 suite failed after 63.998 seconds with 4 issues. early-fail=2
+-- run 5 load 6.34 48.18 108.92: ✘ Test run with 1 test in 1 suite failed after 64.000 seconds with 4 issues. early-fail=2
+-- run 6 load 3.29 39.10 101.04: ✘ Test run with 1 test in 1 suite failed after 64.001 seconds with 4 issues. early-fail=2
+MUTANT none applied
+=== required runs
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+load before:  4:54  up 4 days, 17:17, 2 users, load averages: 128.95 255.40 167.74
+release exit=0
+Build complete! (44,26 s)
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+gates exit=0
+transport run 1 exit=0 load: 40.06 190.36 151.77
+✔ Test run with 165 tests in 17 suites passed after 0.839 seconds.
+transport run 2 exit=0 load: 38.77 187.59 151.02
+✔ Test run with 165 tests in 17 suites passed after 0.890 seconds.
+transport run 3 exit=0 load: 38.15 184.99 150.31
+✔ Test run with 165 tests in 17 suites passed after 0.840 seconds.
+load before: 173.99 172.51 151.96
+tsan exit=0
+load after: 314.61 205.06 168.93
+✔ Test run with 165 tests in 17 suites passed after 12.460 seconds.
+load before: 377.53 226.42 177.43
+tsan-rep exit=0
+load after: 455.27 280.55 201.48
+✔ Test run with 7 tests in 3 suites passed after 9.968 seconds.
+repetition 25
+load before: 109.74 247.12 165.83
+ios build exit=0
+load after: 90.86 236.20 163.35
+load before: 164.39 170.52 151.49
+Fri Oct 30 05:01:15 CET 2026
+sim exit=0
+Fri Oct 30 05:10:07 CET 2026
+load after: 86.79 208.64 186.95
+✔ Test "Test support: misuse of the seam is reported as an error: oversized reads, relative URLs, directories as files" passed after 0.502 seconds.
+** TEST SUCCEEDED **
+bundle .build-verify-s3d-c3-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.30_05-01-23-+0100.xcresult
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 2614,
+      "skippedTests" : 0,
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "passedTests" : 1319,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "totalTestCount" : 1319
+load before: 156.09 168.54 151.01
+build exit=0
+rep exit=0
+load after: 147.57 165.58 150.45
+✔ Test run with 7 tests in 3 suites passed after 3.382 seconds.
+1
+COVERAGE target=ZTronAssetTransport      lines= 99.10% (2427/2449) min=70.0 OK
+COVERAGE overall lines=96.56% (25185/26082) min=80.0 OK
+COVERAGE: PASS
+◇ Test "P-10: 500 small assets over a loopback server use at most connections_max TCP connections" started.

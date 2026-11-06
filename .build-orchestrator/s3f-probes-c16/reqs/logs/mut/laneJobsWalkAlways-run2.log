@@ -1,0 +1,78 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" with 2 test cases passed after 0.970 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" with 2 test cases passed after 1.141 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" with 2 test cases passed after 1.032 seconds.
+◇ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+✔ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" with 2 test cases passed after 1.611 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" with 2 test cases passed after 0.950 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" with 2 test cases passed after 0.632 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" with 2 test cases passed after 0.952 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" with 2 test cases passed after 1.300 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" with 6 test cases passed after 3.244 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" with 4 test cases passed after 2.964 seconds.
+◇ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+✔ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" with 2 test cases passed after 1.540 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" with 2 test cases passed after 1.480 seconds.
+◇ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✔ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" with 8 test cases passed after 4.796 seconds.
+◇ Test "PROBE-C15R-LANE-WALK" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-LANE-WALK" started.
+PROBE-C15R-LANE-WALK followVisitedFirst between the drain turns: (owed: false, barrier: false, events: 0, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cPasses: Optional(true), cFailed: true, jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C15R-LANE-WALK followVisitedFirst throttle at J's 429: Optional(61000000000ns)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-LANE-WALK" started.
+PROBE-C15R-LANE-WALK sweepFollowsFirst between the drain turns: (owed: false, barrier: true, events: 1, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cPasses: Optional(false), cFailed: true, jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C15R-LANE-WALK sweepFollowsFirst throttle at J's 429: Optional(61000000000ns)
+✔ Test "PROBE-C15R-LANE-WALK" with 2 test cases passed after 1.052 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 23.672 seconds.
+✔ Test run with 14 tests in 1 suite passed after 23.672 seconds.

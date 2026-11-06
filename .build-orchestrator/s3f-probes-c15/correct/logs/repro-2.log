@@ -1,0 +1,102 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Suite "VerifyC15ReproC14Correct" started.
+◇ Test "PROBE-C14R-PASSED-LANE-BARRIER" started.
+◇ Test "PROBE-C14C-MARK-TWO-APPLIES" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-LANE-BARRIER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14C-MARK-TWO-APPLIES" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst setup done
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.downloading), yReroute: Optional("nil"), cInterests: Optional(2), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-LANE-BARRIER" started.
+PROBE-C14C-MARK-TWO-APPLIES followVisitedFirst after v4's follow: (c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([])), assets: Optional([zz-a, zz-c]))
+PROBE-C14C-MARK-TWO-APPLIES followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7b/7beacfed8434ec105a580c320473c06e094fadc9298cb6b4d322e082dcee25d1.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) c=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14C-MARK-TWO-APPLIES" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst setup done
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false before the 429: (barrier: true, y: Optional(ZTronAssetSync.JobState.verifying), yReroute: Optional("Optional(Set([zz-u]))"), cInterests: Optional(1), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false right after the 429: (throttle: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) cStarts=1
+✔ Test "PROBE-C14R-PASSED-LANE-BARRIER" with 2 test cases passed after 3.921 seconds.
+◇ Test "PROBE-C14R-PASSED-LANE-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-LANE-AFTER" started.
+PROBE-C14C-MARK-TWO-APPLIES sweepFollowsFirst after v3's pass: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([zz-b])))
+PROBE-C14C-MARK-TWO-APPLIES sweepFollowsFirst after v4's follow: (c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([zz-b])), assets: Optional([zz-a, zz-c]))
+PROBE-C14C-MARK-TWO-APPLIES sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7b/7beacfed8434ec105a580c320473c06e094fadc9298cb6b4d322e082dcee25d1.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) c=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C14C-MARK-TWO-APPLIES" with 2 test cases passed after 5.109 seconds.
+◇ Test "PROBE-C14C-PASSED-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14C-PASSED-LANE" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst setup done
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.downloading), yReroute: Optional("nil"), cInterests: Optional(2), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-LANE-AFTER" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst setup done
+PROBE-C14C-PASSED-LANE followVisitedFirst before the 429: (owed: false, y: Optional(ZTronAssetSync.JobState.downloading), cLane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14C-PASSED-LANE followVisitedFirst right after the 429: (throttle: nil, c: nil)
+PROBE-C14C-PASSED-LANE followVisitedFirst after the drain: (throttle: nil, c: nil, y: Optional(ZTronAssetSync.JobState.downloading), reroute: nil)
+PROBE-C14C-PASSED-LANE followVisitedFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) q=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/27/274c608650ae324318dd60f6d2f0b02e04bd54888d424a8b2de952c139908810.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14C-PASSED-LANE" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.verifying), yReroute: Optional("Optional(Set([zz-u]))"), cInterests: Optional(2), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) cStarts=1
+✔ Test "PROBE-C14R-PASSED-LANE-AFTER" with 2 test cases passed after 3.863 seconds.
+◇ Test "PROBE-C14R-PASSED-FAIL-BARRIER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-FAIL-BARRIER" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst setup done
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.downloading), yReroute: Optional("nil"), cInterests: Optional(2), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14R-PASSED-FAIL followVisitedFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14C-PASSED-LANE sweepFollowsFirst pre-hold: (store: false, y: Optional(ZTronAssetSync.JobState.downloading), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst after Y's release: (y: Optional(ZTronAssetSync.JobState.verifying), store: false, owed: true) heldUnits=1
+PROBE-C14C-PASSED-LANE sweepFollowsFirst before the 429: (owed: true, y: Optional(ZTronAssetSync.JobState.verifying), cLane: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst right after the 429: (throttle: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst after the drain: (throttle: nil, c: nil, y: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([zz-u])))
+PROBE-C14C-PASSED-LANE sweepFollowsFirst u=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) q=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/27/274c608650ae324318dd60f6d2f0b02e04bd54888d424a8b2de952c139908810.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-FAIL-BARRIER" started.
+✔ Test "PROBE-C14C-PASSED-LANE" with 2 test cases passed after 4.550 seconds.
+◇ Test "PROBE-C14C-STAMP-AHEAD" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14C-STAMP-AHEAD" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst setup done
+PROBE-C14C-STAMP-AHEAD followVisitedFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: false, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading), k1: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C14C-STAMP-AHEAD followVisitedFirst at the barrier's end: (k1: Optional(ZTronAssetSync.JobState.downloading), k2: nil)
+PROBE-C14C-STAMP-AHEAD followVisitedFirst k2=success(ZTronAssetModel.AssetLocation(id: zz-k2, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5d/5d041dde722fcdbe55ea42f5c4baec6b86afdcc16297c473971f3d2586effed2.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k1=success(ZTronAssetModel.AssetLocation(id: zz-k1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d23409d85cf976f3f51e75c85b005f273f48cc4b887f1f954157ec64fe1e5ba8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/35/352ce0075ea673aee578d6ee8127dd4e2233448baa460b83f1a2940e79756d48.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k2Starts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14C-STAMP-AHEAD" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false before the 429: (barrier: true, y: Optional(ZTronAssetSync.JobState.verifying), yReroute: Optional("Optional(Set([zz-u]))"), cInterests: Optional(1), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false right after the 429: (throttle: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14R-PASSED-FAIL sweepFollowsFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+✔ Test "PROBE-C14R-PASSED-FAIL-BARRIER" with 2 test cases passed after 3.626 seconds.
+◇ Test "PROBE-C14R-PASSED-FAIL-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-FAIL-AFTER" started.
+PROBE-C14C-STAMP-AHEAD sweepFollowsFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: true, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading), k1: nil)
+PROBE-C14C-STAMP-AHEAD sweepFollowsFirst at the barrier's end: (k1: Optional(ZTronAssetSync.JobState.downloading), k2: Optional(ZTronAssetSync.JobState.verifying))
+PROBE-C14C-STAMP-AHEAD sweepFollowsFirst k2=success(ZTronAssetModel.AssetLocation(id: zz-k2, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5d/5d041dde722fcdbe55ea42f5c4baec6b86afdcc16297c473971f3d2586effed2.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k1=success(ZTronAssetModel.AssetLocation(id: zz-k1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d23409d85cf976f3f51e75c85b005f273f48cc4b887f1f954157ec64fe1e5ba8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/35/352ce0075ea673aee578d6ee8127dd4e2233448baa460b83f1a2940e79756d48.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k2Starts=1
+✔ Test "PROBE-C14C-STAMP-AHEAD" with 2 test cases passed after 2.671 seconds.
+✔ Suite "VerifyC15ReproC14Correct" passed after 12.332 seconds.
+PROBE-C14R-PASSED-LANE followVisitedFirst setup done
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.downloading), yReroute: Optional("nil"), cInterests: Optional(2), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14R-PASSED-FAIL followVisitedFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-FAIL-AFTER" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst setup done
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.verifying), yReroute: Optional("Optional(Set([zz-u]))"), cInterests: Optional(2), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14R-PASSED-FAIL sweepFollowsFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+✔ Test "PROBE-C14R-PASSED-FAIL-AFTER" with 2 test cases passed after 3.653 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 15.065 seconds.
+✔ Test run with 7 tests in 2 suites passed after 15.065 seconds.
+exit=0

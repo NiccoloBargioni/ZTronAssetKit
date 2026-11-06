@@ -1,0 +1,11 @@
+PROBE SECU-01 all: missing=3 bytesMissing=9223372036854775807
+PROBE SECU-01 a+c: missing=2 bytesMissing=9223372036854775807
+✔ Test "probe SECU-01: availability with two Int64.max entries saturates" passed after 0.003 seconds.
+PROBE OI-14 control result=CleanupResult(bytesFreed: 600, filesRemoved: 6, bytesDeferred: 0) used after=400
+✔ Test "probe OI-14 control: swap then eviction alone" passed after 0.012 seconds.
+PROBE OI-14 before: used=1000 pending=0 budget=500
+PROBE OI-14 apply: reused=["o8", "o9"] contentChanged=["o8", "o9"] releasedBytes delta=0 used=1000 pending=0
+PROBE OI-14 result=CleanupResult(bytesFreed: 600, filesRemoved: 6, bytesDeferred: 0) evicted=[0, 1, 2, 3, 4, 5] used after=400 pending=600
+✔ Test "probe OI-14: a content swap during eviction's candidates unit frees nothing, so eviction still frees 600" passed after 0.017 seconds.
+✔ Test "probe S3-PERF-04: ReapQueue random model" passed after 1.106 seconds.
+✔ Test run with 4 tests in 1 suite passed after 1.107 seconds.

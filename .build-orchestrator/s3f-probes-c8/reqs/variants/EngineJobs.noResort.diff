@@ -1,0 +1,10 @@
+--- variants/EngineJobs.head.swift	2026-10-30 08:43:27
++++ variants/EngineJobs.noResort.swift	2026-10-30 08:43:28
+@@ -723,7 +723,6 @@
+             if let room, smallest > room.subtractingClamped(ahead) {
+                 return
+             }
+-            candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+         case .bounded:
+             self.scheduleSpaceSweepFollowUp(sweep)
+             return

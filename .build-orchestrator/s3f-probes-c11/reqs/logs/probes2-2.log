@@ -1,0 +1,105 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Test "PROBE-C10-JOIN-RETIRE" started.
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+◇ Test "PROBE-C11R-COMMIT-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-JOIN-RETIRE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C11R-COMMIT-REROUTE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C11R-COMMIT-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+PROBE-C10-JOIN-RETIRE followVisitedFirst afterFailure: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, ZTronAssetModel.AssetPriority.prefetch, 1)), waits: false)
+PROBE-C10-JOIN-RETIRE followVisitedFirst mid: (owed: false, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1)), joins: 0, violations: [])
+PROBE-C10-JOIN-RETIRE followVisitedFirst after: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, 4, 1)), violations: []) starts: 1
+PROBE-C10-JOIN-RETIRE followVisitedFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8a/8ae57175bdd83229f84a1bca5312b61c9807c99dc9e5a80bf742c296f5ffd1bc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) j=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C11R-COMMIT-REROUTE followVisitedFirst after: (n: Optional(ZTronAssetSync.JobState.downloading), r: Optional(ZTronAssetSync.JobState.queued))
+PROBE-C11R-COMMIT-REROUTE followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a4/a49901fee54e8c90b6303c2994adb9c96d8e042c872171fd6ec939ec3828e14f.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) r=success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) h=success(ZTronAssetModel.AssetLocation(id: zz-h, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7c/7c29a325f6578eed49706fb8eb43611d39be0f0389944b2b4ed29a655a3e5c49.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C11R-COMMIT-REROUTE sweepFollowsFirst after: (n: Optional(ZTronAssetSync.JobState.queued), r: Optional(ZTronAssetSync.JobState.downloading))
+✘ Test "PROBE-C11R-COMMIT-REROUTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:148:9: Expectation failed: after.n == .downloading && after.r == .queued
+↳ PROBE-C11R-COMMIT-REROUTE: N, created by C's visit before R's request, takes the slot C's commit frees (visit-first): (n: Optional(ZTronAssetSync.JobState.queued), r: Optional(ZTronAssetSync.JobState.downloading))
+↳ after.n == .downloading && after.r == .queued → false
+↳   after.n == .downloading → false
+↳   after.r == .queued → <not evaluated>
+PROBE-C11R-COMMIT-REROUTE sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a4/a49901fee54e8c90b6303c2994adb9c96d8e042c872171fd6ec939ec3828e14f.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) r=success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) h=success(ZTronAssetModel.AssetLocation(id: zz-h, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7c/7c29a325f6578eed49706fb8eb43611d39be0f0389944b2b4ed29a655a3e5c49.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-JOIN-RETIRE" started.
+✘ Test "PROBE-C11R-COMMIT-REROUTE" with 2 test cases failed after 1.126 seconds with 1 issue.
+↳ /// PROBE-C11R-COMMIT-REROUTE (the draft's residual R-A, "the publication and commit paths"): two slots. C (100 KB,
+↳ /// content X) downloads for A's user waiter (zz-a) and B's (zz-b); H downloads for a third user waiter. v3 moves zz-a
+↳ /// to a 16-byte content N while the follow owes C's visit. R (zz-r) is then requested for user work, and C completes.
+↳ /// Visit-first: C's visit re-routed A to N before R's request, so N took its queue place first and takes the slot C's
+↳ /// commit frees; R waits. Behind the barrier R's join waits, then C's commit re-routes A (its id is not bound) as a
+↳ /// join that waits behind R's, so the drain places R first and R takes the slot.
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst afterFailure: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 0, ZTronAssetModel.AssetPriority.userInitiated, 2)), waits: true)
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst mid: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 2)), joins: 1, violations: [])
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst after: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, 4, 1)), violations: []) starts: 1
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8a/8ae57175bdd83229f84a1bca5312b61c9807c99dc9e5a80bf742c296f5ffd1bc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) j=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C10-JOIN-RETIRE" with 2 test cases passed after 1.602 seconds.
+◇ Test "PROBE-C10-THROTTLE-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-THROTTLE-LANE" started.
+PROBE-C10-THROTTLE-LANE followVisitedFirst figures: (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+PROBE-C10-THROTTLE-LANE followVisitedFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f6/f638f9105b0b795bc82992eada72e0bf4c65ad20d6f672cd18cc2356d325744a.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be217992888eb6ff4908966035ec6aa741f283d926340ba9514f2eab9ddfb58d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-THROTTLE-LANE" started.
+PROBE-C10-THROTTLE-LANE sweepFollowsFirst figures: (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+PROBE-C10-THROTTLE-LANE sweepFollowsFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f6/f638f9105b0b795bc82992eada72e0bf4c65ad20d6f672cd18cc2356d325744a.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be217992888eb6ff4908966035ec6aa741f283d926340ba9514f2eab9ddfb58d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C10-THROTTLE-LANE" with 2 test cases passed after 1.499 seconds.
+✔ Suite "VerifyC10CorrectProbes" passed after 3.102 seconds.
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:42:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:42:6: Time limit was exceeded: 180.000 seconds
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst before: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:71:13: Expectation failed: before.owed && before.lane == .userInitiated && before.c == .downloading
+↳ setup: C runs on the user lane and its visit is owed: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+↳ before.owed && before.lane == .userInitiated && before.c == .downloading → false
+↳   before.owed && before.lane == .userInitiated → false
+↳   before.c == .downloading → <not evaluated>
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst after: (lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading), policyPause: nil) pauses=0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:80:9: Expectation failed: pauses == 1
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C's visit, lowering it under Low Data Mode, pauses it once (visit-first): 0 pause(s)
+↳ pauses == 1 → false
+↳   pauses → 0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:82:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A is served from W: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst: pauses=0 starts=1 a=failure(ZTronAssetModel.AssetError.cancelled)
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:92:9: Expectation failed: starts == 2
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C, paused by its demotion, starts again once the network is unrestricted (visit-first): 1
+↳ starts == 2 → false
+↳   starts → 1
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:118:13: Expectation failed: outcome.completeReport != nil
+↳ .failed(ZTronAssetModel.AssetError.cancelled)
+↳ outcome.completeReport != nil → false
+↳   outcome.completeReport → nil
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst before: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst after: (lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading), policyPause: nil) pauses=0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:80:9: Expectation failed: pauses == 1
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C's visit, lowering it under Low Data Mode, pauses it once (visit-first): 0 pause(s)
+↳ pauses == 1 → false
+↳   pauses → 0
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:82:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A is served from W: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst: pauses=0 starts=1 a=failure(ZTronAssetModel.AssetError.cancelled)
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:92:9: Expectation failed: starts == 2
+↳ PROBE-C11R-UNCONSTRAIN-DEMOTE: C, paused by its demotion, starts again once the network is unrestricted (visit-first): 1
+↳ starts == 2 → false
+↳   starts → 1
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierTests.swift:118:13: Expectation failed: outcome.completeReport != nil
+↳ .failed(ZTronAssetModel.AssetError.cancelled)
+↳ outcome.completeReport != nil → false
+↳   outcome.completeReport → nil
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" with 2 test cases failed after 192.270 seconds with 11 issues.
+↳ /// PROBE-C11R-UNCONSTRAIN-DEMOTE (the draft's residual R-D, "a visit reads inputs that arrived after it was owed"):
+↳ /// under Low Data Mode, C (1 MB, content X) downloads for A's user waiter (zz-a) and a prefetch member P (zz-p).
+↳ /// v3 moves zz-a to a 16-byte content W while the follow owes C's visit. The network then becomes unrestricted.
+↳ /// Visit-first: C's visit lowers it to the prefetch lane while Low Data Mode still holds, so `relane`'s demotion
+↳ /// pause (`pauseIfRefused`) pauses it (1 pause), and the later unrestricted element re-admits it (2 starts). Behind
+↳ /// the barrier the unrestricted conditions are already in `state.conditions` when the visit runs, so the demotion
+↳ /// pause reads them and does not pause C (0 pauses, 1 start); the deferred conditions pass (snapshot unrestricted)
+↳ /// pauses nothing either.
+✘ Suite "Engine runs" failed after 192.270 seconds with 12 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 4 tests in 2 suites failed after 192.270 seconds with 12 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

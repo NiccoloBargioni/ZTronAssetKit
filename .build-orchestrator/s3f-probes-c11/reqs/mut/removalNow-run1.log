@@ -1,0 +1,72 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Test "PROBE-C10-JOIN-RETIRE" started.
+◇ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-JOIN-RETIRE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+PROBE-C10-JOIN-RETIRE followVisitedFirst afterFailure: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, ZTronAssetModel.AssetPriority.prefetch, 1)), waits: false)
+PROBE-C10-JOIN-RETIRE followVisitedFirst mid: (owed: false, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1)), joins: 0, violations: [])
+PROBE-C10-JOIN-RETIRE followVisitedFirst after: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, 4, 1)), violations: []) starts: 1
+PROBE-C10-JOIN-RETIRE followVisitedFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8a/8ae57175bdd83229f84a1bca5312b61c9807c99dc9e5a80bf742c296f5ffd1bc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) j=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-JOIN-RETIRE" started.
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst afterFailure: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 0, ZTronAssetModel.AssetPriority.userInitiated, 2)), waits: true)
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst mid: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 1)), joins: 1, violations: [])
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:420:25: Issue recorded
+↳ C keeps its backoff with J's interest (visit-first failed(.at)): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 1)), forNobody: [])
+✘ Test "PROBE-C10-JOIN-RETIRE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:151:25: Issue recorded
+↳ C keeps its backoff with J's interest (visit-first failed(.at), 1 attempt): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 8, 1)), violations: []), starts 2
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst after: (c: Optional((ZTronAssetSync.JobState.downloading, 0, 8, 1)), violations: []) starts: 2
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:422:9: Expectation failed: after.c?.1 == 1 && after.c?.2 == 1
+↳ the failed attempt stays counted and J alone holds C (visit-first): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 1)), forNobody: [])
+↳ after.c?.1 == 1 && after.c?.2 == 1 → false
+↳   after.c?.1 == 1 → false
+↳   after.c?.2 == 1 → <not evaluated>
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:423:9: Expectation failed: cStarts == 1
+↳ no second attempt before the backoff ends (visit-first): 2
+↳ cStarts == 1 → false
+↳   cStarts → 2
+✘ Test "PROBE-C10-JOIN-RETIRE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:153:9: Expectation failed: after.c?.1 == 1
+↳ the failed attempt stays counted (visit-first): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 8, 1)), violations: [])
+↳ after.c?.1 == 1 → false
+↳   after.c?.1 → 0
+↳     some → 0
+↳     some → 1
+✘ Test "PROBE-C10-JOIN-RETIRE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:154:9: Expectation failed: cStarts == 1
+↳ no second attempt before the backoff ends (visit-first): 2
+↳ cStarts == 1 → false
+↳   cStarts → 2
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8a/8ae57175bdd83229f84a1bca5312b61c9807c99dc9e5a80bf742c296f5ffd1bc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) j=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" with 2 test cases failed after 0.696 seconds with 3 issues.
+↳ /// A withdrawal made while the follow owes a visit is applied after the answers it would have followed: C (1 MB) is the
+↳ /// content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter); v3 moves zz-a to a 16-byte content while the
+↳ /// follow owes C's visit. C's attempt fails with a 500 (a retry), then a prefetch request J for zz-b arrives, then P
+↳ /// withdraws. Visited first, C backed off (`failed(.at)`, one attempt counted), J joined it and kept it after P left,
+↳ /// and no second attempt started before the backoff ended. With J's join waiting behind C's verdict and P's withdrawal
+↳ /// applied at once, the visit that moved M left C without an interest: C was retired, and the drain created a fresh
+↳ /// job for J that started at once (PROBE-C10-JOIN-RETIRE). P's caller is answered at once in both orders (R-SYN-4,
+↳ /// R-SYN-10), and no transfer runs for nobody once the follow's events are applied (R-CAR-4).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.697 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test "PROBE-C10-JOIN-RETIRE" with 2 test cases failed after 0.697 seconds with 3 issues.
+↳ /// PROBE-C10-JOIN-RETIRE: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter); v3
+↳ /// moves zz-a to a 16-byte content while the follow owes C's visit. C's attempt fails with a 500 (a retry), then a
+↳ /// prefetch request J for zz-b arrives, then P withdraws. Visited first, C backs off (`failed(.at)`, one attempt
+↳ /// counted), J joins it and keeps it after P leaves, and no second attempt starts before the backoff ends. With J's
+↳ /// join waiting behind C's verdict, the visit that moves M leaves C without an interest, so C is retired; the drain
+↳ /// creates a fresh job for J (no attempt counted, no backoff), which starts at once.
+✘ Suite "VerifyC10CorrectProbes" failed after 0.697 seconds with 3 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 2 tests in 2 suites failed after 0.697 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

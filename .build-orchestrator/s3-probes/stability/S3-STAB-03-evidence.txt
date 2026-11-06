@@ -1,0 +1,19 @@
+S3-STAB-03 evidence (1-minute time limits exceeded or nearly exceeded under TSan on the loaded host).
+
+== TSan run 1 (whole package, started at load 192/196/114, Sync target at load ~180-190): tsan-1.log
+✘ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" recorded an issue at EngineModelTests.swift:21:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" failed after 87.009 seconds with 1 issue.
+✘ Suite "Engine model" failed after 89.102 seconds with 1 issue.
+✘ Test run with 351 tests in 52 suites failed after 114.022 seconds with 1 issue.
+
+== Per-run wall time of the tests with a 1-minute limit that came closest (seconds):
+R-SYN-2: 10,000 seeded random operations | full-1=7.419 full-2=31.784 full-3=11.481 full-4=13.814 tsan-1=87.009 tsan-2=40.821
+R-STO-11: a user-initiated prefetch group joined right after start | full-1=4.894 full-2=15.990 full-3=7.629 full-4=8.187 tsan-1=58.767 tsan-2=31.902
+R-STO-11: ensureAvailable right after start, beside | full-1=4.721 full-2=16.317 full-3=7.584 full-4=7.903 tsan-1=58.531 tsan-2=31.299
+Test support: start racing stop ends every start exactly once | full-1=13.109 full-2=36.768 full-3=19.582 full-4=19.357 tsan-1=57.253 tsan-2=54.127
+R-SYN-6: a run whose parked claim a re-admission turn | full-1=4.457 full-2=17.559 full-3=7.576 full-4=8.466 tsan-1=52.572 tsan-2=26.363
+R-SYN-14: while a job's adoption holds the last claimed prior-art file | full-1=4.567 full-2=16.100 full-3=7.389 full-4=8.224 tsan-1=51.930 tsan-2=26.514
+R-CAR-4: a join's give-up of more than releasesPerTurn | full-1=4.062 full-2=15.314 full-3=6.610 full-4=7.291 tsan-1=43.228 tsan-2=20.828
+
+== R-SYN-2 alone under TSan, 3 repetitions, no other test in the process (rsyn2-tsan.log, load ~77):
+✔ Test "R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine invariant" passed after 46.302 seconds.

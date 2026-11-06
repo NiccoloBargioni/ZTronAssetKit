@@ -1,0 +1,11 @@
+C2 refresh under a 10,000-member prefetch group: longest actor wait 17.447542 ms (budgets 50.0 ms median, 10.0 ms best); runs [17.447542, 17.281916, 18.218042]
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:86:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "C2: shutting down an engine under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:30:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+C2 refresh under a 10,000-member prefetch group: longest actor wait 22.609125 ms (budgets 50.0 ms median, 10.0 ms best); runs [22.609125, 19.101792, 22.936792]
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:87:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+S3-PERF diagnostic at 1000 jobs: followApplied() alone 0.862292 ms (of which sorting the job table's keys 0.32125 ms)
+S3-PERF diagnostic at 10000 jobs: followApplied() alone 10.442 ms (of which sorting the job table's keys 2.920834 ms)
+S3-PERF diagnostic at 10000 jobs: followApplied() alone 9.989667 ms (of which sorting the job table's keys 2.846958 ms)
+S3-PERF diagnostic at 10000 jobs: followApplied() alone 10.417417 ms (of which sorting the job table's keys 2.9465 ms)
+C2 refresh under a 10,000-member prefetch group: longest actor wait 17.196041 ms (budgets 50.0 ms median, 10.0 ms best); runs [19.428083, 16.943084, 17.196041]
+✘ Test "C2: a sync run that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" recorded an issue at S3PerfShutdownProbe.swift:87:9: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget

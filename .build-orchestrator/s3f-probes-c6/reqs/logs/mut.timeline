@@ -1,0 +1,25 @@
+[05:21:00 load { 10.77 32.83 93.07 }] build head
+[05:23:46 load { 71.63 49.99 89.14 }] build head exit 0
+[05:23:55 load { 72.06 50.44 89.06 }] test head run1 exit 0
+[05:24:02 load { 70.07 50.72 88.71 }] test head run2 exit 0
+[05:24:02 load { 70.07 50.72 88.71 }] build prefix
+[05:24:12 load { 68.59 51.04 88.38 }] build prefix exit 0
+[05:24:18 load { 67.34 51.07 88.18 }] test prefix run1 exit 1
+[05:24:24 load { 65.87 51.04 87.95 }] test prefix run2 exit 1
+[05:24:24 load { 65.87 51.04 87.95 }] build noLaneRejudge
+[05:24:34 load { 64.20 51.15 87.55 }] build noLaneRejudge exit 0
+[05:24:40 load { 65.62 51.67 87.52 }] test noLaneRejudge run1 exit 1
+[05:24:44 load { 64.05 51.57 87.28 }] test noLaneRejudge run2 exit 1
+[05:24:44 load { 64.05 51.57 87.28 }] build noParkBound
+[05:24:49 load { 59.96 50.93 86.84 }] build noParkBound exit 0
+[05:24:53 load { 57.96 50.67 86.54 }] test noParkBound run1 exit 1
+[05:24:56 load { 55.96 50.37 86.22 }] test noParkBound run2 exit 1
+[05:24:56 load { 55.96 50.37 86.22 }] build skipNotFit
+[05:25:01 load { 55.96 50.37 86.22 }] build skipNotFit exit 0
+[05:25:05 load { 54.52 50.17 85.94 }] test skipNotFit run1 exit 0
+[05:25:09 load { 52.48 49.82 85.61 }] test skipNotFit run2 exit 0
+[05:25:09 load { 52.48 49.82 85.61 }] build requeueNoAhead
+[05:25:12 load { 51.24 49.60 85.32 }] build requeueNoAhead exit 1
+[05:25:17 load { 50.58 49.49 85.07 }] test requeueNoAhead run1 exit 0
+[05:25:21 load { 50.58 49.49 85.07 }] test requeueNoAhead run2 exit 0
+[05:25:21 load { 50.58 49.49 85.07 }] DONE

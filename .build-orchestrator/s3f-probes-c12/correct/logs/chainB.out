@@ -1,0 +1,13 @@
+=== ios 02:42:45 { 9.09 34.92 54.61 }
+ios exit 0
+ios warnings 0 errors 0
+=== sim 02:43:07 { 19.10 35.01 54.06 }
+sim exit 0
+bundle /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_02-43-13-+0100.xcresult
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainB.sh: line 18: 74967 Terminated: 15          sample > $L/load-sim.txt
+summary exit 0
+{'result': 'Passed', 'totalTestCount': 1428, 'passedTests': 1428, 'failedTests': 0, 'skippedTests': 0, 'expectedFailures': 0}
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+shutdown exit 149
+=== doneB 02:50:01 { 49.94 87.65 77.81 }

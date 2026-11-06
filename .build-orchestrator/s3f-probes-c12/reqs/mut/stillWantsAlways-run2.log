@@ -1,0 +1,27 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+✘ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:362:9: Expectation failed: left == nil
+↳ no job is left for the ended run's fetch (visit-first): Optional((ZTronAssetSync.JobState.downloading, 1))
+↳ left == nil → false
+↳   left → (ZTronAssetSync.JobState.downloading, 1)
+↳     some → (ZTronAssetSync.JobState.downloading, 1)
+↳       .0 → .downloading
+↳       .1 → 1
+✘ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" with 2 test cases failed after 2.787 seconds with 1 issue.
+↳ /// A run's join that waits for the follow is not made once the run ended: v3 adds E (zz-e), a fetch of the run that
+↳ /// applies it, which joins E while the follow it started is owed. A purge then ends the run (`cancelled`). Visited
+↳ /// first, the run's join created E's job and the run's end retired it again; a drain that made the waiting join gave E a
+↳ /// job no run wants, which started.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.787 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.787 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

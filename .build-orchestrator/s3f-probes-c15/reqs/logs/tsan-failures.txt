@@ -1,0 +1,35 @@
+1004:✔ Test "R-SYN-15: a source built after shutdown began is invalidated at once and start fails with shutDown" passed after 5.530 seconds.
+1005:✔ Test "R-ENV-1: a cancelled ManualTimeSource sleeper throws promptly and leaves no sleeper behind" passed after 5.539 seconds.
+1006:✔ Test "R-OBS-3: diagnostics answer while the engine is degraded, with its error ring and the last-known generation and stamp" passed after 5.812 seconds.
+1007:✔ Test "R-CAR-7: a store that cannot open degrades the engine and every API answers storageUnavailable" passed after 5.887 seconds.
+1411:✔ Test "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" with 2 test cases passed after 5.346 seconds.
+1427:✔ Test "R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject during a 10,000-asset sync" passed after 55.564 seconds.
+1428:✔ Suite "Engine events" passed after 55.568 seconds.
+1430:✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 58.668 seconds.
+1431:✔ Suite "Engine regressions" passed after 58.670 seconds.
+1448:✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:721:6: Time limit was exceeded: 180.000 seconds
+1449:✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:781:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+1452:✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" with 2 test cases failed after 194.636 seconds with 2 issues.
+1798:✘ Suite "Engine follow barrier (F-28)" failed after 586.142 seconds with 2 issues.
+1803:✘ Test run with 511 tests in 53 suites failed after 586.143 seconds with 2 issues.
+✔ Test "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" with 2 test cases passed after 4.537 seconds.
+◇ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+✔ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" with 2 test cases passed after 4.433 seconds.
+◇ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:721:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:781:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+↳ B is served N, the content v3 maps zz-b to (visit-first): failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? bResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" with 2 test cases failed after 194.636 seconds with 2 issues.
+↳ /// A retried publication of a job the follow passed after its apply serves the moved id its new content, and a later
+↳ /// apply's follow that passes the job's next publication answers as a visit-first engine's: C (100 kB, the content of
+↳ /// zz-a, zz-b and zz-c, a user waiter each) publishes after v3's apply, which moves zz-b to N (16 bytes); behind the
+↳ /// barrier the follow passes C while it verifies. C's verification read then fails (EIO), a transient error the
+↳ /// interactive policy retries. Visited first, B was moved onto N at the apply and served N; C's retry downloaded
+↳ /// bytes that fail their checksum, and v4, applied while that second publication verified, moved zz-c to N2 (24
+↳ /// bytes): its follow passed C, publishing, so A and zz-c's user were answered `integrityFailure`. Behind the barrier,
+↳ /// left to C's retry, B rode it and was answered C's failure; and a pass's mark kept from the first publication

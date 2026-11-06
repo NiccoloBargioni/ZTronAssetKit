@@ -1,0 +1,33 @@
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/Sources/ZTronAssetSync/Engine/EngineFollow.swift	2026-10-31 17:09:37
++++ Sources/ZTronAssetSync/Engine/EngineFollow.swift	2026-10-31 18:55:45
+@@ -395,7 +395,12 @@
+         case .queued, .blocked:
+             return false
+         }
+-        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch, published: job.rerouteOnPass != nil)
++        let published = job.rerouteOnPass != nil
++        if !published {
++            let movedAtArrival = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
++            self.state.jobs[transfer]?.rerouteOnPass = movedAtArrival
++        }
++        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch, published: published)
+         self.deferToFollow(.attemptFailed(transfer, epoch: job.epoch, verdict: verdict))
+         self.notifyObservers()
+         return true
+@@ -624,7 +629,7 @@
+         case .verifying, .committing:
+             return true
+         case .failed:
+-            return self.state.verdictsAfterFollow[job.transfer]?.published == true
++            return self.state.verdictsAfterFollow[job.transfer] != nil
+         case .queued, .blocked, .downloading:
+             return false
+         }
+@@ -652,6 +657,7 @@
+         }
+         if self.passesOnVisit(job) {
+             let passed = moved.subtracting(job.rerouteOnPass ?? [])
++            self.state.jobs[transfer]?.rerouteOnPass = []
+             if !passed.isEmpty {
+                 self.state.unfollowed.insert(transfer)
+             }

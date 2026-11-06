@@ -1,0 +1,16 @@
+# S3-SECU-01 run (swift test --skip-build --filter S3SecurityStorageProbeTests), load avg ~300 at the time
+error: Process (swiftpm-testing-helper ZTronAssetStorageTests) exited with unexpected signal code 5
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "S3 security probes: storage" started.
+◇ Test "R-MAN-3: availability never traps when the declared sizes of missing entries sum past Int64.max" started.
+Note: Some test targets reported failures:
+  - ZTronAssetStorageTests (Swift Testing)
+
+# crash report ~/Library/Logs/DiagnosticReports/swiftpm-testing-helper-2026-10-29-091145.ips, triggered thread:
+{'codes': '0x0000000000000001, 0x00000001098ad8b4', 'rawCodes': [1, 4455061684], 'type': 'EXC_BREAKPOINT', 'signal': 'SIGTRAP'}
+Swift runtime failure: arithmetic overflow /<compiler-generated> None
+AssetStore.currentAvailability(of:) AssetStore+Reads.swift 85
+AssetStore.availability(of:) AssetStore.swift 99
+S3SecurityStorageProbeTests.availabilitySaturatesBytesMissing() S3SecurityStorageProbeTests.swift 29

@@ -1,0 +1,22 @@
+start 22:16:44 load { 63.73 37.01 33.78 }
+run 1 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.112 seconds. load { 65.28 37.77 34.07 } 22:16:52
+run 2 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.202 seconds. load { 64.71 38.53 34.38 } 22:17:01
+run 3 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.450 seconds. load { 65.71 39.61 34.81 } 22:17:10
+run 4 exit 0 ✔ Test run with 1 test in 1 suite passed after 6.116 seconds. load { 65.57 40.45 35.17 } 22:17:20
+run 5 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.219 seconds. load { 59.79 40.03 35.08 } 22:17:29
+run 6 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.630 seconds. load { 62.50 41.24 35.57 } 22:17:39
+run 7 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.037 seconds. load { 62.62 41.62 35.73 } 22:17:48
+run 8 exit 0 ✔ Test run with 1 test in 1 suite passed after 4.010 seconds. load { 56.76 41.05 35.60 } 22:17:54
+run 9 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.192 seconds. load { 54.38 40.82 35.55 } 22:18:03
+run 10 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.260 seconds. load { 50.34 40.41 35.47 } 22:18:11
+run 11 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.598 seconds. load { 48.10 40.25 35.47 } 22:18:21
+run 12 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.301 seconds. load { 47.14 40.29 35.54 } 22:18:30
+run 13 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.998 seconds. load { 45.59 40.19 35.55 } 22:18:39
+run 14 exit 0 ✔ Test run with 1 test in 1 suite passed after 5.088 seconds. load { 48.99 40.98 35.86 } 22:18:47
+run 15 exit 0 ✔ Test run with 1 test in 1 suite passed after 4.153 seconds. load { 61.72 43.96 36.98 } 22:18:56
+run 16 exit 0 ✔ Test run with 1 test in 1 suite passed after 4.538 seconds. load { 66.72 45.65 37.66 } 22:19:04
+run 17 exit 0 ✔ Test run with 1 test in 1 suite passed after 4.396 seconds. load { 67.46 46.15 37.89 } 22:19:11
+run 18 exit 0 ✔ Test run with 1 test in 1 suite passed after 3.962 seconds. load { 68.54 46.73 38.14 } 22:19:18
+run 19 exit 0 ✔ Test run with 1 test in 1 suite passed after 4.669 seconds. load { 70.38 47.84 38.63 } 22:19:25
+run 20 exit 0 ✔ Test run with 1 test in 1 suite passed after 4.652 seconds. load { 69.61 48.40 38.94 } 22:19:33
+end 22:19:33

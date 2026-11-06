@@ -1,0 +1,11 @@
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -791,7 +791,7 @@
+         guard self.holdsMovedID(job) else {
+             return true
+         }
+-        guard follows < Self.followsPerTurn else {
++        guard follows <= Self.followsPerTurn else {
+             return false
+         }
+         follows += 1

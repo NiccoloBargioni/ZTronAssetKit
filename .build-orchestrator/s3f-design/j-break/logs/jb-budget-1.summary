@@ -1,0 +1,10 @@
+exit=1
+✘ Test "PROBE-J-FAIL-REROUTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:84:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(pBytes.count)
+✘ Test "PROBE-J-FAIL-REROUTE" with 2 test cases failed after 4.482 seconds with 1 issue.
+✘ Test "PROBE-J-FAIL-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:137:9: Expectation failed: (try? a1Result.get())?.byteSize == Int64(n1Bytes.count)
+✘ Test "PROBE-J-FAIL-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:140:25: Issue recorded
+✘ Test "PROBE-J-FAIL-TICKET" with 2 test cases failed after 4.819 seconds with 2 issues.
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" recorded an issue at JBreakProbes.swift:185:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" recorded an issue at JBreakProbes.swift:231:9: Expectation failed: pResult == .failure(.shutDown) || pResult == .failure(.insufficientSpace(required: Int64(pBytes.count), available: 2_000_000))
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" failed after 192.009 seconds with 2 issues.
+✘ Test run with 4 tests in 1 suite failed after 205.565 seconds with 5 issues.

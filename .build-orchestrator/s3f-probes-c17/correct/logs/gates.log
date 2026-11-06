@@ -1,0 +1,6 @@
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+unsafe rc=0
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+docs rc=0

@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC4Correct probes" started.
+◇ Test "PROBE-C4-SPACE-PARTIAL: a space sweep during the follow answers a shared content's moved and kept ids each from its own content" started.
+◇ Test "PROBE-C4-SPACE-ORIG: a space sweep during the follow does not answer a moved id with its replaced content's figures" started.
+◇ Test case passing 1 argument roomBeforeReclaim → 2000000 to "PROBE-C4-SPACE-PARTIAL: a space sweep during the follow answers a shared content's moved and kept ids each from its own content" started.
+◇ Test case passing 1 argument roomBeforeReclaim → 500000 to "PROBE-C4-SPACE-PARTIAL: a space sweep during the follow answers a shared content's moved and kept ids each from its own content" started.
+PROBE-C4-SPACE-PARTIAL[500000] before: (listed: true, keepListed: true, parked: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), reached: false, owed: true); after the sweep: [] nil owed true
+PROBE-C4-SPACE-PARTIAL[500000] target: success(ZTronAssetModel.AssetLocation(id: zz-target, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e1/e18516d0d0c454ed12c713512045f2aee77145e48b76ee625093f9f21e12eabc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); keep: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4500000)); run: complete(ZTronAssetModel.SyncReport(runID: run-3, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:14:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 0, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 2102, unchangedCount: 1, fetchBytes: 0, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 0, bytesDownloaded: 0, failures: []))
+✘ Test "PROBE-C4-SPACE-PARTIAL: a space sweep during the follow answers a shared content's moved and kept ids each from its own content" recorded an issue with 1 argument roomBeforeReclaim → 500000 at VerifyC4CorrectProbes.swift:156:9: Expectation failed: mid.assets == ["zz-keep"]
+↳ the old job keeps only the unmoved id: nil
+↳ mid.assets == ["zz-keep"] → false
+↳   mid.assets → nil
+↳     some → ["zz-keep"]
+PROBE-C4-SPACE-PARTIAL[2000000] before: (listed: true, keepListed: true, parked: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), reached: false, owed: true); after the sweep: ["zz-keep"] Optional(ZTronAssetSync.JobState.downloading) owed true
+PROBE-C4-SPACE-ORIG before the reap: (listed: true, oldState: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), unfollowed: false, owed: true); after the reap: owed true, old job nil
+PROBE-C4-SPACE-PARTIAL[2000000] target: success(ZTronAssetModel.AssetLocation(id: zz-target, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e1/e18516d0d0c454ed12c713512045f2aee77145e48b76ee625093f9f21e12eabc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); keep: success(ZTronAssetModel.AssetLocation(id: zz-keep, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/22/225b97dd69cd2b49b6f277b80e4a37b1b9291d640c44264ccdda39da07ef3bac.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); run: complete(ZTronAssetModel.SyncReport(runID: run-3, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:14:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 0, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 2102, unchangedCount: 1, fetchBytes: 0, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 0, bytesDownloaded: 0, failures: []))
+✘ Test "PROBE-C4-SPACE-PARTIAL: a space sweep during the follow answers a shared content's moved and kept ids each from its own content" with 2 test cases failed after 0.848 seconds with 1 issue.
+↳ /// PROBE-C4-SPACE-PARTIAL: the replaced content is shared by two listed ids (`zz-keep`, `zz-target`, same 5 MB bytes,
+↳ /// one transfer); the apply moves only `zz-target` to a 16-byte content. During the owed follow the reclaim's sweep
+↳ /// either re-parks the old job (0.5 MB room before the 4 MB reclaim) or re-queues it (2 MB). The moved id must be
+↳ /// answered from its new content; the kept id from the old content: `insufficientSpace(required: 5,000,000, ...)` when
+↳ /// re-parked, success at 5,000,000 bytes when re-queued. Exercises the fix's "keeps some ids, read again" path.
+PROBE-C4-SPACE-ORIG answer: success(ZTronAssetModel.AssetLocation(id: zz-target, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/31/3130125a834142a80d30ea3aa1b77b3a4d96910f3efbabca664ba89317b5e9f9.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C4-SPACE-ORIG: a space sweep during the follow does not answer a moved id with its replaced content's figures" passed after 0.896 seconds.
+✘ Suite "VerifyC4Correct probes" failed after 0.896 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 4, correctness lens). Never committed.
+✘ Test run with 2 tests in 1 suite failed after 0.896 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

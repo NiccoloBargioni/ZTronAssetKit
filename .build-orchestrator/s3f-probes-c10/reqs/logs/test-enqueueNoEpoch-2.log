@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+✘ Test "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:248:9: Expectation failed: xIndex != nil && zIndex != nil && xIndex! < zIndex!
+↳ X, created by the follow before Z, starts first (visit-first): x=Optional(4) z=Optional(3)
+↳ xIndex != nil && zIndex != nil && xIndex! < zIndex! → false
+↳   xIndex != nil && zIndex != nil → true
+↳   xIndex! < zIndex! → false
+✘ Test "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" with 2 test cases failed after 1.304 seconds with 1 issue.
+↳ /// A place that waited for the follow belongs to the job that asked for it, not to a later job of the same transfer:
+↳ /// during the owed follow a prefetch request for zz-k (v3 maps it to X, the new content of zz-a) creates job X, whose
+↳ /// place waits; the request is withdrawn, so X is removed. The follow then visits zz-a's holder C and creates X again
+↳ /// for A's interest (queued at once: a visit's own place), then zz-z's holder D, creating Z. Visited first, X is
+↳ /// created before Z, keeps its place and starts first. With the dead job's place replayed onto the new X, X was queued
+↳ /// again behind Z (PROBE-C9-STALE-PLACE).
+◇ Test "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+✔ Test "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" with 2 test cases passed after 1.855 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 3.159 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 3.160 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

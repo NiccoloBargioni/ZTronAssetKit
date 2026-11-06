@@ -1,0 +1,2 @@
+syncx-3.log:✔ Test run with 511 tests in 53 suites passed after 109.839 seconds.
+syncx-1.log:✔ Test run with 511 tests in 53 suites passed after 86.038 seconds.

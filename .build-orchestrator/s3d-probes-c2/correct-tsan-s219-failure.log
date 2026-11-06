@@ -1,0 +1,54 @@
+✔ Test "R-NET-3: a handler handed over while an earlier one still waits runs only after its own wake's events were staged, and the earlier one still runs" passed after 6.104 seconds.
+✔ Test "R-NET-8: stale background resume data falls back to a fresh download through resumeRejected" with 3 test cases passed after 6.107 seconds.
+✔ Test "R-NET-4: a redirect to a host outside the allow-list is refused and that host receives no request" passed after 6.107 seconds.
+✔ Test "R-NET-2: invalidation fails every live transfer and later starts without touching the network" passed after 6.026 seconds.
+✔ Test "R-NET-5: a manifest fetch sends If-None-Match with the stored ETag and maps 304 to notModified" passed after 6.105 seconds.
+✔ Test "R-NET-5: URLSession never answers a manifest fetch from its own cache, even within max-age" passed after 6.106 seconds.
+✔ Test "R-NET-6: a 403 after the key was withheld on a cross-origin redirect is reported as keyWithheldOnRedirect" passed after 6.108 seconds.
+✔ Test "R-NET-4: a remote path is joined by percent-encoded components under the base path" passed after 6.026 seconds.
+✔ Test "R-NET-4: a cross-host redirect to an allow-listed host is followed without the app key" passed after 6.108 seconds.
+✔ Suite "Background coordinator" passed after 6.110 seconds.
+✔ Suite "Background resume" passed after 6.110 seconds.
+✔ Test "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar" passed after 6.108 seconds.
+✔ Test "R-NET-4: once stripped, the key never returns on a redirect back to the original origin" passed after 6.108 seconds.
+✔ Suite "Manifest fetch" passed after 6.110 seconds.
+✔ Test "R-NET-6: ENOSPC while staging maps to insufficientSpace and other staging failures to local I/O" passed after 6.135 seconds.
+✔ Test "R-NET-2: cancelling the consumer cancels the URLSession task and reports cancelled by the client" passed after 6.080 seconds.
+✔ Test "R-NET-6: every staging failure kind maps into the taxonomy, a cap as oversize and a source failure as local I/O" passed after 6.160 seconds.
+✔ Test "R-NET-8: a refused or invalid resume yields resumeRejected and a fresh attempt stages the whole body" passed after 6.174 seconds.
+✔ Test "R-NET-10: setPriority on a running transfer changes URLSessionTask.priority synchronously" passed after 6.094 seconds.
+✔ Test "R-NET-8: a live resumed transfer counts the resume offset only when the origin continued it with a 206" with 2 test cases passed after 6.180 seconds.
+✔ Suite "Arithmetic on server and configuration figures" passed after 6.215 seconds.
+✔ Test "R-NET-4: same-origin redirects keep the key and the sixth hop is refused" passed after 6.227 seconds.
+✔ Test "R-NET-8: checksum-less transfers are never resumed" passed after 6.226 seconds.
+✔ Test "R-SEC-1: the canary key appears in no transport update, error or log line" passed after 6.227 seconds.
+✔ Suite "Redirects and the app key" passed after 6.229 seconds.
+✔ Suite "Status mapping through the delegate" passed after 6.229 seconds.
+✔ Test "R-NET-8: a weak ETag is never the resume validator: a pause keeps Last-Modified instead, or nothing without it" with 2 test cases passed after 6.246 seconds.
+✔ Test "R-NET-8: a resumed request carries the current key, never a stale one" passed after 6.246 seconds.
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" recorded an issue at ForegroundBackendTests.swift:277:9: Expectation failed: edges.began == expected.count && edges.ended == expected.count
+↳ edges.began == expected.count && edges.ended == expected.count → false
+↳   edges.began == expected.count → true
+↳   edges.ended == expected.count → false
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" failed after 6.664 seconds with 1 issue.
+↳ /// sync-2 S2-19 (ARCHITECTURE §12.4): a per-transfer control reader over a stream nobody finishes leaks one task
+↳ /// per transfer, and the engine's own reader leaks if the update stream outlives its terminal element. ADR-021
+↳ /// gives the foreground handle synchronous controls and no control stream; this pins the consequence against the
+↳ /// real URLSession backend for every way a transfer ends (staged, failed, paused, cancelled): each reader ends at
+↳ /// its one terminal element, every `transfer` interval ended (the stream's termination ran), the session holds no
+↳ /// unfinished task, and once dropped no handle is kept alive by a task (S2-19's reader captured its transfer).
+✔ Test "R-NET-2: 500 downloads through one backend use at most maxConnectionsPerHost TCP connections" passed after 7.320 seconds.
+✔ Test "R-NET-7: writing more than byteSize aborts early as a size mismatch" passed after 7.999 seconds.
+✔ Test "R-NET-8: cancelling a foreground handle discards its partial, unlike a pause, and a cancel after the outcome changes nothing" passed after 7.980 seconds.
+✔ Test "R-NET-8: a connection dropped mid-download resumes with Range and If-Range and the staged file is complete" passed after 8.111 seconds.
+✔ Suite "Sizes and resume" passed after 8.114 seconds.
+✔ Test "R-NET-2: every task's bytes reach its own staging file and the transfer interval ends once per transfer" passed after 9.150 seconds.
+✔ Test "R-NET-2: cancelling by staging name discards the partial unless it keeps it for a pause" passed after 9.905 seconds.
+✘ Suite "Foreground backend" failed after 9.986 seconds with 1 issue.
+↳ /// R-NET-2, R-NET-10: the one foreground session against the loopback server: connection reuse, per-task routing,
+↳ /// cancellation, invalidation and in-place priority changes.
+✘ Test run with 161 tests in 17 suites failed after 9.989 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetTransportTests (Swift Testing)
+✘ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" recorded an issue at ForegroundBackendTests.swift:277:9: Expectation failed: edges.began == expected.count && edges.ended == expected.count
+✘ Test run with 161 tests in 17 suites failed after 9.989 seconds with 1 issue.

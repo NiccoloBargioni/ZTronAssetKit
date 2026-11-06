@@ -1,0 +1,98 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C10-PAUSE-LANE" started.
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test "PROBE-C10R-POLICY-PAUSE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10R-POLICY-PAUSE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-PAUSE-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10R-POLICY-PAUSE" started.
+✘ Test "PROBE-C10R-POLICY-PAUSE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10ReqsProbes.swift:48:9: Expectation failed: pauses == 0
+↳ PROBE-C10R-POLICY-PAUSE: C, raised to the user lane by the owed visit, is not paused by Low Data Mode (visit-first): 1 pause(s)
+↳ pauses == 0 → false
+↳   pauses → 1
+PROBE-C10R-POLICY-PAUSE sweepFollowsFirst: before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.downloading)) pauses=1 starts=2 a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/75/753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C10R-POLICY-PAUSE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10ReqsProbes.swift:58:9: Expectation failed: starts == 1
+↳ PROBE-C10R-POLICY-PAUSE: C started once, its attempt never paused (visit-first): 2
+↳ starts == 1 → false
+↳   starts → 2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+PROBE-C10-PAUSE-LANE followVisitedFirst decision: (state: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), pause: nil)
+PROBE-C10-PAUSE-LANE followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) n=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) starts=1
+PROBE-C10R-POLICY-PAUSE followVisitedFirst: before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading)) pauses=0 starts=1 a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/75/753e4516513e7f24fa853a6d6c9524efe73bdfbea237701c2da01f7c32d40366.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-PAUSE-LANE" started.
+✘ Test "PROBE-C10R-POLICY-PAUSE" with 2 test cases failed after 0.728 seconds with 2 issues.
+↳ /// PROBE-C10R-POLICY-PAUSE (the draft's cycle-10 residual "a policy pause reads the job's pre-visit lane"): C (1 MB,
+↳ /// content X) downloads for a prefetch member P (zz-p); D (content W) downloads for A's user waiter (zz-a). v3 moves
+↳ /// zz-a onto X while the follow owes D's visit. Low Data Mode then arrives. Visit-first, D's visit moved A's user
+↳ /// interest onto C and raised C to the user lane, which Low Data Mode does not pause (`userInitiatedOverridesPolicy`):
+↳ /// C's attempt runs on and serves A. Behind the barrier C is still on the prefetch lane when the conditions turn
+↳ /// runs, so `pauseIfRefused` pauses it.
+✘ Suite "Engine runs" failed after 0.728 seconds with 2 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:53:9: Expectation failed: pauses == 0
+↳ C, raised to the user lane by the owed visit, is not paused by Low Data Mode (visit-first): 1 pause(s)
+↳ pauses == 0 → false
+↳   pauses → 1
+✘ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:64:9: Expectation failed: starts == 1
+↳ C's one attempt, never paused, serves A (visit-first): 2 start(s)
+↳ starts == 1 → false
+↳   starts → 2
+✘ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" with 2 test cases failed after 1.167 seconds with 2 issues.
+↳ /// Low Data Mode that arrives while the follow owes a visit pauses no transfer the visit raises to user work: C (1 MB,
+↳ /// content X) downloads for a prefetch member P (zz-p); D (content W) downloads for A's user waiter (zz-a). v3 moves
+↳ /// zz-a onto X while the follow owes D's visit; then Low Data Mode arrives. Visited first, D's visit moved A's user
+↳ /// interest onto C, which Low Data Mode does not pause, and C's one attempt serves A. Behind the barrier, C was paused
+↳ /// on its pre-visit prefetch lane and started again (PROBE-C10R-POLICY-PAUSE, PROBE-C10-PAUSE-LANE).
+◇ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+PROBE-C10-PAUSE-LANE sweepFollowsFirst decision: (state: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), pause: Optional(ZTronAssetModel.PolicyBlock.constrainedNetwork))
+PROBE-C10-PAUSE-LANE sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) n=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) starts=2
+✘ Test "PROBE-C10-PAUSE-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:213:9: Expectation failed: decision.pause == nil && decision.state == .downloading
+↳ N, user-lane once the follow moved A onto it, keeps running under Low Data Mode (visit-first): (state: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), pause: Optional(ZTronAssetModel.PolicyBlock.constrainedNetwork))
+↳ decision.pause == nil && decision.state == .downloading → false
+↳   decision.pause == nil → false
+↳   decision.state == .downloading → <not evaluated>
+✘ Test "PROBE-C10-PAUSE-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:214:9: Expectation failed: starts == 1
+↳ N's first attempt serves both (visit-first): 2
+↳ starts == 1 → false
+↳   starts → 2
+✘ Test "PROBE-C10-PAUSE-LANE" with 2 test cases failed after 1.287 seconds with 2 issues.
+↳ /// PROBE-C10-PAUSE-LANE (the draft's residual "a policy pause reads the job's pre-visit lane"): N (1 MB, zz-n) runs
+↳ /// for a prefetch waiter; C (1 MB, zz-a) runs for a user waiter A. v3 moves zz-a onto N's content while the follow
+↳ /// owes C's visit. Then the network turns constrained (Low Data Mode: prefetch refused, user work admitted). Visited
+↳ /// first, A's interest raised N to the user lane, so N keeps running. Before the visit, N is prefetch-lane and is
+↳ /// paused.
+✘ Suite "VerifyC10CorrectProbes" failed after 1.287 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:567:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:615:9: Expectation failed: fSecond != nil && cSecond != nil && fSecond! < cSecond!
+↳ F, re-admitted by the edge ahead of C (same lane, earlier ticket), retries first (visit-first): f=Optional(4) c=nil
+↳ fSecond != nil && cSecond != nil && fSecond! < cSecond! → false
+↳   fSecond != nil && cSecond != nil → false
+↳   fSecond! < cSecond! → <not evaluated>
+✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" with 2 test cases failed after 190.852 seconds with 2 issues.
+↳ /// A network edge that arrives while the follow owes a visit re-admits the jobs it owes in its own order, whatever
+↳ /// verdict waits: one slot, no preemption. F (zz-f, a prefetch member) failed offline and waits for an edge; C (zz-a,
+↳ /// zz-b) runs for a prefetch member of zz-b and A's user waiter of zz-a, and its ticket is F's successor. v3 moves zz-a
+↳ /// while the follow owes C's visit; C fails offline, then the network drops and returns. Visited first, the edge
+↳ /// re-admitted F, then C (same lane, F's earlier ticket): F's retry starts before C's. Behind the barrier the edge's
+↳ /// event for C, whose verdict waited, came before the re-admission's place for F, so C's retry started first (the
+↳ /// cycle-10 residual "`.edge` events before the same edge's re-admissions").
+✘ Suite "Engine follow barrier (F-28)" failed after 192.020 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 4 tests in 3 suites failed after 192.020 seconds with 8 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

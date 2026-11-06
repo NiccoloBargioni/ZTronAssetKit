@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineCommands.swift b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+index f0c6404..d70073c 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineCommands.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+@@ -725,7 +725,7 @@ extension SyncEngine {
+         case .failed(let error):
+             return error.assetError(now: self.environment.time.now())
+         case .circuitOpen(let cause):
+-            return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
++            _ = cause; return .serverUnavailable(retryAfter: nil) // MUTANT S3-CONF-05
+         case .throttled(let until):
+             return self.throttledError(after: until)
+         default:

@@ -1,0 +1,38 @@
+Building for debugging...
+[Computing dependencies]
+[Using on-disk description]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[21 / 21] ZTronAssetSyncTests-product
+Build complete! (6,91 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine regressions" started.
+◇ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" started.
+✘ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" recorded an issue at EngineSync1RegressionTests.swift:96:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" recorded an issue at EngineSync1RegressionTests.swift:114:9: Expectation failed: (try? answer.get()) != nil
+↳ the retry delivered the asset: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? answer.get()) != nil → <not evaluated>
+✘ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" recorded an issue at EngineSync1RegressionTests.swift:118:9: Expectation failed: recorded == 1
+↳ the ended stream failed its attempt once, as an incomplete callback sequence: 0
+↳ recorded == 1 → false
+↳   recorded → 0
+✘ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" recorded an issue at EngineSync1RegressionTests.swift:119:9: Expectation failed: await base.starts.count == 1
+↳ the retry reached the transport; the ended attempt never did
+↳ await base.starts.count == 1 → <not evaluated>
+✘ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" failed after 63.998 seconds with 4 issues.
+↳ /// A transfer whose stream ends without a terminal element fails its attempt (`transient(.incompleteCallbackSequence)`,
+↳ /// recorded once) instead of leaving the job downloading for ever: the job backs off, and its retry delivers the
+↳ /// asset to the waiter (sync-1 S1-11, ARCHITECTURE §12.3; Stage 3, S3-B-068).
+✘ Suite "Engine regressions" failed after 63.998 seconds with 4 issues.
+↳ /// Regressions the level-4 verifiers found (WP-F fix round 1). Each test failed before its fix.
+✘ Test run with 1 test in 1 suite failed after 63.998 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

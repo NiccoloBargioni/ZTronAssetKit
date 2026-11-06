@@ -1,0 +1,35 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC18Correct" started.
+◇ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C18C-PUBLICATION-WAIT-APPLY" started.
+PROBE-C18C-PUBLICATION-WAIT-APPLY followVisitedFirst at O's bytes -; at v4 waits false O nil; u=success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d2cb75443428d1da09ebecb10f33c15521ff33c64a92ea007b4133411027fd37.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) zStarts=0 ahead sizes [16]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C18C-PUBLICATION-WAIT-APPLY" started.
+PROBE-C18C-PUBLICATION-WAIT-APPLY sweepFollowsFirst at O's bytes waits true movesOwed 8 O verifying ids 65; at v4 waits true O verifying ids 65; u=success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a0/a0466adf29d1a7af9f0c0db4dc90cf5b2dc07f8fb2c94429ad04330ba7eddbe0.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) zStarts=1 ahead sizes [16]
+✘ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC18CorrectProbes.swift:369:9: Expectation failed: (try? uResult.get())?.byteSize == 16
+↳ PROBE-C18C-PUBLICATION-WAIT-APPLY: visit-first, O's publication bound zz-o before v4, so U is served O's 16 bytes: success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a0/a0466adf29d1a7af9f0c0db4dc90cf5b2dc07f8fb2c94429ad04330ba7eddbe0.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); at O's bytes waits true movesOwed 8 O verifying ids 65; at v4 waits true O verifying ids 65; zStarts 1
+↳ (try? uResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY" with 2 test cases failed after 1.640 seconds with 1 issue.
+↳ /// PROBE-C18C-PUBLICATION-WAIT-APPLY. A publication that waits for owed moves (`awaitInboundMoves`, cycle 18) binds
+↳ /// its ids only after them, so an apply that lands during the wait decides which ids the store binds. O (16 B; zz-o,
+↳ /// user waiter U) downloads; 72 prefetch holders (zz-g…, own 16 B contents) wait. v3 maps every zz-g to O's content.
+↳ /// O's bytes arrive. Then v4 maps zz-o to Z (48 B) and keeps every zz-g on O.
+↳ ///
+↳ /// Visit-first: v3's visits moved the holders onto O; O's publication began at its attempt's end with nothing owed,
+↳ /// bound zz-o and the holders' ids and committed before v4: U is served O's 16 bytes.
+↳ /// Behind the barrier: O's attempt end makes 64 moves and its publication waits for the other 8; v4 is applied
+↳ /// meanwhile, so the binding the store checks after the wait meets v4's zz-o on Z.
+◇ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY-HELD" started.
+PROBE-C18C-PUBLICATION-WAIT-APPLY-HELD followVisitedFirst u=success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a0/a0466adf29d1a7af9f0c0db4dc90cf5b2dc07f8fb2c94429ad04330ba7eddbe0.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) zStarts=1 ahead sizes [16]
+✔ Test "PROBE-C18C-PUBLICATION-WAIT-APPLY-HELD" passed after 1.150 seconds.
+✘ Suite "VerifyC18Correct" failed after 2.791 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 18, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs the cycle-17 blocking scenarios (RR-14 in both verifiers' shapes, the Retry-After date) as this
+↳ /// verifier's own copies. Part 2 hunts cycle 18's mechanism: the owed moves (`inboundMoves`) read by `followedLane`, and
+↳ /// the publication that waits for them (`awaitInboundMoves`) across a later apply. Each runs in both orders and expects
+↳ /// the visit-first outcome.
+✘ Test run with 2 tests in 1 suite failed after 2.791 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

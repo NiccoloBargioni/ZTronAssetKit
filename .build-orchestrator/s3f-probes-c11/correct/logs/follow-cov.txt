@@ -1,0 +1,816 @@
+warning: .build-verify-s3f-c11-correct/out/Products/Debug/ZTronAssetTransportTests.xctest/Contents/MacOS/ZTronAssetTransportTests: profile data may be out of date - object is newer
+    1|       |import Foundation
+    2|       |import ZTronAssetModel
+    3|       |
+    4|       |/// The follow after an apply (T21/T22), bounded per actor turn (C2; Stage 3, S3-PERF-02 and its cycle-2 residual).
+    5|       |extension SyncEngine {
+    6|       |    /// The jobs one follow turn visits at most before it leaves the rest to an owned follow-up turn. A visit that moves
+    7|       |    /// a job supersedes it, re-routes each interest and creates the job of the id's new content: about 10 to 12 µs in
+    8|       |    /// release, so a turn of 256 visits stays near 3 ms. In one turn, a sync whose manifest changed the content of every
+    9|       |    /// member of a waiting 10,000-member prefetch group held the actor 111 to 145 ms (`changedRefreshTurns`, the close-out
+   10|       |    /// cycle-1 verifier's PROBE-V9).
+   11|       |    static let followsPerTurn = 256
+   12|       |
+   13|       |    /// The entries of a replaced copy one follow turn compares with the copy at most, and the transfers of changed
+   14|       |    /// entries it formats at most: a comparison is a lookup and a checksum comparison (about 0.1 µs), a formatted transfer
+   15|       |    /// and its job lookup about 0.75 µs in release. The whole pass over 10,000 changed entries took 7.5 to 15 ms in one
+   16|       |    /// turn, and the sort of 10,000 transfers 3.6 ms more; a copy of SPEC §6's 10,000 entries where nothing moved is
+   17|       |    /// still compared in one turn.
+   18|       |    static let followScansPerTurn = 16_384
+   19|       |    /// See `followScansPerTurn`.
+   20|       |    static let followFormatsPerTurn = 2_048
+   21|       |
+   22|       |    /// Moves every job to the engine's copy of the applied manifest, which replaced `previous`: a job none of whose ids
+   23|       |    /// still want its content is superseded (its interests follow their entries, T22, or end, T21), one some of whose ids
+   24|       |    /// moved lets them go. A job that follows `previous` can only have moved for an id whose transfer differs between
+   25|       |    /// the two copies, and that id's job is the transfer `previous` named for it; every other job that may not follow
+   26|       |    /// the copy is in `unfollowed`. So the follow visits those jobs, not the whole table: at SPEC §6's 10,000, a sorted
+   27|       |    /// walk of every job after every apply held the actor 10 to 12 ms although nothing moved (C2; Stage 3,
+   28|       |    /// S3-PERF-02). One pass over `previous` with one lookup and a key comparison per id, and a transfer formatted only
+   29|       |    /// for an id that moved.
+   30|       |    ///
+   31|       |    /// The pass and the visits are bounded per turn (`followScansPerTurn`, `followFormatsPerTurn`, `followsPerTurn`); the
+   32|       |    /// rest is owed to owned follow-up turns (`followScans`, `followOrder`). The visits go in `unfollowed`'s transfer
+   33|       |    /// order, then in the order the pass finds the moved jobs (the replaced copy's entry order), each job once. A job
+   34|       |    /// waits in `unfollowed` from the pass's finding until its visit, which is what that set means (it may not follow
+   35|       |    /// the copy); a job the pass has not reached yet follows a copy whose pass is owed. A later apply's follow keeps the
+   36|       |    /// visits still owed in their order and appends the other jobs of `unfollowed`, sorted, then queues its pass behind
+   37|       |    /// the owed ones; every pass compares with the copy as it stands when it runs. Sorting the owed visits again visited
+   38|       |    /// them in another order than a follow that had visited first, so the new contents' jobs were created, and served,
+   39|       |    /// in that other order (Stage 3 close-out cycle 9, amendment (e) of S3-R11). While an older pass is still owed, the
+   40|       |    /// other jobs of `unfollowed` wait for it too (`FollowScan.carried`): a visit-first engine's older pass had ended at
+   41|       |    /// this apply and placed its finds first, and appending them now put them ahead of the older pass's later finds
+   42|       |    /// (cycle 11, S3-R14 item 2). While a follow is owed no admission is made and no space verdict given
+   43|       |    /// (`followBarrier`, F-28), no run settles (a claim may still move) and no job held for a manifest catch-up is
+   44|       |    /// released (it may be one the follow moves).
+   45|  3.49k|    func followApplied(from previous: ValidatedManifest) {
+   46|  3.49k|        let owed = self.state.followOrder[self.state.followNext...]
+   47|  3.49k|        let owedSet = Set(owed)
+   48|  3.49k|        let others = self.state.unfollowed.subtracting(owedSet).subtracting(self.state.followCarried).sorted()
+   49|  3.49k|        let changed = previous.digest != self.state.applied.digest || previous.count != self.state.applied.count
+   50|  3.49k|        if self.state.followScans.isEmpty {
+   51|  3.49k|            self.state.followOrder = Array(owed) + others
+   52|  3.49k|            if !self.state.jobs.isEmpty, changed {
+   53|    155|                self.state.followScans.append(FollowScan(manifest: previous))
+   54|    155|            }
+   55|  3.49k|        } else {
+   56|      2|            self.state.followOrder = Array(owed)
+   57|      2|            self.state.followCarried.formUnion(others)
+   58|      2|            // A pass over an unchanged copy compares every entry and finds nothing; it is queued only to carry `others`.
+   59|      2|            if changed || !others.isEmpty {
+   60|      2|                self.state.followScans.append(FollowScan(manifest: changed ? previous : self.state.applied, carried: others))
+   61|      2|            }
+   62|      2|        }
+   63|  3.49k|        self.state.followNext = 0
+   64|  3.49k|        self.continueFollow()
+   65|  3.49k|    }
+   66|       |
+   67|       |    /// Whether a follow still owes a pass or visits to follow-up turns.
+   68|   686k|    var followOwed: Bool {
+   69|   686k|        !self.state.followScans.isEmpty || self.state.followNext < self.state.followOrder.count
+   70|   686k|    }
+   71|       |
+   72|       |    /// Whether admissions and space verdicts wait (the follow barrier, F-28; Stage 3 close-out cycle 9, S3-R11 design
+   73|       |    /// D3): a follow is owed, or the events that waited for the last one are not all applied yet (`eventsAfterFollow`,
+   74|       |    /// drained a bounded batch per turn). Every start, park, space verdict and failure verdict of a job that holds a
+   75|       |    /// moved id reads lanes, ranks, interests or bytes in flight that the owed visits change; decided before them, its
+   76|       |    /// answer depended on whether a visit ran first (the close-out cycles 2 to 8 each found a new member of that class).
+   77|   613k|    var followBarrier: Bool {
+   78|   613k|        self.followOwed || !self.state.eventsAfterFollow.isEmpty
+   79|   613k|    }
+   80|       |
+   81|       |    /// Whether an event arriving now waits for the follow (`eventsAfterFollow`): behind the barrier, unless the follow's
+   82|       |    /// own visit makes it or the drain of the waiting events applies it.
+   83|   467k|    var defersToFollow: Bool {
+   84|   467k|        self.followBarrier && !self.state.inFollowVisit && !self.state.drainingAfterFollow
+   85|   467k|    }
+   86|       |
+   87|       |    /// Continues the follow's owed passes, then visits its next `followsPerTurn` jobs; schedules a follow-up turn for the
+   88|       |    /// rest, or ends the follow: the jobs held for a manifest catch-up that no catch-up holds any more are released, and
+   89|       |    /// the run is checked.
+   90|  3.63k|    private func continueFollow() {
+   91|  3.63k|        self.continueFollowScans()
+   92|  3.63k|        var visited = 0
+   93|  3.63k|        var moved = false
+   94|  13.8k|        while visited < Self.followsPerTurn, self.state.followNext < self.state.followOrder.count {
+   95|  10.2k|            let transfer = self.state.followOrder[self.state.followNext]
+   96|  10.2k|            self.state.followNext += 1
+   97|  10.2k|            // A job owed a visit stays in `unfollowed` until it; one that left it was removed meanwhile (`removeJob`).
+   98|  10.2k|            guard self.state.unfollowed.remove(transfer) != nil else {
+   99|      0|                continue
+  100|  10.2k|            }
+  101|  10.2k|            visited += 1
+  102|  10.2k|            if self.visit(transfer) {
+  103|  10.2k|                moved = true
+  104|  10.2k|            }
+  105|  10.2k|        }
+  106|  3.63k|        if self.followOwed {
+  107|    139|            // A pump that left a queue's head to this follow (`pumpWaitsForFollow`) looks again: its job may be followed now.
+  108|    139|            if moved || self.state.pumpWaitsForFollow {
+  109|     37|                self.pump()
+  110|     37|            }
+  111|    139|            self.scheduleFollowFollowUp()
+  112|    139|            return
+  113|  3.49k|        }
+  114|  3.49k|        self.state.followOrder = []
+  115|  3.49k|        self.state.followNext = 0
+  116|  3.49k|        if self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
+  117|      1|            // `manifestCaughtUp` left them held while this follow was owed.
+  118|      1|            self.state.heldForManifest.removeAll()
+  119|      1|            moved = true
+  120|      1|        }
+  121|  3.49k|        self.checkRunSettled()
+  122|  3.49k|        if moved || self.state.pumpWaitsForFollow {
+  123|    131|            self.pump()
+  124|    131|        }
+  125|  3.49k|        self.drainEventsAfterFollow()
+  126|  3.49k|    }
+  127|       |
+  128|       |    /// The events one drain turn applies at most (`drainEventsAfterFollow`): an event costs about what a re-queue or a park
+  129|       |    /// costs, so a turn stays near 1 ms (C2) whatever arrived during the follow (a 10,000-member group's joins). An event
+  130|       |    /// that is itself a bounded pass (`EventAfterFollow.endsDrainBatch`: a conditions element's pass, a re-admission, a
+  131|       |    /// release or purge, a throttle's fail-fast turn) ends its batch, so a turn holds at most one of them.
+  132|       |    static let eventsAfterFollowPerTurn = 512
+  133|       |
+  134|       |    /// Applies the events that waited for the follow (F-28) as a visit-first engine meets them: after the follow's
+  135|       |    /// own last turn and its pump, in arrival order, on the state every visit left, at most `eventsAfterFollowPerTurn`
+  136|       |    /// per turn; the barrier holds (`followBarrier`) until the last is applied, and no pump runs during a batch or
+  137|       |    /// between two (`pump`: a slot freed between two batches went to work queued before the user work a later batch
+  138|       |    /// queues, the cycle-9 amendment (d)); after the last, the run is checked and the queues pumped. Each event
+  139|       |    /// re-validates what it names (the job, its epoch, the interest): a job that ended or moved meanwhile is skipped. A
+  140|       |    /// sweep owed meanwhile is a follow-up turn already (`sweepSpaceParked`).
+  141|  3.49k|    func drainEventsAfterFollow() {
+  142|  3.49k|        guard !self.followOwed, !self.state.eventsAfterFollow.isEmpty else {
+  143|  3.45k|            return
+  144|  3.45k|        }
+  145|     37|        var count = 0
+  146|    561|        for event in self.state.eventsAfterFollow.prefix(Self.eventsAfterFollowPerTurn) {
+  147|    561|            count += 1
+  148|    561|            if event.endsDrainBatch {
+  149|      8|                break
+  150|    553|            }
+  151|    553|        }
+  152|     37|        let batch = Array(zip(self.state.eventsAfterFollow.prefix(count), self.state.eventsArrivedAt.prefix(count)))
+  153|     37|        self.state.eventsAfterFollow.removeFirst(count)
+  154|     37|        self.state.eventsArrivedAt.removeFirst(min(count, self.state.eventsArrivedAt.count))
+  155|     37|        self.state.drainingAfterFollow = true
+  156|    561|        for (event, arrived) in batch {
+  157|    561|            self.state.replayInstant = arrived
+  158|    561|            self.replay(event)
+  159|    561|        }
+  160|     37|        self.state.replayInstant = nil
+  161|     37|        self.state.drainingAfterFollow = false
+  162|     37|        guard self.state.eventsAfterFollow.isEmpty else {
+  163|      3|            self.scheduleDrainFollowUp()
+  164|      3|            return
+  165|     34|        }
+  166|     34|        self.state.throttlesReplayed = [:]
+  167|     34|        self.checkRunSettled()
+  168|     34|        self.pump()
+  169|     34|    }
+  170|       |
+  171|       |    /// Defers `event` to the follow's end (`eventsAfterFollow`), with the instant it arrived.
+  172|    561|    func deferToFollow(_ event: EventAfterFollow) {
+  173|    561|        self.state.eventsAfterFollow.append(event)
+  174|    561|        self.state.eventsArrivedAt.append(self.environment.time.monotonicNow())
+  175|    561|    }
+  176|       |
+  177|       |    /// The instant a decision is taken at: the arrival of the event the drain applies (`replayInstant`), or now. A
+  178|       |    /// visit-first engine took the decision when the event arrived, so a place's request time, a backoff's start and a
+  179|       |    /// fail-fast answer's wait count from then.
+  180|   306k|    func decisionNow() -> MonotonicInstant {
+  181|   306k|        self.state.replayInstant ?? self.environment.time.monotonicNow()
+  182|   306k|    }
+  183|       |
+  184|       |    /// Applies one event that waited for the follow (`drainEventsAfterFollow`).
+  185|    561|    private func replay(_ event: EventAfterFollow) {
+  186|    561|        switch event {
+  187|    561|        case .spaceFailure(let transfer, let epoch, let required):
+  188|      2|            guard self.followedForVerdict(transfer, epoch: epoch) else {
+  189|      1|                return
+  190|      1|            }
+  191|      1|            self.decideSpaceFailure(transfer, required: required)
+  192|    561|        case .attemptFailed(let transfer, let epoch, let verdict):
+  193|     21|            self.replayVerdict(transfer, epoch: epoch, verdict)
+  194|    561|        case .enqueue(let transfer, let epoch, let front):
+  195|      0|            self.notePlaceTaken(transfer)
+  196|      0|            // A place belongs to the job that asked for it: one removed meanwhile, and re-created by the follow's
+  197|      0|            // visit, has its own place (PROBE-C9-STALE-PLACE).
+  198|      0|            guard self.state.jobs[transfer]?.epoch == epoch else {
+  199|      0|                return
+  200|      0|            }
+  201|      0|            self.enqueue(transfer, front: front, askedBefore: true)
+  202|    561|        case .join(let join):
+  203|    527|            self.replayJoin(join)
+  204|    561|        case .endClaim(let token, let member):
+  205|      0|            self.endClaim(token, member: member)
+  206|    561|        case .endClaims(let token):
+  207|      0|            self.endClaims(of: token)
+  208|    561|        case .removal(let token, let transfer):
+  209|      3|            self.replayRemoval(token, from: transfer)
+  210|    561|        case .release(let token, let entry):
+  211|      1|            if entry {
+  212|      0|                self.releaseEntryGroup(token)
+  213|      1|            } else {
+  214|      1|                self.performReleaseGroup(token)
+  215|      1|            }
+  216|    561|        case .continueReleases:
+  217|      0|            self.resumeReleases()
+  218|    561|        case .purge(let request):
+  219|      0|            self.withdrawPurged(request)
+  220|    561|        case .conditions(let conditions, let edge):
+  221|      6|            self.withConditions(conditions) {
+  222|      6|                self.applyConditionsToJobs(edge: edge)
+  223|      6|            }
+  224|    561|        case .readmit(let passes, let conditions):
+  225|      0|            self.withConditions(conditions) {
+  226|      0|                self.readmit(passes)
+  227|      0|            }
+  228|    561|        case .unblock(let kind):
+  229|      0|            self.unblockOrigin(kind)
+  230|    561|        case .retryDue(let transfer, let epoch):
+  231|      0|            self.retryDue(transfer, epoch: epoch)
+  232|    561|        case .throttleAnswers:
+  233|      1|            self.answerThrottledUsersNow()
+  234|    561|        }
+  235|    560|    }
+  236|       |
+  237|       |    /// Runs `body` with the lane-wide conditions an event captured when it arrived (`ConditionsSnapshot`): the lane
+  238|       |    /// verdicts it reads are those a visit-first engine read at that event, whatever arrived after it. Synchronous: no
+  239|       |    /// other turn sees the swap.
+  240|      6|    private func withConditions(_ snapshot: ConditionsSnapshot, _ body: () -> Void) {
+  241|      6|        let conditions = self.state.conditions
+  242|      6|        let thermal = self.state.pausedForThermal
+  243|      6|        self.state.conditions = snapshot.conditions
+  244|      6|        self.state.pausedForThermal = snapshot.pausedForThermal
+  245|      6|        body()
+  246|      6|        self.state.conditions = conditions
+  247|      6|        self.state.pausedForThermal = thermal
+  248|      6|    }
+  249|       |
+  250|       |    /// The lane-wide conditions now (`withConditions`).
+  251|      6|    var conditionsSnapshot: ConditionsSnapshot {
+  252|      6|        ConditionsSnapshot(conditions: self.state.conditions, pausedForThermal: self.state.pausedForThermal)
+  253|      6|    }
+  254|       |
+  255|       |    /// Schedules one later turn for the events a drain turn left (C2).
+  256|      3|    private func scheduleDrainFollowUp() {
+  257|      3|        guard !self.state.drainFollowUpScheduled else {
+  258|      0|            return
+  259|      3|        }
+  260|      3|        self.state.drainFollowUpScheduled = true
+  261|      3|        let spawned = self.spawn(.entry) { engine in
+  262|      3|            // REENTRANCY: RE-S45 (proposed) — the drain's follow-up hops onto the actor and re-reads the waiting events
+  263|      3|            // and each job, epoch and interest they name (`drainEventsAfterFollow` re-validates every one); a follow
+  264|      3|            // begun meanwhile holds them again until its own end drains them.
+  265|      3|            await engine.drainFollowUp()
+  266|      3|        }
+  267|      3|        if spawned == nil {
+  268|      0|            // Shutting down: nothing is admitted any more.
+  269|      0|            self.state.drainFollowUpScheduled = false
+  270|      0|            self.state.eventsAfterFollow = []
+  271|      0|            self.state.eventsArrivedAt = []
+  272|      0|            self.state.placesAfterFollow = [:]
+  273|      0|            self.state.verdictsAfterFollow = [:]
+  274|      0|            self.state.joinsAfterFollow = [:]
+  275|      0|            self.state.throttlesReplayed = [:]
+  276|      0|        }
+  277|      3|    }
+  278|       |
+  279|       |    /// The scheduled continuation of `drainEventsAfterFollow`.
+  280|      3|    private func drainFollowUp() {
+  281|      3|        self.state.drainFollowUpScheduled = false
+  282|      3|        guard self.isRunning else {
+  283|      0|            return
+  284|      3|        }
+  285|      3|        self.drainEventsAfterFollow()
+  286|      3|        self.rearm()
+  287|      3|        self.reconcileIdle()
+  288|      3|        self.notifyObservers()
+  289|      3|    }
+  290|       |
+  291|       |    /// Whether `job` holds an id the engine's copy lists at another transfer while a follow is owed: the job an owed
+  292|       |    /// visit moves. An id the copy does not list is not counted: a waiter joined from the store's newer manifest
+  293|       |    /// (`EngineManifest.join`) holds one legitimately. One lookup in the copy and one key comparison per id of the job
+  294|       |    /// (`sameTransfer` against the job's own entry, whose transfer is the job's), no transfer formatted.
+  295|  1.20k|    func holdsMovedID(_ job: Job) -> Bool {
+  296|  1.20k|        guard self.followOwed else {
+  297|      0|            return false
+  298|  1.20k|        }
+  299|  1.20k|        return self.holdsIDListedElsewhere(job)
+  300|  1.20k|    }
+  301|       |
+  302|       |    /// Whether `job` holds an id the engine's copy lists at another transfer (`holdsMovedID` without its follow).
+  303|  1.21k|    private func holdsIDListedElsewhere(_ job: Job) -> Bool {
+  304|  1.21k|        job.assets.contains { asset in
+  305|  1.21k|            self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? false
+  306|  1.21k|        }
+  307|  1.21k|    }
+  308|       |
+  309|       |    /// Defers the exit verdict of an attempt that ends while the barrier holds (`defersToFollow`; Stage 3 close-out
+  310|       |    /// cycle 9, amendment (c) of S3-R11, widened in cycle 11 by S3-R14): the attempt leaves flight now (`failed(.nextRun)`,
+  311|       |    /// its bytes no longer in the ledger, as any ended transfer's, S3-R11 R1) and nobody is answered; the follow's own
+  312|       |    /// visits move the ids in their order, and the drain gives `verdict` to the job they leave (`replayVerdict`).
+  313|       |    /// Every exit waits, whether or not the job holds a moved id: a visit may raise or lower any job, join it or move an
+  314|       |    /// interest onto it, so a verdict decided before the visits read a lane, a rank or interests the visits change (a
+  315|       |    /// policy pause parked on the pre-visit lane, a 429's backoff on the pre-visit lane's policy; the cycle-10 verifiers'
+  316|       |    /// PROBE-C10-PAUSE-LANE and PROBE-C10-THROTTLE-LANE). Bringing the visit forward to the failure (the cycles before)
+  317|       |    /// moved that job's ids ahead of earlier owed visits (PROBE-J-FAIL-REROUTE, PROBE-J-FAIL-TICKET). Returns `true` when
+  318|       |    /// the verdict waits. A job not in flight or failed is decided now: only an attempt's end is deferred.
+  319|       |    ///
+  320|       |    /// While the verdict waits, the job is inert as a visit-first engine's job is while its attempt still runs: the
+  321|       |    /// follow's own visit may move its ids or join it (its re-lane then does nothing, `relane`), and every other input
+  322|       |    /// that meets it (a join, a withdrawal, a conditions element, an edge) waits behind the verdict as an event of its own.
+  323|  2.71k|    func defersFailure(_ transfer: TransferID, _ verdict: AttemptVerdict) -> Bool {
+  324|  2.71k|        guard self.defersToFollow, let job = self.state.jobs[transfer] else {
+  325|  2.69k|            return false
+  326|  2.69k|        }
+  327|     21|        switch job.state {
+  328|     21|        case .failed:
+  329|      4|            self.state.jobs[transfer]?.active = nil
+  330|     21|        case .downloading, .verifying, .committing:
+  331|     17|            guard self.transition(transfer, to: .failed(.nextRun)) else {
+  332|      0|                return false
+  333|      0|            }
+  334|     21|        case .queued, .blocked:
+  335|      0|            return false
+  336|     21|        }
+  337|     21|        self.state.verdictsAfterFollow[transfer] = VerdictAfterFollow(epoch: job.epoch)
+  338|     21|        self.deferToFollow(.attemptFailed(transfer, epoch: job.epoch, verdict: verdict))
+  339|     21|        self.notifyObservers()
+  340|     21|        return true
+  341|  2.71k|    }
+  342|       |
+  343|       |    /// Gives a deferred exit verdict (`defersFailure`) to the ids its job holds after the follow, unless the job ended
+  344|       |    /// or was superseded meanwhile: the exit the attempt's end would have taken once the follow had visited first, on
+  345|       |    /// the lane, interests and ranks the visits left. The verdict stays recorded while the drain's own visit of the job
+  346|       |    /// runs (`followedForVerdict`), so that visit's re-lane is the follow's, as it would have been while the attempt
+  347|       |    /// still ran (`relane`). Every input that met the job meanwhile waits behind this event, at its own arrival, and
+  348|       |    /// meets the job as the verdict leaves it (PROBE-C9-JOIN-RESOLVE, PROBE-C9-JOIN-RETRY-PLACE, PROBE-C10-JOIN-RETIRE).
+  349|     21|    private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) {
+  350|     21|        guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
+  351|      5|            return
+  352|     16|        }
+  353|     16|        let followed = self.followedForVerdict(transfer, epoch: epoch)
+  354|     16|        self.state.verdictsAfterFollow[transfer] = nil
+  355|     16|        guard followed, case .failed? = self.state.jobs[transfer]?.state else {
+  356|      0|            return
+  357|     16|        }
+  358|     16|        switch verdict {
+  359|     16|        case .resolve(let answer):
+  360|      1|            self.resolveAll(transfer, with: .failed(answer))
+  361|     16|        case .retry(let error, let answer):
+  362|      4|            self.retryLater(transfer, error: error, answer: answer)
+  363|     16|        case .offline(let requeue):
+  364|      3|            if requeue {
+  365|      0|                // An edge passed while the attempt ran (`failed`'s offline exit): a fresh attempt, no answer.
+  366|      0|                if self.transition(transfer, to: .queued) {
+  367|      0|                    self.enqueue(transfer)
+  368|      0|                }
+  369|      3|            } else if self.transition(transfer, to: .failed(.whenOnline)) {
+  370|      3|                self.failFast(transfer, reason: .offline)
+  371|      3|            }
+  372|     16|        case .throttle(let facts):
+  373|      6|            self.replayThrottle(transfer, facts)
+  374|     16|        case .pause(let policy, let blocks):
+  375|      2|            // `paused`'s decision on the lane the visits left, with the lane-wide blocks of the pause's arrival.
+  376|      2|            guard self.transition(transfer, to: .queued) else {
+  377|      0|                return
+  378|      2|            }
+  379|      2|            if policy, let lane = self.state.jobs[transfer]?.lane, lane < .userInitiated, let block = blocks.first(where: { $0.lane == lane })?.reason {
+  380|      0|                self.park(transfer, reason: block)
+  381|      2|            } else {
+  382|      2|                self.enqueue(transfer, front: true)
+  383|      2|            }
+  384|     16|        case .requeue:
+  385|      0|            if self.transition(transfer, to: .queued) {
+  386|      0|                self.enqueue(transfer)
+  387|      0|            }
+  388|     16|        }
+  389|     16|    }
+  390|       |
+  391|       |    /// A 429's park decided after the follow (`EngineFailures.throttled`): the backoff of the lane the visits left
+  392|       |    /// (R-SYN-5, PROBE-C10-THROTTLE-LANE) from the 429's instant, or its `Retry-After` when longer, which already
+  393|       |    /// throttled the origin when it arrived (a real-world input, S3-R14). The origin's throttle keeps the later end. The
+  394|       |    /// park's fail-fast answers read the wait at the 429's instant against the end a visit-first engine had decided
+  395|       |    /// then: the throttle in force when the 429 arrived and the ends the earlier replayed 429s gave, not a later 429's
+  396|       |    /// (PROBE-C10-THROTTLE-EXTENDED; `throttlesReplayed`). The origin's alarm stays at the origin's end (`park`).
+  397|      6|    private func replayThrottle(_ transfer: TransferID, _ facts: ThrottleFacts) {
+  398|      6|        guard let job = self.state.jobs[transfer], let origin = self.state.remote?.originID else {
+  399|      0|            return
+  400|      6|        }
+  401|      6|        let policy = job.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+  402|      6|        guard let delay = Backoff.delay(attempt: job.attempts + 1, retryAfter: facts.retryAfter, policy: policy, seed: self.environment.random.seed, key: StableHash.fnv1a64(origin)) else {
+  403|      0|            self.transition(transfer, to: .failed(.nextRun))
+  404|      0|            self.resolveAll(transfer, with: .failed(.serverUnavailable(retryAfter: facts.retryAfter)))
+  405|      0|            return
+  406|      6|        }
+  407|      6|        let until = facts.at.adding(seconds: max(delay, facts.retryAfter ?? 0))
+  408|      6|        let previous = self.state.throttles[origin]
+  409|      6|        self.state.throttles[origin] = max(previous ?? .zero, until)
+  410|      6|        self.state.metrics.retries[.throttled] += 1
+  411|      6|        self.throttleExtended(from: previous)
+  412|      6|        let replayed = self.state.throttlesReplayed[origin]
+  413|      6|        let end = max(facts.decided ?? .zero, replayed ?? .zero, until)
+  414|      6|        self.state.throttlesReplayed[origin] = max(replayed ?? .zero, until)
+  415|      6|        if self.transition(transfer, to: .queued) {
+  416|      6|            self.park(transfer, reason: .throttled(until: end), answeredAt: facts.at, answerEnd: end)
+  417|      6|        }
+  418|      6|    }
+  419|       |
+  420|       |    /// Joins an interest that waited for the follow (`addInterest`; `EventAfterFollow.join`) at its arrival place in the
+  421|       |    /// drain, after every event before it: to the job the visits and earlier events left, or to a new job of the content
+  422|       |    /// when none is left, which a visit-first engine's request would have joined or created (PROBE-C9-JOIN-RESOLVE,
+  423|       |    /// PROBE-C10-JOIN-RETIRE, the cycle-10 verifiers' request join). A request answered meanwhile (a waiter answered, a
+  424|       |    /// group released, a run ended) joins nothing; a withdrawn waiter's join is made, and its withdrawal removes it next,
+  425|       |    /// as a visit-first engine did both. An id a later apply moved meanwhile is re-routed as that apply's follow would
+  426|       |    /// have (`reroute`).
+  427|    527|    private func replayJoin(_ join: JoinAfterFollow) {
+  428|    527|        let transfer = join.entry.transferID
+  429|    527|        guard self.state.joinsAfterFollow[join.token]?[join.asset] == transfer else {
+  430|      0|            return
+  431|    527|        }
+  432|    527|        self.state.joinsAfterFollow[join.token]?[join.asset] = nil
+  433|    527|        if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
+  434|    527|            self.state.joinsAfterFollow[join.token] = nil
+  435|    527|        }
+  436|    527|        guard self.stillWants(join) else {
+  437|      0|            return
+  438|    527|        }
+  439|    527|        if join.listed, self.state.applied.entry(for: join.asset).map({ !SyncEngine.sameTransfer($0, join.entry) }) ?? true {
+  440|      1|            self.reroute(join.token, interest: JobInterest(lane: join.lane, kind: join.kind, assets: [join.asset]), asset: join.asset, from: transfer)
+  441|      1|            return
+  442|    526|        }
+  443|    526|        self.addInterest(join.token, asset: join.asset, entry: join.entry, lane: join.lane, kind: join.kind)
+  444|    526|    }
+  445|       |
+  446|       |    /// Whether the owner of a waiting join still waits for its asset in the join's transfer.
+  447|    527|    private func stillWants(_ join: JoinAfterFollow) -> Bool {
+  448|    527|        let transfer = join.entry.transferID
+  449|    527|        switch join.kind {
+  450|    527|        case .waiter:
+  451|    526|            guard let waiter = self.state.waiters[join.token] else {
+  452|      0|                return false
+  453|    526|            }
+  454|    526|            return !waiter.fromStore && waiter.asset == join.asset && waiter.transfer == transfer
+  455|    527|        case .prefetch, .ensure:
+  456|      0|            return self.state.groups[join.token]?.pending[join.asset] == transfer
+  457|    527|        case .run:
+  458|      0|            return self.state.run?.token == join.token && self.state.run?.outstanding[transfer]?.contains(join.asset) == true
+  459|    527|        case .system:
+  460|      1|            return true
+  461|    527|        }
+  462|    527|    }
+  463|       |
+  464|       |    /// Removes an interest whose withdrawal waited for the follow (`removeInterest`; `EventAfterFollow.removal`) at its
+  465|       |    /// arrival place in the drain: after the answers and joins before it, as a visit-first engine removed it (S3-R14 item
+  466|       |    /// 3). A withdrawn waiter's record followed the interest's re-routes (`Waiter.continuation` is `nil`); the removal
+  467|       |    /// takes it from the job the record names then. Any transfer cancellation the removal causes (`retire`) happens here.
+  468|      3|    private func replayRemoval(_ token: InterestToken, from transfer: TransferID) {
+  469|      3|        var target = transfer
+  470|      3|        if let waiter = self.state.waiters[token], waiter.continuation == nil {
+  471|      3|            self.state.waiters[token] = nil
+  472|      3|            target = waiter.transfer
+  473|      3|        }
+  474|      3|        self.removeInterest(token, from: target)
+  475|      3|    }
+  476|       |
+  477|       |    /// Moves the ids a deferred verdict's job still holds for content the copy lists elsewhere before the drain gives
+  478|       |    /// the verdict, and returns whether the job is still `epoch`'s: one the visit superseded has nobody left to answer.
+  479|       |    /// The follow's visits moved them already, unless the follow passed the job while it verified or committed (it is
+  480|       |    /// visited again only by the next follow) or the job was joined for a replaced entry after the follow's pass; the
+  481|       |    /// cycles before brought that visit forward to the failure. The drain's last batch pumps for any job it creates.
+  482|     18|    private func followedForVerdict(_ transfer: TransferID, epoch: UInt64) -> Bool {
+  483|     18|        guard let job = self.state.jobs[transfer], job.epoch == epoch else {
+  484|      1|            return false
+  485|     17|        }
+  486|     17|        if self.holdsIDListedElsewhere(job) {
+  487|      0|            _ = self.visit(transfer)
+  488|      0|        }
+  489|     17|        return self.state.jobs[transfer]?.epoch == epoch
+  490|     18|    }
+  491|       |
+  492|       |    /// Records that a place in a queue (`EventAfterFollow.enqueue`) waits for the drain.
+  493|      0|    func notePlaceWaits(_ transfer: TransferID) {
+  494|      0|        self.state.placesAfterFollow[transfer, default: 0] += 1
+  495|      0|    }
+  496|       |
+  497|       |    /// Records that the drain gives a waiting place (`notePlaceWaits`).
+  498|      0|    private func notePlaceTaken(_ transfer: TransferID) {
+  499|      0|        guard let count = self.state.placesAfterFollow[transfer] else {
+  500|      0|            return
+  501|      0|        }
+  502|      0|        self.state.placesAfterFollow[transfer] = count > 1 ? count - 1 : nil
+  503|      0|    }
+  504|       |
+  505|       |    /// Compares the owed passes' next entries with the copy, oldest pass first, within this turn's bounds: a job of an
+  506|       |    /// entry the copy no longer maps to the same transfer is owed a visit (it joins `unfollowed` and `followOrder` once).
+  507|       |    /// A pass that begins first places the jobs its apply carried (`FollowScan.carried`) that no older pass found
+  508|       |    /// meanwhile; a carried job an older pass finds is placed at that find, as the older pass placed it on a visit-first
+  509|       |    /// engine.
+  510|  3.63k|    private func continueFollowScans() {
+  511|  3.63k|        var compared = 0
+  512|  3.63k|        var formatted = 0
+  513|  3.63k|        let copy = self.state.applied
+  514|  3.89k|        while !self.state.followScans.isEmpty, compared < Self.followScansPerTurn, formatted < Self.followFormatsPerTurn {
+  515|    263|            var scan = self.state.followScans.removeFirst()
+  516|    263|            if scan.next == 0, !scan.carried.isEmpty {
+  517|      1|                for transfer in scan.carried where self.state.followCarried.remove(transfer) != nil {
+  518|      1|                    if self.state.jobs[transfer] != nil, self.state.unfollowed.contains(transfer) {
+  519|      1|                        self.state.followOrder.append(transfer)
+  520|      1|                    }
+  521|      1|                }
+  522|      1|                scan.carried = []
+  523|      1|            }
+  524|    263|            let entries = scan.manifest.entries
+  525|   240k|            while scan.next < entries.count, compared < Self.followScansPerTurn, formatted < Self.followFormatsPerTurn {
+  526|   240k|                let entry = entries[scan.next]
+  527|   240k|                scan.next += 1
+  528|   240k|                compared += 1
+  529|   240k|                if let listed = copy.entry(for: entry.identifier), SyncEngine.sameTransfer(entry, listed) {
+  530|  11.4k|                    continue
+  531|   228k|                }
+  532|   228k|                formatted += 1
+  533|   228k|                let transfer = entry.transferID
+  534|   228k|                guard self.state.jobs[transfer] != nil else {
+  535|   218k|                    continue
+  536|   218k|                }
+  537|  10.3k|                if self.state.unfollowed.insert(transfer).inserted || self.state.followCarried.remove(transfer) != nil {
+  538|  10.2k|                    self.state.followOrder.append(transfer)
+  539|  10.2k|                }
+  540|  10.3k|            }
+  541|    263|            if scan.next < entries.count {
+  542|    106|                self.state.followScans.insert(scan, at: 0)
+  543|    106|            }
+  544|  3.63k|        }
+  545|  3.63k|    }
+  546|       |
+  547|       |    /// The ids of the owed passes' entries not compared yet, with the transfers those entries name: a job that holds one
+  548|       |    /// of them for that transfer follows a copy whose pass is owed (`invariantViolations()`).
+  549|      8|    func unscannedFollowEntries() -> [AssetID: Set<TransferID>] {
+  550|      8|        var unscanned: [AssetID: Set<TransferID>] = [:]
+  551|      8|        for scan in self.state.followScans {
+  552|    493|            for entry in scan.manifest.entries[scan.next...] {
+  553|    493|                unscanned[entry.identifier, default: []].insert(entry.transferID)
+  554|    493|            }
+  555|      8|        }
+  556|      8|        return unscanned
+  557|      8|    }
+  558|       |
+  559|       |    /// `follow(_:)` with the joins it makes marked as the follow's own (`EngineState.inFollowVisit`).
+  560|  10.2k|    private func visit(_ transfer: TransferID) -> Bool {
+  561|  10.2k|        self.state.inFollowVisit = true
+  562|  10.2k|        defer {
+  563|  10.2k|            self.state.inFollowVisit = false
+  564|  10.2k|        }
+  565|  10.2k|        return self.follow(transfer)
+  566|  10.2k|    }
+  567|       |
+  568|       |    /// Moves one job to the copy (see `followApplied(from:)`); `true` when it moved. A job verifying or committing is
+  569|       |    /// not moved (its commit binds only the ids the copy still maps to it); it stays in `unfollowed` for the next
+  570|       |    /// follow. The caller checks the run and pumps once per turn, not once per job.
+  571|  10.2k|    private func follow(_ transfer: TransferID) -> Bool {
+  572|  10.2k|        guard let job = self.state.jobs[transfer] else {
+  573|      0|            return false
+  574|  10.2k|        }
+  575|  10.3k|        let moved = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }
+  576|  10.2k|        switch job.state {
+  577|  10.2k|        case .verifying, .committing:
+  578|      4|            if !moved.isEmpty {
+  579|      4|                self.state.unfollowed.insert(transfer)
+  580|      4|            }
+  581|      4|            return false
+  582|  10.2k|        default:
+  583|  10.2k|            break
+  584|  10.2k|        }
+  585|  10.2k|        guard !moved.isEmpty else {
+  586|      0|            return false
+  587|  10.2k|        }
+  588|  10.2k|        if moved.count == job.assets.count {
+  589|  10.2k|            if job.state == .downloading {
+  590|     58|                if let active = job.active {
+  591|     58|                    self.abandon(transfer, active)
+  592|     58|                }
+  593|     58|                // The transfer ends without a verdict: a half-open probe returns to `halfOpen(probe: nil)` (§7.7).
+  594|     58|                self.recordBreaker(.abandoned(transfer))
+  595|     58|            }
+  596|  10.2k|            self.supersede(transfer, settling: false)
+  597|  10.2k|        } else {
+  598|     50|            self.state.jobs[transfer]?.assets.subtract(moved)
+  599|    104|            for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) {
+  600|    104|                for asset in interest.assets.sorted() where moved.contains(asset) {
+  601|     50|                    self.state.jobs[transfer]?.interests[token]?.assets.remove(asset)
+  602|     50|                    self.reroute(token, interest: interest, asset: asset, from: transfer)
+  603|    104|                }
+  604|    104|                if self.state.jobs[transfer]?.interests[token]?.assets.isEmpty == true {
+  605|     50|                    self.removeInterest(token, from: transfer)
+  606|     50|                }
+  607|    104|            }
+  608|     50|        }
+  609|  10.2k|        return true
+  610|  10.2k|    }
+  611|       |
+  612|       |    /// One follow turn run by a space sweep that found the follow barrier up (F-28, `sweepSpaceParked`): the follow takes
+  613|       |    /// priority over the sweep's verdicts, and the sweep's own follow-up turns keep the follow moving whether or not the
+  614|       |    /// follow's own follow-up has run (it finds nothing owed, or continues). Bounded as any follow turn (C2). The deadlines
+  615|       |    /// are re-read; the idle state too when this turn ended the follow, since the follow's own follow-up then finds
+  616|       |    /// nothing owed and returns before it would (`followFollowUp`).
+  617|     26|    func advanceFollowForSpaceSweep() {
+  618|     26|        guard self.followOwed else {
+  619|      0|            self.drainEventsAfterFollow()
+  620|      0|            return
+  621|     26|        }
+  622|     26|        self.continueFollow()
+  623|     26|        if self.followOwed {
+  624|      3|            self.rearm()
+  625|      3|            self.notifyObservers()
+  626|     23|        } else {
+  627|     23|            self.reconcileIdle()
+  628|     23|        }
+  629|     26|    }
+  630|       |
+  631|       |    /// Schedules one later turn for the visits a follow turn left after `followsPerTurn`. When none can be spawned
+  632|       |    /// (shutting down), the follow ends here: the jobs it still owed stay in `unfollowed` for the next follow.
+  633|    139|    private func scheduleFollowFollowUp() {
+  634|    139|        guard !self.state.followFollowUpScheduled else {
+  635|      3|            return
+  636|    136|        }
+  637|    136|        self.state.followFollowUpScheduled = true
+  638|    136|        let spawned = self.spawn(.entry) { engine in
+  639|    136|            // REENTRANCY: RE-S44 (proposed) — the follow-up hops onto the actor and re-reads everything it uses: the
+  640|    136|            // owed passes and the visit cursor (a newer apply's follow may have extended or restarted them), the copy as
+  641|    136|            // it stands then (each pass compares with it), whether each job is still owed a visit (in `unfollowed`, which
+  642|    136|            // `removeJob` leaves) and still exists, and its state and ids, so a job that moved, started, ended or was
+  643|    136|            // re-joined meanwhile is followed as it is now.
+  644|    136|            await engine.followFollowUp()
+  645|    136|        }
+  646|    136|        if spawned == nil {
+  647|      0|            // The jobs found so far stay in `unfollowed`; the owed passes are dropped: shutting down, nothing follows.
+  648|      0|            self.state.followFollowUpScheduled = false
+  649|      0|            self.state.followOrder = []
+  650|      0|            self.state.followNext = 0
+  651|      0|            self.state.followScans = []
+  652|      0|            self.state.followCarried = []
+  653|      0|            self.state.pumpWaitsForFollow = false
+  654|      0|        }
+  655|    136|    }
+  656|       |
+  657|       |    /// The scheduled continuation of `continueFollow`; it continues in any state but shutdown, as a release does.
+  658|    258|    private func followFollowUp() {
+  659|    258|        if self.state.followFollowUpsHeld {
+  660|    123|            // Test seam: the visits stay owed and the turn stays scheduled until the release runs it.
+  661|    123|            self.state.followFollowUpWaiting = true
+  662|    123|            self.notifyObservers()
+  663|    123|            return
+  664|    135|        }
+  665|    135|        self.state.followFollowUpScheduled = false
+  666|    135|        guard !self.isShuttingDown, self.followOwed else {
+  667|     25|            return
+  668|    110|        }
+  669|    110|        self.continueFollow()
+  670|    110|        self.rearm()
+  671|    110|        self.reconcileIdle()
+  672|    110|        self.notifyObservers()
+  673|    110|    }
+  674|       |
+  675|       |    /// Test seam: the next follow-up turns keep their visits owed until `releaseFollowFollowUps()`, so a test reads the
+  676|       |    /// engine between two follow turns, which no production path can order.
+  677|    125|    func holdFollowFollowUps() {
+  678|    125|        self.state.followFollowUpsHeld = true
+  679|    125|    }
+  680|       |
+  681|       |    /// Test seam: lets a held follow-up run in this turn, or disarms a hold nothing reached.
+  682|    173|    func releaseFollowFollowUps() {
+  683|    173|        self.state.followFollowUpsHeld = false
+  684|    173|        guard self.state.followFollowUpWaiting else {
+  685|     51|            return
+  686|    122|        }
+  687|    122|        self.state.followFollowUpWaiting = false
+  688|    122|        self.followFollowUp()
+  689|    122|    }
+  690|       |}
+  691|       |
+  692|       |/// An event that waits for the follow's end (`EngineState.eventsAfterFollow`; F-28, S3-R11 design D3, S3-R14). Real-world
+  693|       |/// ledger inputs (a free-space read, the bytes an ended transfer frees) apply when they arrive (S3-R11 R1): none waits;
+  694|       |/// the other real-world facts an input carries (the path, the clock, a `Retry-After`) are captured at its arrival.
+  695|       |enum EventAfterFollow: Sendable {
+  696|       |    /// An ENOSPC whose verdict (`decideSpaceFailure`) waits; `epoch` is the job's at the failure.
+  697|       |    case spaceFailure(TransferID, epoch: UInt64, required: Int64)
+  698|       |    /// The exit verdict of an attempt that ended behind the barrier (`SyncEngine.defersFailure`); `epoch` is the job's
+  699|       |    /// at the exit.
+  700|       |    case attemptFailed(TransferID, epoch: UInt64, verdict: AttemptVerdict)
+  701|       |    /// A queued job's place in its lane's queue (`enqueue`), taken after the places of the jobs the follow queues, at
+  702|       |    /// the front when `front` (a pause's resume, a gate's wait), with the time the place was asked for; `epoch` is the
+  703|       |    /// job's when it asked, and a later job of the transfer does not take it.
+  704|       |    case enqueue(TransferID, epoch: UInt64, front: Bool)
+  705|       |    /// A request's join (`addInterest`), other than the follow's own.
+  706|       |    case join(JoinAfterFollow)
+  707|       |    /// The end of a prefetch member's pending claim that the group's join reached (`joinMember`), after its join.
+  708|       |    case endClaim(InterestToken, member: AssetID)
+  709|       |    /// The end of every claim a group's join that gave up still held (`endClaims(of:)`).
+  710|       |    case endClaims(InterestToken)
+  711|       |    /// An interest's removal by a withdrawal, a run's end or a release of re-attachments (`removeInterest`), other
+  712|       |    /// than the follow's own and an answer's (`resolve`); `TransferID` is the job that held it then.
+  713|       |    case removal(InterestToken, TransferID)
+  714|       |    /// A group's release (`performReleaseGroup`), or an `ensureAvailable` group's withdrawal when `entry`
+  715|       |    /// (`releaseEntryGroup`); the caller was answered when it arrived.
+  716|       |    case release(InterestToken, entry: Bool)
+  717|       |    /// A release's follow-up turn (`continueReleases`).
+  718|       |    case continueReleases
+  719|       |    /// A purge's withdrawals of non-user interests (`withdrawPurged`).
+  720|       |    case purge(PurgeRequest)
+  721|       |    /// A conditions element's decisions about jobs (`applyConditionsToJobs`): the pauses of refused running work, the
+  722|       |    /// re-queues a satisfied edge owes and the conditions' re-admissions, read under the element's own conditions; the
+  723|       |    /// element itself, its edge serial and the pending run's reading applied when it arrived.
+  724|       |    case conditions(ConditionsSnapshot, edge: Bool)
+  725|       |    /// A re-admission turn (`readmit`) under the conditions of its arrival.
+  726|       |    case readmit(Readmissions, ConditionsSnapshot)
+  727|       |    /// The re-admission of the jobs an origin gate parked, once the gate opened (`unblockOrigin`).
+  728|       |    case unblock(OriginBlock)
+  729|       |    /// A failed job's backoff ended (the alarm's `.retry`, `retryDue`).
+  730|       |    case retryDue(TransferID, epoch: UInt64)
+  731|       |    /// A throttle's fail-fast turn for the users of the jobs it parked (`answerThrottledUsers`).
+  732|       |    case throttleAnswers
+  733|       |
+  734|       |    /// Whether the event is itself a bounded pass (a re-admission, a release turn, a purge's pass, a throttle's
+  735|       |    /// fail-fast turn): the drain's batch ends after it (`drainEventsAfterFollow`, C2).
+  736|    561|    var endsDrainBatch: Bool {
+  737|    561|        switch self {
+  738|    561|        case .release, .continueReleases, .purge, .conditions, .readmit, .unblock, .throttleAnswers:
+  739|      8|            return true
+  740|    561|        case .spaceFailure, .attemptFailed, .enqueue, .join, .endClaim, .endClaims, .removal, .retryDue:
+  741|    553|            return false
+  742|    561|        }
+  743|    561|    }
+  744|       |}
+  745|       |
+  746|       |/// An exit verdict that waits for the follow (`EventAfterFollow.attemptFailed`).
+  747|       |enum AttemptVerdict: Sendable, Equatable {
+  748|       |    /// Every interest is answered with the failure (`resolveAll`).
+  749|       |    case resolve(AssetError)
+  750|       |    /// The attempt counts toward the retry caps and the job backs off (`retryLater`), `answer` being the engine's own
+  751|       |    /// figures when it has them.
+  752|       |    case retry(TransferError, answer: AssetError?)
+  753|       |    /// The attempt failed offline: a fresh attempt when `requeue` (an edge passed while it ran and the path is
+  754|       |    /// satisfied), else a wait for the next edge with the offline fail-fast (`failed(.whenOnline)`). Both read when the
+  755|       |    /// failure arrived (R-SYN-13).
+  756|       |    case offline(requeue: Bool)
+  757|       |    /// A 429 (`EngineFailures.throttled`): the park and its fail-fast answers, from the facts of its arrival.
+  758|       |    case throttle(ThrottleFacts)
+  759|       |    /// The attempt paused (`paused`): a policy pause (`policy`) parks on its lane's lane-wide block when the lane the
+  760|       |    /// visits leave has one in `blocks` (the blocks when the pause arrived), any other resumes first in its queue.
+  761|       |    case pause(policy: Bool, blocks: [LaneBlock])
+  762|       |    /// A fresh attempt now, no backoff (`requeue`: a cancel the engine did not ask for, a rejected resume, a background
+  763|       |    /// session that cannot be used).
+  764|       |    case requeue
+  765|       |}
+  766|       |
+  767|       |/// A lane's lane-wide block when a pause arrived (`AttemptVerdict.pause`).
+  768|       |struct LaneBlock: Sendable, Equatable {
+  769|       |    /// The lane.
+  770|       |    let lane: AssetPriority
+  771|       |    /// Its block.
+  772|       |    let reason: BlockReason
+  773|       |}
+  774|       |
+  775|       |/// What a 429's verdict reads from its arrival (`AttemptVerdict.throttle`).
+  776|       |struct ThrottleFacts: Sendable, Equatable {
+  777|       |    /// The `Retry-After`, in seconds from the 429's instant, if any.
+  778|       |    let retryAfter: TimeInterval?
+  779|       |    /// The 429's instant.
+  780|       |    let at: MonotonicInstant
+  781|       |    /// The origin's throttle end in force just before the 429 arrived.
+  782|       |    let decided: MonotonicInstant?
+  783|       |}
+  784|       |
+  785|       |/// The lane-wide conditions an event read when it arrived (`SyncEngine.withConditions`).
+  786|       |struct ConditionsSnapshot: Sendable, Equatable {
+  787|       |    /// The conditions element in force.
+  788|       |    let conditions: DeviceConditions?
+  789|       |    /// Whether the thermal state paused background work.
+  790|       |    let pausedForThermal: Bool
+  791|       |}
+  792|       |
+  793|       |/// What the drain needs of a job whose exit verdict waits (`EngineState.verdictsAfterFollow`).
+  794|       |struct VerdictAfterFollow: Sendable, Equatable {
+  795|       |    /// The job's epoch at the exit.
+  796|       |    let epoch: UInt64
+  797|       |}
+  798|       |
+  799|       |/// A join that waits for the follow (`EventAfterFollow.join`): what `addInterest` was called with.
+  800|       |struct JoinAfterFollow: Sendable {
+  801|       |    /// The interest.
+  802|       |    let token: InterestToken
+  803|       |    /// The asset it joins for.
+  804|       |    let asset: AssetID
+  805|       |    /// The entry it joins for (`transferID` names the job).
+  806|       |    let entry: ManifestEntry
+  807|       |    /// Its lane.
+  808|       |    let lane: AssetPriority
+  809|       |    /// Its kind.
+  810|       |    let kind: InterestKind
+  811|       |    /// Whether the engine's copy listed `asset` at `entry`'s transfer when it joined (a waiter joined from the store's
+  812|       |    /// newer manifest may name another), so a later apply that moved it is followed at the drain.
+  813|       |    let listed: Bool
+  814|       |}
+

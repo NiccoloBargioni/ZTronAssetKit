@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" started.
+✘ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" recorded an issue at EngineFollowBarrierTests.swift:511:9: Expectation failed: between.running.isEmpty
+↳ no transfer starts between two drain turns: [c-3e73c53dcbd7b2fdb4ceaf90398a9a4446addd9b868cd9f62ce0f6e7b53174df]
+↳ between.running.isEmpty → false
+↳   between.running → [c-3e73c53dcbd7b2fdb4ceaf90398a9a4446addd9b868cd9f62ce0f6e7b53174df]
+↳   isEmpty → false
+✘ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" recorded an issue at EngineFollowBarrierTests.swift:516:9: Expectation failed: after == [u.transferID]
+↳ the drain's last batch pumps, and the slot goes to U, user work: [c-3e73c53dcbd7b2fdb4ceaf90398a9a4446addd9b868cd9f62ce0f6e7b53174df, c-b4b4af5118892537abffa7e2a187b0efd060876a488e328c11355699b6de4c38]
+↳ after == [u.transferID] → false
+↳   after → [c-3e73c53dcbd7b2fdb4ceaf90398a9a4446addd9b868cd9f62ce0f6e7b53174df, c-b4b4af5118892537abffa7e2a187b0efd060876a488e328c11355699b6de4c38]
+↳   [u.transferID] → [c-b4b4af5118892537abffa7e2a187b0efd060876a488e328c11355699b6de4c38]
+✘ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" failed after 0.906 seconds with 2 issues.
+↳ /// No transfer starts between two turns of the drain that gives the places an owed follow deferred, so work queued in
+↳ /// a later drain turn is not passed by work a pump started meanwhile (the cycle-9 amendment (d)): the only slot is
+↳ /// free; while the follow is owed 512 prefetch requests and then a user request U are made, so 513 places wait and
+↳ /// the drain's first turn gives the prefetch requests' 512 (`eventsAfterFollowPerTurn`). An event between the
+↳ /// two drain turns pumps (here, the release's own turn pumps again). Pumped there, the slot went to the first member
+↳ /// and U waited behind it; held until the drain's last batch, the pump serves U, user work, first (R-SYN-2). The
+↳ /// follow barrier has no visit-first counterpart for the slot (a request made after the follow starts at once), so
+↳ /// the test runs in one order.
+✘ Suite "Engine runs" failed after 0.907 seconds with 2 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 0.907 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

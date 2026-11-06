@@ -1,0 +1,15 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 3] ZTronAssetTransportTests-product
+Build complete! (0,47 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Verifier probes r3" started.
+◇ Test "PROBE-4: an assetAvailable of the replacement during the reopen's tail reaches the consumer" started.
+PROBE-4 control: the direct subscriber of the replacement saw assetAvailable(x): true
+PROBE-4 generation=1 subscribersWhileParked=1 resolved=d07f55593172fe9148e868999d778bdfb8499c81112e5739e7a6c43957cdd405.png purge=success(ZTronAssetModel.PurgeResult(bytesFreed: 300, bytesDeferred: 0, assetsRemoved: 1)) assetAvailable(x) received=true events=["clientStarted(generation: 1)", "syncStarted(run-1, ZTronAssetModel.SyncT", "conditionsChanged(ZTronAssetModel.Device", "snapshotChanged(generation: 2)", "syncFinished(run-1, ZTronAssetModel.Sync", "clientStarted(generation: 1)", "syncStarted(run-1, ZTronAssetModel.SyncT", "conditionsChanged(ZTronAssetModel.Device", "assetAvailable(x, generation: 1)", "snapshotChanged(generation: 3)", "syncFinished(run-1, ZTronAssetModel.Sync", "snapshotChanged(generation: 3)", "clientShutDown"]
+✔ Test "PROBE-4: an assetAvailable of the replacement during the reopen's tail reaches the consumer" passed after 0.013 seconds.
+✔ Suite "Verifier probes r3" passed after 0.013 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.013 seconds.
+exit=0

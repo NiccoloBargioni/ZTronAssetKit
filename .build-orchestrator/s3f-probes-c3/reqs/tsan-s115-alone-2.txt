@@ -1,0 +1,4 @@
+✘ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" recorded an issue at EngineSync1LivenessTests.swift:175:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" recorded an issue at EngineSync1LivenessTests.swift:220:9: Expectation failed: held.jobs >= tuning.maxConcurrentTransfers
+✘ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" recorded an issue at EngineSync1LivenessTests.swift:222:9: Expectation failed: held.downloading == tuning.maxConcurrentTransfers
+✘ Test run with 1 test in 1 suite failed after 215.871 seconds with 3 issues.

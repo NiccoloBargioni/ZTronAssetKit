@@ -1,0 +1,54 @@
+ 5:40  up 4 days, 18:03, 2 users, load averages: 448.75 220.68 125.59
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC6CorrectProbes" started.
+◇ Test "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" started.
+PROBE-C6-PARKFIGURES visitFirst=true before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), ids: Optional(1)) b=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 0)) k=success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/38/3874875f4bc924bd8c8bd9ed4766c5ca27a6b4356da18335a9be1fca9fad1c9c.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be6e918dad1df69df00d1869cb22830c3998fb23f466b3cd278297d32d434ddb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) violations=0
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" started.
+PROBE-C6-PARKFIGURES visitFirst=false before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), ids: Optional(2)) b=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 0)) k=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be6e918dad1df69df00d1869cb22830c3998fb23f466b3cd278297d32d434ddb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) violations=0
+✘ Test "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" recorded an issue with 1 argument visitFirst → false at VerifyC6CorrectProbes.swift:205:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ K: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" with 2 test cases failed after 2.049 seconds with 1 issue.
+↳ /// PROBE-C6-PARKFIGURES: the committed lane-drop scenario (`.reclaimed` sweep, alarm path), but B is a prefetch-lane
+↳ /// WAITER instead of a group member, so the fall-through from the re-queue branch into the park branch answers it.
+↳ /// F-22: its figures are the room its own (prefetch) lane lacks: required 5,000,000, available 0 (the opportunistic
+↳ /// volume is 6 MB smaller than the important one, which has 6 MB of room). K's waiter is answered from its 3 MB.
+◇ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" started.
+PROBE-C6-LANEGAIN visitFirst=true before=(owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), ids: Optional(1), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))) afterSweep=(lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.downloading), space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 272435459, volumeOpportunistic: 278435459, usedBytes: 300, pendingReclaim: 0, budgetBytes: 136217879, reserveBytes: 268435456))) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/49/493bb497c0a5d0cb3b238461c6e0bf407ced5124cb8abc763a68ce89347cb7a1.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d1cfd9872bf8459d5d9ae01b9fb1ce7b9002d63e7abba724b76772006dce97b8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" started.
+PROBE-C6-LANEGAIN visitFirst=false before=(owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), ids: Optional(2), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))) afterSweep=(lane: nil, c: nil, space: Optional(ZTronAssetStorage.FreeSpace(volumeImportant: 272435459, volumeOpportunistic: 278435459, usedBytes: 300, pendingReclaim: 0, budgetBytes: 136217879, reserveBytes: 268435456))) b=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 10000003)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d1cfd9872bf8459d5d9ae01b9fb1ce7b9002d63e7abba724b76772006dce97b8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" recorded an issue with 1 argument visitFirst → false at VerifyC6CorrectProbes.swift:287:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(cBytes.count)
+↳ B's prefetch waiter: 5 MB fit the 10 MB of prefetch room: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 10000003))
+↳ (try? bResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" with 2 test cases failed after 1.643 seconds with 1 issue.
+↳ /// PROBE-C6-LANEGAIN: the park branch's assumption that a lane drop only shrinks the room (the `followBeforeActing`
+↳ /// re-read, cycle 4, and the fall-through of cycle 6) when the opportunistic volume is LARGER than the important one
+↳ /// (the store does not clamp the two readings, and `largestRoom` itself takes their max). C (5 MB) is wanted by A
+↳ /// (a user waiter) and B (a prefetch waiter); 0 bytes of important room, 6 MB of opportunistic room, x's 4 MB
+↳ /// pending reclaim. A forced sync moves A while the bounded follow owes C's visit. After the reclaim: 4 MB important,
+↳ /// 10 MB opportunistic. Followed first (control), C is prefetch and fits: B's waiter gets the asset. During the owed
+↳ /// follow the sweep judges C on A's user lane (does not fit), follows it (prefetch now) and parks it anyway.
+✘ Suite "VerifyC6CorrectProbes" failed after 3.693 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 6, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C6-READDROP: the cycle-5 lane-drop defect reproduced through a different sweep and different interests. A
+↳ /// free-space read's `.read` sweep (`refreshFreeSpace` -> `reconsiderSpaceBlocked`), not the reclaim's `.reclaimed` one,
+↳ /// and only group interests (no waiter, so no fail-fast hides the outcome). Content C (5 MB) is wanted by A through a
+↳ /// user-lane group and by B through a prefetch group, so its job is user-lane; K (3 MB) is wanted by a user-lane group.
+↳ /// Both are parked `insufficientSpace` (2 MB of important room, none opportunistic, nothing pending reclaim). A forced
+↳ /// sync moves A to a 16-byte content while 2,100 changed fillers sort before it, so the bounded follow owes C's visit
+↳ /// (held). The volume then gains room: 6 MB important, still none opportunistic, and a free-space read sweeps.
+↳ ///
+↳ /// Right outcome (the one the sweep gives when the follow visited first): C's job is prefetch-lane, does not fit and stays
+↳ /// parked; K fits the 6 MB and is re-queued. Pre-fix (`39dadd4` / `48c8dfc`): the sweep judged C on its user lane (fits),
+↳ /// followed it (A leaves, lane drops to prefetch), re-queued it and counted its 5 MB ahead, so K was judged against 1 MB
+↳ /// and left parked although 6 MB are free; the gate then parks C again.
+✘ Test run with 2 tests in 1 suite failed after 3.694 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+exit 1
+ 5:40  up 4 days, 18:04, 2 users, load averages: 445.33 223.76 127.23

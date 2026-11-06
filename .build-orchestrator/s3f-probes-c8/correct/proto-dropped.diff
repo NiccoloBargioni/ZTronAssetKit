@@ -1,0 +1,14 @@
+--- Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 08:10:47
++++ .build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 08:53:12
+@@ -853,6 +853,11 @@
+             return false
+         }
+         self.enqueue(job.transfer)
++        // PROTOTYPE (verifier, cycle 8): a job that cannot start before the owed follow's visit (it holds an id the copy
++        // no longer lists) is neither counted ahead nor recorded: the gate judges it again once it may start.
++        guard !self.awaitsFollow(job) else {
++            return true
++        }
+         ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
+         self.state.spaceAdmitted[job.transfer] = self.state.jobs[job.transfer]?.ticket
+         return true

@@ -1,0 +1,11 @@
+✔ Test run with 151 tests in 16 suites passed after 0.510 seconds.
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:721:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:781:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" with 2 test cases failed after 187.786 seconds with 2 issues.
+✘ Suite "Engine follow barrier (F-28)" failed after 264.632 seconds with 2 issues.
+✘ Test run with 511 tests in 53 suites failed after 264.633 seconds with 2 issues.
+✔ Test run with 459 tests in 60 suites passed after 75.212 seconds.
+✔ Test run with 84 tests in 18 suites passed after 60.662 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.028 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.336 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.381 seconds.

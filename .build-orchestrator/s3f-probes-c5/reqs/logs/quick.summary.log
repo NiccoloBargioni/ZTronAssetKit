@@ -1,0 +1,12 @@
+::: OK   harness
+::: OK   toolchain
+::: OK   build-debug
+✔ Test run with 151 tests in 16 suites passed after 2.011 seconds.
+✔ Test run with 406 tests in 52 suites passed after 54.752 seconds.
+✔ Test run with 459 tests in 60 suites passed after 322.784 seconds.
+✔ Test run with 84 tests in 18 suites passed after 244.315 seconds.
+✔ Test run with 85 tests in 11 suites passed after 14.266 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.969 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.604 seconds.
+::: OK   tests
+VERIFY: PASS

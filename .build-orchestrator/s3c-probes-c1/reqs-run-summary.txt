@@ -1,0 +1,23 @@
+# reqs verifier c1 run summary
+✔ Test run with 151 tests in 16 suites passed after 0.533 seconds.
+✔ Test run with 351 tests in 52 suites passed after 9.677 seconds.
+✔ Test run with 481 tests in 64 suites passed after 267.418 seconds.
+✔ Test run with 84 tests in 18 suites passed after 130.916 seconds.
+✔ Test run with 85 tests in 11 suites passed after 4.044 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.448 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.487 seconds.
+VERIFY: PASS
+.build-verify-s3c-c1-reqs/storage-run1.log: ✔ Test run with 481 tests in 64 suites passed after 774.431 seconds. load averages: 18.73 23.24 38.20 -> load averages: 106.50 110.75 90.06
+.build-verify-s3c-c1-reqs/storage-run2.log: ✔ Test run with 481 tests in 64 suites passed after 684.360 seconds. load averages: 106.50 110.75 90.06 -> load averages: 99.43 180.52 150.27
+.build-verify-s3c-c1-reqs/storage-run3.log: ✔ Test run with 481 tests in 64 suites passed after 400.299 seconds. load averages: 99.43 180.52 150.27 -> load averages: 27.67 72.01 107.01
+Build complete! (39,34 s)
+EXIT=0
+EXIT=0
+18:02:33
+18:02  up 4 days,  6:25, 2 users, load averages: 112.87 111.86 91.53
+18:02:49
+18:02  up 4 days,  6:26, 2 users, load averages: 106.84 110.59 91.44
+EXIT=0
+18:15:00
+18:15  up 4 days,  6:38, 2 users, load averages: 62.17 143.24 139.01
+** TEST SUCCEEDED **

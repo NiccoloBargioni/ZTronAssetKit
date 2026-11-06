@@ -1,0 +1,9 @@
+✘ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" recorded an issue with 1 argument swept → .ensureReparked at EngineFollowTests.swift:579:9: Expectation failed: answered.fromNewContent
+✘ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" recorded an issue with 1 argument swept → .waiterReparked at EngineFollowTests.swift:579:9: Expectation failed: answered.fromNewContent
+✘ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" with 3 test cases failed after 0.813 seconds with 2 issues.
+✘ Suite "Engine runs" failed after 0.813 seconds with 2 issues.
+PROBE-C3-SPACE answer: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 1000303)); room above reserve now 1000340
+✘ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" recorded an issue at VerifyC3CorrectProbes.swift:294:9: Expectation failed: (try? answer.get()) != nil
+✘ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" failed after 0.865 seconds with 1 issue.
+✘ Suite "VerifyC3Correct probes" failed after 0.865 seconds with 1 issue.
+✘ Test run with 2 tests in 2 suites failed after 0.866 seconds with 3 issues.

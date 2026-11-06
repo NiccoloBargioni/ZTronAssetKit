@@ -1,0 +1,97 @@
+staleOriginal: build rc=0 (4 s)
+  run1 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.932 seconds with 5 issues.
+    ✘ Test "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:153:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:165:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-STALE-REROUTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:219:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:175:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15R-REROUTE-STALE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:81:9: Expectation failed: bResult == .failure(.integrityFailure)
+  run2 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.951 seconds with 5 issues.
+    ✘ Test "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:153:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:165:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-STALE-REROUTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:219:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:175:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15R-REROUTE-STALE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:81:9: Expectation failed: bResult == .failure(.integrityFailure)
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+consumeDrop: build rc=0 (3 s)
+  run1 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.839 seconds with 1 issue.
+    ✘ Test "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:175:9: Expectation failed: bResult == .failure(.integrityFailure)
+  run2 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.803 seconds with 1 issue.
+    ✘ Test "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:175:9: Expectation failed: bResult == .failure(.integrityFailure)
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+followGenerationDrop: build rc=0 (3 s)
+  run1 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.812 seconds with 2 issues.
+    ✘ Test "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:165:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-STALE-REROUTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:219:9: Expectation failed: bResult == .failure(.integrityFailure)
+  run2 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.843 seconds with 2 issues.
+    ✘ Test "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierStaleRerouteTests.swift:165:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-STALE-REROUTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:219:9: Expectation failed: bResult == .failure(.integrityFailure)
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+failedNeverPasses: build rc=0 (3 s)
+  run1 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.477 seconds with 6 issues.
+    ✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:154:9: Expectation failed: bResult == .failure(.notFound)
+    ✘ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:140:9: Expectation failed: bResult == .failure(.notFound)
+    ✘ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:169:25: Issue recorded
+    ✘ Test "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:182:9: Expectation failed: bResult == .failure(.serverUnavailable(retryAfter: nil))
+    ✘ Test "PROBE-C15R-VERDICT-LATER-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:143:9: Expectation failed: bResult == .failure(.notFound)
+  run2 rc=1 ✘ Test run with 7 tests in 2 suites failed after 4.589 seconds with 6 issues.
+    ✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:154:9: Expectation failed: bResult == .failure(.notFound)
+    ✘ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:140:9: Expectation failed: bResult == .failure(.notFound)
+    ✘ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:169:25: Issue recorded
+    ✘ Test "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:182:9: Expectation failed: bResult == .failure(.serverUnavailable(retryAfter: nil))
+    ✘ Test "PROBE-C15R-VERDICT-LATER-APPLY" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:143:9: Expectation failed: bResult == .failure(.notFound)
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+enospcOriginal: build rc=0 (3 s)
+  run1 rc=1 ✘ Test run with 4 tests in 2 suites failed after 3.069 seconds with 2 issues.
+    ✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:361:9: Expectation failed: bResult == .failure(.integrityFailure)
+  run2 rc=1 ✘ Test run with 4 tests in 2 suites failed after 3.124 seconds with 2 issues.
+    ✘ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:361:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+  reverted: Sources/ZTronAssetSync/Engine/EngineDispatch.swift, Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD
+publicationEndDrop: build rc=0 (3 s)
+  run1 rc=1 ✘ Test run with 7 tests in 3 suites failed after 6.512 seconds with 4 issues.
+    ✘ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:361:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-INTEGRITY-WINDOW" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectWindowProbe.swift:118:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWindowTests.swift:168:9: Expectation failed: bResult == .failure(.integrityFailure)
+  run2 rc=1 ✘ Test run with 7 tests in 3 suites failed after 5.440 seconds with 4 issues.
+    ✘ Test "PROBE-C15C-INTEGRITY-WINDOW" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectWindowProbe.swift:118:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:361:9: Expectation failed: bResult == .failure(.integrityFailure)
+    ✘ Test "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWindowTests.swift:168:9: Expectation failed: bResult == .failure(.integrityFailure)
+  reverted: Sources/ZTronAssetSync/Engine/EngineDispatch.swift == HEAD
+spaceDeferralRecordDrop: build rc=0 (6 s)
+  run1 rc=1 ✘ Test run with 6 tests in 2 suites failed after 6.299 seconds with 1 issue.
+    ✘ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:169:25: Issue recorded
+  run2 rc=1 ✘ Test run with 6 tests in 2 suites failed after 6.630 seconds with 1 issue.
+    ✘ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictApplyTests.swift:169:25: Issue recorded
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD
+spaceFailureEpochDropped: build rc=0 (6 s)
+  run1 rc=1 ✘ Test run with 2 tests in 1 suite failed after 4.562 seconds with 2 issues.
+    ✘ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSpaceEpochTests.swift:71:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+    ✘ Test "PROBE-C15R-SPACE-EPOCH" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:208:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+  run2 rc=1 ✘ Test run with 2 tests in 1 suite failed after 4.596 seconds with 2 issues.
+    ✘ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSpaceEpochTests.swift:71:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+    ✘ Test "PROBE-C15R-SPACE-EPOCH" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:208:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD
+laneVisitOwedDrop: build rc=0 (5 s)
+  run1 rc=1 ✘ Test run with 2 tests in 1 suite failed after 1.951 seconds with 1 issue.
+    ✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDrainLaneTests.swift:115:9: Expectation failed: throttle != nil
+  run2 rc=1 ✘ Test run with 2 tests in 1 suite failed after 1.934 seconds with 1 issue.
+    ✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDrainLaneTests.swift:115:9: Expectation failed: throttle != nil
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD
+laneOriginal: build rc=0 (4 s)
+  run1 rc=1 ✘ Test run with 2 tests in 1 suite failed after 2.063 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDrainLaneTests.swift:115:9: Expectation failed: throttle != nil
+    ✘ Test "PROBE-C15R-LANE-WALK" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsLaneWalkProbe.swift:100:9: Expectation failed: throttleAtArrival != nil
+  run2 rc=1 ✘ Test run with 2 tests in 1 suite failed after 2.727 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDrainLaneTests.swift:115:9: Expectation failed: throttle != nil
+    ✘ Test "PROBE-C15R-LANE-WALK" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsLaneWalkProbe.swift:100:9: Expectation failed: throttleAtArrival != nil
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD
+laneJobsWalkAlways: build rc=0 (6 s)
+  run1 rc=0 ✔ Test run with 14 tests in 1 suite passed after 23.650 seconds.
+  run2 rc=0 ✔ Test run with 14 tests in 1 suite passed after 23.672 seconds.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD
+PLAN DONE 22:54:07

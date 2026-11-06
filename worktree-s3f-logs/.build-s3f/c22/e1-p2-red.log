@@ -1,0 +1,32 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+✘ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAfterVerdictSpaceTests.swift:160:9: Expectation failed: Self.isNoSpace(run.vx) && run.vy == run.vx
+↳ Vx and Vy get the ENOSPC's space figures (visit-first): X at the drain's end downloading holding ["zz-x", "zz-y"]; Vx failure(ZTronAssetModel.AssetError.notFound), Vy failure(ZTronAssetModel.AssetError.notFound); X started 2 times, Y 1
+↳ Self.isNoSpace(run.vx) && run.vy == run.vx → false
+↳   Self.isNoSpace(run.vx) → false
+↳   run.vy == run.vx → <not evaluated>
+✘ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAfterVerdictSpaceTests.swift:161:9: Expectation failed: run.xStarts == 1
+↳ X is not requested past the interactive cap (visit-first): X at the drain's end downloading holding ["zz-x", "zz-y"]; Vx failure(ZTronAssetModel.AssetError.notFound), Vy failure(ZTronAssetModel.AssetError.notFound); X started 2 times, Y 1
+↳ run.xStarts == 1 → false
+↳   run.xStarts → 2
+✘ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" with 2 test cases failed after 1.105 seconds with 2 issues.
+↳ /// e1-P2: K maps zz-y to X's content while X publishes. Swept first, the drain's visit after Y's verdict joins zz-y to
+↳ /// X inside the free-space read; visited first, K's visit joined it to X publishing, and the ENOSPC's verdict, at the
+↳ /// cap, answered Vx and Vy with the space figures. X starts once.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+✔ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" with 2 test cases passed after 1.120 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.226 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 2.226 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,39 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .atTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .atTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .pastTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → .pastTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .atTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .atTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+✘ Test "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, edge → .atTheEdgeCapped at EngineFollowBarrierRerouteTakeOffShareTests.swift:179:17: Expectation failed: made[given - 1] == moved && turns[given].batches == 0
+↳ at the edge the take-off fits the turn's ids and is made in the verdict's turn: [0, 0, 0, 0] [follow owed=true moving=false verdicts=1 settled=0 batches=0/0 queue=["verdict"](1) onP=0 removalOnJob=false heldLane=nil o0=5 yOnW=0 boundOnD=0 dJob=false jobs=1 violations=[], follow owed=true moving=false verdicts=1 settled=0 batches=0/0 queue=["verdict"](1) onP=0 removalOnJob=false heldLane=nil o0=5 yOnW=0 boundOnD=0 dJob=false jobs=1 violations=[], follow owed=true moving=false verdicts=1 settled=0 batches=0/0 queue=["verdict"](1) onP=0 removalOnJob=false heldLane=nil o0=5 yOnW=0 boundOnD=0 dJob=false jobs=1 violations=[], follow owed=true moving=false verdicts=1 settled=0 batches=0/0 queue=["verdict"](1) onP=0 removalOnJob=false heldLane=nil o0=5 yOnW=0 boundOnD=0 dJob=false jobs=1 violations=[], follow owed=false moving=false verdicts=0 settled=0 batches=0/0 queue=[](0) onP=0 removalOnJob=false heldLane=nil o0=0 yOnW=0 boundOnD=0 dJob=false jobs=0 violations=[]]
+↳ made[given - 1] == moved && turns[given].batches == 0 → false
+↳   made[given - 1] == moved → false
+↳   turns[given].batches == 0 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .pastTheEdge to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → .pastTheEdgeCapped to "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" started.
+✘ Test "R-SYN-11: moved-back ids taken off at the reservation's edge rejoin their job with its retry state, as visited first (F-28, PROBE-RR21-RESERVE-REJOIN)" with 8 test cases failed after 7.326 seconds with 1 issue.
+↳ /// PROBE-RR21-RESERVE-REJOIN (`integrate-rr21.md`'s probes; the order class of the reservation, recorded with its
+↳ /// results): O0 holds zz-c0k and four or five moved-before ids, at four a turn, and times out; capped, its retry
+↳ /// times out too, at the interactive cap. Swept first, the verdict's turn takes the four off and re-routes them at
+↳ /// once, charged to the turn, all its ids (the reservation's edge), or takes the five off and owes them; either way
+↳ /// they rejoin O0 with its retry state (its attempts), as v4's visit rejoined them visited first, and their user
+↳ /// waiters' join skips its backoff (T20, `relane`), so O0's retry serves them all or, capped, answers them all with
+↳ /// its own failure.
+↳ ///
+↳ /// The drain's last turn leaves the barrier down, and its pump starts that retry, which runs before the turn is read
+↳ /// or after it, as the scheduler orders them (the cycle-21 gate run's third Sync run read it after a capped retry had
+↳ /// ended O0: `made` [0, 0, 0, 0]). `settle` reads each such turn in the worst order, once O0's retry has its terminal
+↳ /// (PROBE-C21-RESERVE-SETTLE).
+✘ Suite "Engine follow barrier (F-28)" failed after 7.326 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 7.326 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

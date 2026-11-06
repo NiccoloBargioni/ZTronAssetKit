@@ -1,0 +1,35 @@
+# S3-CRAS-02 confirmation
+grep count of runDueWork/settleDeletions/reapDeletable in OracleTests.swift: 0
+baseline (load 20-45):
+S3 oracle with reaping, seed 1: 40 steps, 10 lifetimes, 6 unlinks
+S3 oracle with reaping, seed 2: 40 steps, 4 lifetimes, 7 unlinks
+S3 oracle with reaping, seed 3: 40 steps, 12 lifetimes, 4 unlinks
+S3 oracle with reaping, seed 4: 40 steps, 4 lifetimes, 6 unlinks
+S3 oracle with reaping, seed 5: 40 steps, 4 lifetimes, 7 unlinks
+S3 oracle with reaping, seed 6: 40 steps, 5 lifetimes, 6 unlinks
+S3 oracle with reaping, seed 7: 40 steps, 6 lifetimes, 4 unlinks
+S3 oracle with reaping, seed 8: 40 steps, 6 lifetimes, 6 unlinks
+S3 oracle with reaping, seed 9: 40 steps, 7 lifetimes, 3 unlinks
+S3 oracle with reaping, seed 10: 40 steps, 9 lifetimes, 4 unlinks
+S3 oracle with reaping, seed 11: 40 steps, 9 lifetimes, 3 unlinks
+S3 oracle with reaping, seed 12: 40 steps, 9 lifetimes, 2 unlinks
+✔ Test "R-STO-5: seeded random store, relocate, remove, evict, crash and reopen sequences match the oracle with I-1…I-5 after every step" with 16 test cases passed after 0.950 seconds.
+S3 oracle with reaping, seed 13: 40 steps, 6 lifetimes, 7 unlinks
+S3 oracle with reaping, seed 14: 40 steps, 9 lifetimes, 4 unlinks
+S3 oracle with reaping, seed 15: 40 steps, 5 lifetimes, 6 unlinks
+S3 oracle with reaping, seed 16: 40 steps, 4 lifetimes, 3 unlinks
+✔ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" with 16 test cases passed after 1.140 seconds.
+mutant Z (fatalError in BlobDeletionUnit.run when keys non-empty):
+ shipped OracleTests: ✔ Test run with 1 test in 1 suite passed after 0.714 seconds.
+ S3OracleReapProbe: ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran
+mutant G (deletionBlocker returns .none for every doomed key: no ack, commit, lease or grace check):
+✘ Test run with 34 tests in 7 suites failed after 255.968 seconds with 29 issues.
+   1 ✘ Test "R-CLN-1: a manifest that re-adds a key being deleted waits for the deletion and re-downloads"
+   5 ✘ Test "R-CLN-1: prune removes blobs of removed entries only after acknowledgement and grace"
+   4 ✘ Test "R-CLN-5: a doomed key blocked only by a lease keeps no deadline, and releasing the lease makes it deletable at once"
+   1 ✘ Test "R-CLN-5: a failed unlink keeps the key doomed with backoff and retries it"
+   8 ✘ Test "R-CLN-5: a sink that keeps an older or foreign snapshot never counts as acknowledgement"
+   4 ✘ Test "R-CLN-5: deletion grace uses the awake clock and a fresh acknowledgement after a device sleep"
+   2 ✘ Test "R-STO-4: a degraded fallback deletes no blob listed in the older generation's doomed set"
+   4 ✘ Test "R-STO-5: a blob reaped and then republished before the lazy commit survives a crash and the next launch"
+ (OracleTests, S3OracleReapProbe, S3UpdateCrashProbe, S3CleanupCrashProbe, StoreCrashTests and CleanupCrashTests eviction/legacy all passed under G)

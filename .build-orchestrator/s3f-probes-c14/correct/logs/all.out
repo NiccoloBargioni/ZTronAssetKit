@@ -1,0 +1,9 @@
+LOAD 15:48:09 { 1.84 14.83 47.69 }
+build exit 0
+run1 exit 1
+✘ Test run with 6 tests in 2 suites failed after 2.839 seconds with 4 issues.
+LOAD 15:48:18 { 1.78 14.39 47.15 }
+run2 exit 1
+✘ Test run with 6 tests in 2 suites failed after 2.871 seconds with 4 issues.
+LOAD 15:48:22 { 1.78 14.39 47.15 }
+PROBES DONE

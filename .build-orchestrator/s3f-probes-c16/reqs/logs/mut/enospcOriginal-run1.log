@@ -1,0 +1,166 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Suite "VerifyC15CorrectNew" started.
+◇ Test "PROBE-C15C-ENOSPC-PASSED" started.
+◇ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-ENOSPC-PASSED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst after the apply: (owed: false, c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])))
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst after the drain: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, n: nil)
+PROBE-C15C-ENOSPC-PASSED followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-ENOSPC-PASSED" started.
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst after the apply: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])))
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst the ENOSPC waits: (owed: false, c: Optional(ZTronAssetSync.JobState.downloading), verdict: nil, cOwedVisit: false, holdsB: false)
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst after the drain: (c: Optional(ZTronAssetSync.JobState.downloading), holdsB: false, n: Optional(ZTronAssetSync.JobState.verifying))
+PROBE-C15C-ENOSPC-PASSED sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a3/a372ddc721284661923f719ac07ea881369b14c8821e9149b5793175c00a3b4e.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✘ Test "PROBE-C15C-ENOSPC-PASSED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15CorrectNewProbes.swift:83:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ PROBE-C15C-ENOSPC-PASSED: B rode C's retry, as the follow passed C publishing at the apply (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a3/a372ddc721284661923f719ac07ea881369b14c8821e9149b5793175c00a3b4e.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a3/a372ddc721284661923f719ac07ea881369b14c8821e9149b5793175c00a3b4e.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a3/a372ddc721284661923f719ac07ea881369b14c8821e9149b5793175c00a3b4e.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a3/a372ddc721284661923f719ac07ea881369b14c8821e9149b5793175c00a3b4e.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a3/a372ddc721284661923f719ac07ea881369b14c8821e9149b5793175c00a3b4e.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 16
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:361:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ B rode C's retry: v3's follow passed C, publishing at the apply (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd71226a1f1c0e20b1d6c4e111cfde197816074a3c0c1f9a41100bd8534daa92.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd71226a1f1c0e20b1d6c4e111cfde197816074a3c0c1f9a41100bd8534daa92.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd71226a1f1c0e20b1d6c4e111cfde197816074a3c0c1f9a41100bd8534daa92.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd71226a1f1c0e20b1d6c4e111cfde197816074a3c0c1f9a41100bd8534daa92.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd71226a1f1c0e20b1d6c4e111cfde197816074a3c0c1f9a41100bd8534daa92.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 16
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "PROBE-C15C-ENOSPC-PASSED" with 2 test cases failed after 0.975 seconds with 1 issue.
+↳ /// PROBE-C15C-ENOSPC-PASSED: a publication begun before v3's apply fails with ENOSPC (the store's placement rename)
+↳ /// while v3's follow still owes C's visit, before the follow's turn that finds C.
+↳ /// Visit-first: v3's visit met C verifying and passed zz-b (B stays on C); the ENOSPC retries C (32 MB free); the
+↳ /// retry's bytes fail their checksum, so A and B are answered `integrityFailure`.
+↳ /// Behind the barrier the ENOSPC verdict waits as `.spaceFailure`, which records no `VerdictAfterFollow`, so
+↳ /// `passesOnVisit` is false for the failed C and the visit moves zz-b onto N as for a download.
+✘ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" with 2 test cases failed after 0.975 seconds with 1 issue.
+↳ /// As above, with the publication ending in ENOSPC (the store's placement rename) while the follow is owed and
+↳ /// before its turn that finds C (PROBE-C15C-ENOSPC-PASSED). C's publication began before v3's apply, which moves zz-b
+↳ /// to N. The ENOSPC's free-space read runs that turn (`advanceFollowForSpaceSweep`) inside the failure's bookkeeping,
+↳ /// before its verdict waits as `.spaceFailure`; the 32 MB volume makes the verdict a retry, whose bytes fail their
+↳ /// checksum. Visited first, v3's visit passed C, publishing, and B rode the retry to its `integrityFailure`. Behind the
+↳ /// barrier the visit met C failed with no verdict waiting and moved B onto N as a download's, and N served B.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.976 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+◇ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+PROBE-C15C-VERDICT-ACROSS-APPLY followVisitedFirst after the 404: (owed: false, c: nil, verdict: nil)
+PROBE-C15C-VERDICT-ACROSS-APPLY followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-VERDICT-ACROSS-APPLY" started.
+PROBE-C15C-VERDICT-ACROSS-APPLY sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4)))
+PROBE-C15C-VERDICT-ACROSS-APPLY sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=failure(ZTronAssetModel.AssetError.notFound)
+✔ Test "PROBE-C15C-VERDICT-ACROSS-APPLY" with 2 test cases passed after 0.986 seconds.
+◇ Test "PROBE-C15C-STALE-REROUTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15C-STALE-REROUTE" started.
+PROBE-C15C-STALE-REROUTE followVisitedFirst C publishing: (owed: false, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([])), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C15C-STALE-REROUTE followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([])), n: nil, barrier: false)
+PROBE-C15C-STALE-REROUTE followVisitedFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+PROBE-C15C-STALE-REROUTE followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15C-STALE-REROUTE" started.
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst C publishing: (owed: true, c: Optional(ZTronAssetSync.JobState.verifying), reroute: Optional(Set([zz-b])), n: nil)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, reroute: Optional(Set([zz-b])), n: nil, barrier: false)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst after v5: (c: Optional(ZTronAssetSync.JobState.verifying), holdsB: true, unfollowed: true, n2: nil)
+PROBE-C15C-STALE-REROUTE sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15C-STALE-REROUTE" with 2 test cases passed after 1.106 seconds.
+✘ Suite "VerifyC15CorrectNew" failed after 3.068 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 15, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`); every expectation is the visit-first outcome (S3-R16 1(a)).
+✘ Test run with 4 tests in 2 suites failed after 3.069 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

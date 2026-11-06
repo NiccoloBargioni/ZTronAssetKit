@@ -1,0 +1,21 @@
+--- Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift	2026-10-29 13:22:14
++++ .build-verify-s3b-c2-correct/copy/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift	2026-10-29 14:10:22
+@@ -155,6 +155,8 @@
+         guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
+             return result
+         }
++        if AssetStore.verifierMutant == "REAP" { return await self.reapS3Base(maxKeys: maxKeys, recordStatistics: false) }
++        if AssetStore.verifierMutant == "REAPSTATS" { return await self.reapS3Base(maxKeys: maxKeys, recordStatistics: true) }
+         // A cursor over the sorted keys: the keys a time-bounded unit did not attempt stay in place and lead the next
+         // batch, so the run is linear in the keys (S3-PERF-04).
+         var queue = ReapQueue(self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted())
+--- Sources/ZTronAssetStorage/Store/AssetStore+References.swift	2026-10-29 13:18:10
++++ .build-verify-s3b-c2-correct/copy/Sources/ZTronAssetStorage/Store/AssetStore+References.swift	2026-10-29 14:10:22
+@@ -106,6 +106,7 @@
+         guard let bytes = self.state.core.countedReleases.removeValue(forKey: key) else {
+             return nil
+         }
++        if AssetStore.verifierMutant == "NOTAKEBACK" { return nil }
+         self.state.eviction.releasedBytes -= bytes
+         return bytes
+     }

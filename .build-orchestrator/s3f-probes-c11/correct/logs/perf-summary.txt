@@ -1,0 +1,9 @@
+◇ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" started.
+P-13 reclaim of 10000 blobs: 0.701625834 s in 571 units, unit max 9.416083 ms (p50 0.957166 ms, p95 0.991208 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.043792 ms, p99 0.089666 ms, max 0.2975 ms; unit on-CPU max 1.124291 ms; units over the batc
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.354 seconds with 1 issue.
+↳ /// P-2, P-5, P-6 and P-13 (WP-B), release configuration, live file system in directories inside this repository
+↳ /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
+◇ Suite "SyncBenchmarks" started.
+✔ Suite "SyncBenchmarks" passed after 67.778 seconds.
+✘ Test run with 44 tests in 8 suites failed after 209.269 seconds with 1 issue.

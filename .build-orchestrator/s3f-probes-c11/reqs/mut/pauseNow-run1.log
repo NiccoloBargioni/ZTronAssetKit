@@ -1,0 +1,28 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:135:9: Expectation failed: nSecond != nil && (wFirst == nil || nSecond! < wFirst!)
+↳ N, user work again once K's visit moved U2 onto it, resumes first in its queue, ahead of W (visit-first): n=nil w=Optional(3)
+↳ nSecond != nil && (wFirst == nil || nSecond! < wFirst!) → false
+↳   nSecond != nil → false
+↳   (wFirst == nil || nSecond! < wFirst!) → <not evaluated>
+✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" with 2 test cases failed after 0.211 seconds with 1 issue.
+↳ /// A pause that ends while the follow owes a visit is decided on the lane the visits leave: under Low Data Mode N
+↳ /// (content X) downloads for U1's user waiter (b-n1) and a prefetch member (zz-n2), H holds the other of two slots and
+↳ /// W's user request waits in the queue. v3 moves b-n1 away, moves zz-k (K, U2's user waiter, queued) onto X, and changes
+↳ /// 300 prefetch members' contents, so the follow visits N in its first turn and K in its second. N's visit lowers it to
+↳ /// the prefetch lane, which Low Data Mode refuses, so its attempt pauses. Visited first, K's visit raised N to user work
+↳ /// again before the pause ended, so N resumed first in the user queue, ahead of W. With the pause decided between the
+↳ /// two turns, N parked on its policy and K's visit re-queued it behind W.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.211 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.211 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

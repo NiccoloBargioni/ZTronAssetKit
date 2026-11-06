@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyDDeferProbes" started.
+◇ Test "PROBE-D-ENOSPC" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D-ENOSPC" started.
+PROBE-D-ENOSPC followVisitedFirst between: (owed: false, d: nil, e: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1223730389ns))), eError: Optional(ZTronAssetModel.AssetError.insufficientSpace(required: 1500000, available: 4999984)), violations: [])
+PROBE-D-ENOSPC followVisitedFirst U: success(ZTronAssetModel.AssetLocation(id: zz-e, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bd/bd1019e7ce2581f27e63987305e3ee8bdc968bffecd8085137d916dbb3e4a589.png, fileExtension: png, byteSize: 1500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d22090ca39520437e6a2d842020c0d05cbd7d04b73f8904cf4fd59c798037c70.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D-ENOSPC" started.
+PROBE-D-ENOSPC sweepFollowsFirst between: (owed: true, d: Optional(ZTronAssetSync.JobState.downloading), e: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), eError: nil, violations: [])
+PROBE-D-ENOSPC sweepFollowsFirst U: success(ZTronAssetModel.AssetLocation(id: zz-e, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bd/bd1019e7ce2581f27e63987305e3ee8bdc968bffecd8085137d916dbb3e4a589.png, fileExtension: png, byteSize: 1500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d22090ca39520437e6a2d842020c0d05cbd7d04b73f8904cf4fd59c798037c70.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-D-ENOSPC" with 2 test cases passed after 0.632 seconds.
+✔ Suite "VerifyDDeferProbes" passed after 0.632 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.632 seconds.

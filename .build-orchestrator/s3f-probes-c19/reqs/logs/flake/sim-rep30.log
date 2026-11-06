@@ -1,0 +1,202 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -scheme ZTronAssetKit -destination "platform=iOS Simulator,id=6BE15CAF-7E02-4060-9338-9DAC025EDF0B" -derivedDataPath .build-verify-s3f-c19-reqs/xcode-sim "-only-testing:ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)" -test-iterations 30 -collect-test-diagnostics never -resultBundlePath /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c19-reqs/logs/flake/sim-rep30.xcresult
+
+Running tests repeatedly 30 times.
+
+Resolve Package Graph
+2026-11-01 22:59:59.987 xcodebuild[58744:30826280] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  ZTronAssetKit: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f
+
+Writing result bundle at path:
+	/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c19-reqs/logs/flake/sim-rep30.xcresult
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+Test Suite 'Selected tests' started at 2026-11-01 23:00:18.674.
+Test Suite 'ZTronAssetSyncTests.xctest' started at 2026-11-01 23:00:18.675.
+Test Suite 'ZTronAssetSyncTests.xctest' passed at 2026-11-01 23:00:18.675.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-01 23:00:18.675.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64-apple-ios17.0-simulator
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 2).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 3).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 4).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 5).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 6).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 7).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 8).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 9).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 10).
+Resolve Package Graph
+
+✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+↳ N, queued at P's visit, starts before the members the follow-up re-queues (visit-first): [c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d, c-d2d5570fbc4b2bea8b5dd91e820a443881d9f7573a11d5c58fadacb46b1fdfc1, c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb]
+↳ started.first == n.transferID → false
+↳   started.first → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d
+↳     some → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d
+↳       rawValue → "c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d"
+↳   n.transferID → c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb
+↳     rawValue → "c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb"
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 11).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 12).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 13).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 14).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 15).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 16).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 17).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 18).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 19).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 20).
+Resolve Package Graph
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 21).
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 22).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 23).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 24).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 25).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 26).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 27).
+Resolve Package Graph
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 28).
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 29).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 30).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 2).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 3).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 4).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 5).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 6).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 7).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 8).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 9).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 10).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 11).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 12).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 13).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 14).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 15).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 16).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 17).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 18).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 19).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 20).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 21).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 22).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 23).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 24).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 25).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 26).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 27).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 28).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 29).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started (repetition 30).
+Resolve Package Graph
+
+​✔ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" with 2 test cases passed after 46.446 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 46.448 seconds.
+✔ Test run with 1 test in 1 suite passed after 46.449 seconds.
+2026-11-01 23:01:05.453 xcodebuild[58744:30826280] [MT] IDETestOperationsObserverDebug: 65.174 elapsed -- Testing started completed.
+2026-11-01 23:01:05.453 xcodebuild[58744:30826280] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-11-01 23:01:05.453 xcodebuild[58744:30826280] [MT] IDETestOperationsObserverDebug: 65.174 sec, +65.174 sec -- end
+Resolve Package Graph
+
+
+Test session results, code coverage, and logs:
+	/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c19-reqs/logs/flake/sim-rep30.xcresult
+
+Failing tests:
+	-[EngineFollowBarrierTests barrierReadmitsBehindTheOwedVisitsPlaces(_:)]
+
+** TEST EXECUTE FAILED **
+
+Testing started

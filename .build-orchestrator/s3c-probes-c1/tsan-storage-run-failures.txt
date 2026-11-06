@@ -1,0 +1,18 @@
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" recorded an issue at LoopbackHTTPServerTests.swift:400:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 0 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 1 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 3 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 2 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 1 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 0 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 2 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" recorded an issue with 2 arguments mode → .powerLossKeepMetadata, slice → 3 at StoreCrashTests.swift:167:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, slice → 0 at CrashPairTests.swift:40:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5" with 8 test cases failed after 87.402 seconds with 1969 issues.
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" failed after 134.655 seconds with 1 issue.
+✘ Suite "Test support: LoopbackHTTPServer" failed after 134.659 seconds with 1 issue.
+✘ Suite "Core: crash consistency (R-STO-5)" failed after 171.275 seconds with 1969 issues.
+✘ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" with 128 test cases failed after 1654.287 seconds with 1 issue.
+✘ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" failed after 1654.293 seconds with 1 issue.
+✘ Test run with 481 tests in 64 suites failed after 1654.294 seconds with 1971 issues.
+1961

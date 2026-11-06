@@ -1,0 +1,15 @@
+diff --git a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+index 9a91ef8..25f41de 100644
+--- a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
++++ b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+@@ -151,9 +151,7 @@ public enum TransferClassifier {
+         case -1206 ... -1200:
+             return .transient(.secureConnectionFailed(urlErrorCode: urlErrorCode), retryAfter: nil)
+         case -3005 ... -3000:
+-            if underlyingPOSIXCode == ENOSPC {
+-                return .insufficientSpace(requiredBytes: nil)
+-            }
++
+             return .transient(.localIO(posixCode: underlyingPOSIXCode ?? 0), retryAfter: nil)
+         case -997 ... -995:
+             return .transient(.backgroundSessionUnavailable(urlErrorCode: urlErrorCode), retryAfter: nil)

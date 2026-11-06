@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15R-RETRY-RACE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-RETRY-RACE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-RETRY-RACE" started.
+✔ Test "PROBE-C15R-RETRY-RACE" with 2 test cases passed after 1.037 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 1.037 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.037 seconds.

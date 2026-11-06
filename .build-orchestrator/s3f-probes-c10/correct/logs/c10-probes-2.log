@@ -1,0 +1,100 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Test "PROBE-C10-THROTTLE-EXTENDED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-THROTTLE-EXTENDED" started.
+PROBE-C10-THROTTLE-EXTENDED followVisitedFirst mid: (owed: false, c: nil, d: nil, waits: false)
+PROBE-C10-THROTTLE-EXTENDED followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) d=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0))) w=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-THROTTLE-EXTENDED" started.
+PROBE-C10-THROTTLE-EXTENDED sweepFollowsFirst mid: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), d: nil, waits: true)
+PROBE-C10-THROTTLE-EXTENDED sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0))) d=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0))) w=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C10-THROTTLE-EXTENDED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:76:13: Expectation failed: abs(retryAfter - 60) < 1
+↳ B, answered by C's park, gets the wait C's 429 gave (visit-first 60 s): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0)))
+↳ abs(retryAfter - 60) < 1 → false
+↳   abs(retryAfter - 60) → 240.0
+↳   1 → 1.0
+✘ Test "PROBE-C10-THROTTLE-EXTENDED" with 2 test cases failed after 0.665 seconds with 1 issue.
+↳ /// PROBE-C10-THROTTLE-EXTENDED: C (1 MB) is the content of zz-a and zz-b, one user waiter each (A, B); N (16 B,
+↳ /// zz-n, held) and D (1 MB, zz-d, held) run for user waiters. v3 moves zz-a onto N's content. C gets a 429 with
+↳ /// Retry-After 60 s, then D a 429 with Retry-After 300 s. Visited first, C's park answers B with the 60 s wait C's
+↳ /// 429 gave. With C's park deferred, the drain's fail-fast reads the origin's end (300 s, from D's later 429) at C's
+↳ /// 429 instant.
+◇ Test "PROBE-C10-JOIN-RETIRE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-JOIN-RETIRE" started.
+PROBE-C10-JOIN-RETIRE followVisitedFirst afterFailure: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, ZTronAssetModel.AssetPriority.prefetch, 1)), waits: false)
+PROBE-C10-JOIN-RETIRE followVisitedFirst mid: (owed: false, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1)), joins: 0, violations: [])
+PROBE-C10-JOIN-RETIRE followVisitedFirst after: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1514619821ns)), 1, 4, 1)), violations: []) starts: 1
+PROBE-C10-JOIN-RETIRE followVisitedFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8a/8ae57175bdd83229f84a1bca5312b61c9807c99dc9e5a80bf742c296f5ffd1bc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) j=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-JOIN-RETIRE" started.
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst afterFailure: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 0, ZTronAssetModel.AssetPriority.userInitiated, 2)), waits: true)
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst mid: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 1)), joins: 1, violations: [])
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst after: (c: Optional((ZTronAssetSync.JobState.downloading, 0, 8, 1)), violations: []) starts: 2
+✘ Test "PROBE-C10-JOIN-RETIRE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:143:25: Issue recorded
+↳ C keeps its backoff with J's interest (visit-first failed(.at), 1 attempt): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 8, 1)), violations: []), starts 2
+✘ Test "PROBE-C10-JOIN-RETIRE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:145:9: Expectation failed: after.c?.1 == 1
+↳ the failed attempt stays counted (visit-first): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 8, 1)), violations: [])
+↳ after.c?.1 == 1 → false
+↳   after.c?.1 → 0
+↳     some → 0
+↳     some → 1
+✘ Test "PROBE-C10-JOIN-RETIRE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:146:9: Expectation failed: cStarts == 1
+↳ no second attempt before the backoff ends (visit-first): 2
+↳ cStarts == 1 → false
+↳   cStarts → 2
+PROBE-C10-JOIN-RETIRE sweepFollowsFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/8a/8ae57175bdd83229f84a1bca5312b61c9807c99dc9e5a80bf742c296f5ffd1bc.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) j=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C10-JOIN-RETIRE" with 2 test cases failed after 0.682 seconds with 3 issues.
+↳ /// PROBE-C10-JOIN-RETIRE: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter); v3
+↳ /// moves zz-a to a 16-byte content while the follow owes C's visit. C's attempt fails with a 500 (a retry), then a
+↳ /// prefetch request J for zz-b arrives, then P withdraws. Visited first, C backs off (`failed(.at)`, one attempt
+↳ /// counted), J joins it and keeps it after P leaves, and no second attempt starts before the backoff ends. With J's
+↳ /// join waiting behind C's verdict, the visit that moves M leaves C without an interest, so C is retired; the drain
+↳ /// creates a fresh job for J (no attempt counted, no backoff), which starts at once.
+◇ Test "PROBE-C10-PAUSE-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-PAUSE-LANE" started.
+PROBE-C10-PAUSE-LANE followVisitedFirst decision: (state: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), pause: nil)
+PROBE-C10-PAUSE-LANE followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) n=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) starts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-PAUSE-LANE" started.
+PROBE-C10-PAUSE-LANE sweepFollowsFirst decision: (state: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), pause: Optional(ZTronAssetModel.PolicyBlock.constrainedNetwork))
+PROBE-C10-PAUSE-LANE sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) n=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6f/6f45cac50701472d2a2b307a31c8ccaaa6d976b45ff02ed7ac0881e6955c8727.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) starts=2
+✘ Test "PROBE-C10-PAUSE-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:205:9: Expectation failed: decision.pause == nil && decision.state == .downloading
+↳ N, user-lane once the follow moved A onto it, keeps running under Low Data Mode (visit-first): (state: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), pause: Optional(ZTronAssetModel.PolicyBlock.constrainedNetwork))
+↳ decision.pause == nil && decision.state == .downloading → false
+↳   decision.pause == nil → false
+↳   decision.state == .downloading → <not evaluated>
+✘ Test "PROBE-C10-PAUSE-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:206:9: Expectation failed: starts == 1
+↳ N's first attempt serves both (visit-first): 2
+↳ starts == 1 → false
+↳   starts → 2
+✘ Test "PROBE-C10-PAUSE-LANE" with 2 test cases failed after 0.659 seconds with 2 issues.
+↳ /// PROBE-C10-PAUSE-LANE (the draft's residual "a policy pause reads the job's pre-visit lane"): N (1 MB, zz-n) runs
+↳ /// for a prefetch waiter; C (1 MB, zz-a) runs for a user waiter A. v3 moves zz-a onto N's content while the follow
+↳ /// owes C's visit. Then the network turns constrained (Low Data Mode: prefetch refused, user work admitted). Visited
+↳ /// first, A's interest raised N to the user lane, so N keeps running. Before the visit, N is prefetch-lane and is
+↳ /// paused.
+◇ Test "PROBE-C10-THROTTLE-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-THROTTLE-LANE" started.
+PROBE-C10-THROTTLE-LANE followVisitedFirst figures: (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+PROBE-C10-THROTTLE-LANE followVisitedFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f6/f638f9105b0b795bc82992eada72e0bf4c65ad20d6f672cd18cc2356d325744a.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be217992888eb6ff4908966035ec6aa741f283d926340ba9514f2eab9ddfb58d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-THROTTLE-LANE" started.
+PROBE-C10-THROTTLE-LANE sweepFollowsFirst figures: (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+PROBE-C10-THROTTLE-LANE sweepFollowsFirst results: m=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f6/f638f9105b0b795bc82992eada72e0bf4c65ad20d6f672cd18cc2356d325744a.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be217992888eb6ff4908966035ec6aa741f283d926340ba9514f2eab9ddfb58d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C10-THROTTLE-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:263:13: Expectation failed: abs(throttle - background) < 0.000_001
+↳ the origin's throttle is C's prefetch-lane backoff (visit-first): (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+↳ abs(throttle - background) < 0.000_001 → false
+↳   abs(throttle - background) → 0.6287160519433109
+↳   0.000_001 → 1e-06
+✘ Test "PROBE-C10-THROTTLE-LANE" with 2 test cases failed after 0.631 seconds with 1 issue.
+↳ /// PROBE-C10-THROTTLE-LANE (the draft's residual "the throttle's delay without a Retry-After reads the job's
+↳ /// pre-visit lane"): C (1 MB) is the content of zz-a (M, user) and zz-b (P, prefetch); v3 moves zz-a while the follow
+↳ /// owes C's visit. C gets a 429 without Retry-After. Visited first, C is prefetch-lane, so the origin's throttle is
+↳ /// the background policy's first backoff; before the visit it is the interactive policy's.
+✘ Suite "VerifyC10CorrectProbes" failed after 2.640 seconds with 7 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 4 tests in 1 suite failed after 2.640 seconds with 7 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

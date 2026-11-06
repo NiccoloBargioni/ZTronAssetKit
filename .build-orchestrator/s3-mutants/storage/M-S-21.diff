@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift b/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+index cc1a13b..c9ad475 100644
+--- a/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
++++ b/Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift
+@@ -219,7 +219,7 @@ enum LaunchReconciliation {
+             }
+         }
+         let orphans = onDisk.filter { table[$0.key] == nil }
+-        let osPurge = missing > 0 || (hadPresent && onDisk.isEmpty) || (blobsRecreated && hadPresent)
++        let osPurge = (hadPresent && onDisk.isEmpty) || (blobsRecreated && hadPresent)
+         return Result(
+             records: records,
+             blobTable: table,

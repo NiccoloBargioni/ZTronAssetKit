@@ -1,0 +1,48 @@
+start 20:44:03 { 13.51 65.20 132.20 }
+20:44:03 { 13.51 65.20 132.20 }
+20:44:33 { 9.79 59.35 127.76 }
+20:45:03 { 13.28 55.37 123.94 }
+20:45:33 { 15.70 51.94 120.32 }
+20:46:03 { 18.20 49.60 117.49 }
+20:46:33 { 21.73 47.68 114.46 }
+20:47:03 { 15.38 43.65 110.68 }
+20:47:33 { 10.89 39.86 106.98 }
+20:48:03 { 8.52 36.50 103.44 }
+20:48:33 { 12.58 34.84 100.52 }
+20:49:03 { 11.67 32.51 97.40 }
+20:49:33 { 13.15 30.87 94.55 }
+20:50:03 { 15.53 29.75 91.94 }
+20:50:33 { 21.62 29.93 89.85 }
+20:51:03 { 23.09 29.50 87.62 }
+exit 1
+end 20:51:14 { 23.32 29.23 86.51 }
+P-4 plan 10,000: 13.239042 ms (budget 20.0); 20,000: 27.58075 ms; ratio 2.0832889570106357 (max 2.5)
+P-14 armed timers 0 (max 0), owned tasks 0 (max 0), sleepers 0
+P-7 resident delta: 4.953125 MiB for 256 MiB, 1.0 MiB for 1024 MiB (max 48.0)
+P-11 200 assets at 10.0 ms: concurrency 1 3.032384416 s, 5 1.030374792 s, speedup 2.9429916565738345 (min 3.0)
+✘ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" recorded an issue at BenchSync.swift:103:13: Expectation failed: speedup >= speedupMin
+✘ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" failed after 4.075 seconds with 1 issue.
+R-SYN-12 prune of 10,000 ids: nobody subscribed 0.012703042 s, one stalled subscriber 0.01616375 s, ratio 1.2724314380760138 (max 2, plus 5 ms)
+R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking 5.078084 ms, during an ENOSPC's free-space read 5.57675 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.078084, 5.179417, 4.779375] and [4.737792, 5.57675, 5.58775]
+R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait 8.46775 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.226292, 8.587041, 8.46775]
+R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline 1.45775 ms, coming back 7.707334 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.45775, 1.515875, 1.435458] and [7.707334, 7.685416, 8.109]
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 7.048375 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.048375, 6.342209, 7.053292]
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 1.724333 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.724333, 1.796375, 1.509083]; at 1,000: 0.5445 ms; the group without waiters: [0.746125, 0.850709, 0.941959]
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 1.588042 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.588042, 1.50475, 1.957583]
+R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait 4.686125 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.727, 4.310916, 4.686125]
+R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait 5.458833 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.527667, 5.458833, 5.380917]
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 1.05725 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.11675, 1.024167, 1.05725]
+R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait 5.151916 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.3255, 5.118458, 5.151916]
+R-SYN-3 re-join of a released 10,000-member prefetch handle: longest actor wait 5.209459 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.189375, 5.881792, 5.209459]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-3 re-join of a released 10,000-member bulk handle: longest actor wait 5.661583 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.69575, 5.231791, 5.661583]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait 0.025334 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.025334, 0.022375, 0.033]
+R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait 0.085083 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.113833, 0.083833, 0.085083]
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" recorded an issue at BenchSync.swift:439:10: Time limit was exceeded: 180.000 seconds
+R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait 114.644334 ms (budgets 50.0 ms median, 10.0 ms best); totals [59.076788625, 62.266439541, 51.332529791] s; runs [114.644334, 132.111833, 71.780583]
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" recorded an issue at BenchSync.swift:452:13: Expectation failed: median <= gapMax
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" recorded an issue at BenchSync.swift:453:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budge
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" failed after 180.147 seconds with 3 issues.
+R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait 22.854542 ms (budgets 50.0 ms median, 10.0 ms best); runs [36.543375, 22.854542, 10.661458]
+✘ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:474:13: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+✘ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" failed after 29.352 seconds with 1 issue.
+✘ Test run with 20 tests in 2 suites failed after 248.434 seconds with 5 issues.

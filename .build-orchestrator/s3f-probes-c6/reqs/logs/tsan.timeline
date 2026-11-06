@@ -1,0 +1,5 @@
+[05:21:41 load { 30.65 34.82 90.69 }] build-start
+[05:24:46 load { 64.05 51.57 87.28 }] tsan build exit 0
+[05:24:46 load { 64.05 51.57 87.28 }] tsan-test-start
+[05:27:09 load { 24.90 41.65 77.75 }] tsan test exit 0
+[05:27:09 load { 24.90 41.65 77.75 }] DONE

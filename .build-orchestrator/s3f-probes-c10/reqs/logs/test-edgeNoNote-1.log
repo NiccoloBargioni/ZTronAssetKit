@@ -1,0 +1,32 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:369:9: Expectation failed: c == nil
+↳ C, met by the edge after its failure, was retried and served the member: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.whenOnline))
+↳ c == nil → false
+↳   c → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳     some → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳       failed → .whenOnline
+✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:371:9: Expectation failed: starts == 2
+↳ C's content started twice: the offline attempt and the edge's retry: 1
+↳ starts == 2 → false
+↳   starts → 1
+✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" with 2 test cases failed after 0.757 seconds with 2 issues.
+↳ /// A satisfied network edge that meets an offline failure whose verdict waits for the follow retries it after the
+↳ /// verdict, as it does when the follow visits first: the offline scenario above, with the path dropping and returning
+↳ /// after C's attempt failed and before the follow's visits run. Visited first, C waited `failed(.whenOnline)` when
+↳ /// the edge came, so the edge re-queued it and its next attempt served the prefetch member. With the verdict waiting,
+↳ /// C was failed for the run when the edge came, which re-queues no such job, and the verdict then left it waiting for
+↳ /// an edge that had already passed (R-SYN-13), the member never served (Stage 3 close-out cycle 10).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.757 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.757 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

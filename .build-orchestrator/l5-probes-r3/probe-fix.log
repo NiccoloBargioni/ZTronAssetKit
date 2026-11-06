@@ -1,0 +1,29 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[12 / 12] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[21 / 21] ZTronAssetSyncTests-product
+Build complete! (5,09 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Verifier probes r3" started.
+◇ Test "PROBE-1 control: register after start, then shutdown, leaves nothing" started.
+◇ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" started.
+◇ Test "PROBE-2: a shutdown between the replacement's pressure request and its start leaves no observer" started.
+PROBE-1 before: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=0 observer=false liveObservations=0
+PROBE-1 after one more event: liveObservations=0 purges=0
+✔ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" passed after 0.004 seconds.
+PROBE-1 control after: lifecycle=shutDown ownedTasks=0 observer=false
+✔ Test "PROBE-1 control: register after start, then shutdown, leaves nothing" passed after 0.011 seconds.
+PROBE-2 generation=1 before shutdown: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=0 observer=false liveObservations=0; purge=failure(ZTronAssetModel.AssetError.shutDown)
+✔ Test "PROBE-2: a shutdown between the replacement's pressure request and its start leaves no observer" passed after 0.015 seconds.
+✔ Suite "Verifier probes r3" passed after 0.015 seconds.
+✔ Test run with 3 tests in 1 suite passed after 0.016 seconds.
+exit=0

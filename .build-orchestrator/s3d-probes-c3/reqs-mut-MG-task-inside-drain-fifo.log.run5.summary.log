@@ -1,0 +1,7 @@
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:415:9: Expectation failed: early == [.listing]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:399:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:420:9: Expectation failed: delivered == [.priority(0.75), .listing, .priority(0.25)]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" recorded an issue at BackgroundInterleavingTests.swift:422:9: Expectation failed: changes == [0.75, 0.25]
+✘ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" failed after 63.994 seconds with 4 issues.
+✘ Suite "Background coordinator interleavings" failed after 63.994 seconds with 4 issues.
+✘ Test run with 1 test in 1 suite failed after 63.994 seconds with 4 issues.

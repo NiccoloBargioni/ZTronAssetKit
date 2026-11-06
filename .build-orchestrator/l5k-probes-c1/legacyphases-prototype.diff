@@ -1,0 +1,34 @@
+--- /Users/admin/Documents/ZTronAssetKit/.worktrees/k/Sources/ZTronAssetStorage/Migration/LegacyPhases.swift	2026-10-23 11:41:54
++++ Sources/ZTronAssetStorage/Migration/LegacyPhases.swift	2026-10-23 19:07:33
+@@ -224,7 +224,7 @@
+             hashed = try await self.hashFile(at: url)
+         } catch {
+             try AssetStore.rethrowLifecycle(error)
+-            return self.legacyFailureOutcome(file, error)
++            return await self.legacyFailureOutcome(file, error)
+         }
+         try self.checkLive()
+         let wanting = self.legacyWanters(file)
+@@ -240,14 +240,20 @@
+             }
+         } catch {
+             try AssetStore.rethrowLifecycle(error)
+-            return self.legacyFailureOutcome(file, error)
++            return await self.legacyFailureOutcome(file, error)
+         }
+         return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
+     }
+ 
+     /// The outcome of a file whose hash or move failed with `error`: adopted by a racing call, deferred when the error
+     /// says nothing about the file (`isTransientLegacyFailure`), dropped otherwise.
+-    func legacyFailureOutcome(_ file: LegacyFile, _ error: StoreError) -> LegacyOutcome {
++    func legacyFailureOutcome(_ file: LegacyFile, _ error: StoreError) async -> LegacyOutcome {
++        // VERIFIER PROTOTYPE (not for the repository): a racing placement of the same bytes (a batch and an adopt-on-demand
++        // of one file) renames the file away before it binds its records, so wait for that placement, then decide.
++        while let key = self.state.core.publishing.first(where: { $0.hash == file.digest }) {
++            // REENTRANCY: prototype — `publishing` and the records are read again after the wait.
++            await self.waitForKey(key)
++        }
+         if self.legacyAdopted(file) {
+             return .alreadyAdopted
+         }

@@ -1,0 +1,13 @@
+== run040506a: unmodified s3-base + probe (release)
+10:26  up 3 days, 22:49, 2 users, load averages: 63.75 56.09 43.68
+S3-PERF publish scaling: user-initiated [(key: 2500, value: 0.50866832), (key: 5000, value: 1.71853894), (key: 10000, value: 4.919927418)] s (10,000 / 5,000 = 2.8628547794209425); bulk [(key: 2500, value: 0.455147631), (key: 5000, value: 0.911390965), (key: 10000, value: 1.918733011)] s (ratio 2.1052798246688784); max 2.5
+✘ Test "R-SYN-10: user-initiated publications of a doubled catalog cost the store at most doubling_ratio_max times as much" recorded an issue at S3PerfPublishProbe.swift:29:9: Expectation failed: userRatio <= ratioMax
+✘ Test "R-SYN-10: user-initiated publications of a doubled catalog cost the store at most doubling_ratio_max times as much" failed after 13.316 seconds with 1 issue.
+↳ /// S3-PERF probe: the store's cost of a run of user-initiated publications (what `ensureAvailable` drives, R-SYN-10)
+10:27  up 3 days, 22:50, 2 users, load averages: 70.27 58.37 45.06
+== run0405b: control with a non-retaining sink (same build, S3CONF-05)
+10:33  up 3 days, 22:56, 2 users, load averages: 69.97 59.50 49.39
+◇ Test "S3CONF-05: user-initiated publications with a non-retaining sink" started.
+S3CONF-05 user-initiated, sink not retaining: [(key: 2500, value: 0.4158296), (key: 5000, value: 1.072494457), (key: 10000, value: 2.141667374)] s (10,000 / 5,000 = 1.9969029770006541); sink retaining (same run): [(key: 2500, value: 0.7811686), (key: 5000, value: 2.118100712), (key: 10000, value: 5.819550541)] s (ratio 2.747532498350815)
+✔ Test "S3CONF-05: user-initiated publications with a non-retaining sink" passed after 15.546 seconds.
+10:33  up 3 days, 22:57, 2 users, load averages: 78.12 62.95 51.12

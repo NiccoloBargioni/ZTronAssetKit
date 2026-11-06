@@ -1,0 +1,23 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16Correct" started.
+◇ Test "C16-REPRO-SPACE-EPOCH" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "C16-REPRO-SPACE-EPOCH" started.
+C16-REPRO-SPACE-EPOCH followVisitedFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "C16-REPRO-SPACE-EPOCH" started.
+C16-REPRO-SPACE-EPOCH sweepFollowsFirst x=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 5000000)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "C16-REPRO-SPACE-EPOCH" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:462:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+↳ C16-REPRO-SPACE-EPOCH: zz-x's caller is served C's content by a new job (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 5000000))
+↳ (try? xResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "C16-REPRO-SPACE-EPOCH" with 2 test cases failed after 1.959 seconds with 1 issue.
+↳ /// reqs-4/correct-6, PROBE-C15R-SPACE-EPOCH (seed 1_515_602): passes at HEAD; run against the dropped epoch check.
+✘ Suite "VerifyC16Correct" failed after 1.959 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs, adapted to cycle 16's names only, every scenario the cycle-15 verifiers reported blocking; every
+↳ /// expectation is the visit-first outcome. Part 2 hunts the classes cycle 16's mechanism (`appliesFollowed`,
+↳ /// `Job.attemptEnd`, `rerouteOnVisit`, `followAfterVerdict`, `verdictAnswers`) may still miss. Each runs in both orders.
+✘ Test run with 1 test in 1 suite failed after 1.959 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

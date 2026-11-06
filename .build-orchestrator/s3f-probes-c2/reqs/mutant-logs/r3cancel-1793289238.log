@@ -1,0 +1,19 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[23 / 23] ZTronAssetKit-product
+Build complete! (5,06 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine failure paths" started.
+◇ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" started.
+✔ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" passed after 0.014 seconds.
+✔ Suite "Engine failure paths" passed after 0.014 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.014 seconds.

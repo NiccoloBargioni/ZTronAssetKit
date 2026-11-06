@@ -1,0 +1,33 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Test "PROBE-C10-THROTTLE-EXTENDED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-THROTTLE-EXTENDED" started.
+PROBE-C10-THROTTLE-EXTENDED followVisitedFirst mid: (owed: false, c: nil, d: nil, waits: false)
+PROBE-C10-THROTTLE-EXTENDED followVisitedFirst alarm: (deadline: Optional(300.0), origin: Optional(300.0))
+PROBE-C10-THROTTLE-EXTENDED followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) d=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0))) w=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-THROTTLE-EXTENDED" started.
+PROBE-C10-THROTTLE-EXTENDED sweepFollowsFirst mid: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), d: nil, waits: true)
+PROBE-C10-THROTTLE-EXTENDED sweepFollowsFirst alarm: (deadline: Optional(60.0), origin: Optional(300.0))
+PROBE-C10-THROTTLE-EXTENDED sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0))) d=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0))) w=success(ZTronAssetModel.AssetLocation(id: zz-n, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d8/d823f39328966b938660a5f7a6ef160149944f327f497f339aff2164809f4d66.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C10-THROTTLE-EXTENDED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:84:13: Expectation failed: abs(retryAfter - 60) < 1
+↳ B, answered by C's park, gets the wait C's 429 gave (visit-first 60 s): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0)))
+↳ abs(retryAfter - 60) < 1 → false
+↳   abs(retryAfter - 60) → 240.0
+↳   1 → 1.0
+✘ Test "PROBE-C10-THROTTLE-EXTENDED" with 2 test cases failed after 1.041 seconds with 1 issue.
+↳ /// PROBE-C10-THROTTLE-EXTENDED: C (1 MB) is the content of zz-a and zz-b, one user waiter each (A, B); N (16 B,
+↳ /// zz-n, held) and D (1 MB, zz-d, held) run for user waiters. v3 moves zz-a onto N's content. C gets a 429 with
+↳ /// Retry-After 60 s, then D a 429 with Retry-After 300 s. Visited first, C's park answers B with the 60 s wait C's
+↳ /// 429 gave. With C's park deferred, the drain's fail-fast reads the origin's end (300 s, from D's later 429) at C's
+↳ /// 429 instant.
+✘ Suite "VerifyC10CorrectProbes" failed after 1.041 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 1 test in 1 suite failed after 1.041 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

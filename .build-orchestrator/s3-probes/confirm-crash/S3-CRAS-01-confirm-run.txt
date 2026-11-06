@@ -1,0 +1,13 @@
+# S3-CRAS-01 confirmation (s3-base b5796ba + hunter probe, unchanged)
+◇ Test run started.
+S3 probe processKill: 29 crash points
+S3 probe processKillTornWrite: 29 crash points
+S3 probe powerLossDropUnsynced: 29 crash points
+S3 probe powerLossKeepMetadata: 29 crash points
+✔ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" with 4 test cases passed after 0.833 seconds.
+mutant A (hunter's S3MUT diff):
+✘ Test run with 1 test in 1 suite failed after 0.905 seconds with 132 issues.
+mutant B (hunter's S3MUT diff):
+✘ Test run with 1 test in 1 suite failed after 0.801 seconds with 65 issues.
+mutant I (hunter's S3MUT diff):
+✘ Test run with 1 test in 1 suite failed after 0.987 seconds with 7 issues.

@@ -1,0 +1,50 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C14R-PASSED-FAIL-BARRIER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-FAIL-BARRIER" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst setup done
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.downloading), yMark: Optional("nil"), cInterests: Optional(2), lane: Optional(Optional(ZTronAssetModel.AssetPriority.userInitiated)))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14R-PASSED-FAIL followVisitedFirst afterDrain=false u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-FAIL-BARRIER" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst setup done
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false before the 429: (barrier: true, y: Optional(ZTronAssetSync.JobState.verifying), yMark: Optional("nil"), cInterests: Optional(1), lane: Optional(Optional(ZTronAssetModel.AssetPriority.prefetch)))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false right after the 429: (throttle: nil, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=false u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=2
+PROBE-C14R-PASSED-FAIL sweepFollowsFirst afterDrain=false u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=2
+✘ Test "PROBE-C14R-PASSED-FAIL-BARRIER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14ReqsProbes.swift:107:13: Expectation failed: (try? uResult.get()) == nil
+↳ PROBE-C14R-PASSED-FAIL: U gets C's failure (visit-first: U rode C since the apply): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ (try? uResult.get()) == nil → <not evaluated>
+✘ Test "PROBE-C14R-PASSED-FAIL-BARRIER" with 2 test cases failed after 3.075 seconds with 1 issue.
+◇ Test "PROBE-C14R-PASSED-FAIL-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14R-PASSED-FAIL-AFTER" started.
+PROBE-C14R-PASSED-LANE followVisitedFirst setup done
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.downloading), yMark: Optional("nil"), cInterests: Optional(2), lane: Optional(Optional(ZTronAssetModel.AssetPriority.userInitiated)))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE followVisitedFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+PROBE-C14R-PASSED-FAIL followVisitedFirst afterDrain=true u=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14R-PASSED-FAIL-AFTER" started.
+PROBE-C14R-PASSED-LANE sweepFollowsFirst setup done
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true before the 429: (barrier: false, y: Optional(ZTronAssetSync.JobState.verifying), yMark: Optional("Optional(ZTronAssetSync.PassedPublication.publishedAfterApply)"), cInterests: Optional(1), lane: Optional(Optional(ZTronAssetModel.AssetPriority.prefetch)))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true right after the 429: (throttle: nil, c: nil)
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true w=success(ZTronAssetModel.AssetLocation(id: zz-y, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/18/18e8b1ed626b9b4e04e7b5051b869503e507537113022230b98ecde1cb148e74.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C14R-PASSED-LANE sweepFollowsFirst afterDrain=true u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=2
+PROBE-C14R-PASSED-FAIL sweepFollowsFirst afterDrain=true u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=failure(ZTronAssetModel.AssetError.notFound) cStarts=2
+✘ Test "PROBE-C14R-PASSED-FAIL-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14ReqsProbes.swift:107:13: Expectation failed: (try? uResult.get()) == nil
+↳ PROBE-C14R-PASSED-FAIL: U gets C's failure (visit-first: U rode C since the apply): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ (try? uResult.get()) == nil → <not evaluated>
+✘ Test "PROBE-C14R-PASSED-FAIL-AFTER" with 2 test cases failed after 3.502 seconds with 1 issue.
+✘ Suite "Engine follow barrier (F-28)" failed after 6.578 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 6.578 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,12 @@
+[05:28:09 load { 18.05 36.87 73.51 }] build head exit 0
+[05:28:12 load { 17.80 36.50 73.17 }] test head run1 exit 0
+[05:28:15 load { 17.80 36.50 73.17 }] test head run2 exit 0
+[05:28:19 load { 17.34 36.10 72.81 }] build skipNotFit exit 0
+[05:28:24 load { 17.63 35.84 72.51 }] test skipNotFit run1 exit 0
+[05:28:28 load { 18.38 35.70 72.24 }] test skipNotFit run2 exit 1
+[05:28:54 load { 23.35 35.53 71.13 }] sync bundle skipNotFit exit 0
+[05:29:00 load { 22.76 35.21 70.80 }] build requeueNoAhead exit 0
+[05:29:04 load { 24.30 35.32 70.63 }] test requeueNoAhead run1 exit 0
+[05:29:08 load { 23.80 35.03 70.32 }] test requeueNoAhead run2 exit 0
+[05:29:40 load { 27.53 34.83 69.03 }] sync bundle requeueNoAhead exit 0
+[05:29:40 load { 27.53 34.83 69.03 }] DONE

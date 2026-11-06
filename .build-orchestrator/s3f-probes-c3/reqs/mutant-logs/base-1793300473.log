@@ -1,0 +1,187 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[127 / 304]
+[128 / 305] ZTronAssetModel
+[136 / 351]
+[140 / 351]
+[143 / 351]
+[146 / 351]
+[148 / 351]
+[152 / 351]
+[154 / 351]
+[157 / 351]
+[161 / 351]
+[163 / 351]
+[164 / 351]
+[174 / 351] ZTronAssetModel
+[181 / 352]
+[183 / 354]
+[183 / 354] ZTronAssetModel
+[183 / 354] ZTronAssetTransport
+[190 / 378]
+[198 / 387] ZTronAssetStorage
+[200 / 387] ZTronAssetTransport
+[213 / 387] ZTronAssetStorage
+[215 / 387] ZTronAssetTransport
+[217 / 387] ZTronAssetAppleHosted
+[218 / 387] ZTronAssetAppleHosted
+[223 / 387] ZTronAssetTransport
+[225 / 387] ZTronAssetStorage
+[226 / 387] ZTronAssetTransport
+[228 / 387] ZTronAssetTestSupport
+[229 / 387] ZTronAssetTestSupport
+[231 / 387] ZTronAssetAppleHosted
+[231 / 387] ZTronAssetTransport
+[232 / 387] ZTronAssetAppleHosted
+[234 / 387] ZTronAssetAppleHosted
+[235 / 387] ZTronAssetAppleHosted
+[236 / 387] ZTronAssetAppleHosted
+[236 / 387]
+[238 / 389]
+[240 / 389] ZTronAssetAppleHosted
+[240 / 389] ZTronAssetTestSupport
+[244 / 407] ZTronAssetAppleHosted
+[247 / 407] ZTronAssetTestSupport
+[248 / 407] ZTronAssetTestSupport
+[250 / 407] ZTronAssetTestSupport
+[251 / 407] ZTronAssetTestSupport
+[252 / 407] ZTronAssetSync
+[260 / 407] ZTronAssetSync
+[266 / 407] ZTronAssetSync
+[267 / 407] ZTronAssetSyncTests-product
+[268 / 407] ZTronAssetSync
+[270 / 407] ZTronAssetSync
+[270 / 407] ZTronAssetTestSupport
+[283 / 407] ZTronAssetSyncTests-product
+[292 / 410] ZTronAssetKit
+[295 / 430]
+[295 / 430] ZTronAssetKit
+[304 / 430] ZTronAssetStorageTests-product
+[306 / 439] ZTronAssetKit
+[307 / 439] ZTronAssetKit
+[309 / 439] ZTronAssetKit
+[310 / 439] ZTronAssetKit
+[311 / 439] ZTronAssetKit
+[313 / 439] ZTronAssetTransportTests-product
+[313 / 439] ZTronAssetSync
+[316 / 439] ZTronAssetTransportTests-product
+[318 / 439] ZTronAssetTransportTests-product
+[319 / 439] ZTronAssetTransportTests-product
+[326 / 439] ZTronAssetTransportTests-product
+[329 / 439] ZTronAssetStorageTests-product
+[330 / 439] ZTronAssetStorageTests-product
+[331 / 439] ZTronAssetStorageTests-product
+[332 / 439] ZTronAssetStorageTests-product
+[332 / 439] ZTronAssetTransportTests-product
+[334 / 439] ZTronAssetTransportTests-product
+[340 / 439] ZTronAssetStorageTests-product
+[341 / 439] ZTronAssetKit
+[342 / 439] ZTronAssetKit
+[343 / 439] ZTronAssetKit
+[344 / 439] ZTronAssetCompatibilityTests-product
+[348 / 441] ZTronAssetModelTests-product
+[349 / 450] ZTronAssetAppleHostedTests-product
+[351 / 459] ZTronAssetAppleHostedTests-product
+[352 / 459] ZTronAssetModelTests-product
+[352 / 459] ZTronAssetAppleHostedTests-product
+[363 / 459] ZTronAssetStorageTests-product
+[364 / 459] ZTronAssetModelTests-product
+[365 / 459] ZTronAssetModelTests-product
+[366 / 459] ZTronAssetModelTests-product
+[369 / 459] ZTronAssetModelTests-product
+[374 / 459] ZTronAssetKitTests-product
+[377 / 459] ZTronAssetStorageTests-product
+[378 / 459] ZTronAssetStorageTests-product
+[381 / 459] ZTronAssetAppleHostedTests-product
+[382 / 459] ZTronAssetAppleHostedTests-product
+[384 / 459] ZTronAssetAppleHostedTests-product
+[384 / 459] ZTronAssetStorageTests-product
+[387 / 459]
+[395 / 460] ZTronAssetCompatibilityTests-product
+[397 / 462] ZTronAssetKitTests-product
+[399 / 471] ZTronAssetKitTests-product
+[400 / 480] ZTronAssetSyncTests-product
+[400 / 489] ZTronAssetStorageTests-product
+[402 / 489] ZTronAssetSyncTests-product
+[402 / 489] ZTronAssetAppleHostedTests-product
+[403 / 489] ZTronAssetAppleHostedTests-product
+[404 / 489] ZTronAssetKitTests-product
+[405 / 489] ZTronAssetKitBenchmarks-product
+[416 / 489] ZTronAssetAppleHostedTests-product
+[417 / 489] ZTronAssetAppleHostedTests-product
+[418 / 489] ZTronAssetSyncTests-product
+[419 / 489] ZTronAssetSyncTests-product
+[424 / 489] ZTronAssetSyncTests-product
+[429 / 489] ZTronAssetSyncTests-product
+[430 / 489] ZTronAssetModelTests-product
+[431 / 489] ZTronAssetKitTests-product
+[432 / 489] ZTronAssetSyncTests-product
+[433 / 489] ZTronAssetKitTests-product
+[435 / 489] ZTronAssetKitTests-product
+[436 / 489] ZTronAssetKitTests-product
+[437 / 489] ZTronAssetKitBenchmarks-product
+[438 / 489] ZTronAssetKitBenchmarks-product
+[439 / 489] ZTronAssetKitBenchmarks-product
+[440 / 489] ZTronAssetKitBenchmarks-product
+[442 / 489] ZTronAssetKitBenchmarks-product
+[444 / 489] ZTronAssetKitBenchmarks-product
+[446 / 489] ZTronAssetAppleHostedTests-product
+[448 / 490] ZTronAssetCompatibilityTests-product
+[449 / 490] ZTronAssetStorageTests-product
+[450 / 499] ZTronAssetKitBenchmarks-product
+[453 / 499] ZTronAssetCompatibilityTests-product
+[454 / 499] ZTronAssetCompatibilityTests-product
+[457 / 499] ZTronAssetCompatibilityTests-product
+[463 / 499] ZTronAssetCompatibilityTests-product
+[465 / 499] ZTronAssetCompatibilityTests-product
+[466 / 499] ZTronAssetCompatibilityTests-product
+[467 / 499] ZTronAssetCompatibilityTests-product
+[467 / 499] ZTronAssetAppleHostedTests-product
+[469 / 499] ZTronAssetModelTests-product
+[470 / 499]
+[471 / 499] ZTronAssetModelTests-product
+[476 / 499]
+[480 / 499] ZTronAssetAppleHostedTests-product
+[481 / 499] ZTronAssetCompatibilityTests-product
+[481 / 499] ZTronAssetKitBenchmarks-product
+[483 / 499] ZTronAssetKitBenchmarks-product
+[484 / 499] ZTronAssetKitBenchmarks-product
+[485 / 499] ZTronAssetKitBenchmarks-product
+[487 / 499] ZTronAssetCompatibilityTests-product
+[489 / 499] ZTronAssetCompatibilityTests-product
+[491 / 499] ZTronAssetCompatibilityTests-product
+[493 / 499] ZTronAssetSyncTests-product
+[495 / 499] ZTronAssetSyncTests-product
+[496 / 499] ZTronAssetSyncTests-product
+[496 / 499]
+[497 / 499] ZTronAssetSyncTests-product
+Build complete! (217,98 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" started.
+◇ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" started.
+◇ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" started.
+◇ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" started.
+◇ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" started.
+PROBE-W4 before the 404: copy lists the id at its new content true, old job Optional(ZTronAssetSync.JobState.downloading), owed visits 344
+PROBE-W4 waiter's answer: success(ZTronAssetModel.AssetLocation(id: y0599, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6a/6a67f1a0dcc6531f31f3f0fa9f2af6a9566482f29a88c50d10658b03532f0756.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" passed after 0.774 seconds.
+PROBE-W4b: owed visits when the 404 was released 1792, sync complete true, waiter's answer success(ZTronAssetModel.AssetLocation(id: z2999, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7a/7a96ee08888ec5374ceeddae08f3ccc9578d9a29eb14d47632ca899543a9a541.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" passed after 6.338 seconds.
+PROBE-W1b: complete true, starts since the apply 4, of replaced content 0
+✔ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" passed after 8.018 seconds.
+✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" recorded an issue at VerifyC2CorrectProbes.swift:15:6: Time limit was exceeded: 120.000 seconds
+PROBE-W1 between follow turns: owed visits 444, downloading [], starts since the apply 0, of replaced content 0: []
+PROBE-W1 after the follow: outcome complete false, starts since the apply 0, of replaced content 0
+✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" failed after 128.071 seconds with 1 issue.
+↳ /// PROBE-W1: the bounded follow (958348e) leaves the jobs of replaced content queued between follow turns; a pump in
+↳ /// between (a drain's, a slot freed) dispatches them, starting transfers of content no id of the applied copy wants.
+↳ /// The hold seam orders the follow-up after the drains, an interleaving production allows (independent tasks).
+✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 128.072 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 2, correctness lens). Never committed.
+✘ Test run with 4 tests in 1 suite failed after 128.072 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

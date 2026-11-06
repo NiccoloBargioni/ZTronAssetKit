@@ -1,0 +1,58 @@
+base build 15:04:17 { 25.13 49.90 54.58 }
+base build exit 0
+base test 1 exit 1
+base test 2 exit 1
+ok sweepNoBarrier apply
+sweepNoBarrier build exit 0 15:08:02
+sweepNoBarrier test 1 exit 1
+sweepNoBarrier test 2 exit 1
+ok sweepNoBarrier revert
+ok pumpOwedOnly apply
+pumpOwedOnly build exit 0 15:08:21
+pumpOwedOnly test 1 exit 1
+pumpOwedOnly test 2 exit 1
+ok pumpOwedOnly revert
+ok pumpNoBarrier apply
+pumpNoBarrier build exit 0 15:08:33
+pumpNoBarrier test 1 exit 1
+pumpNoBarrier test 2 exit 1
+ok pumpNoBarrier revert
+ok dropFront apply
+dropFront build exit 0 15:08:43
+dropFront test 1 exit 1
+dropFront test 2 exit 1
+ok dropFront revert
+ok dropAskedBefore apply
+dropAskedBefore build exit 0 15:08:51
+dropAskedBefore test 1 exit 1
+dropAskedBefore test 2 exit 1
+ok dropAskedBefore revert
+ok resortOwed apply
+resortOwed build exit 0 15:08:59
+resortOwed test 1 exit 1
+resortOwed test 2 exit 1
+ok resortOwed revert
+ok visitForward apply
+visitForward build exit 0 15:09:10
+visitForward test 1 exit 1
+visitForward test 2 exit 1
+ok visitForward revert
+ok joinNoDefer apply
+joinNoDefer build exit 0 15:09:28
+joinNoDefer test 1 exit 1
+joinNoDefer test 2 exit 1
+ok joinNoDefer revert
+ok enospcNoDefer apply
+enospcNoDefer build exit 0 15:09:47
+enospcNoDefer test 1 exit 0
+enospcNoDefer test 2 exit 0
+ok enospcNoDefer revert
+ok enqueueNoDefer apply
+enqueueNoDefer build exit 0 15:10:05
+enqueueNoDefer test 1 exit 1
+enqueueNoDefer test 2 exit 1
+ok enqueueNoDefer revert
+copy-head restored
+head build exit 0
+head test exit 1
+done 15:10:41

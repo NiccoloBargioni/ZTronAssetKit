@@ -1,0 +1,32 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:300:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A, moved to N, is served from N, not answered with C's offline failure (visit-first): failure(ZTronAssetModel.AssetError.offline)
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:303:9: Expectation failed: c == .failed(.whenOnline)
+↳ C, still wanted by the prefetch member, waits for the next edge: Optional(ZTronAssetSync.JobState.verifying)
+↳ c == .failed(.whenOnline) → false
+↳   c → .verifying
+↳     some → .verifying
+↳   .failed(.whenOnline) → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳     some → .failed(ZTronAssetModel.RetryDisposition.whenOnline)
+↳       failed → .whenOnline
+✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" with 2 test cases failed after 1.366 seconds with 2 issues.
+↳ /// An offline exit's fail-fast answers only the interests the job holds once the follow moved its ids: C (1 MB) is
+↳ /// the content of zz-a and zz-b, one user waiter each, and of a prefetch member of zz-b; v3 moves zz-a to N (16 bytes)
+↳ /// while the follow owes C's visit. C's attempt fails offline with no network edge during it, so it waits for the next
+↳ /// edge (`failed(.whenOnline)`) and answers its waiters `.offline`. Visited first, A's interest is on N, which serves
+↳ /// it; only B gets the offline answer. Decided before the visit, the fail-fast answered A too (PROBE-C9-OFFLINE).
+✘ Suite "Engine follow barrier (F-28)" failed after 1.367 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.367 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

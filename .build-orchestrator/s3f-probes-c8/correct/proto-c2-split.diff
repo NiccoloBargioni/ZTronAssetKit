@@ -1,0 +1,13 @@
+--- Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 08:10:47
++++ /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 09:24:41
+@@ -718,6 +718,10 @@
+         case .none:
+             break
+         case .followed:
++            // PROTOTYPE (verifier, cycle 8, C2): a turn that followed jobs judges none; its follow-up turn collects,
++            // orders and judges them as the follows left them.
++            self.scheduleSpaceSweepFollowUp(sweep)
++            return
+             // Ranks, lanes and the jobs themselves may have changed: collect and order them again.
+             (candidates, smallest) = self.spaceSweepCandidates(sweep)
+             if let room, smallest > room.subtractingClamped(ahead) {

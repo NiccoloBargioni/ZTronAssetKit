@@ -1,0 +1,43 @@
+--- Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 08:10:47
++++ /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 09:25:54
+@@ -718,6 +718,10 @@
+         case .none:
+             break
+         case .followed:
++            // PROTOTYPE (verifier, cycle 8, C2): a turn that followed jobs judges none; its follow-up turn collects,
++            // orders and judges them as the follows left them.
++            self.scheduleSpaceSweepFollowUp(sweep)
++            return
+             // Ranks, lanes and the jobs themselves may have changed: collect and order them again.
+             (candidates, smallest) = self.spaceSweepCandidates(sweep)
+             if let room, smallest > room.subtractingClamped(ahead) {
+@@ -763,7 +767,7 @@
+     /// the follow's visit brought forward), at most `followsPerTurn` of them. One check per job and id while a follow is
+     /// owed (`holdsMovedID`, a lookup and a key comparison); nothing otherwise.
+     private func followSweptHolders(_ candidates: [SweepCandidate]) -> SweptFollow {
+-        guard self.followOwed else {
++        guard self.followOwed, self.state.sweptHoldersClearAt != self.state.copySerial else {
+             return .none
+         }
+         var follows = 0
+@@ -777,6 +781,9 @@
+             follows += 1
+             _ = self.followBeforeActing(candidate.transfer)
+         }
++        // PROTOTYPE (verifier, cycle 8, C2): every space-parked holder of this copy is followed; until another apply
++        // none appears (a job waiting for the follow is never gated, and a failure follows its job first).
++        self.state.sweptHoldersClearAt = self.state.copySerial
+         return follows > 0 ? .followed : .none
+     }
+ 
+--- Sources/ZTronAssetSync/Engine/EngineState.swift	2026-10-29 18:23:55
++++ /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineState.swift	2026-10-30 09:25:54
+@@ -291,6 +291,8 @@
+     /// A space sweep stopped after `SyncEngine.parksPerPump` parks or re-admissions and owes a later turn the rest, in
+     /// this mode (C2).
+     var spaceSweepFollowUp: SpaceSweep?
++    /// PROTOTYPE: the copy serial at which a sweep's pre-phase left no space-parked holder of a moved id.
++    var sweptHoldersClearAt: UInt64?
+     /// Test seam (close-out cycle 17): while set, the scheduled space sweep follow-up keeps its sweep owed
+     /// (`spaceSweepFollowUp`) instead of running (`holdSpaceSweepFollowUps()`, `releaseSpaceSweepFollowUps()`), so a
+     /// test decides what the engine does while a sweep is owed, an order no production path fixes. No production path

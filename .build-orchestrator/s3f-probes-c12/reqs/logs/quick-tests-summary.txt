@@ -1,0 +1,6 @@
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:106:6: Time limit was exceeded
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:141:27: Expectation failed: ba
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:106:6: Time limit was exceeded:
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:141:27: Expectation failed: bac
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" with 2 test cases failed after 384.051 seconds with 4 issues.
+✘ Test run with 474 tests in 53 suites failed after 523.037 seconds with 4 issues.

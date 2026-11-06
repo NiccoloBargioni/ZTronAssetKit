@@ -1,0 +1,89 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "DesignBudgetProbes" started.
+◇ Test "PROBE-D2-FOLLOW-ORDER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D2-FOLLOW-ORDER" started.
+PROBE-D2-FOLLOW-ORDER followVisitedFirst before: (owed: false, c1: nil, c2: nil, n1: Optional((state: ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), ticket: 5)), n2: Optional((state: ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), ticket: 6)))
+PROBE-D2-FOLLOW-ORDER followVisitedFirst A1: success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e7/e75e469f68b5fb544641332438a2f79730ecc622cae75f0f44efe713e3a50369.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A2: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 2500000))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D2-FOLLOW-ORDER" started.
+PROBE-D2-FOLLOW-ORDER sweepFollowsFirst before: (owed: true, c1: Optional((state: ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), ticket: 4)), c2: Optional((state: ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace), ticket: 3)), n1: nil, n2: nil)
+PROBE-D2-FOLLOW-ORDER sweepFollowsFirst A1: success(ZTronAssetModel.AssetLocation(id: zz-a1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e7/e75e469f68b5fb544641332438a2f79730ecc622cae75f0f44efe713e3a50369.png, fileExtension: png, byteSize: 3500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A2: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 2500000))
+✔ Test "PROBE-D2-FOLLOW-ORDER" with 2 test cases passed after 0.671 seconds.
+◇ Test "PROBE-D2-INFLIGHT-ABANDON" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D2-INFLIGHT-ABANDON" started.
+PROBE-D2-INFLIGHT-ABANDON followVisitedFirst before: (owed: false, c: nil, k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), inFlight: 16)
+PROBE-D2-INFLIGHT-ABANDON followVisitedFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ca/ca05f44fa73e789b4e9b9269bc3787cc2698160c472b479fcda8d6c56f872ecd.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7e/7e184b146f07ed1d671b6f727340b9b7f454b8d41129d4127bdbb070d2e0a50d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D2-INFLIGHT-ABANDON" started.
+PROBE-D2-INFLIGHT-ABANDON sweepFollowsFirst before: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), inFlight: 5000000)
+PROBE-D2-INFLIGHT-ABANDON sweepFollowsFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ca/ca05f44fa73e789b4e9b9269bc3787cc2698160c472b479fcda8d6c56f872ecd.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7e/7e184b146f07ed1d671b6f727340b9b7f454b8d41129d4127bdbb070d2e0a50d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-D2-INFLIGHT-ABANDON" with 2 test cases passed after 0.651 seconds.
+◇ Test "PROBE-D2-JOIN-ABANDON" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D2-JOIN-ABANDON" started.
+PROBE-D2-JOIN-ABANDON followVisitedFirst before: (owed: false, c: nil, k: nil, inFlight: 16)
+PROBE-D2-JOIN-ABANDON followVisitedFirst after K's request: (owed: false, k: Optional(ZTronAssetSync.JobState.downloading), waits: false)
+PROBE-D2-JOIN-ABANDON followVisitedFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ca/ca05f44fa73e789b4e9b9269bc3787cc2698160c472b479fcda8d6c56f872ecd.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7e/7e184b146f07ed1d671b6f727340b9b7f454b8d41129d4127bdbb070d2e0a50d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D2-JOIN-ABANDON" started.
+PROBE-D2-JOIN-ABANDON sweepFollowsFirst before: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), k: nil, inFlight: 5000000)
+PROBE-D2-JOIN-ABANDON sweepFollowsFirst after K's request: (owed: true, k: Optional(ZTronAssetSync.JobState.queued), waits: true)
+PROBE-D2-JOIN-ABANDON sweepFollowsFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ca/ca05f44fa73e789b4e9b9269bc3787cc2698160c472b479fcda8d6c56f872ecd.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7e/7e184b146f07ed1d671b6f727340b9b7f454b8d41129d4127bdbb070d2e0a50d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-D2-JOIN-ABANDON" with 2 test cases passed after 0.647 seconds.
+◇ Test "PROBE-D2-GATE-ABANDON" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D2-GATE-ABANDON" started.
+PROBE-D2-GATE-ABANDON followVisitedFirst before: (owed: false, c: nil, k: nil, inFlight: 16)
+PROBE-D2-GATE-ABANDON followVisitedFirst after K's request: (owed: false, k: Optional(ZTronAssetSync.JobState.downloading), waits: false)
+PROBE-D2-GATE-ABANDON followVisitedFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ca/ca05f44fa73e789b4e9b9269bc3787cc2698160c472b479fcda8d6c56f872ecd.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7e/7e184b146f07ed1d671b6f727340b9b7f454b8d41129d4127bdbb070d2e0a50d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D2-GATE-ABANDON" started.
+PROBE-D2-GATE-ABANDON sweepFollowsFirst before: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), k: nil, inFlight: 5000000)
+PROBE-D2-GATE-ABANDON sweepFollowsFirst after K's request: (owed: true, k: Optional(ZTronAssetSync.JobState.queued), waits: true)
+PROBE-D2-GATE-ABANDON sweepFollowsFirst K: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ca/ca05f44fa73e789b4e9b9269bc3787cc2698160c472b479fcda8d6c56f872ecd.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7e/7e184b146f07ed1d671b6f727340b9b7f454b8d41129d4127bdbb070d2e0a50d.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-D2-GATE-ABANDON" with 2 test cases passed after 0.643 seconds.
+◇ Test "PROBE-D2-PUMP-PROMOTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D2-PUMP-PROMOTE" started.
+PROBE-D2-PUMP-PROMOTE followVisitedFirst before: (owed: false, c: nil, r: Optional((state: ZTronAssetSync.JobState.queued, lane: ZTronAssetModel.AssetPriority.prefetch)), p: Optional((state: ZTronAssetSync.JobState.queued, lane: ZTronAssetModel.AssetPriority.userInitiated)))
+PROBE-D2-PUMP-PROMOTE followVisitedFirst after D: (r: nil, p: Optional(ZTronAssetSync.JobState.verifying), owed: false)
+PROBE-D2-PUMP-PROMOTE followVisitedFirst A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ad/ad756d1c14ec415b202669f4955dc346354f3563586b734a8fd58315ce0cfb1f.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | P: success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ad/ad756d1c14ec415b202669f4955dc346354f3563586b734a8fd58315ce0cfb1f.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | R: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 999984))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D2-PUMP-PROMOTE" started.
+PROBE-D2-PUMP-PROMOTE sweepFollowsFirst before: (owed: true, c: Optional((state: ZTronAssetSync.JobState.queued, holdsA: true)), r: Optional((state: ZTronAssetSync.JobState.queued, lane: ZTronAssetModel.AssetPriority.prefetch)), p: Optional((state: ZTronAssetSync.JobState.queued, lane: ZTronAssetModel.AssetPriority.prefetch)))
+PROBE-D2-PUMP-PROMOTE sweepFollowsFirst after D: (r: Optional(ZTronAssetSync.JobState.queued), p: Optional(ZTronAssetSync.JobState.queued), owed: true)
+PROBE-D2-PUMP-PROMOTE sweepFollowsFirst A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ad/ad756d1c14ec415b202669f4955dc346354f3563586b734a8fd58315ce0cfb1f.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | P: success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ad/ad756d1c14ec415b202669f4955dc346354f3563586b734a8fd58315ce0cfb1f.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | R: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 999984))
+✔ Test "PROBE-D2-PUMP-PROMOTE" with 2 test cases passed after 0.660 seconds.
+◇ Test "PROBE-D2-READ-ORDER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D2-READ-ORDER" started.
+PROBE-D2-READ-ORDER followVisitedFirst A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 1000000)) | B: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/36/362d6cf8b4f2cc89c6ae5054c319b4ee516b549e169a049638404730e7ac0da9.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D2-READ-ORDER" started.
+PROBE-D2-READ-ORDER sweepFollowsFirst A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3a/3a35d34d01d6e26555531f9cc96c2ea4e556628a9ffb6164b7b228c48297d159.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | B: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/36/362d6cf8b4f2cc89c6ae5054c319b4ee516b549e169a049638404730e7ac0da9.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D2-READ-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:386:25: Issue recorded
+↳ A's waiter gets the visit-first answer (insufficientSpace at its join, before the read): success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3a/3a35d34d01d6e26555531f9cc96c2ea4e556628a9ffb6164b7b228c48297d159.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D2-READ-ORDER" with 2 test cases failed after 0.639 seconds with 1 issue.
+↳ /// PROBE-D2-READ-ORDER (boundary, not the sweep's judging): C (5 MB) downloads for A (user) and B (prefetch); P (3 MB)
+↳ /// is a prefetch group's member parked `insufficientSpace` (1 MB beside C). v3 moves A onto P's content while the
+↳ /// follow owes C's visit. Then the ballast is removed and a free-space read runs. Visit-first, A's interest joins P
+↳ /// before the read: `failFastJoiner` answers it `insufficientSpace` with the room of that moment. Read-first, the
+↳ /// interest joins P after the read (the sweep's bring-forward, or the follow's own turn), and `relane` re-queues P.
+✘ Suite "DesignBudgetProbes" failed after 3.914 seconds with 1 issue.
+↳ /// Scratch probes (s3f structural design D2 "budget", designer's probes). Never committed as is.
+↳ ///
+↳ /// Each runs one scenario in both visit orders (`LaneDropVisit`): the follow's held turns released and ended before the
+↳ /// space event (`followVisitedFirst`, the reference outcome), or the space event while the follow still owes the visits
+↳ /// (`sweepFollowsFirst`). The expectations are the visit-first outcome; a probe passes when both orders give it.
+↳ ///
+↳ /// - PROBE-D2-FOLLOW-ORDER: two space-parked user jobs C2 (earlier ticket) and C1; v3 moves their only ids (A1, A2) to
+↳ ///   new 3.5 MB contents no job holds yet, of which only one fits after the reclaim. The follow's pass finds C1 first
+↳ ///   (entry order zz-a1 < zz-a2), so its visits create N1 before N2 and N1 is served. A pre-phase that follows the
+↳ ///   holders in the sweep's order (rank, ticket) creates N2 first and serves N2 instead.
+↳ /// - PROBE-D2-INFLIGHT-ABANDON: C (5 MB) downloads for A only; v3 moves A to a 16-byte content, so the follow's visit
+↳ ///   abandons C's download and its 5 MB leave the ledger. K (3 MB, user) waits for the reclaim. Visit-first, K fits the
+↳ ///   room the reclaim leaves; judged beside C's in-flight bytes, K is parked and its waiter answered insufficientSpace.
+↳ /// - PROBE-D2-JOIN-ABANDON: as INFLIGHT-ABANDON, but K is requested while the follow owes C's visit; the gate parks it
+↳ ///   `awaitingSpace` (a 1,000-byte reclaim is pending) and the reclaim's sweep decides it beside C's in-flight bytes.
+↳ /// - PROBE-D2-PUMP-PROMOTE: one slot, held by D (a user download). C (wanted by A, user) and R (3.5 MB) and P (3 MB),
+↳ ///   both prefetch, are queued for the slot; 4 MB of room, nothing pending reclaim. v3 moves A onto P's content while
+↳ ///   the follow owes C's visit; then D ends. Visit-first, P is user work and takes the slot and the room, and R is
+↳ ///   parked; pump-first, the pump starts R (C's head waits for the follow), and the promotion's preemption frees the
+↳ ///   slot but not R's in-flight bytes, so P is parked and A's user waiter failed fast.
+↳ /// - PROBE-D2-GATE-ABANDON: as JOIN-ABANDON with nothing pending reclaim: the pump's gate (not a sweep) parks K
+↳ ///   `insufficientSpace` beside C's in-flight bytes and fails its user waiter fast.
+✘ Test run with 6 tests in 1 suite failed after 3.914 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

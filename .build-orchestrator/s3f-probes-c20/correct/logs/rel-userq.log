@@ -1,0 +1,40 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC19UserBench" started.
+◇ Test "PROBE-C19C-USER-SHARED-TURNS" started.
+◇ Test case passing 1 argument shape → .supersede to "PROBE-C19C-USER-SHARED-TURNS" started.
+PROBE-C19C-USER-SHARED-TURNS supersede 10,000 user waiters: apply window 10.456334 ms; 19 follow turns, longest 4.986958 ms; per turn ms [4.59, 4.99, 4.68, 4.51, 3.56, 3.4, 3.46, 3.53, 3.45, 3.43, 3.69, 3.43, 3.4, 3.35, 3.37, 3.44, 3.37, 3.34, 1.81]; ids moved off H per turn [512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272]
+✘ Test "PROBE-C19C-USER-SHARED-TURNS" recorded an issue with 1 argument shape → .supersede at VerifyC19UserBench.swift:209:9: Expectation failed: (run.turns.max() ?? 0) <= 10.0 && run.apply <= 10.0
+↳ PROBE-C19C-USER-SHARED-TURNS: each follow turn and the apply's window at most C2's 10 ms: [4.59, 4.99, 4.68, 4.51, 3.56, 3.4, 3.46, 3.53, 3.45, 3.43, 3.69, 3.43, 3.4, 3.35, 3.37, 3.44, 3.37, 3.34, 1.81], apply 10.456334
+↳ (run.turns.max() ?? 0) <= 10.0 && run.apply <= 10.0 → false
+↳   (run.turns.max() ?? 0) <= 10.0 → true
+↳   run.apply <= 10.0 → false
+◇ Test case passing 1 argument shape → .keep to "PROBE-C19C-USER-SHARED-TURNS" started.
+PROBE-C19C-USER-SHARED-TURNS keep 10,000 user waiters: apply window 11.0135 ms; 19 follow turns, longest 5.646375 ms; per turn ms [5.65, 5.63, 5.61, 5.37, 3.9, 3.85, 3.73, 3.7, 3.72, 3.73, 3.86, 3.61, 3.59, 3.58, 3.6, 3.56, 3.56, 3.53, 1.87]; ids moved off H per turn [512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272]
+✘ Test "PROBE-C19C-USER-SHARED-TURNS" recorded an issue with 1 argument shape → .keep at VerifyC19UserBench.swift:209:9: Expectation failed: (run.turns.max() ?? 0) <= 10.0 && run.apply <= 10.0
+↳ PROBE-C19C-USER-SHARED-TURNS: each follow turn and the apply's window at most C2's 10 ms: [5.65, 5.63, 5.61, 5.37, 3.9, 3.85, 3.73, 3.7, 3.72, 3.73, 3.86, 3.61, 3.59, 3.58, 3.6, 3.56, 3.56, 3.53, 1.87], apply 11.0135
+↳ (run.turns.max() ?? 0) <= 10.0 && run.apply <= 10.0 → false
+↳   (run.turns.max() ?? 0) <= 10.0 → true
+↳   run.apply <= 10.0 → false
+✘ Test "PROBE-C19C-USER-SHARED-TURNS" with 2 test cases failed after 0.927 seconds with 2 issues.
+◇ Test "PROBE-C19C-USER-SHARED-C2" started.
+◇ Test case passing 1 argument shape → .supersede to "PROBE-C19C-USER-SHARED-C2" started.
+PROBE-C19C-USER-SHARED-C2 warm-up supersede 1,000: wait 3.685417 ms; H held 1000 ids, 1000 interests; after: O 1001 ids, H 0 ids, owed false
+PROBE-C19C-USER-SHARED-C2 supersede 10,000 user waiters: longest actor wait [7.311167, 9.637042, 7.127958] ms, best 7.127958; runs [wait 7.311167 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false, wait 9.637042 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false, wait 7.127958 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false]
+◇ Test case passing 1 argument shape → .keep to "PROBE-C19C-USER-SHARED-C2" started.
+PROBE-C19C-USER-SHARED-C2 warm-up keep 1,000: wait 4.342208 ms; H held 1001 ids, 1001 interests; after: O 1001 ids, H 1 ids, owed false
+PROBE-C19C-USER-SHARED-C2 keep 10,000 user waiters: longest actor wait [8.174, 8.151667, 8.149584] ms, best 8.149584; runs [wait 8.174 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false, wait 8.151667 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false, wait 8.149584 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false]
+✔ Test "PROBE-C19C-USER-SHARED-C2" with 2 test cases passed after 2.343 seconds.
+✘ Suite "VerifyC19UserBench" failed after 3.270 seconds with 2 issues.
+↳ /// Scratch release probe (s3f close-out verification, cycle 19, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C19C-USER-SHARED-C2: `BenchSync.sharedApplyTurns`' convergence shape with user-initiated waiters in place of
+↳ /// the prefetch group: `count` ids share H's 16 bytes and each has a user waiter of its own (one interest token per
+↳ /// id), so H's job holds `count` interests; O, 16 bytes for a user request, downloads (held). v3 maps every id to O's
+↳ /// content. `.supersede`: every id of H moves (H superseded, its interests dropped in place). `.keep`: one more id of
+↳ /// H's content, `keep`, with its own waiter, stays on H, so H is not superseded and each emptied interest is removed
+↳ /// through `removeInterest`. The heartbeat's longest wait over v3's sync and its whole follow, best of three.
+✘ Test run with 2 tests in 1 suite failed after 3.271 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

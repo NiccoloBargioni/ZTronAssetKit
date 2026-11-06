@@ -1,0 +1,25 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+✘ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:352:9: Expectation failed: (try? uResult.get())?.byteSize == 16
+↳ U, moved onto Y's present content by the owed visit, is answered from it (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0)))
+↳ (try? uResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" with 2 test cases failed after 0.660 seconds with 1 issue.
+↳ /// The fail-fast turn a throttle's extension owes the throttle-parked jobs' users waits for the follow: Y (16 bytes,
+↳ /// zz-y) is present; T (1 MB) runs for U (zz-u) and K (zz-k), user waiters both; E (1 MB) runs for a user waiter. v3
+↳ /// moves zz-u onto Y. Between the manifest's fetch and its apply, T gets a 429 with Retry-After 1 s (within the user
+↳ /// wait: nobody is answered); then, while the follow owes T's visit, E gets one with Retry-After 300 s. Visited first,
+↳ /// U was answered from Y and the extension's fail-fast answered K alone. Behind the barrier the extension's turn
+↳ /// answered U too, with the throttle (the cycle-10 residual `answerThrottledUsers`).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.660 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.660 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

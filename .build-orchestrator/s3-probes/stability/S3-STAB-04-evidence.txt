@@ -1,0 +1,20 @@
+S3-STAB-04 evidence: a time-limited test that joins an unstructured task whose wait lost its resume never ends; the time limit records an issue at 60 s and the run hangs (killed by a scoped watchdog at 180 s).
+Command: swift test --scratch-path <probe>/.build (package S3-STAB-04-hangprobe), watchdog 180 s.
+Watchdog output:
+STILL RUNNING after 180s: killing scoped processes
+Test log:
+Building for debugging...
+[Planning deferred tasks]
+Build complete! (0,53 s)
+Test Suite 'All tests' started at 2026-10-29 09:05:00.736.
+Test Suite 'All tests' passed at 2026-10-29 09:05:00.739.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.003) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test "a sibling test that ends at once" started.
+◇ Test "join of an unstructured task after a lost resume" started.
+✔ Test "a sibling test that ends at once" passed after 0.001 seconds.
+✘ Test "join of an unstructured task after a lost resume" recorded an issue at HangProbeTests.swift:5:2: Time limit was exceeded: 60.000 seconds
+Note: Some test targets reported failures:
+  - HangProbeTests (Swift Testing)

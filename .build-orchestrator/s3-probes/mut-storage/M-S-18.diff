@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+index 91bcc60..aebb123 100644
+--- a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
++++ b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+@@ -226,7 +226,7 @@ enum EvictionOrder {
+                     return lhs.lastAccess < rhs.lastAccess
+                 }
+                 if lhs.bytes != rhs.bytes {
+-                    return lhs.bytes > rhs.bytes
++                    return lhs.bytes < rhs.bytes
+                 }
+                 if lhs.prefix != rhs.prefix {
+                     return lhs.prefix < rhs.prefix

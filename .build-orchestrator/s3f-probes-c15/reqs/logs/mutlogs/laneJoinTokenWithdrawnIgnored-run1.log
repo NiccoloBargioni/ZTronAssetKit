@@ -1,0 +1,35 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter at EngineFollowBarrierLaneTests.swift:359:9: Expectation failed: throttleAtArrival != nil
+↳ the 429 throttles the origin for prefetch work (visit-first): nil
+↳ throttleAtArrival != nil → false
+↳   throttleAtArrival → nil
+✘ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter at EngineFollowBarrierLaneTests.swift:360:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+↳ P is served by C's retry once the throttle ends (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" with 6 test cases failed after 6.177 seconds with 2 issues.
+↳ /// A 429 on prefetch work during an owed follow is decided on the prefetch lane whatever user request waits for the
+↳ /// follow without joining it at the drain: one slot, no preemption; C (1 MB, zz-b) downloads for P, a prefetch
+↳ /// waiter. While v3's follow is owed, `request` arrives; then C gets a 429 with Retry-After 60 s (above the user
+↳ /// lane's 30 s cap, below the background lane's). Visited first, the request joined other content, or joined C and
+↳ /// left it, so C stayed prefetch work: the 429 throttled the origin for 60 s and C's retry served P. Counted as one of
+↳ /// C's interests, the request made C user work: `.exhausted`, nothing throttled, and P answered `serverUnavailable`.
+↳ /// O (zz-o) is queued behind C's slot, visited first, and created by its join at the drain otherwise: both orders
+↳ /// park it on the throttle and answer its user `serverUnavailable`.
+✘ Suite "Engine follow barrier (F-28)" failed after 6.177 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 6.177 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

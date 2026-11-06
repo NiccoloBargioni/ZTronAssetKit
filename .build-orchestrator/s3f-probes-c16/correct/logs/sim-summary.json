@@ -1,0 +1,69 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "5B940E6E-490F-4E9E-A917-A6456A18225E",
+        "deviceName" : "iPhone Air",
+        "modelName" : "iPhone Air",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 1,
+      "passedTests" : 2908,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "ZTronAssetKit · Built with macOS 27.0",
+  "expectedFailures" : 0,
+  "failedTests" : 1,
+  "finishTime" : 1793485708.378,
+  "passedTests" : 1481,
+  "result" : "Failed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1793484829.021,
+  "statistics" : [
+    {
+      "subtitle" : "1661 test runs",
+      "title" : "234 tests ran with dynamic parameters"
+    }
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "Expectation failed: await awaitProgress(&iterator, reaching: 512 * 1_024)",
+      "targetName" : "ZTronAssetTransportTests",
+      "testIdentifier" : 12,
+      "testIdentifierString" : "SizeAndResumeTests/pauseKeepsThePartial()",
+      "testIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetTransportTests/SizeAndResumeTests/pauseKeepsThePartial()",
+      "testName" : "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar"
+    }
+  ],
+  "title" : "Test - ZTronAssetKit",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "10% of duration",
+      "text" : "15 longest test runs with outlier durations exceeding 32.80s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "4% of duration",
+      "text" : "2 longest test runs with outlier durations exceeding 15.05s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "34% of duration",
+      "text" : "4 longest test runs with outlier durations exceeding 12.92s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 1482
+}

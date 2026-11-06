@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:207:9: Expectation failed: throttleAtArrival != nil
+↳ the 429 throttles the origin for prefetch work (visit-first): nil
+↳ throttleAtArrival != nil → false
+↳   throttleAtArrival → nil
+✘ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:208:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+↳ P is served by C's retry once the throttle ends (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" with 2 test cases failed after 1.731 seconds with 2 issues.
+↳ /// A 429 on prefetch work during an owed follow is decided on the prefetch lane when the interest another job's visit
+↳ /// moves onto it is withdrawn while the follow is owed: C (1 MB, zz-b) downloads for P, a prefetch waiter; Y (zz-u)
+↳ /// downloads for U, a user waiter; v3 moves zz-u onto C's content; U withdraws; then C gets a 429 with Retry-After 60
+↳ /// s (above the user lane's 30 s cap, below the background lane's). Visited first, Y's visit moved U onto C at the
+↳ /// apply and U's withdrawal took it off again, so C was prefetch work at the 429: the origin was throttled for 60 s and
+↳ /// C's retry served P. Behind the barrier U's interest is still Y's and its removal waits (`EventAfterFollow.removal`);
+↳ /// counted by the jobs walk of `followedLane`, it made C user work: `.exhausted`, nothing throttled, and P answered
+↳ /// `serverUnavailable`.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.731 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.731 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,59 @@
+# S3-CRAS-03 probe run (S3CleanupCrashProbe, audited I-3, 13 tests)
+◇ Suite "S3 probe: crash at every boundary during cleanup flows" started.
+S3 probe purge(.all) processKill: 15 crash points
+S3 probe purge(.all) processKillTornWrite: 15 crash points
+S3 probe purge(.all) powerLossDropUnsynced: 15 crash points
+S3 probe purge(.all) powerLossKeepMetadata: 15 crash points
+✔ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" with 4 test cases passed after 1.008 seconds.
+S3 probe purge(.evictable) processKill: 14 crash points
+S3 probe purge(.evictable) processKillTornWrite: 14 crash points
+S3 probe purge(.evictable) powerLossDropUnsynced: 14 crash points
+S3 probe purge(.evictable) powerLossKeepMetadata: 14 crash points
+✔ Test "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5" with 4 test cases passed after 0.873 seconds.
+S3 probe reportUnreadable + re-download processKill: 22 crash points
+S3 probe reportUnreadable + re-download processKillTornWrite: 22 crash points
+S3 probe reportUnreadable + re-download powerLossDropUnsynced: 22 crash points
+S3 probe reportUnreadable + re-download powerLossKeepMetadata: 22 crash points
+✔ Test "R-STO-5: crash at every boundary during a quarantine and its re-download preserves I-1…I-5" with 4 test cases passed after 2.229 seconds.
+S3 probe orphan GC processKill: 8 crash points
+S3 probe orphan GC processKillTornWrite: 8 crash points
+S3 probe orphan GC powerLossDropUnsynced: 8 crash points
+S3 probe orphan GC powerLossKeepMetadata: 8 crash points
+✔ Test "R-STO-5: crash at every boundary during orphan GC preserves I-1…I-5" with 4 test cases passed after 0.947 seconds.
+S3 probe second extension then removal processKill: 32 crash points
+S3 probe second extension then removal processKillTornWrite: 32 crash points
+S3 probe second extension then removal powerLossDropUnsynced: 32 crash points
+S3 probe second extension then removal powerLossKeepMetadata: 32 crash points
+✔ Test "R-STO-5: crash at every boundary while identical bytes are placed under a second extension, then one is removed, preserves I-1…I-5" with 4 test cases passed after 3.563 seconds.
+S3 probe second extension then removal kill→powerLossDropUnsynced: 685 pairs
+S3 probe second extension then removal kill→powerLossKeepMetadata: 685 pairs
+✔ Test "R-STO-5: a kill while bytes are placed under a second extension, then a power loss at every boundary of the next lifetime, preserves I-1…I-5" with 2 test cases passed after 25.679 seconds.
+S3 probe checksum change, directory change, removal processKill: 29 crash points
+S3 probe checksum change, directory change, removal processKillTornWrite: 29 crash points
+S3 probe checksum change, directory change, removal powerLossDropUnsynced: 29 crash points
+S3 probe checksum change, directory change, removal powerLossKeepMetadata: 29 crash points
+✔ Test "R-STO-5: crash at every boundary during an update (audited I-3) preserves I-1…I-5" with 4 test cases passed after 2.653 seconds.
+S3 probe checksum change, directory change, removal kill→powerLossDropUnsynced: 645 pairs
+S3 probe checksum change, directory change, removal kill→powerLossKeepMetadata: 645 pairs
+✔ Test "R-STO-5: a kill during an update, then a power loss at every boundary of the next lifetime, preserves I-1…I-5" with 2 test cases passed after 21.013 seconds.
+S3 probe verifyIntegrity processKill: 7 crash points
+S3 probe verifyIntegrity processKillTornWrite: 7 crash points
+S3 probe verifyIntegrity powerLossDropUnsynced: 7 crash points
+S3 probe verifyIntegrity powerLossKeepMetadata: 7 crash points
+✔ Test "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" with 4 test cases passed after 0.303 seconds.
+S3 probe eviction with a lease processKill: 13 crash points
+S3 probe eviction with a lease processKillTornWrite: 13 crash points
+S3 probe eviction with a lease powerLossDropUnsynced: 13 crash points
+S3 probe eviction with a lease powerLossKeepMetadata: 13 crash points
+✔ Test "R-STO-5: crash at every boundary during an eviction that waits for a lease preserves I-1…I-5" with 4 test cases passed after 0.484 seconds.
+S3 probe purge(.all) kill→powerLossDropUnsynced: 340 pairs
+S3 probe purge(.all) kill→powerLossKeepMetadata: 340 pairs
+✔ Test "R-STO-5: a kill during purge(.all), then a power loss at every boundary of the next lifetime, preserves I-1…I-5" with 2 test cases passed after 6.651 seconds.
+S3 probe reportUnreadable + re-download kill→powerLossDropUnsynced: 469 pairs
+S3 probe reportUnreadable + re-download kill→powerLossKeepMetadata: 469 pairs
+✔ Test "R-STO-5: a kill during a quarantine, then a power loss at every boundary of the next lifetime, preserves I-1…I-5" with 2 test cases passed after 11.435 seconds.
+S3 probe eviction with a lease kill→powerLossDropUnsynced: 287 pairs
+S3 probe eviction with a lease kill→powerLossKeepMetadata: 287 pairs
+✔ Test "R-STO-5: a kill during an eviction with a lease, then a power loss at every boundary of the next lifetime, preserves I-1…I-5" with 2 test cases passed after 6.594 seconds.
+✔ Suite "S3 probe: crash at every boundary during cleanup flows" passed after 83.439 seconds.
+✔ Test run with 13 tests in 1 suite passed after 83.439 seconds.

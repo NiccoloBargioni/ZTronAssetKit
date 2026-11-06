@@ -1,0 +1,43 @@
+diff --git a/docs/adr-drafts/s3f.md b/docs/adr-drafts/s3f.md
+index a5ef7f2..6dee549 100644
+--- a/docs/adr-drafts/s3f.md
++++ b/docs/adr-drafts/s3f.md
+@@ -1,4 +1,4 @@
+-# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 5
++# Stage 3 close-out `s3f` — WP-F (sync engine), cycles 1 to 6
+ 
+ Branch `wp/s3f` from tag `s3-base`. Rulings: `.build-orchestrator/s3-rulings-s3f.md`; findings:
+ `.build-orchestrator/s3-findings-s3f.json`. WP-F's Stage 2 record is `docs/adr-drafts/f.md` (background only).
+@@ -24,7 +24,10 @@ or was added, and it holds no ruling on the S1-15 run test's guard (requested in
+ blocking correctness finding's failing test `04ae782` committed before its fix `e18d5aa`), S3-R3 (each branch's budget
+ removed in place and shown to fail the new test), S3-R5 (the fix bounds the sweep's follows per turn, pinned by a
+ structural test and a `c2Budget` benchmark), S3-R6/S3-R7 (only WP-F's files and this draft) and S3-R8 (P-13 and the
+-per-404 index commit stay `other-wp:b`).
++per-404 index commit stay `other-wp:b`). In cycle 6 the rulings file was re-read again (unchanged since 2026-10-29 10:54:
++no ruling changed or was added, still none on the S1-15 run test's guard) and the cycle was handed no finding to fix, so
++S3-R1, S3-R2, S3-R3 and S3-R5 had nothing new to apply; S3-R4 (the S1-15 guard stays `.minutes(3)`, re-measured under
++"Cycle 6"), S3-R6/S3-R7 (only this draft changed) and S3-R8 (P-13 and the per-404 index commit stay `other-wp:b`).
+ 
+ - **Orchestrator ruling (close-out) S3-R1, scope and order.** Blocking items first (failing test committed on its own,
+   then the fix), then REQUIRED, then OPTIONAL; ADR-RECORD items get an entry here and no code; items not listed are out
+@@ -446,6 +449,20 @@ the paired shape.
+   of N 404s rewrites the index N times, about 5 ms each at 10,000 records): routed to WP-B, with the suggestion to
+   coalesce one burst's failure records into one ordered commit; P-13 to be re-run on a quiet host.
+ 
++## Cycle 6: the cycle-5 verification findings
++
++The computed task for this cycle hands it no finding to fix (its list is empty), and the rulings file is unchanged (no
++new ruling, none on the S1-15 run test's guard). So no source, test or benchmark file changed in cycle 6: the code is
++as at `72b2ab2`, and HEAD before this cycle's commit (`39dadd4`) differs from it in this draft only (`git diff --stat
++72b2ab2 HEAD`: `docs/adr-drafts/s3f.md` alone). The cycle re-ran every gate on that code ("Gate evidence (cycle 6)").
++
++| Item carried from cycle 5 | Disposition in cycle 6 |
++|---|---|
++| S1-15's run test guard (`EngineSync1LivenessTests.swift:180`, `.minutes(3)`) | **Open: the cycle-4 request stands** (no ruling in the rulings file, none in `docs/ORCHESTRATION.md`). Guard unchanged (S3-R4). This cycle, alone in the TSan bundle at load 16–20: `✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 87.172 seconds` (48 % of 3 minutes); no paired run this cycle |
++| Survivors `noDispatchOwedFlag`, `noFlagPump` | Kept as recorded (§14 candidates (a) and (c)); no test |
++| other-wp:b: P-13, the per-404 index commit | **other-wp:b:** unchanged, routed to WP-B; not re-run |
++| `SyncBenchmarks` on a loaded host | Load only (S3-R5): every miss this cycle came at a 1-minute load from 14 to over 140 with other agents' compilers running, and each benchmark that missed in one run passed in another (figures under "Gate evidence (cycle 6)") |
++
+ ## Items
+ 
+ ### S3F-1 [BLOCKING] S3-CONC-04 — a satisfied first conditions reading is an edge — **Fixed**

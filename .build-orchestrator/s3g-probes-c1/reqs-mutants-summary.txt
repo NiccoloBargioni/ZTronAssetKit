@@ -1,0 +1,120 @@
+== NONE build exit 0
+== NONE test exit 0
+✔ Test run with 5 tests in 4 suites passed after 0.588 seconds.
+== exit 0 after 9.9 s, load (70.951171875, 45.83154296875, 55.701171875)
+== O1 build exit 0
+== O1 test exit TIMEOUT
+== exit TIMEOUT after 300.0 s, load (38.14453125, 42.234375, 51.736328125)
+== MC1 build exit 0
+== MC1 test exit 1
+✘ Test "R-CAR-3: a window radius beyond the carousel, Int.max included, walks only the carousel's ids and yields the whole carousel once" recorded an issue at PrefetchFacadeTests.swift:167:33: Issue recorded
+✘ Test "R-CAR-3: a window radius beyond the carousel, Int.max included, walks only the carousel's ids and yields the whole carousel once" failed after 0.001 seconds with 1 issue.
+✘ Suite "Facade prefetch" failed after 0.001 seconds with 1 issue.
+✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue.
+== exit 1 after 3.4 s, load (38.54150390625, 42.1787109375, 51.60498046875)
+== MC2 build exit 0
+== MC2 test exit 1
+✘ Test "R-CAR-3: a window radius beyond the carousel, Int.max included, walks only the carousel's ids and yields the whole carousel once" recorded an issue at PrefetchFacadeTests.swift:167:33: Issue recorded
+✘ Test "R-CAR-3: a window radius beyond the carousel, Int.max included, walks only the carousel's ids and yields the whole carousel once" failed after 0.001 seconds with 1 issue.
+✘ Suite "Facade prefetch" failed after 0.001 seconds with 1 issue.
+✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 1 issue.
+== exit 1 after 3.0 s, load (39.779296875, 42.37451171875, 51.61865234375)
+== M05 build exit 0
+== M05 test exit 1
+✘ Test "R-SYN-12: an events stream stopped while its first registration waits for a reopen subscribes nothing of its own to the replacement" recorded an issue at FacadeRaceTests.swift:437:9: Expectation failed: registrations == 1
+✘ Test "R-SYN-12: an events stream stopped while its first registration waits for a reopen subscribes nothing of its own to the replacement" failed after 0.009 seconds with 1 issue.
+✘ Suite "Facade races" failed after 0.011 seconds with 1 issue.
+✘ Test run with 9 tests in 1 suite failed after 0.011 seconds with 1 issue.
+== exit 1 after 2.4 s, load (34.271484375, 41.1103515625, 51.0615234375)
+== M01s build exit 0
+== M01s test exit 1
+✘ Test "R-STO-9: a forced sync ending serverUnavailable or insufficientSpace on a healthy root is checked once against the root, returned as given, and never reopens" recorded an issue with 1 argument failure → .insufficientSpace at FacadeReopenTests.swift:775:9: Expectation failed: checks.count == 1
+✘ Test "R-STO-9: a forced sync ending serverUnavailable or insufficientSpace on a healthy root is checked once against the root, returned as given, and never reopens" recorded an issue with 1 argument failure → .serverUnavailable at FacadeReopenTests.swift:775:9: Expectation failed: checks.count == 1
+✘ Test "R-STO-9: a forced sync ending serverUnavailable or insufficientSpace on a healthy root is checked once against the root, returned as given, and never reopens" with 2 test cases failed after 0.029 seconds with 2 issues.
+✘ Suite "Facade reopen" failed after 0.029 seconds with 2 issues.
+✘ Test run with 1 test in 1 suite failed after 0.029 seconds with 2 issues.
+== exit 1 after 3.0 s, load (35.69091796875, 41.291015625, 51.06689453125)
+== M01i build exit 0
+== M01i test exit 1
+✘ Test "R-STO-9: a forced sync ending serverUnavailable or insufficientSpace on a healthy root is checked once against the root, returned as given, and never reopens" recorded an issue with 1 argument failure → .insufficientSpace at FacadeReopenTests.swift:775:9: Expectation failed: checks.count == 1
+✘ Test "R-STO-9: a forced sync ending serverUnavailable or insufficientSpace on a healthy root is checked once against the root, returned as given, and never reopens" with 2 test cases failed after 0.006 seconds with 1 issue.
+✘ Suite "Facade reopen" failed after 0.006 seconds with 1 issue.
+✘ Test run with 1 test in 1 suite failed after 0.006 seconds with 1 issue.
+== exit 1 after 2.2 s, load (33.15283203125, 40.671875, 50.791015625)
+== MR4 build exit 0
+== MR4 test exit 1
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" recorded an issue at FacadeReopenLimitTests.swift:106:9: Expectation failed: limited.generation == 3
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" recorded an issue at FacadeReopenLimitTests.swift:107:9: Expectation failed: vanished == 4
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" failed after 0.140 seconds with 2 issues.
+✘ Test "R-STO-9: a call whose root vanishes at every root check reopens reopenAttempts times, then reports the replaced root" recorded an issue at FacadeReopenLimitTests.swift:52:9: Expectation failed: limited.generation == 3
+✘ Test "R-STO-9: a call whose root vanishes at every root check reopens reopenAttempts times, then reports the replaced root" failed after 0.146 seconds with 1 issue.
+✘ Suite "Facade reopen limit" failed after 0.146 seconds with 3 issues.
+✘ Test run with 2 tests in 1 suite failed after 0.146 seconds with 3 issues.
+== exit 1 after 3.2 s, load (31.130859375, 39.6953125, 50.20361328125)
+== MR2 build exit 0
+== MR2 test exit 1
+✘ Test "R-STO-9: a call whose root vanishes at every root check reopens reopenAttempts times, then reports the replaced root" recorded an issue at FacadeReopenLimitTests.swift:52:9: Expectation failed: limited.generation == 3
+✘ Test "R-STO-9: a call whose root vanishes at every root check reopens reopenAttempts times, then reports the replaced root" recorded an issue at FacadeReopenLimitTests.swift:53:9: Expectation failed: vanished >= 4
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" recorded an issue at FacadeReopenLimitTests.swift:106:9: Expectation failed: limited.generation == 3
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" recorded an issue at FacadeReopenLimitTests.swift:107:9: Expectation failed: vanished == 4
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" failed after 0.519 seconds with 2 issues.
+✘ Test "R-STO-9: a call whose root vanishes at every root check reopens reopenAttempts times, then reports the replaced root" failed after 0.519 seconds with 2 issues.
+✘ Suite "Facade reopen limit" failed after 0.519 seconds with 4 issues.
+✘ Test run with 2 tests in 1 suite failed after 0.520 seconds with 4 issues.
+== exit 1 after 4.2 s, load (34.96044921875, 39.73974609375, 49.85107421875)
+== MW build exit 0
+== MW test exit 1
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" recorded an issue at FacadeReopenLimitTests.swift:103:9: Expectation failed: (result.failedWith as? AssetError) == .storageUnavailable(.rootVanished)
+✘ Test "R-STO-9: withAsset whose every pair knows its root was replaced reopens three times, then throws without leasing" failed after 0.026 seconds with 1 issue.
+✘ Suite "Facade reopen limit" failed after 0.036 seconds with 1 issue.
+✘ Test run with 2 tests in 1 suite failed after 0.036 seconds with 1 issue.
+== exit 1 after 3.4 s, load (36.0712890625, 39.56787109375, 49.4384765625)
+== MT1 build exit 0
+== MT1 test exit 1
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 8 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 5 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 0 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 7 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 3 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 4 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 2 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 1 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 6 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 9 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" with 10 test cases failed after 8.358 seconds with 10 issues.
+✘ Suite "Event continuity model, close-out cycle 2" failed after 8.359 seconds with 10 issues.
+✘ Test run with 1 test in 1 suite failed after 8.359 seconds with 10 issues.
+== exit 1 after 11.6 s, load (35.58642578125, 39.2802734375, 49.16259765625)
+== MT2 build exit 0
+== MT2 test exit 1
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 3 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 2 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 1 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 0 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 5 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 4 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 9 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 8 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 6 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 7 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" with 10 test cases failed after 6.148 seconds with 10 issues.
+✘ Suite "Event continuity model, close-out cycle 2" failed after 6.148 seconds with 10 issues.
+✘ Test run with 1 test in 1 suite failed after 6.148 seconds with 10 issues.
+== exit 1 after 9.2 s, load (36.16455078125, 39.21875, 48.96728515625)
+== MT3 build exit 0
+== MT3 test exit 1
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 3 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 4 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 7 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 2 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 8 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 5 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 0 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 6 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 9 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" recorded an issue with 1 argument index → 1 at EventContinuityModelTests.swift:96:29: Issue recorded
+✘ Test "R-SYN-12: seeded walks over subscriptions, pulls, drops, cancellations, parked reopens, publishing calls and shutdown lose no event a stream is owed, keep each stream's generations in order, leak no follower or subscriber, and buffer at most one event per forwarder" with 10 test cases failed after 8.859 seconds with 10 issues.
+✘ Suite "Event continuity model, close-out cycle 2" failed after 8.859 seconds with 10 issues.
+✘ Test run with 1 test in 1 suite failed after 8.860 seconds with 10 issues.
+== exit 1 after 12.0 s, load (36.68310546875, 39.150390625, 48.7705078125)
+done 0

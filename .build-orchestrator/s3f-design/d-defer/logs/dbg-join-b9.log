@@ -1,0 +1,30 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyDDeferProbes" started.
+◇ Test "PROBE-D-JOIN-FREED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D-JOIN-FREED" started.
+DBG-STEP S1 before U followVisitedFirst
+DBG-STEP S2 before between followVisitedFirst
+PROBE-D-join followVisitedFirst between: (owed: false, d: nil, k: Optional(ZTronAssetSync.JobState.downloading), violations: [])
+DBG-STEP S3 before release followVisitedFirst
+PROBE-D-join followVisitedFirst U: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6c/6c00f79df8106aa3eec926d4978726315b063b30655e4c9440176b0608e686ce.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be6e918dad1df69df00d1869cb22830c3998fb23f466b3cd278297d32d434ddb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+DBG-STEP S4 before cancelled followVisitedFirst
+PROBE-D-join followVisitedFirst cancelled joiner: failure(ZTronAssetModel.AssetError.cancelled)
+DBG-join-followVisitedFirst before release: owed=false deferred=false turn=false pumpWaits=false run=Optional(ZTronAssetSync.RunSettlement.finished) jobs=[:]
+DBG-join-followVisitedFirst released group
+DBG-join-followVisitedFirst sync done
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D-JOIN-FREED" started.
+DBG-STEP S1 before U sweepFollowsFirst
+DBG-STEP S2 before between sweepFollowsFirst
+PROBE-D-join sweepFollowsFirst between: (owed: true, d: Optional(ZTronAssetSync.JobState.downloading), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), violations: [])
+DBG-STEP S3 before release sweepFollowsFirst
+PROBE-D-join sweepFollowsFirst U: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6c/6c00f79df8106aa3eec926d4978726315b063b30655e4c9440176b0608e686ce.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be6e918dad1df69df00d1869cb22830c3998fb23f466b3cd278297d32d434ddb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+DBG-STEP S4 before cancelled sweepFollowsFirst
+PROBE-D-join sweepFollowsFirst cancelled joiner: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6c/6c00f79df8106aa3eec926d4978726315b063b30655e4c9440176b0608e686ce.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+DBG-join-sweepFollowsFirst before release: owed=false deferred=false turn=false pumpWaits=false run=Optional(ZTronAssetSync.RunSettlement.finished) jobs=[:]
+DBG-join-sweepFollowsFirst released group
+DBG-join-sweepFollowsFirst sync done
+✔ Test "PROBE-D-JOIN-FREED" with 2 test cases passed after 1.338 seconds.
+✔ Suite "VerifyDDeferProbes" passed after 1.338 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.339 seconds.

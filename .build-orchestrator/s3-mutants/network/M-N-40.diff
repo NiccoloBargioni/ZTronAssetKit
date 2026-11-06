@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineFailures.swift b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+index e6996d5..f4027dc 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineFailures.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+@@ -279,7 +279,7 @@ extension SyncEngine {
+                 continue
+             }
+             let policy = interest.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+-            if attempts >= max(1, policy.maxAttemptsPerRun) {
++            if attempts > max(1, policy.maxAttemptsPerRun) {
+                 self.deliver(.failed(assetError), to: token, interest: interest, transfer: transfer)
+                 self.state.jobs[transfer]?.interests[token] = nil
+             }

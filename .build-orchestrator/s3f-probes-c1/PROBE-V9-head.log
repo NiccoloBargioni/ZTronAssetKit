@@ -1,0 +1,22 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC1Correct changed refresh" started.
+◇ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" started.
+PROBE-V9 longest actor wait at 10,000 members: ["1% changed: runs [2.279042, 2.212125, 2.263375] ms", "10% changed: runs [10.273833, 10.345584, 10.452458] ms", "100% changed: runs [144.922458, 143.595, 124.557375] ms"]
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" recorded an issue at VerifyC1ChangedRefresh.swift:59:13: Expectation failed: value <= 10.0
+↳ PROBE-V9 FAIL: 10% changed, best of three 10.273833 ms > C2's 10 ms
+↳ value <= 10.0 → false
+↳   value → 10.273833
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" recorded an issue at VerifyC1ChangedRefresh.swift:59:13: Expectation failed: value <= 10.0
+↳ PROBE-V9 FAIL: 100% changed, best of three 124.557375 ms > C2's 10 ms
+↳ value <= 10.0 → false
+↳   value → 124.557375
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" failed after 4.569 seconds with 2 issues.
+✘ Suite "VerifyC1Correct changed refresh" failed after 4.569 seconds with 2 issues.
+↳ /// Scratch probe (s3f close-out verification, cycle 1, correctness lens): C2 of a forced sync whose manifest changes the
+↳ /// content of some members of a waiting 10,000-member prefetch group (the S3-PERF-02 shape with content changes instead
+↳ /// of one added entry). Production dispatch executors, release build, heartbeat measurement of `SyncBench.longestWait`.
+✘ Test run with 1 test in 1 suite failed after 4.569 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

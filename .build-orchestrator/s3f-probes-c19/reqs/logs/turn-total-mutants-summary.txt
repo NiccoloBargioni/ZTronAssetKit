@@ -1,0 +1,42 @@
+22:28:15 inboundSpentDrop: build exit 0 load { 229.05 116.39 67.86 }
+22:28:21 inboundSpentDrop: VerifyC19ReqsTurnTotal run1 exit 1 load { 220.48 116.48 68.18 }
+22:28:21     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 8, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:28:21     ✘ Test "PROBE-C19R-TWO-HOLDER-TURN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:108:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:28:21     ✘ Test run with 1 test in 1 suite failed after 2.351 seconds with 1 issue.
+22:28:26 inboundSpentDrop: VerifyC19ReqsTurnTotal run2 exit 1 load { 210.27 116.09 68.32 }
+22:28:26     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 8, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:28:26     ✘ Test "PROBE-C19R-TWO-HOLDER-TURN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:108:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:28:26     ✘ Test run with 1 test in 1 suite failed after 1.520 seconds with 1 issue.
+22:28:26 inboundSpentDrop: reverted; sources diff: none
+22:28:34 clean rebuild exit 0
+22:30:09 restSpentDrop: build exit 0 load { 51.52 89.42 63.39 }
+22:30:14 restSpentDrop: VerifyC19ReqsTurnTotal run1 exit 1 load { 47.88 88.03 63.05 }
+22:30:14     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 4, 4, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:30:14     ✘ Test "PROBE-C19R-THREE-HOLDER-VISITS" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:202:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:30:14     ✘ Test run with 2 tests in 1 suite failed after 2.360 seconds with 1 issue.
+22:30:21 restSpentDrop: VerifyC19ReqsTurnTotal run2 exit 1 load { 43.13 85.68 62.51 }
+22:30:21     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 4, 4, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:30:21     ✘ Test "PROBE-C19R-THREE-HOLDER-VISITS" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:202:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:30:21     ✘ Test run with 2 tests in 1 suite failed after 4.198 seconds with 1 issue.
+22:30:21 restSpentDrop: reverted; sources diff: none
+22:30:28 visitSpentDrop: build exit 0 load { 42.48 84.83 62.35 }
+22:30:41 visitSpentDrop: VerifyC19ReqsTurnTotal run1 exit 1 load { 42.68 82.75 61.99 }
+22:30:41     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 4, 4, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:30:41     ✘ Test "PROBE-C19R-THREE-HOLDER-VISITS" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:202:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:30:41     ✘ Test run with 2 tests in 1 suite failed after 8.747 seconds with 1 issue.
+22:30:50 visitSpentDrop: VerifyC19ReqsTurnTotal run2 exit 1 load { 44.54 82.47 62.02 }
+22:30:50     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 4, 4, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:30:50     ✘ Test "PROBE-C19R-THREE-HOLDER-VISITS" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:202:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:30:50     ✘ Test run with 2 tests in 1 suite failed after 4.679 seconds with 1 issue.
+22:30:50 visitSpentDrop: reverted; sources diff: none
+22:30:57 inboundSpentDrop: build exit 0 load { 47.24 81.78 62.01 }
+22:31:05 inboundSpentDrop: VerifyC19ReqsTurnTotal run1 exit 1 load { 49.91 81.23 62.04 }
+22:31:05     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 8, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:31:05     ✘ Test "PROBE-C19R-TWO-HOLDER-TURN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:108:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:31:05     ✘ Test run with 2 tests in 1 suite failed after 3.656 seconds with 1 issue.
+22:31:13 inboundSpentDrop: VerifyC19ReqsTurnTotal run2 exit 1 load { 49.28 80.58 61.93 }
+22:31:13     PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 8, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+22:31:13     ✘ Test "PROBE-C19R-TWO-HOLDER-TURN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:108:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+22:31:13     ✘ Test run with 2 tests in 1 suite failed after 3.697 seconds with 1 issue.
+22:31:13 inboundSpentDrop: reverted; sources diff: none
+22:31:20 clean rebuild exit 0

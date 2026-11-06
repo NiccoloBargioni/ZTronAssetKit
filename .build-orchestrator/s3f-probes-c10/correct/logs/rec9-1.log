@@ -1,0 +1,123 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "ReC9CorrectProbes" started.
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C9-JOIN-RESOLVE" started.
+◇ Test "PROBE-C9R-THROTTLE-FAILFAST" started.
+◇ Test "PROBE-C9R-OFFLINE-FAILFAST" started.
+◇ Test "PROBE-C9R-THROTTLE-PRESENT" started.
+◇ Test "PROBE-C9R-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9R-THROTTLE-FAILFAST" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9R-THROTTLE-FAILFAST" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9R-OFFLINE-FAILFAST" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9R-OFFLINE-FAILFAST" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9R-THROTTLE-PRESENT" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9R-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9R-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9R-THROTTLE-PRESENT" started.
+PROBE-C9-JOIN-RESOLVE followVisitedFirst before: (owed: false, c: Optional(ZTronAssetSync.JobState.downloading), n: nil)
+PROBE-C9-JOIN-RESOLVE followVisitedFirst afterFailure: (owed: false, c: nil, verdictWaits: false)
+PROBE-C9R-OFFLINE-FAILFAST followVisitedFirst: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be6e918dad1df69df00d1869cb22830c3998fb23f466b3cd278297d32d434ddb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b0=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7d/7d9044aa7058a7e4dbfcb1f82fa921889c3aebccc2cf9003e876444558eb763f.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C9R-OFFLINE-FAILFAST" recorded an issue with 1 argument visit → .followVisitedFirst at ReC9ReqsProbes.swift:115:25: Issue recorded
+↳ B0, still held by C, gets the offline answer: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7d/7d9044aa7058a7e4dbfcb1f82fa921889c3aebccc2cf9003e876444558eb763f.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C9-JOIN-RESOLVE followVisitedFirst aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/76/76dc926a26f22dd18daa12d24f7a9fd77495c6e86a939650b86336478154dab7.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil)) b2Result: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bcf8d976c1acd364832b2b30237babe134f0b67bf5334f87f2de5a4a03c5767d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts: 2
+PROBE-C9R-THROTTLE-FAILFAST sweepFollowsFirst: a=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0))) b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+✘ Test "PROBE-C9R-THROTTLE-FAILFAST" recorded an issue with 1 argument visit → .sweepFollowsFirst at ReC9ReqsProbes.swift:160:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A, moved to Y by the owed visit, is served from Y (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+PROBE-C9R-THROTTLE-FAILFAST followVisitedFirst: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d1cfd9872bf8459d5d9ae01b9fb1ce7b9002d63e7abba724b76772006dce97b8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-JOIN-RESOLVE" started.
+PROBE-C9R-JOIN-RESOLVE sweepFollowsFirst: b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/50/50b1b20c829cc50778e4a485c3faf07dbcbadbb8dd1be300cf6b2dbc9a9924ce.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b3/b3571a587998c0ab98d6071c9f75cb81baa0fad2c4c8dbb4f23d9d9eb644cebe.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C9R-THROTTLE-FAILFAST" with 2 test cases failed after 1.519 seconds with 1 issue.
+↳ /// PROBE-C9R-THROTTLE-FAILFAST: the draft's open residual "the offline and throttle exits". C (1 MB, content X)
+↳ /// downloads for A (zz-a, user) and B0 (zz-b, user). v3 moves zz-a to a 16-byte content Y. C's attempt then fails
+↳ /// offline while the path reads satisfied (no edge since it started): `.failed(.whenOnline)` with its fail-fast.
+↳ /// Visit-first, A's interest left C for Y's job before the failure, Y stages: A is served. Behind the barrier the
+↳ /// fail-fast answers A `.offline` before the owed visit moves it.
+PROBE-C9R-OFFLINE-FAILFAST sweepFollowsFirst: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/be/be6e918dad1df69df00d1869cb22830c3998fb23f466b3cd278297d32d434ddb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b0=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7d/7d9044aa7058a7e4dbfcb1f82fa921889c3aebccc2cf9003e876444558eb763f.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C9R-OFFLINE-FAILFAST" recorded an issue with 1 argument visit → .sweepFollowsFirst at ReC9ReqsProbes.swift:115:25: Issue recorded
+↳ B0, still held by C, gets the offline answer: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7d/7d9044aa7058a7e4dbfcb1f82fa921889c3aebccc2cf9003e876444558eb763f.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C9R-JOIN-RESOLVE followVisitedFirst: b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/50/50b1b20c829cc50778e4a485c3faf07dbcbadbb8dd1be300cf6b2dbc9a9924ce.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b3/b3571a587998c0ab98d6071c9f75cb81baa0fad2c4c8dbb4f23d9d9eb644cebe.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C9R-THROTTLE-PRESENT followVisitedFirst: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/76/76dc926a26f22dd18daa12d24f7a9fd77495c6e86a939650b86336478154dab7.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+✘ Test "PROBE-C9R-OFFLINE-FAILFAST" with 2 test cases failed after 1.608 seconds with 2 issues.
+↳ /// PROBE-C9R-OFFLINE-FAILFAST: the draft's open residual "the offline and throttle exits". C (1 MB, content X)
+↳ /// downloads for A (zz-a, user) and B0 (zz-b, user). v3 moves zz-a to a 16-byte content Y. C's attempt then fails
+↳ /// offline while the path reads satisfied (no edge since it started): `.failed(.whenOnline)` with its fail-fast.
+↳ /// Visit-first, A's interest left C for Y's job before the failure, Y stages: A is served. Behind the barrier the
+↳ /// fail-fast answers A `.offline` before the owed visit moves it.
+✔ Test "PROBE-C9R-JOIN-RESOLVE" with 2 test cases passed after 1.611 seconds.
+PROBE-C9R-THROTTLE-PRESENT before: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), bound: true)
+PROBE-C9R-THROTTLE-PRESENT sweepFollowsFirst: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/76/76dc926a26f22dd18daa12d24f7a9fd77495c6e86a939650b86336478154dab7.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+✔ Test "PROBE-C9R-THROTTLE-PRESENT" with 2 test cases passed after 1.839 seconds.
+✘ Suite "Engine runs" failed after 1.839 seconds with 3 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+PROBE-C9-JOIN-RESOLVE sweepFollowsFirst before: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), n: nil)
+PROBE-C9-JOIN-RESOLVE sweepFollowsFirst afterFailure: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 4, 2)), verdictWaits: true)
+PROBE-C9-JOIN-RESOLVE sweepFollowsFirst joined: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 2)), joined: true)
+PROBE-C9-JOIN-RESOLVE sweepFollowsFirst aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/76/76dc926a26f22dd18daa12d24f7a9fd77495c6e86a939650b86336478154dab7.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil)) b2Result: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bcf8d976c1acd364832b2b30237babe134f0b67bf5334f87f2de5a4a03c5767d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts: 2
+✔ Test "PROBE-C9-JOIN-RESOLVE" with 2 test cases passed after 2.352 seconds.
+◇ Test "PROBE-C9-OFFLINE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-OFFLINE" started.
+PROBE-C9-OFFLINE followVisitedFirst edge serials (attempt, engine): (Optional(3), 3)
+PROBE-C9-OFFLINE followVisitedFirst afterFailure: (owed: false, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.whenOnline), 1)), satisfied: Optional(true))
+PROBE-C9-OFFLINE followVisitedFirst aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d22090ca39520437e6a2d842020c0d05cbd7d04b73f8904cf4fd59c798037c70.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.offline)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-OFFLINE" started.
+PROBE-C9-OFFLINE sweepFollowsFirst edge serials (attempt, engine): (Optional(3), 3)
+PROBE-C9-OFFLINE sweepFollowsFirst afterFailure: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 3)), satisfied: Optional(true))
+PROBE-C9-OFFLINE sweepFollowsFirst aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d22090ca39520437e6a2d842020c0d05cbd7d04b73f8904cf4fd59c798037c70.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.offline)
+✔ Test "PROBE-C9-OFFLINE" with 2 test cases passed after 1.149 seconds.
+◇ Test "PROBE-C9-JOIN-RETRY-PLACE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-JOIN-RETRY-PLACE" started.
+PROBE-C9-JOIN-RETRY-PLACE followVisitedFirst mid: (c: Optional((ZTronAssetSync.JobState.queued, 2)), r: Optional(ZTronAssetSync.JobState.queued), n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C9-JOIN-RETRY-PLACE followVisitedFirst starts r=Optional(3) c2=Optional(4) n=Optional(2) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/22/2258d6a59061d2935fac2b05b89290148c64ffc8667d888ffffa1337c9e6f8be.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/08/086ea7b6d890fbab41d8f447bb09aefc0713d0655de9faea5c6d5c065a0185d9.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b2=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/08/086ea7b6d890fbab41d8f447bb09aefc0713d0655de9faea5c6d5c065a0185d9.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) r=success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-JOIN-RETRY-PLACE" started.
+PROBE-C9-JOIN-RETRY-PLACE sweepFollowsFirst mid: (c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 2)), r: Optional(ZTronAssetSync.JobState.queued), n: nil)
+PROBE-C9-JOIN-RETRY-PLACE sweepFollowsFirst starts r=Optional(3) c2=Optional(4) n=Optional(2) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/22/2258d6a59061d2935fac2b05b89290148c64ffc8667d888ffffa1337c9e6f8be.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/08/086ea7b6d890fbab41d8f447bb09aefc0713d0655de9faea5c6d5c065a0185d9.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b2=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/08/086ea7b6d890fbab41d8f447bb09aefc0713d0655de9faea5c6d5c065a0185d9.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) r=success(ZTronAssetModel.AssetLocation(id: zz-r, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/89/89fefd8cb8839d8640b2bb1a7c0afc83af313dd64a16e0dd30d88830484afe70.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C9-JOIN-RETRY-PLACE" with 2 test cases passed after 1.237 seconds.
+◇ Test "PROBE-C9-THROTTLE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-THROTTLE" started.
+PROBE-C9-THROTTLE followVisitedFirst afterFailure: (owed: false, c: nil)
+PROBE-C9-THROTTLE followVisitedFirst aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6504aa1adf9897f7ed5c903d71feece396a149cc63be1a24aa21bd3f520fe482.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-THROTTLE" started.
+PROBE-C9-THROTTLE sweepFollowsFirst afterFailure: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 2)))
+PROBE-C9-THROTTLE sweepFollowsFirst aResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) bResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+✘ Test "PROBE-C9-THROTTLE" recorded an issue with 1 argument visit → .sweepFollowsFirst at ReC9CorrectProbes.swift:230:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ PROBE-C9-THROTTLE: A, moved to N, is served from N, not answered with C's throttle (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C9-THROTTLE" with 2 test cases failed after 1.601 seconds with 1 issue.
+↳ /// PROBE-C9-THROTTLE (the draft's residual "a 429's throttle park and its fail-fast answers"): C (1 MB) is the content
+↳ /// of zz-a and zz-b, one user waiter each; v3 moves zz-a to N (16 bytes, held once started) while the follow owes C's
+↳ /// visit. C's attempt gets a 429 with Retry-After 60 s (above the interactive 2 s wait). Visited first, A's interest is
+↳ /// on N, already started, and N serves it; the throttle's fail-fast answers B only. Before the visit, the park's
+↳ /// fail-fast answers A as well.
+◇ Test "PROBE-C9-STALE-PLACE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-STALE-PLACE" started.
+PROBE-C9-STALE-PLACE withK=true followVisitedFirst starts x=Optional(3) z=Optional(4) a=Optional(100000) z=Optional(100000)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-STALE-PLACE" started.
+PROBE-C9-STALE-PLACE sweepFollowsFirst mid: (owed: true, places: Optional(1), events: 1)
+PROBE-C9-STALE-PLACE withK=true sweepFollowsFirst starts x=Optional(3) z=Optional(4) a=Optional(100000) z=Optional(100000)
+✔ Test "PROBE-C9-STALE-PLACE" with 2 test cases passed after 1.551 seconds.
+◇ Test "PROBE-C9-STALE-PLACE-CONTROL" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-STALE-PLACE-CONTROL" started.
+PROBE-C9-STALE-PLACE withK=false followVisitedFirst starts x=Optional(3) z=Optional(4) a=Optional(100000) z=Optional(100000)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-STALE-PLACE-CONTROL" started.
+PROBE-C9-STALE-PLACE withK=false sweepFollowsFirst starts x=Optional(3) z=Optional(4) a=Optional(100000) z=Optional(100000)
+✔ Test "PROBE-C9-STALE-PLACE-CONTROL" with 2 test cases passed after 2.012 seconds.
+◇ Test "PROBE-C9-SPURIOUS-JOIN" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-SPURIOUS-JOIN" started.
+PROBE-C9-SPURIOUS-JOIN followVisitedFirst after (clock unmoved): (state: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1064548171ns))), attempts: Optional(1), interests: Optional(1)) cStarts=1 a=Optional(16)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-SPURIOUS-JOIN" started.
+PROBE-C9-SPURIOUS-JOIN sweepFollowsFirst after (clock unmoved): (state: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1064548171ns))), attempts: Optional(1), interests: Optional(1)) cStarts=1 a=Optional(16)
+✔ Test "PROBE-C9-SPURIOUS-JOIN" with 2 test cases passed after 1.817 seconds.
+✘ Suite "ReC9CorrectProbes" failed after 11.724 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 9, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11: every decision that differs, other than by a real-world ledger
+↳ /// input, is blocking).
+✘ Test run with 11 tests in 2 suites failed after 11.724 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

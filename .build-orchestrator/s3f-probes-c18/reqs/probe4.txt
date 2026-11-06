@@ -1,0 +1,4 @@
+08:46:37 build start load={ 7.77 34.23 49.77 } phase=ios
+08:47:16 build exit 0 load={ 14.59 32.64 48.47 } phase=sim
+09:03:47 run sharedConvergenceProbe start load={ 7.87 11.26 29.83 } phase=t64
+09:03:53 run sharedConvergenceProbe exit 1 load={ 11.25 11.90 29.94 } phase=t64

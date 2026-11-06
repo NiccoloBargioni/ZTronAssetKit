@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetAppleHosted/PackErrorMapping.swift b/Sources/ZTronAssetAppleHosted/PackErrorMapping.swift
+index c920510..b307375 100644
+--- a/Sources/ZTronAssetAppleHosted/PackErrorMapping.swift
++++ b/Sources/ZTronAssetAppleHosted/PackErrorMapping.swift
+@@ -74,7 +74,7 @@ enum PackErrorMapping {
+     /// `transient(.unknown)`. A code of another domain is not a URL error code, so it is reported as 0 (the source
+     /// logs the domain and code). Which errors BackgroundAssets throws is UNVERIFIED (APPLE-API-VERIFICATION §1.8).
+     static func systemError(domain: String, code: Int) -> TransferError {
+-        if (domain == NSPOSIXErrorDomain && code == Int(ENOSPC)) || (domain == NSCocoaErrorDomain && code == NSFileWriteOutOfSpaceError) {
++        if domain == NSCocoaErrorDomain && code == NSFileWriteOutOfSpaceError {
+             return .insufficientSpace(requiredBytes: nil)
+         }
+         guard domain == NSURLErrorDomain else {

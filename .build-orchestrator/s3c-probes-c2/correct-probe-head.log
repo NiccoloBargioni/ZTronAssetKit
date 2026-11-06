@@ -1,0 +1,9 @@
+✔ Test "probe Q0: evictable purge, first-chunk holder swapped for a pinned id before the first turn" passed after 0.009 seconds.
+✔ Test "probe Q1: evictable purge, next-chunk holder swapped for a pinned id between turns" passed after 0.005 seconds.
+✔ Test "probe Q2: quota eviction, last victim swapped for a pinned id between turns" with 2 test cases passed after 0.011 seconds.
+✔ Test "probe Q3: evictable purge, a holder leaves between turns, the rest still purged" passed after 0.004 seconds.
+✔ Test "probe Q4: evictable purge, last holder swapped for an ordinary id between turns, every holder purged" passed after 0.005 seconds.
+Q5 releasedBytes before 0 after 100; metrics evictions 2
+✔ Test "probe Q5: quota eviction and an evictable purge interleaved across the turns of one blob" passed after 0.005 seconds.
+✔ Suite "Verifier s3c c2 correctness probes" passed after 0.041 seconds.
+✔ Test run with 6 tests in 1 suite passed after 0.041 seconds.

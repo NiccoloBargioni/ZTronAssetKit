@@ -1,0 +1,3 @@
+load before: 11:10:44 { 17.07 22.06 15.42 }
+load after: 11:10:50 { 17.15 21.99 15.43 }
+TEST defer live-defer exit 0 in 6 s

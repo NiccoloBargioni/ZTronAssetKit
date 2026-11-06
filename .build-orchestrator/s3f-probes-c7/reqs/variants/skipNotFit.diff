@@ -1,0 +1,12 @@
+--- .build-verify-s3f-c7-reqs/variants/EngineJobs.head.swift	2026-10-30 07:10:41
++++ .build-verify-s3f-c7-reqs/variants/EngineJobs.skipNotFit.swift	2026-10-30 07:10:41
+@@ -752,6 +752,9 @@
+                 }
+                 job = followed
+                 verdict = self.spaceBlock(job, ahead: ahead)
++                if verdict != nil {
++                    continue
++                }
+             }
+             guard let block = verdict else {
+                 if self.requeueSwept(job, ahead: &ahead) {

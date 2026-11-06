@@ -1,0 +1,45 @@
+ 4:07  up 6 days, 16:30, 3 users, load averages: 37.26 30.67 22.10
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "VerifyC17Bench" started.
+◇ Test "C17-BENCH-INBOUND-CONCENTRATION" started.
+C17-BENCH-INBOUND-CONCENTRATION warm-up 1,000: wait 10.976708 ms, 0 follow turns (longest 0.0 ms, median 0.0 ms), jobs 745, owed true, verdict waits true, O ids 257 -> 1001
+C17-BENCH-INBOUND-CONCENTRATION 10,000: wait 568.231083 ms, 0 follow turns (longest 0.0 ms, median 0.0 ms), jobs 9745, owed true, verdict waits true, O ids 257 -> 10001
+C17-BENCH-INBOUND-CONCENTRATION 10,000: wait 798.523167 ms, 0 follow turns (longest 0.0 ms, median 0.0 ms), jobs 9745, owed true, verdict waits true, O ids 257 -> 10001
+C17-BENCH-INBOUND-CONCENTRATION 10,000: wait 1499.5592080000001 ms, 0 follow turns (longest 0.0 ms, median 0.0 ms), jobs 9745, owed true, verdict waits true, O ids 257 -> 10001
+C17-BENCH-INBOUND-CONCENTRATION best 568.231083 ms median 798.523167 ms (C2 10 ms)
+✘ Test "C17-BENCH-INBOUND-CONCENTRATION" recorded an issue at VerifyC17Bench.swift:30:13: Expectation failed: (waits.min() ?? .infinity) <= 10.0
+↳ the 404's turn (bringInbound) at 10,000 converging ids: [568.231083, 798.523167, 1499.5592080000001]
+↳ (waits.min() ?? .infinity) <= 10.0 → false
+↳   (waits.min() ?? .infinity) → 568.231083
+✘ Test "C17-BENCH-INBOUND-CONCENTRATION" failed after 10.214 seconds with 1 issue.
+↳ /// S3-R20's case: 10,000 ids, held by other jobs, that the copy maps to one content whose attempt ends while the
+↳ /// follow is owed. The heartbeat's longest wait from O's 404 to its waiting verdict (`bringInbound` in that turn).
+◇ Test "C17-BENCH-FOLLOW-CONCENTRATION" started.
+C17-BENCH-FOLLOW-CONCENTRATION 10,000: wait 0.0 ms, 39 follow turns (longest 83.292584 ms, median 33.599875 ms), jobs 9745, owed true, verdict waits false, O ids 257 -> 10001
+C17-BENCH-FOLLOW-CONCENTRATION 10,000: wait 0.0 ms, 39 follow turns (longest 127.950875 ms, median 40.8095 ms), jobs 9745, owed true, verdict waits false, O ids 257 -> 10001
+C17-BENCH-FOLLOW-CONCENTRATION 10,000: wait 0.0 ms, 39 follow turns (longest 70.175541 ms, median 15.659834 ms), jobs 9745, owed true, verdict waits false, O ids 257 -> 10001
+C17-BENCH-FOLLOW-CONCENTRATION longest turn per run [83.292584, 127.950875, 70.175541] ms; best 70.175541 ms (C2 10 ms)
+✘ Test "C17-BENCH-FOLLOW-CONCENTRATION" recorded an issue at VerifyC17Bench.swift:47:13: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ the follow's longest turn at 10,000 converging ids: [83.292584, 127.950875, 70.175541]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 70.175541
+✘ Test "C17-BENCH-FOLLOW-CONCENTRATION" failed after 18.707 seconds with 1 issue.
+↳ /// The follow's own turns in the same shape, without the 404: each held follow-up turn timed inside the actor.
+✘ Suite "VerifyC17Bench" failed after 28.922 seconds with 2 issues.
+✘ Suite ZTronAssetKitBenchmarks failed after 28.922 seconds with 2 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 2 tests in 2 suites failed after 28.922 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+rc=1
+ 4:08  up 6 days, 16:31, 3 users, load averages: 40.26 31.80 22.79

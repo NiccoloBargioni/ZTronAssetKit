@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineFailures.swift b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+index e6996d5..e2c09a1 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineFailures.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+@@ -232,7 +232,7 @@ extension SyncEngine {
+         let policy = remaining.lane == .userInitiated ? self.tuning.interactiveRetry : self.tuning.retry
+         let retryAfter: TimeInterval?
+         if case .transient(_, let hint?) = error {
+-            retryAfter = hint.seconds(from: wall)
++            retryAfter = nil; _ = hint
+         } else {
+             retryAfter = nil
+         }

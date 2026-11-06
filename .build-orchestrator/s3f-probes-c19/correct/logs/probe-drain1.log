@@ -1,0 +1,15 @@
+start 21:46:22 load { 45.71 42.68 49.77 }
+◇ Test "PROBE-C19C-DRAIN-BOUND" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C19C-DRAIN-BOUND" started.
+PROBE-C19C-DRAIN-BOUND followVisitedFirst bound 4 atV4 9 turns [9] drainTurn nil answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+✘ Test "PROBE-C19C-DRAIN-BOUND" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC19CorrectProbes.swift:113:9: Expectation failed: turns.allSatisfy { $0 <= bound }
+↳ PROBE-C19C-DRAIN-BOUND: no follow turn moves more than followIDsPerTurn (4) ids: [9], drain turn nil
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C19C-DRAIN-BOUND" started.
+PROBE-C19C-DRAIN-BOUND sweepFollowsFirst bound 4 atV4 9 turns [0, 0, 9] drainTurn Optional(9) answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+✘ Test "PROBE-C19C-DRAIN-BOUND" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19CorrectProbes.swift:113:9: Expectation failed: turns.allSatisfy { $0 <= bound }
+↳ PROBE-C19C-DRAIN-BOUND: no follow turn moves more than followIDsPerTurn (4) ids: [0, 0, 9], drain turn Optional(9)
+✘ Test "PROBE-C19C-DRAIN-BOUND" with 2 test cases failed after 1.468 seconds with 2 issues.
+✘ Suite "VerifyC19Correct" failed after 1.468 seconds with 2 issues.
+↳ /// PROBE-C19C-DRAIN-BOUND: the drain's visits after verdicts (`followAfterVerdict`) each get a whole turn's id budget
+✘ Test run with 1 test in 1 suite failed after 1.468 seconds with 2 issues.
+end 21:46:29 load { 40.11 41.59 49.30 }

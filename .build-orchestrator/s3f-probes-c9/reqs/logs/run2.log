@@ -1,0 +1,17 @@
+probe2 build exit 0
+present 1 exit 1
+present 2 exit 1
+present 3 exit 1
+ok sweepNoBarrier apply
+sweepNoBarrier2 build exit 0
+sweepNoBarrier dropped 1 exit 1
+sweepNoBarrier dropped 2 exit 1
+ok sweepNoBarrier revert
+ok enospcNoDefer apply
+ok enqueueNoDefer apply
+enospc+enqueue build exit 0
+enospc+enqueue exit 0
+ok enqueueNoDefer revert
+ok enospcNoDefer revert
+copy-head restored
+done 15:13:09

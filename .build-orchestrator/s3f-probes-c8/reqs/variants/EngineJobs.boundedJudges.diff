@@ -1,0 +1,10 @@
+--- variants/EngineJobs.head.swift	2026-10-30 08:43:27
++++ variants/EngineJobs.boundedJudges.swift	2026-10-30 08:43:28
+@@ -726,7 +726,6 @@
+             candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+         case .bounded:
+             self.scheduleSpaceSweepFollowUp(sweep)
+-            return
+         }
+         self.judgeSpaceParked(candidates, sweep: sweep, room: room, smallest: smallest, ahead: ahead)
+     }

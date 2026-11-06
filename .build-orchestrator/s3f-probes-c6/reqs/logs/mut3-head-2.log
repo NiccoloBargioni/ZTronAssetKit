@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC6ReqsProbes" started.
+◇ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+✔ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" with 2 test cases passed after 1.068 seconds.
+✔ Suite "VerifyC6ReqsProbes" passed after 1.068 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.069 seconds.

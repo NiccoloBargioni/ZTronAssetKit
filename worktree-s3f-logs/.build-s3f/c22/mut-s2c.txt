@@ -1,0 +1,12 @@
+start 02:33 rev 4ca9044 load { 2.45 3.92 5.90 }
+sync diff: none
+b23-no-lane run1: ✘ Test run with 4 tests in 1 suite failed after 10.529 seconds with 8 issues. | EngineFollowBarrierRerouteOwnerTests.swift:223:13, EngineFollowBarrierRerouteOwnerTests.swift:224:13, EngineFollowBarrierRerouteOwnerTests.swift:239:13, EngineFollowBarrierRerouteOwnerTests.swift:263:13 | load { 9.94 5.84 6.47 }
+b23-no-lane run2: ✘ Test run with 4 tests in 1 suite failed after 10.544 seconds with 8 issues. | EngineFollowBarrierRerouteOwnerTests.swift:223:13, EngineFollowBarrierRerouteOwnerTests.swift:224:13, EngineFollowBarrierRerouteOwnerTests.swift:239:13, EngineFollowBarrierRerouteOwnerTests.swift:263:13 | load { 8.94 5.77 6.44 }
+b23-no-kind run1: ✘ Test run with 4 tests in 1 suite failed after 10.433 seconds with 2 issues. | EngineFollowBarrierRerouteOwnerTests.swift:226:17 | load { 7.32 5.56 6.35 }
+b23-no-kind run2: ✘ Test run with 4 tests in 1 suite failed after 10.326 seconds with 2 issues. | EngineFollowBarrierRerouteOwnerTests.swift:226:17 | load { 6.14 5.39 6.28 }
+settle-slice-off run1: ✘ Test run with 1 test in 1 suite failed after 4.074 seconds with 4 issues. | EngineOwedAnswersTests.swift:211:13 | load { 5.50 5.28 6.23 }
+settle-slice-off run2: ✘ Test run with 1 test in 1 suite failed after 4.023 seconds with 4 issues. | EngineOwedAnswersTests.swift:211:13 | load { 5.22 5.22 6.20 }
+f7-delisted-stays run1: ✘ Test run with 23 tests in 1 suite failed after 27.314 seconds with 2 issues. | EngineFollowBarrierRerouteCapturedTests.swift:155:9 | load { 4.36 4.99 6.08 }
+f7-delisted-stays run2: ✘ Test run with 23 tests in 1 suite failed after 27.155 seconds with 2 issues. | EngineFollowBarrierRerouteCapturedTests.swift:155:9 | load { 3.09 4.62 5.91 }
+revert diff: none
+end 02:36 load { 3.09 4.62 5.91 }

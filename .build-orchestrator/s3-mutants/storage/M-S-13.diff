@@ -1,0 +1,22 @@
+diff --git a/Sources/ZTronAssetStorage/Migration/LegacyPhases.swift b/Sources/ZTronAssetStorage/Migration/LegacyPhases.swift
+index fd69236..7fded1f 100644
+--- a/Sources/ZTronAssetStorage/Migration/LegacyPhases.swift
++++ b/Sources/ZTronAssetStorage/Migration/LegacyPhases.swift
+@@ -244,7 +244,7 @@ extension AssetStore {
+         // REENTRANCY: k-6 (proposed) — the records below are read once no other call's adoption of the file is in flight.
+         try await self.awaitLegacyAdoption(of: file)
+         let wanting = self.legacyWanters(file)
+-        guard hashed.digest == file.digest, file.byteSize.map({ $0 == hashed.byteCount }) ?? true, !wanting.isEmpty else {
++        guard file.byteSize.map({ $0 == hashed.byteCount }) ?? true, !wanting.isEmpty else {
+             return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
+         }
+         // No other adoption of the file is in flight in this turn (the wait above): this call's starts.
+@@ -254,7 +254,7 @@ extension AssetStore {
+             // REENTRANCY: R11, R18, R3, R4 — `adoptVerifiedFile` re-validates every record after its placement unit and
+             // binds only those that still expect the digest; this call's mark in `adopting` keeps every other call that
+             // processes the file waiting until the binding is done (k-5, k-6).
+-            locations = try await self.adoptVerifiedFile(at: url, digest: hashed.digest, byteCount: hashed.byteCount, for: wanting)
++            locations = try await self.adoptVerifiedFile(at: url, digest: file.digest, byteCount: hashed.byteCount, for: wanting)
+         } catch {
+             self.endLegacyAdoption(of: file)
+             try AssetStore.rethrowLifecycle(error)

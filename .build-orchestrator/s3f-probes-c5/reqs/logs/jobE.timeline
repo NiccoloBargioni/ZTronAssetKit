@@ -1,0 +1,9 @@
+[04:06:19 { 9.99 99.13 223.95 }] probe-head start
+[04:06:46 { 7.47 90.00 216.31 }] probe-head exit 0
+[04:06:46 { 7.47 90.00 216.31 }] probe-prefix start
+[04:07:15 { 8.39 83.55 210.33 }] probe-prefix exit 1
+[04:07:15 { 8.39 83.55 210.33 }] bench-prefix start
+[04:07:32 { 12.42 79.60 205.96 }] bench-prefix exit 1
+[04:07:32 { 12.42 79.60 205.96 }] bench-head-pkg start
+[04:07:46 { 16.05 77.10 202.86 }] bench-head-pkg exit 1
+[04:07:46 { 16.05 77.10 202.86 }] DONE

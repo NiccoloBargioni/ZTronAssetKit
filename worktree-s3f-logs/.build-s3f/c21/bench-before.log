@@ -1,0 +1,212 @@
+{ 29.17 17.38 10.78 }
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 6]
+[2 / 7] ZTronAssetModel
+[3 / 8] ZTronAssetModel
+[6 / 11] ZTronAssetStorage
+[7 / 12] ZTronAssetStorage
+[11 / 16] ZTronAssetTransport
+[15 / 20] ZTronAssetAppleHosted
+[19 / 23] ZTronAssetSync
+[24 / 27] ZTronAssetKit
+[25 / 28] ZTronAssetKit
+[39 / 46] ZTronAssetTestSupport
+[41 / 47] ZTronAssetTestSupport
+[51 / 69] ZTronAssetAppleHostedTests-product
+[52 / 70] ZTronAssetKitBenchmarks-product
+[60 / 77] ZTronAssetCompatibilityTests-product
+[62 / 77] ZTronAssetCompatibilityTests-product
+[62 / 77] ZTronAssetAppleHostedTests-product
+[64 / 77] ZTronAssetAppleHostedTests-product
+[64 / 77] ZTronAssetTransportTests-product
+[67 / 77] ZTronAssetTransportTests-product
+[70 / 79] ZTronAssetKitTests-product
+[72 / 79] ZTronAssetTransportTests-product
+[74 / 82] ZTronAssetModelTests-product
+[76 / 82] ZTronAssetModelTests-product
+[76 / 82] ZTronAssetKitBenchmarks-product
+[78 / 82] ZTronAssetKitBenchmarks-product
+[78 / 82] ZTronAssetStorageTests-product
+[80 / 82] ZTronAssetStorageTests-product
+[80 / 82] ZTronAssetSyncTests-product
+[91 / 95] ZTronAssetSyncTests-product
+[93 / 95] ZTronAssetSyncTests-product
+[97 / 97] ZTronAssetStorageTests-product
+[101 / 101] ZTronAssetModelTests-product
+[105 / 105] ZTronAssetKitTests-product
+[109 / 111] ZTronAssetKitBenchmarks-product
+[113 / 113] ZTronAssetCompatibilityTests-product
+[117 / 117] ZTronAssetAppleHostedTests-product
+Build complete! (194,77 s)
+build exit 0
+{ 45.38 23.40 14.19 }
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: the drain's verdict on a job holding 10,000 ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 the drain's verdict on a job holding 10,000 ids moved off before it and back: longest actor wait [45.199041, 45.014292, 45.074375] ms, best 45.014292 ms; longest held turn [45.193083, 45.0085, 45.068125] ms; J's 500 deferring its verdict [3.189666, 3.225083, 3.190667] ms, best 3.189666 ms (budget 10.0 ms best); load 42.23 23.12 14.15; runs [wait 45.199041 ms; J's ending 3.189666 ms; moved before 10000, held 10000, verdict given true, re-routed 10000; 4 held turns, longest 45.193083 ms, wait 45.014292 ms; J's ending 3.225083 ms; moved before 10000, held 10000, verdict given true, re-routed 10000; 4 held turns, longest 45.0085 ms, wait 45.074375 ms; J's ending 3.190667 ms; moved before 10000, held 10000, verdict given true, re-routed 10000; 4 held turns, longest 45.068125 ms]
+✘ Test "R-SYN-11: the drain's verdict on a job holding 10,000 ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:690:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [45.199041, 45.014292, 45.074375]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 45.014292
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: the drain's verdict on a job holding 10,000 ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn" failed after 1.068 seconds with 1 issue.
+↳ /// C2 of the drain's verdict on a job whose 10,000 ids a visit-first engine's visits had moved off it before the
+↳ /// verdict arrived, and a later apply moved back (Stage 3 close-out cycle 20, rulings S3-R24 item 2 and S3-R25
+↳ /// item 11, RR-21; `SyncBench.movedBeforeDrain`): the drain takes them off the job before the verdict
+↳ /// (`takeOffMovedBefore`) and re-routes them after it (`rerouteMovedBefore`). The heartbeat's longest wait from the
+↳ /// follow's held turns' release until the verdict is given, the best of three against C2, after a warm-up.
+◇ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" started.
+◇ Test case passing 1 argument shape → .notFoundGroup to "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 deferBehindVerdictTurns notFoundGroup at 10,000: longest held turn [37.013167, 36.976167, 38.926166] ms, best 36.976167 ms; heartbeat [37.023708, 36.98675, 38.939125] ms, best 36.98675 ms (budget 10.0 ms best); runs [turns 38 longest 37.01 ms; apply 7.30 ms, turns' heartbeat 37.02 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10000; load 42.23 23.12 14.15 -> 42.23 23.12 14.15, turns 38 longest 36.98 ms; apply 7.18 ms, turns' heartbeat 36.99 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10000; load 42.23 23.12 14.15 -> 42.23 23.12 14.15, turns 38 longest 38.93 ms; apply 7.23 ms, turns' heartbeat 38.94 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10000; load 42.23 23.12 14.15 -> 39.40 22.85 14.10]
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .notFoundGroup at BenchSyncCycle21.swift:36:9: Expectation failed: (turns.min() ?? .infinity) <= Self.c2Budget
+↳ longest held turn: [37.013167, 36.976167, 38.926166]
+↳ (turns.min() ?? .infinity) <= Self.c2Budget → false
+↳   (turns.min() ?? .infinity) → 36.976167
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .notFoundGroup at BenchSyncCycle21.swift:37:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ heartbeat: [37.023708, 36.98675, 38.939125]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 36.98675
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .timeoutGroup to "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 deferBehindVerdictTurns timeoutGroup at 10,000: longest held turn [37.780583, 36.856416, 37.279666] ms, best 36.856416 ms; heartbeat [37.790875, 36.866292, 37.295375] ms, best 36.866292 ms (budget 10.0 ms best); runs [turns 38 longest 37.78 ms; apply 7.78 ms, turns' heartbeat 37.79 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10001; load 39.40 22.85 14.10 -> 39.40 22.85 14.10, turns 38 longest 36.86 ms; apply 7.15 ms, turns' heartbeat 36.87 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10001; load 39.40 22.85 14.10 -> 39.40 22.85 14.10, turns 38 longest 37.28 ms; apply 8.28 ms, turns' heartbeat 37.30 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10001; load 39.40 22.85 14.10 -> 36.49 22.52 14.04]
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .timeoutGroup at BenchSyncCycle21.swift:36:9: Expectation failed: (turns.min() ?? .infinity) <= Self.c2Budget
+↳ longest held turn: [37.780583, 36.856416, 37.279666]
+↳ (turns.min() ?? .infinity) <= Self.c2Budget → false
+↳   (turns.min() ?? .infinity) → 36.856416
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .timeoutGroup at BenchSyncCycle21.swift:37:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ heartbeat: [37.790875, 36.866292, 37.295375]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 36.866292
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .notFoundUsers to "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 deferBehindVerdictTurns notFoundUsers at 10,000: longest held turn [36.878625, 37.072166, 37.32675] ms, best 36.878625 ms; heartbeat [36.885667, 37.087875, 37.337] ms, best 36.885667 ms (budget 10.0 ms best); runs [turns 38 longest 36.88 ms; apply 7.44 ms, turns' heartbeat 36.89 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10000; load 36.49 22.52 14.04 -> 36.49 22.52 14.04, turns 38 longest 37.07 ms; apply 7.47 ms, turns' heartbeat 37.09 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10000; load 36.49 22.52 14.04 -> 36.49 22.52 14.04, turns 38 longest 37.33 ms; apply 7.90 ms, turns' heartbeat 37.34 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10000; load 36.49 22.52 14.04 -> 36.49 22.52 14.04]
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .notFoundUsers at BenchSyncCycle21.swift:36:9: Expectation failed: (turns.min() ?? .infinity) <= Self.c2Budget
+↳ longest held turn: [36.878625, 37.072166, 37.32675]
+↳ (turns.min() ?? .infinity) <= Self.c2Budget → false
+↳   (turns.min() ?? .infinity) → 36.878625
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .notFoundUsers at BenchSyncCycle21.swift:37:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ heartbeat: [36.885667, 37.087875, 37.337]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 36.885667
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .timeoutUsers to "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 deferBehindVerdictTurns timeoutUsers at 10,000: longest held turn [37.087834, 36.916916, 37.182375] ms, best 36.916916 ms; heartbeat [37.10075, 36.925667, 37.193375] ms, best 36.925667 ms (budget 10.0 ms best); runs [turns 38 longest 37.09 ms; apply 7.74 ms, turns' heartbeat 37.10 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10001; load 36.49 22.52 14.04 -> 34.29 22.29 14.01, turns 38 longest 36.92 ms; apply 7.65 ms, turns' heartbeat 36.93 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10001; load 34.29 22.29 14.01 -> 34.29 22.29 14.01, turns 38 longest 37.18 ms; apply 7.66 ms, turns' heartbeat 37.19 ms; most events during the follow 9729; joins at the follow's end 9489; on O 10001; load 34.29 22.29 14.01 -> 34.29 22.29 14.01]
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .timeoutUsers at BenchSyncCycle21.swift:36:9: Expectation failed: (turns.min() ?? .infinity) <= Self.c2Budget
+↳ longest held turn: [37.087834, 36.916916, 37.182375]
+↳ (turns.min() ?? .infinity) <= Self.c2Budget → false
+↳   (turns.min() ?? .infinity) → 36.916916
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument shape → .timeoutUsers at BenchSyncCycle21.swift:37:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ heartbeat: [37.10075, 36.925667, 37.193375]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 36.925667
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: a follow that defers 10,000 joins behind a waiting exit verdict holds the engine's actor at most C2's 10 ms per turn" with 4 test cases failed after 16.417 seconds with 8 issues.
+↳ /// C2 of a follow whose visit moves 10,000 ids onto a content whose exit verdict waits (`SyncBench.deferBehind`):
+↳ /// every join waits behind that verdict (`deferBehindVerdict`). Each held follow and drain turn is timed inside the
+↳ /// actor, and the heartbeat covers the apply and every turn; the best of three of each against C2, after a warm-up.
+◇ Test "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" started.
+◇ Test case passing 1 argument moves → 1 to "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 manyMovesTurns k=1 off 10,000 ids: longest follow turn [9.143125, 8.833292, 8.002291] ms, best 8.002291 ms (budget 10.0 ms best); runs [publishing 1; H ids after v3 10000; owed after v4 1 (off H 1); first turn's moves 1; longest follow turn 9.14 ms over 2 turns; load 34.29 22.29 14.01 -> 34.29 22.29 14.01, publishing 1; H ids after v3 10000; owed after v4 1 (off H 1); first turn's moves 1; longest follow turn 8.83 ms over 2 turns; load 34.29 22.29 14.01 -> 34.29 22.29 14.01, publishing 1; H ids after v3 10000; owed after v4 1 (off H 1); first turn's moves 1; longest follow turn 8.00 ms over 2 turns; load 34.29 22.29 14.01 -> 34.29 22.29 14.01]
+◇ Test case passing 1 argument moves → 16 to "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 manyMovesTurns k=16 off 10,000 ids: longest follow turn [79.382917, 78.843916, 79.581208] ms, best 78.843916 ms (budget 10.0 ms best); runs [publishing 16; H ids after v3 10000; owed after v4 16 (off H 16); first turn's moves 16; longest follow turn 79.38 ms over 2 turns; load 34.29 22.29 14.01 -> 31.86 21.99 13.95, publishing 16; H ids after v3 10000; owed after v4 16 (off H 16); first turn's moves 16; longest follow turn 78.84 ms over 2 turns; load 31.86 21.99 13.95 -> 31.86 21.99 13.95, publishing 16; H ids after v3 10000; owed after v4 16 (off H 16); first turn's moves 16; longest follow turn 79.58 ms over 2 turns; load 31.86 21.99 13.95 -> 31.86 21.99 13.95]
+✘ Test "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument moves → 16 at BenchSyncCycle21.swift:58:9: Expectation failed: (longest.min() ?? .infinity) <= Self.c2Budget
+↳ [79.382917, 78.843916, 79.581208]
+↳ (longest.min() ?? .infinity) <= Self.c2Budget → false
+↳   (longest.min() ?? .infinity) → 78.843916
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument moves → 64 to "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 manyMovesTurns k=64 off 10,000 ids: longest follow turn [302.872958, 303.327791, 302.2855] ms, best 302.2855 ms (budget 10.0 ms best); runs [publishing 64; H ids after v3 10000; owed after v4 64 (off H 64); first turn's moves 64; longest follow turn 302.87 ms over 2 turns; load 31.86 21.99 13.95 -> 31.86 21.99 13.95, publishing 64; H ids after v3 10000; owed after v4 64 (off H 64); first turn's moves 64; longest follow turn 303.33 ms over 2 turns; load 31.86 21.99 13.95 -> 31.86 21.99 13.95, publishing 64; H ids after v3 10000; owed after v4 64 (off H 64); first turn's moves 64; longest follow turn 302.29 ms over 2 turns; load 31.86 21.99 13.95 -> 31.86 21.99 13.95]
+✘ Test "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument moves → 64 at BenchSyncCycle21.swift:58:9: Expectation failed: (longest.min() ?? .infinity) <= Self.c2Budget
+↳ [302.872958, 303.327791, 302.2855]
+↳ (longest.min() ?? .infinity) <= Self.c2Budget → false
+↳   (longest.min() ?? .infinity) → 302.2855
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument moves → 256 to "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 manyMovesTurns k=256 off 10,000 ids: longest follow turn [1188.131458, 1194.821792, 1184.960208] ms, best 1184.960208 ms (budget 10.0 ms best); runs [publishing 256; H ids after v3 10000; owed after v4 256 (off H 256); first turn's moves 256; longest follow turn 1188.13 ms over 2 turns; load 31.86 21.99 13.95 -> 31.86 21.99 13.95, publishing 256; H ids after v3 10000; owed after v4 256 (off H 256); first turn's moves 256; longest follow turn 1194.82 ms over 2 turns; load 31.86 21.99 13.95 -> 29.71 21.71 13.90, publishing 256; H ids after v3 10000; owed after v4 256 (off H 256); first turn's moves 256; longest follow turn 1184.96 ms over 2 turns; load 29.71 21.71 13.90 -> 29.71 21.71 13.90]
+✘ Test "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" recorded an issue with 1 argument moves → 256 at BenchSyncCycle21.swift:58:9: Expectation failed: (longest.min() ?? .infinity) <= Self.c2Budget
+↳ [1188.131458, 1194.821792, 1184.960208]
+↳ (longest.min() ?? .infinity) <= Self.c2Budget → false
+↳   (longest.min() ?? .infinity) → 1184.960208
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: up to followsPerTurn moves owed off one 10,000-id holder hold the engine's actor at most C2's 10 ms per turn" with 4 test cases failed after 8.602 seconds with 3 issues.
+↳ /// C2 of `k` moves owed off one holder of 10,000 ids onto `k` publications in flight (`SyncBench.manyMoves`; the
+↳ /// cycle-20 correctness verifier's PROBE-C20C-MANY-MOVES): one follow turn makes them all, at most `followsPerTurn`.
+↳ /// The longest held follow turn, timed inside the actor, best of three against C2, after a warm-up.
+◇ Test "R-SYN-11: a visit that moves 500 of a 10,000-id holder's ids holds the engine's actor at most C2's 10 ms per turn" started.
+◇ Test case passing 1 argument users → false to "R-SYN-11: a visit that moves 500 of a 10,000-id holder's ids holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 partialMoveTurns users=false 500 of 10,000: heartbeat [8.549709, 8.716666, 8.592708] ms, best 8.549709 ms (budget 10.0 ms best); runs [wait 8.55 ms; on O 501, on H 9500; load 29.71 21.71 13.90 -> 29.71 21.71 13.90, wait 8.72 ms; on O 501, on H 9500; load 29.71 21.71 13.90 -> 29.71 21.71 13.90, wait 8.59 ms; on O 501, on H 9500; load 29.71 21.71 13.90 -> 29.71 21.71 13.90]
+◇ Test case passing 1 argument users → true to "R-SYN-11: a visit that moves 500 of a 10,000-id holder's ids holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 partialMoveTurns users=true 500 of 10,000: heartbeat [9.568834, 9.664375, 9.617958] ms, best 9.568834 ms (budget 10.0 ms best); runs [wait 9.57 ms; on O 501, on H 9500; load 29.71 21.71 13.90 -> 29.71 21.71 13.90, wait 9.66 ms; on O 501, on H 9500; load 29.71 21.71 13.90 -> 29.71 21.71 13.90, wait 9.62 ms; on O 501, on H 9500; load 29.71 21.71 13.90 -> 29.71 21.71 13.90]
+✔ Test "R-SYN-11: a visit that moves 500 of a 10,000-id holder's ids holds the engine's actor at most C2's 10 ms per turn" with 2 test cases passed after 1.738 seconds.
+◇ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+◇ Test case passing 1 argument shape → .waiters to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns waiters at 10,000: heartbeat [19.009875, 19.236292, 19.427167] ms, best 19.009875 ms (budget 10.0 ms best); the commit's own turn [18.197291, 18.499583, 18.714208] ms, best 18.197291 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 19.01 ms, turn 18.20 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 29.71 21.71 13.90 -> 29.71 21.71 13.90, heartbeat 19.24 ms, turn 18.50 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 29.71 21.71 13.90 -> 27.89 21.46 13.86, heartbeat 19.43 ms, turn 18.71 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 27.89 21.46 13.86 -> 27.89 21.46 13.86]
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .waiters at BenchSyncCycle21.swift:101:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [19.009875, 19.236292, 19.427167]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 19.009875
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .waitersStalledSubscriber to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns waitersStalledSubscriber at 10,000: heartbeat [24.447542, 24.780375, 26.133625] ms, best 24.447542 ms (budget 10.0 ms best); the commit's own turn [23.743917, 23.8215, 25.193542] ms, best 23.743917 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 24.45 ms, turn 23.74 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 27.89 21.46 13.86 -> 27.89 21.46 13.86, heartbeat 24.78 ms, turn 23.82 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 27.89 21.46 13.86 -> 27.89 21.46 13.86, heartbeat 26.13 ms, turn 25.19 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 27.89 21.46 13.86 -> 27.89 21.46 13.86]
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .waitersStalledSubscriber at BenchSyncCycle21.swift:101:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [24.447542, 24.780375, 26.133625]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 24.447542
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .groupStalledSubscriber to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns groupStalledSubscriber at 10,000: heartbeat [15.895458, 15.998541, 15.968] ms, best 15.895458 ms (budget 10.0 ms best); the commit's own turn [15.887542, 15.990417, 15.96] ms, best 15.887542 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 15.90 ms, turn 15.89 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 27.89 21.46 13.86 -> 27.89 21.46 13.86, heartbeat 16.00 ms, turn 15.99 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 27.89 21.46 13.86 -> 26.14 21.21 13.81, heartbeat 15.97 ms, turn 15.96 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 26.14 21.21 13.81 -> 26.14 21.21 13.81]
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .groupStalledSubscriber at BenchSyncCycle21.swift:101:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [15.895458, 15.998541, 15.968]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 15.895458
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .manyGroups to "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitTurns manyGroups at 10,000: heartbeat [17.539875, 17.847542, 17.9745] ms, best 17.539875 ms (budget 10.0 ms best); the commit's own turn [17.53175, 17.843, 17.964917] ms, best 17.53175 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 17.54 ms, turn 17.53 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 26.14 21.21 13.81 -> 24.45 20.94 13.76, heartbeat 17.85 ms, turn 17.84 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 24.45 20.94 13.76 -> 22.17 20.56 13.71, heartbeat 17.97 ms, turn 17.96 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 22.17 20.56 13.71 -> 20.71 20.29 13.65]
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .manyGroups at BenchSyncCycle21.swift:101:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [17.539875, 17.847542, 17.9745]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 17.539875
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: a commit that binds and answers 10,000 ids holds the engine's actor at most C2's 10 ms" with 4 test cases failed after 30.403 seconds with 4 issues.
+↳ /// C2 of a commit that binds and answers 10,000 ids (`SyncBench.commitTurn`; ruling S3-R26 item 4, the cycle-20
+↳ /// verifiers' correct #5 and reqs #10), in four groupings: a user waiter per id, the same with a stalled subscriber,
+↳ /// one prefetch group with a stalled subscriber, and 10,000 one-member prefetch groups. The heartbeat over the commit
+↳ /// is the gate, best of three against C2; the commit's own turn is also timed inside the actor
+↳ /// (`EngineState.commitTurnMarksForTests`), which decides item 4's Phase 2 trigger (7.0 ms).
+◇ Test "R-SYN-11: a commit that answers 10,000 user waiters with two stalled subscribers, measured once (S3-R26 answer 4)" started.
+R-SYN-11 commitTurns waiters with two stalled subscribers at 10,000 (recorded, not gated): heartbeat [30.412834, 30.603584, 30.876958] ms, best 30.412834 ms; the commit's own turn [29.280916, 29.649584, 29.975] ms, best 29.280916 ms; runs [heartbeat 30.41 ms, turn 29.28 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 20.71 20.29 13.65 -> 20.10 20.16 13.65, heartbeat 30.60 ms, turn 29.65 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 20.10 20.16 13.65 -> 20.10 20.16 13.65, heartbeat 30.88 ms, turn 29.98 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 20.10 20.16 13.65 -> 20.10 20.16 13.65]
+✔ Test "R-SYN-11: a commit that answers 10,000 user waiters with two stalled subscribers, measured once (S3-R26 answer 4)" passed after 2.374 seconds.
+✘ Suite "SyncBenchmarks" failed after 60.606 seconds with 16 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+✘ Suite ZTronAssetKitBenchmarks failed after 60.606 seconds with 16 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 6 tests in 2 suites failed after 60.606 seconds with 16 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+test exit 1
+{ 20.10 20.16 13.65 }

@@ -1,0 +1,16 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC6ReqsProbes" started.
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases passed after 0.465 seconds.
+✔ Suite "Engine runs" passed after 0.465 seconds.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+✔ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" with 2 test cases passed after 0.830 seconds.
+✔ Suite "VerifyC6ReqsProbes" passed after 0.830 seconds.
+✔ Test run with 2 tests in 2 suites passed after 0.830 seconds.

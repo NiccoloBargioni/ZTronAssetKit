@@ -1,0 +1,36 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC12ReqsProbes" started.
+◇ Test "PROBE-C12R-FOLLOWED-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C12R-FOLLOWED-LANE" started.
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst before the 429: (owed: false, c: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), y: nil)
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst atArrival=Optional(0.209572016) after drain=(throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C12R-FOLLOWED-LANE" started.
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst before the 429: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), y: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst atArrival=Optional(0.838288067) after drain=(throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+✘ Test "PROBE-C12R-FOLLOWED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12ReqsProbes.swift:76:13: Expectation failed: abs(throttle - interactive) < 0.000_001
+↳ PROBE-C12R-FOLLOWED-LANE: right after the 429 the origin is throttled for the backoff of C's user lane (visit-first): 0.838288067 against (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+↳ abs(throttle - interactive) < 0.000_001 → false
+↳   abs(throttle - interactive) → 0.6287160500141723
+↳   0.000_001 → 1e-06
+✘ Test "PROBE-C12R-FOLLOWED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12ReqsProbes.swift:81:13: Expectation failed: abs(throttle - interactive) < 0.000_001
+↳ PROBE-C12R-FOLLOWED-LANE: after the drain the throttle is the user lane's backoff (visit-first): (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+↳ abs(throttle - interactive) < 0.000_001 → false
+↳   abs(throttle - interactive) → 0.6287160500141723
+↳   0.000_001 → 1e-06
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C12R-FOLLOWED-LANE" with 2 test cases failed after 2.686 seconds with 2 issues.
+↳ /// PROBE-C12R-FOLLOWED-LANE (residual R-H, S3-R15 item 2): C (1 MB, zz-b) runs for P, a prefetch waiter; Y (1 MB,
+↳ /// zz-u) runs for U, a user waiter. v3 moves zz-u onto C's content, so the follow owes Y's visit, which moves U's
+↳ /// interest onto C (C's lane becomes the user lane). C then gets a 429 without Retry-After. Visited first, C was user
+↳ /// work when the 429 arrived: the origin's throttle is the interactive policy's first backoff. `followedLane(C)` counts
+↳ /// only C's own interests (P), so behind the barrier the throttle is the background policy's.
+✘ Suite "VerifyC12ReqsProbes" failed after 2.686 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 12, requirements lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`); every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 1 test in 1 suite failed after 2.686 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

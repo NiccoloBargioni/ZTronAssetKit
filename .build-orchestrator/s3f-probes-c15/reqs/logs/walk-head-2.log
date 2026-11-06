@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15R-LANE-WALK" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-LANE-WALK" started.
+PROBE-C15R-LANE-WALK followVisitedFirst between the drain turns: (owed: false, barrier: false, events: 0, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cPasses: Optional(false), jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C15R-LANE-WALK followVisitedFirst throttle at J's 429: Optional(61000000000ns)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-LANE-WALK" started.
+PROBE-C15R-LANE-WALK sweepFollowsFirst between the drain turns: (owed: false, barrier: true, events: 1, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1052428829ns))), cHoldsB: true, cPasses: Optional(false), jLane: Optional(ZTronAssetModel.AssetPriority.prefetch), jOwn: Optional(ZTronAssetModel.AssetPriority.prefetch))
+PROBE-C15R-LANE-WALK sweepFollowsFirst throttle at J's 429: Optional(61000000000ns)
+✔ Test "PROBE-C15R-LANE-WALK" with 2 test cases passed after 0.857 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 0.857 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.857 seconds.

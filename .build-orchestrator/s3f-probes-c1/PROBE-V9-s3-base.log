@@ -1,0 +1,26 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC1Correct changed refresh" started.
+◇ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" started.
+PROBE-V9 longest actor wait at 10,000 members: ["1% changed: runs [44.260291, 45.792916, 38.0965] ms", "10% changed: runs [45.912916, 39.435292, 40.414667] ms", "100% changed: runs [138.265541, 200.532542, 130.693917] ms"]
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" recorded an issue at VerifyC1ChangedRefresh.swift:59:13: Expectation failed: value <= 10.0
+↳ PROBE-V9 FAIL: 1% changed, best of three 38.0965 ms > C2's 10 ms
+↳ value <= 10.0 → false
+↳   value → 38.0965
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" recorded an issue at VerifyC1ChangedRefresh.swift:59:13: Expectation failed: value <= 10.0
+↳ PROBE-V9 FAIL: 10% changed, best of three 39.435292 ms > C2's 10 ms
+↳ value <= 10.0 → false
+↳   value → 39.435292
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" recorded an issue at VerifyC1ChangedRefresh.swift:59:13: Expectation failed: value <= 10.0
+↳ PROBE-V9 FAIL: 100% changed, best of three 130.693917 ms > C2's 10 ms
+↳ value <= 10.0 → false
+↳   value → 130.693917
+✘ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" failed after 9.923 seconds with 3 issues.
+✘ Suite "VerifyC1Correct changed refresh" failed after 9.923 seconds with 3 issues.
+↳ /// Scratch probe (s3f close-out verification, cycle 1, correctness lens): C2 of a forced sync whose manifest changes the
+↳ /// content of some members of a waiting 10,000-member prefetch group (the S3-PERF-02 shape with content changes instead
+↳ /// of one added entry). Production dispatch executors, release build, heartbeat measurement of `SyncBench.longestWait`.
+✘ Test run with 1 test in 1 suite failed after 9.923 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

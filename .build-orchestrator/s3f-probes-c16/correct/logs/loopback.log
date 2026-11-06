@@ -1,0 +1,8 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Test support: LoopbackHTTPServer" started.
+◇ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" started.
+✔ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" passed after 0.056 seconds.
+✔ Suite "Test support: LoopbackHTTPServer" passed after 0.056 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.057 seconds.

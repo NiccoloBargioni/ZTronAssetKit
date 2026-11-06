@@ -1,0 +1,61 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:222:9: Expectation failed: !after.pending && after.job == nil
+↳ the purge withdrew the group's member (visit-first: no job, the group no longer waits for zz-m): (pending: true, job: Optional(ZTronAssetSync.JobState.downloading))
+↳ !after.pending && after.job == nil → false
+↳   !after.pending → false
+↳   after.job == nil → <not evaluated>
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:223:9: Expectation failed: startsAfter == startsBefore
+↳ no request for the purged zz-m after the purge (visit-first): 0 -> 1
+↳ startsAfter == startsBefore → false
+↳   startsAfter → 1
+↳   startsBefore → 0
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:232:9: Expectation failed: !present
+↳ zz-m stays purged (visit-first)
+↳ !present → <not evaluated>
+↳   present → <not evaluated>
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" with 2 test cases failed after 0.833 seconds with 3 issues.
+↳ /// A purge during an owed follow withdraws a prefetch group's join of a purged id that waits for the follow, as it
+↳ /// withdrew the member's interest of a visit-first engine: W downloads for a user waiter while v3's follow is owed; a
+↳ /// prefetch group registers zz-m (no job), then `purge(.scope([zz-m]))` arrives. Visited first, the group's join
+↳ /// created M, the purge dropped the group's member and its interest, and M was retired; zz-m is not stored. Applied
+↳ /// at once (cycle 13's removal 7), the purge found no job holding the group's interest, and the drain's join created
+↳ /// M again: zz-m was downloaded and stored after the purge returned (the cycle-13 correctness verifier).
+◇ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:276:9: Expectation failed: healAfterPurge == nil
+↳ the purge forgot zz-h's heal (visit-first): Optional(1000000000ns)
+↳ healAfterPurge == nil → false
+↳   healAfterPurge → 1000000000ns
+↳     some → 1000000000ns
+↳       nanoseconds → 1000000000
+✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:284:9: Expectation failed: after.job == nil && after.heal == nil
+↳ no job and no heal for the purged zz-h (visit-first): (job: Optional(ZTronAssetSync.JobState.downloading), heal: Optional(1000000000ns))
+↳ after.job == nil && after.heal == nil → false
+↳   after.job == nil → false
+↳   after.heal == nil → <not evaluated>
+✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:285:9: Expectation failed: startsAfter == startsBefore
+↳ no request for the purged zz-h after the purge (visit-first): 0 -> 1
+↳ startsAfter == startsBefore → false
+↳   startsAfter → 1
+↳   startsBefore → 0
+✘ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" with 2 test cases failed after 0.713 seconds with 3 issues.
+↳ /// A purge during an owed follow forgets a heal of a purged id whose join waits for the follow, as it forgot the heal
+↳ /// of a visit-first engine: W downloads for a user waiter while v3's follow is owed; zz-h's quarantine ends (its heal
+↳ /// joins a system interest), then `purge(.scope([zz-h]))` arrives. Visited first, the heal's join created H and the
+↳ /// purge withdrew its system interest and forgot the heal (`EngineState.heals`). Behind the barrier the purge
+↳ /// withdraws the waiting join and forgets the heal too (`withdrawPurgedJoins`).
+✘ Suite "Engine follow barrier (F-28)" failed after 1.547 seconds with 6 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 1.547 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

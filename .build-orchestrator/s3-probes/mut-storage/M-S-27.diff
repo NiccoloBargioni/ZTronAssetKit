@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+index 91bcc60..6d88164 100644
+--- a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
++++ b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+@@ -353,7 +353,7 @@ enum EvictionOrder {
+     /// `min(hysteresis × budget, used − reserve shortfall)`. Zero when nothing is due.
+     static func bytesToFree(usedBytes used: Int64, availableBytes available: Int64, pendingReclaim pending: Int64, policy: StoragePolicy) -> Int64 {
+         let used = max(0, used)
+-        let effective = max(0, available).addingSaturating(max(0, pending))
++        let effective = max(0, available)
+         let budget = policy.budget.resolve(usedBytes: used, availableBytes: effective)
+         let shortfall = max(0, max(0, policy.reserveFreeBytes) - effective)
+         guard used > budget || shortfall > 0 else {

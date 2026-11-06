@@ -1,0 +1,12 @@
+start 21:39:43 load { 26.27 51.73 55.92 }
+[132 / 152] ZTronAssetTestSupport
+[138 / 152] ZTronAssetSync
+[145 / 153] ZTronAssetKit
+[147 / 154] ZTronAssetKit
+Build complete! (82,49 s)
+release exit  end 21:41:07 load { 26.01 46.64 53.67 }
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+gates exit 0

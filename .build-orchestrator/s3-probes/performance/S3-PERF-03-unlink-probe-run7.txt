@@ -1,0 +1,4 @@
+load average 25.0 27.1 44.4; root /Users/admin/Documents/ZTronAssetKit/.build-s3-performance/tmp/p13
+[load 25.0] approx stall time gap p50 21 ms; T1-period-fresh-fanout-default-spin45us: unlink p50 0.036 p99 0.156 max 6.91 ms, >2ms 23, >4ms 8, >8ms 0, sum of excess over 1ms 105 ms | spin(45us cpu) p50 0.045 p99 0.045 max 15.97 ms, >2ms 10, >4ms 5, >8ms 2, sum of excess over 1ms 55 ms | unlink on-CPU p50 0.037 ms | unlink-stall indices gap p50 256.0 first [77, 146, 199, 332, 756, 1012, 1113, 1166, 2093, 2148]
+[load 30.6] approx stall time gap p50 41 ms; T2-period-fresh-fanout-default-spin400us: unlink p50 0.047 p99 1.030 max 18.86 ms, >2ms 63, >4ms 22, >8ms 7, sum of excess over 1ms 352 ms | spin(45us cpu) p50 0.400 p99 4.361 max 50.97 ms, >2ms 200, >4ms 111, >8ms 45, sum of excess over 1ms 1424 ms | unlink on-CPU p50 0.047 ms | unlink-stall indices gap p50 92.0 first [320, 473, 1084, 1134, 1138, 1616, 1989, 2066, 2245, 2732]
+load average at end 30.6 28.2 44.6

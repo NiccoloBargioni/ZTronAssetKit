@@ -1,0 +1,204 @@
+# s3f cycle-16 correctness verification: summary extracts (scratch logs deleted afterwards)
+== quick.log
+::: OK   harness
+::: OK   toolchain
+::: OK   build-debug
+::: OK   tests
+VERIFY: PASS
+== quick-tests (Sync)
+✔ Test run with 151 tests in 16 suites passed after 0.524 seconds.
+✔ Test run with 528 tests in 53 suites passed after 115.467 seconds.
+✔ Test run with 459 tests in 60 suites passed after 99.234 seconds.
+== quick load
+n=70 mean=16.50 min=1.56 max=44.38
+== release
+Build complete! (36,14 s)
+== gates
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+== syncx-1
+✔ Test run with 528 tests in 53 suites passed after 116.800 seconds.
+load n=38 mean=18.73 min=8.99 max=30.91
+== syncx-2
+✔ Test run with 528 tests in 53 suites passed after 115.429 seconds.
+load n=24 mean=7.94 min=6.18 max=9.78
+== syncx-3
+✔ Test run with 528 tests in 53 suites passed after 105.237 seconds.
+load n=22 mean=7.84 min=5.25 max=11.74
+== tsan
+✔ Test run with 528 tests in 53 suites passed after 621.758 seconds.
+ThreadSanitizer lines: 0
+rule-1 load n=120 mean=9.89 min=3.62 max=24.07
+== coverage run 1 (load storm)
+✔ Test run with 151 tests in 16 suites passed after 0.769 seconds.
+✔ Test run with 528 tests in 53 suites passed after 388.385 seconds.
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" recorded an issue at LoopbackHTTPServerTests.swift:400:6: Time limit was exceeded: 60.000 seconds
+✘ Test "Test support: start racing stop ends every start exactly once, with a port or stopped, and never hangs" failed after 75.950 seconds with 1 issue.
+✘ Test run with 459 tests in 60 suites failed after 263.887 seconds with 1 issue.
+✔ Test run with 84 tests in 18 suites passed after 168.618 seconds.
+✔ Test run with 85 tests in 11 suites passed after 4.145 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.488 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.579 seconds.
+Sat Oct 31 23:10:26 CET 2026
+23:10  up 6 days, 11:33, 3 users, load averages: 9.00 7.66 9.37
+Sat Oct 31 23:26:05 CET 2026
+23:26  up 6 days, 11:49, 3 users, load averages: 625.59 534.51 292.75
+exit=1
+codecov json path: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c16-correct/out/Products/Debug/codecov/ZTronAssetKit.json
+profdata: ls: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c16-correct/out/Products/Debug/codecov/*.profdata: No such file or directory
+llvm-cov exit=1 bins=8
+covgate exit=1
+load n=185 mean=308.32 min=8.68 max=781.98
+-- merged-profraw gate
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.83% (1444/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.42% (8121/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 93.98% (10213/10867) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.57% (26726/27675) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK
+COVERAGE: PASS
+== sim
+Sat Oct 31 23:13:37 CET 2026
+23:13  up 6 days, 11:36, 3 users, load averages: 17.96 13.79 11.71
+Sat Oct 31 23:28:32 CET 2026
+23:28  up 6 days, 11:51, 3 users, load averages: 190.24 399.96 277.89
+exit=65
+xcresult: .build-verify-s3f-c16-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_23-13-49-+0100.xcresult
+xcresulttool exit=0
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+shutdown exit=149
+✘ Test run with 151 tests in 16 suites failed after 23.304 seconds with 3 issues.
+✔ Test run with 528 tests in 53 suites passed after 222.112 seconds.
+✔ Test run with 459 tests in 60 suites passed after 115.692 seconds.
+✔ Test run with 84 tests in 18 suites passed after 124.976 seconds.
+✔ Test run with 85 tests in 11 suites passed after 13.758 seconds.
+✔ Test run with 71 tests in 10 suites passed after 3.433 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.790 seconds.
+** TEST FAILED **
+load n=176 mean=383.88 min=17.48 max=781.98
+== flaky test x20
+   1 ✔ Test run with 1 test in 1 suite passed after 1.051 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.052 seconds.
+   2 ✔ Test run with 1 test in 1 suite passed after 1.053 seconds.
+   3 ✔ Test run with 1 test in 1 suite passed after 1.054 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.055 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.056 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.059 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.062 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.065 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.071 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.087 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.137 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.163 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.167 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.271 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.363 seconds.
+   1 ✔ Test run with 1 test in 1 suite passed after 1.382 seconds.
+== coverage run 2 (clean, normal load)
+Sat Oct 31 23:41:49 CET 2026
+23:41  up 6 days, 12:05, 3 users, load averages: 3.98 39.83 121.53
+Sat Oct 31 23:45:50 CET 2026
+23:45  up 6 days, 12:09, 3 users, load averages: 7.06 22.79 93.95
+exit=0
+codecov json path: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c16-correct/out/Products/Debug/codecov/ZTronAssetKit.json
+profdata: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c16-correct/out/Products/Debug/codecov/default.profdata
+llvm-cov exit=0 bins=8
+covgate exit=0
+✔ Test run with 151 tests in 16 suites passed after 0.558 seconds.
+✔ Test run with 528 tests in 53 suites passed after 101.321 seconds.
+✔ Test run with 459 tests in 60 suites passed after 70.630 seconds.
+✔ Test run with 84 tests in 18 suites passed after 61.173 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.295 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.342 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.399 seconds.
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.83% (1444/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.40% (8119/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 94.00% (10215/10867) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.57% (26726/27675) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK
+COVERAGE: PASS
+load n=48 mean=8.74 min=3.98 max=12.52
+== ios generic build
+Sat Oct 31 23:09:39 CET 2026
+23:09  up 6 days, 11:33, 3 users, load averages: 5.69 6.83 9.18
+Sat Oct 31 23:10:01 CET 2026
+23:10  up 6 days, 11:33, 3 users, load averages: 9.35 7.60 9.40
+exit=0
+== sim re-run of R-NET-8 alone
+Sat Oct 31 23:30:26 CET 2026
+23:30  up 6 days, 11:53, 3 users, load averages: 47.10 285.41 247.77
+Sat Oct 31 23:31:14 CET 2026
+23:31  up 6 days, 11:54, 3 users, load averages: 128.59 268.96 243.70
+exit=0
+✔ Test "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar" passed after 0.768 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.770 seconds.
+** TEST EXECUTE SUCCEEDED **
+== loopback alone
+✔ Test run with 1 test in 1 suite passed after 0.057 seconds.
+Sat Oct 31 23:30:16 CET 2026
+23:30  up 6 days, 11:53, 3 users, load averages: 55.21 295.04 250.67
+Sat Oct 31 23:30:18 CET 2026
+23:30  up 6 days, 11:53, 3 users, load averages: 51.03 290.19 249.22
+exit=0
+== perf
+Sat Oct 31 23:36:27 CET 2026
+23:36  up 6 days, 11:59, 3 users, load averages: 22.57 109.33 175.94
+Sat Oct 31 23:40:02 CET 2026
+23:40  up 6 days, 12:03, 3 users, load averages: 5.88 55.87 137.78
+exit=1
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.607 seconds with 1 issue.
+✘ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" recorded an issue at BenchSync.swift:103:13: Expectation failed: speedup >= speedupMin
+✘ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" failed after 4.100 seconds with 1 issue.
+✘ Test run with 44 tests in 8 suites failed after 210.298 seconds with 2 issues.
+load n=43 mean=9.91 min=5.61 max=22.57
+== P-11 alone
+P-11 200 assets at 10.0 ms: concurrency 1 2.781813208 s, 5 1.027789667 s, speedup 2.7065977576129883 (min 3.0) | 5.26 50.18 132.41
+P-11 200 assets at 10.0 ms: concurrency 1 3.281671292 s, 5 1.027047417 s, speedup 3.1952480846363884 (min 3.0) | 5.00 49.38 131.64
+P-11 200 assets at 10.0 ms: concurrency 1 3.284645541 s, 5 1.019229 s, speedup 3.2226766909104825 (min 3.0) | 4.78 46.46 128.68
+P-11 200 assets at 10.0 ms: concurrency 1 3.553857 s, 5 1.021772708 s, speedup 3.478128719014483 (min 3.0) | 4.72 45.75 127.95
+P-11 200 assets at 10.0 ms: concurrency 1 3.540506625 s, 5 1.035124417 s, speedup 3.420368186523031 (min 3.0) | 4.90 45.11 127.24
+P-11 200 assets at 10.0 ms: concurrency 1 3.539664583 s, 5 1.030475667 s, speedup 3.4349812386205527 (min 3.0) | 4.30 43.65 125.77
+P-11 200 assets at 10.0 ms: concurrency 1 3.540136459 s, 5 1.014840875 s, speedup 3.488366054431933 (min 3.0) | 4.84 43.11 125.09
+== mutants
+spaceFailureEpochDropped run 1 filter barrierGivesASpaceVerdictOnlyToTheJobThatFailed exit=1 :: ✘ Test run with 1 test in 1 suite failed after 3.103 seconds with 1 issue.
+✘ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSpaceEpoc
+spaceFailureEpochDropped run 1 filter VerifyC16Correct/reproSpaceEpoch exit=1 :: ✘ Test run with 1 test in 1 suite failed after 2.714 seconds with 1 issue.
+✘ Test "C16-REPRO-SPACE-EPOCH" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:462:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cByte
+spaceFailureEpochDropped run 2 filter barrierGivesASpaceVerdictOnlyToTheJobThatFailed exit=1 :: ✘ Test run with 1 test in 1 suite failed after 3.269 seconds with 1 issue.
+✘ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSpaceEpoc
+spaceFailureEpochDropped run 2 filter VerifyC16Correct/reproSpaceEpoch exit=1 :: ✘ Test run with 1 test in 1 suite failed after 1.959 seconds with 1 issue.
+✘ Test "C16-REPRO-SPACE-EPOCH" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:462:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cByte
+laneVisitOwedDrop run 1 filter barrierDecidesA429BetweenDrainTurnsOnItsJobsOwnInterests exit=1 :: ✘ Test run with 1 test in 1 suite failed after 0.974 seconds with 1 issue.
+✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrie
+laneVisitOwedDrop run 2 filter barrierDecidesA429BetweenDrainTurnsOnItsJobsOwnInterests exit=1 :: ✘ Test run with 1 test in 1 suite failed after 1.430 seconds with 1 issue.
+✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrie
+probe Sources restored identical to HEAD
+restore build exit=0
+
+[exited with code 0]
+== hop probes
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(byteSize: 48) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=1
+✘ Test "PROBE-C16C-INTERMEDIATE-HOP" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:838:9: Expectation failed: bResult == .failure(.notFound)
+✘ Test run with 1 test in 1 suite failed after 0.998 seconds with 1 issue.
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(byteSize: 48) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=1
+✘ Test "PROBE-C16C-INTERMEDIATE-HOP" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:838:9: Expectation failed: bResult == .failure(.notFound)
+✘ Test run with 1 test in 1 suite failed after 1.004 seconds with 1 issue.
+PROBE-C16C-INTERMEDIATE-HOP-SERVED followVisitedFirst b=success(ZTronAssetModel.AssetLocation(byteSize: 16) mStarts=0
+PROBE-C16C-INTERMEDIATE-HOP-SERVED sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(byteSize: 48) mStarts=1
+✘ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:897:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+✘ Test run with 1 test in 1 suite failed after 1.335 seconds with 1 issue.
+PROBE-C16C-INTERMEDIATE-HOP-SERVED followVisitedFirst b=success(ZTronAssetModel.AssetLocation(byteSize: 16) mStarts=0
+PROBE-C16C-INTERMEDIATE-HOP-SERVED sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(byteSize: 48) mStarts=1
+✘ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:897:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+✘ Test run with 1 test in 1 suite failed after 1.340 seconds with 1 issue.

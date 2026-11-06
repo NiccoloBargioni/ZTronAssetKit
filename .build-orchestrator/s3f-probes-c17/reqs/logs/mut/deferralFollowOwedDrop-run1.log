@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" started.
+✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:104:9: Expectation failed: afterVerdict.xHoldsU && afterVerdict.uWaits
+↳ X's retry keeps U, as the verdict given at the 503's arrival kept it: (xHoldsU: false, uWaits: false)
+↳ afterVerdict.xHoldsU && afterVerdict.uWaits → false
+↳   afterVerdict.xHoldsU → false
+↳   afterVerdict.uWaits → <not evaluated>
+✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:110:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(xBytes.count)
+↳ U, admitted from v4, is served by X's second attempt, as visited first: failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? uResult.get())?.byteSize == Int64(xBytes.count) → <not evaluated>
+✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" with 2 test cases failed after 0.938 seconds with 2 issues.
+↳ /// X (100 kB, zz-x, a user waiter) downloads. v3 changes only the fillers, so behind the barrier its follow is
+↳ /// owed. v4, which adds zz-u at X's content, is applied by the store and its follow-up held
+↳ /// (`holdNextApplyFollow`). A user waiter U for zz-u, which the copy (v3) does not list, is admitted from the
+↳ /// fetched v4 and its join waits; two conditions elements follow it. The follow ends: the drain's first batch joins
+↳ /// zz-u to X and ends at the first element, and its second turn (held) still owes the second. X's attempt then
+↳ /// fails with a 503 (transient), so its verdict waits for that turn. Visited first, the verdict was given at the
+↳ /// 503's arrival: X backed off with both waiters, and its second attempt served them.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.939 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.939 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

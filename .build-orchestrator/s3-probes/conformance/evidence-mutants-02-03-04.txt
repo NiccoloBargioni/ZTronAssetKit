@@ -1,0 +1,15 @@
+# S3-CONF-02 + -03 + -04 mutants applied together; --filter ZTronAssetSyncTests then 'ZTronAssetKitTests|ZTronAssetCompatibilityTests'
+✘ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" recorded an issue at S3ConformanceProbeTests.swift:28:9: Expectation failed: request.allowsUpdateCheck == false
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical" recorded an issue at S3ConformanceProbeTests.swift:97:9: Expectation failed: state.running == harness.configuration.power.interactiveConcurrencyAtCritical
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical" recorded an issue at S3ConformanceProbeTests.swift:98:9: Expectation failed: await harness.source.starts.count == 1
+✘ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical" failed after 1.123 seconds with 2 issues.
+✘ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" failed after 1.137 seconds with 1 issue.
+✘ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" recorded an issue at S3ConformanceProbeTests.swift:61:25: Issue recorded
+✘ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" failed after 1.263 seconds with 1 issue.
+✘ Suite "S3 conformance probes: engine" failed after 1.584 seconds with 4 issues.
+✘ Test run with 354 tests in 53 suites failed after 17.669 seconds with 4 issues.
+✘ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" recorded an issue at S3ConformanceProbeTests.swift:61:25: Issue recorded
+↳ a run over a failed asset ended .complete(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 23:11:40 +0000, finishedAt: 2023-11-14 23:11:40 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 0, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 1, unchangedCount: 0, fetchBytes: 0, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 0, bytesDownloaded: 0, failures: [])), not completeWithFailures
+✔ Test "R-SYN-4: a waiter whose asset an apply binds to content already present is answered from the store and downloads nothing" passed after 1.482 seconds.
+✔ Test run with 85 tests in 11 suites passed after 18.294 seconds.
+✔ Test run with 71 tests in 10 suites passed after 4.508 seconds.

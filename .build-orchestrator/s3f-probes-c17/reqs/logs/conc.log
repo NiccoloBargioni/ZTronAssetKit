@@ -1,0 +1,51 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "VerifyC17ReqsConcentration" started.
+◇ Test "VERIFY-C17R-CONC-404" started.
+VERIFY-C17R-CONC-404 members 10000: wait 408.93375 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits true, O state failed(ZTronAssetModel.RetryDisposition.untilEntryChanges); follow turns 0, max 0.0 ms, median 0.0 ms
+VERIFY-C17R-CONC-404 members 10000: wait 407.385083 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits true, O state failed(ZTronAssetModel.RetryDisposition.untilEntryChanges); follow turns 0, max 0.0 ms, median 0.0 ms
+VERIFY-C17R-CONC-404 members 10000: wait 403.401916 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits true, O state failed(ZTronAssetModel.RetryDisposition.untilEntryChanges); follow turns 0, max 0.0 ms, median 0.0 ms
+VERIFY-C17R-CONC-404 best 403.401916 ms, median 407.385083 ms, runs [408.93375, 407.385083, 403.401916] (C2 budget 10.0 ms)
+✘ Test "VERIFY-C17R-CONC-404" recorded an issue at VerifyC17ReqsConcentration.swift:34:13: Expectation failed: (waits.min() ?? .infinity) <= SyncBenchmarks.c2Budget
+↳ VERIFY-C17R-CONC-404: the 404's turn (bringInbound) best of 3: [408.93375, 407.385083, 403.401916]
+↳ (waits.min() ?? .infinity) <= SyncBenchmarks.c2Budget → false
+↳   (waits.min() ?? .infinity) → 403.401916
+↳   SyncBenchmarks.c2Budget → 10.0
+✘ Test "VERIFY-C17R-CONC-404" failed after 4.319 seconds with 1 issue.
+◇ Test "VERIFY-C17R-CONC-PUBLISH" started.
+VERIFY-C17R-CONC-PUBLISH members 10000: wait 411.176166 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits false, O state verifying; follow turns 0, max 0.0 ms, median 0.0 ms
+VERIFY-C17R-CONC-PUBLISH members 10000: wait 410.277125 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits false, O state verifying; follow turns 0, max 0.0 ms, median 0.0 ms
+VERIFY-C17R-CONC-PUBLISH members 10000: wait 412.934208 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits false, O state verifying; follow turns 0, max 0.0 ms, median 0.0 ms
+VERIFY-C17R-CONC-PUBLISH best 410.277125 ms, median 411.176166 ms, runs [411.176166, 410.277125, 412.934208] (C2 budget 10.0 ms)
+✘ Test "VERIFY-C17R-CONC-PUBLISH" recorded an issue at VerifyC17ReqsConcentration.swift:53:13: Expectation failed: (waits.min() ?? .infinity) <= SyncBenchmarks.c2Budget
+↳ VERIFY-C17R-CONC-PUBLISH: the publication's first turn (bringInbound) best of 3: [411.176166, 410.277125, 412.934208]
+↳ (waits.min() ?? .infinity) <= SyncBenchmarks.c2Budget → false
+↳   (waits.min() ?? .infinity) → 410.277125
+↳   SyncBenchmarks.c2Budget → 10.0
+✘ Test "VERIFY-C17R-CONC-PUBLISH" failed after 4.128 seconds with 1 issue.
+◇ Test "VERIFY-C17R-CONC-FOLLOW" started.
+VERIFY-C17R-CONC-FOLLOW members 10000: wait 0.0 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits false, O state ; follow turns 39, max 18.477625 ms, median 10.0535 ms
+VERIFY-C17R-CONC-FOLLOW members 10000: wait 0.0 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits false, O state ; follow turns 39, max 17.764333 ms, median 10.119208 ms
+VERIFY-C17R-CONC-FOLLOW members 10000: wait 0.0 ms; jobs 9745, owed true, O ids 257 -> 10001, verdict waits false, O state ; follow turns 39, max 19.104292 ms, median 10.099959 ms
+VERIFY-C17R-CONC-FOLLOW longest follow turn per run [18.477625, 17.764333, 19.104292] ms, best 17.764333 ms (C2 budget 10.0 ms)
+✘ Test "VERIFY-C17R-CONC-FOLLOW" recorded an issue at VerifyC17ReqsConcentration.swift:72:13: Expectation failed: (longest.min() ?? .infinity) <= SyncBenchmarks.c2Budget
+↳ VERIFY-C17R-CONC-FOLLOW: the longest follow turn, best of 3: [18.477625, 17.764333, 19.104292]
+↳ (longest.min() ?? .infinity) <= SyncBenchmarks.c2Budget → false
+↳   (longest.min() ?? .infinity) → 17.764333
+↳   SyncBenchmarks.c2Budget → 10.0
+✘ Test "VERIFY-C17R-CONC-FOLLOW" failed after 4.096 seconds with 1 issue.
+✘ Suite "VerifyC17ReqsConcentration" failed after 12.544 seconds with 3 issues.
+✘ Suite ZTronAssetKitBenchmarks failed after 12.544 seconds with 3 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 3 tests in 2 suites failed after 12.544 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

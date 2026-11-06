@@ -1,0 +1,102 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine races" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-4: publishing a transfer the engine cancelled treats ENOENT as that cancellation and never retries it" started.
+◇ Test "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+✔ Test "R-SYN-4: publishing a transfer the engine cancelled treats ENOENT as that cancellation and never retries it" passed after 0.007 seconds.
+✔ Suite "Engine races" passed after 0.007 seconds.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" started.
+✔ Test "R-SYN-6: a request's waiting join gets the failure of the publication it joined visited first, which a later apply passed (F-28)" with 2 test cases passed after 1.089 seconds.
+◇ Test "R-SYN-6: a request's waiting join whose job a later apply passed publishing ends at that job's commit under a copy that dropped its id, though a later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's waiting join whose job a later apply passed publishing ends at that job's commit under a copy that dropped its id, though a later apply lists it again (F-28, T21)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's waiting join whose job a later apply passed publishing ends at that job's commit under a copy that dropped its id, though a later apply lists it again (F-28, T21)" started.
+✔ Test "R-SYN-6: a request's waiting join whose job a later apply passed publishing ends at that job's commit under a copy that dropped its id, though a later apply lists it again (F-28, T21)" with 2 test cases passed after 1.271 seconds.
+◇ Test "R-SYN-11: the invariants report a waiting join whose chain holds a copy no apply adopted (F-28, rr21-C4)" started.
+✔ Test "R-SYN-11: the invariants report a waiting join whose chain holds a copy no apply adopted (F-28, rr21-C4)" passed after 0.512 seconds.
+◇ Test "R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+✔ Test "R-SYN-6: a request's join waiting behind owed re-routes gets the integrity failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" with 2 test cases passed after 1.136 seconds.
+◇ Test "R-SYN-6: a request's join waiting behind owed re-routes gets the storage failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the storage failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a request's join waiting behind owed re-routes gets the storage failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" started.
+✔ Test "R-SYN-6: a request's join waiting behind owed re-routes gets the storage failure of the job a later apply passed publishing (F-28, RR-14, RR21-HOP)" with 2 test cases passed after 1.078 seconds.
+◇ Test "R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)" started.
+✔ Test "R-SYN-11: an owed re-route whose pinned job committed follows the copy then onto a job that publishes and fails (F-28, RR-14)" with 2 test cases passed after 1.164 seconds.
+◇ Test "R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" started.
+✔ Test "R-SYN-11: an owed re-route whose pinned job committed before a later apply follows the copy at that commit (F-28, RR-14, PROBE-RR21-PIN-END)" with 2 test cases passed after 1.533 seconds.
+◇ Test "R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" started.
+✔ Test "R-SYN-11: an owed re-route whose pinned job committed follows the applies after that commit from the copy then (F-28, PROBE-RR21-PIN-END)" with 2 test cases passed after 1.464 seconds.
+◇ Test "R-SYN-11: an owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" started.
+✔ Test "R-SYN-11: an owed re-route whose pinned job committed under a copy that dropped its id ends its interest though a later apply lists it again (F-28, T21, PROBE-RR21-PIN-END)" with 2 test cases passed after 1.414 seconds.
+◇ Test "R-SYN-11: a second owed batch whose pinned job committed follows the copy at that commit once the first is replayed whole (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a second owed batch whose pinned job committed follows the copy at that commit once the first is replayed whole (F-28, T21, PROBE-RR21-PIN-END)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a second owed batch whose pinned job committed follows the copy at that commit once the first is replayed whole (F-28, T21, PROBE-RR21-PIN-END)" started.
+✔ Test "R-SYN-11: a second owed batch whose pinned job committed follows the copy at that commit once the first is replayed whole (F-28, T21, PROBE-RR21-PIN-END)" with 2 test cases passed after 1.454 seconds.
+◇ Test "R-SYN-11: the invariants report a commit kept for owed re-routes at an attempt still at its end, ahead of the copy or once the barrier is down (F-28, PROBE-RR21-PIN-END)" started.
+✔ Test "R-SYN-11: the invariants report a commit kept for owed re-routes at an attempt still at its end, ahead of the copy or once the barrier is down (F-28, PROBE-RR21-PIN-END)" passed after 0.574 seconds.
+◇ Test "R-SYN-11: a shutdown while owed re-routes wait forgets the commits kept for them (F-28, PROBE-RR21-PIN-END)" started.
+✔ Test "R-SYN-11: a shutdown while owed re-routes wait forgets the commits kept for them (F-28, PROBE-RR21-PIN-END)" passed after 0.536 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job whose publication was superseded follows the copy at the supersede onto a job that publishes and fails (F-28, RR-14, T22, e1-PS)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job whose publication was superseded follows the copy at the supersede onto a job that publishes and fails (F-28, RR-14, T22, e1-PS)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job whose publication was superseded follows the copy at the supersede onto a job that publishes and fails (F-28, RR-14, T22, e1-PS)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job whose publication was superseded follows the copy at the supersede onto a job that publishes and fails (F-28, RR-14, T22, e1-PS)" with 2 test cases passed after 1.600 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job whose publication was superseded ends at a later apply's drop though a later one lists it again (F-28, T21, T22, e1-PS)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job whose publication was superseded ends at a later apply's drop though a later one lists it again (F-28, T21, T22, e1-PS)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job whose publication was superseded ends at a later apply's drop though a later one lists it again (F-28, T21, T22, e1-PS)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job whose publication was superseded ends at a later apply's drop though a later one lists it again (F-28, T21, T22, e1-PS)" with 2 test cases passed after 1.807 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" with 2 test cases passed after 1.143 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, owe → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, owe → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, owe → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, owe → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued rides its fresh attempt, which fails with a 404 (F-28, D-13, T-E1)" with 4 test cases passed after 2.204 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued follows the copy of the first apply after the re-queue (F-28, D-13, T-E2)" with 2 test cases passed after 1.465 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued ends at the first apply after the re-queue that drops it (F-28, D-13, T21, T-E3)" with 2 test cases passed after 1.756 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued and a later apply took off ends at that apply's drop (F-28, D-13, T21, T-E4)" with 2 test cases passed after 1.766 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" started.
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued walks on from the first apply after the re-queue (F-28, D-13, T-E5)" with 2 test cases passed after 1.806 seconds.
+◇ Test "R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)" started.
+✔ Test "R-SYN-11: an owed move onto a job its drained publication's ENOENT re-queued is made onto the queued job, with the visit-first answers (F-28)" with 2 test cases passed after 1.582 seconds.
+◇ Test "R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)" started.
+✔ Test "R-SYN-11: an id a later apply moves away from a publishing job that ENOENT then re-queues rides the job's fresh attempt, as visited first (F-28)" with 2 test cases passed after 1.869 seconds.
+◇ Test "R-SYN-11: an owed visit of a job an ENOENT re-queued passes it while no apply followed its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued passes it while no apply followed its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued passes it while no apply followed its end, as visited first (F-28)" started.
+✔ Test "R-SYN-11: an owed visit of a job an ENOENT re-queued passes it while no apply followed its end, as visited first (F-28)" with 2 test cases passed after 1.225 seconds.
+◇ Test "R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)" started.
+✔ Test "R-SYN-11: an owed visit of a job an ENOENT re-queued moves its id for an apply after its end, as visited first (F-28)" with 2 test cases passed after 1.280 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 32.740 seconds.
+✔ Test run with 25 tests in 2 suites passed after 32.741 seconds.

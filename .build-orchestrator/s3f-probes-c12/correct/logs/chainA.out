@@ -1,0 +1,52 @@
+=== coverage 02:42:45 { 9.09 34.92 54.61 }
+cov exit 1
+✔ Test run with 151 tests in 16 suites passed after 0.638 seconds.
+✘ Test run with 474 tests in 53 suites failed after 262.558 seconds with 2 issues.
+✔ Test run with 459 tests in 60 suites passed after 135.838 seconds.
+✔ Test run with 84 tests in 18 suites passed after 66.286 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.192 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.391 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.392 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainA.sh: line 15: 74577 Terminated: 15          sample > $L/load-cov.txt
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" with 2 test cases failed after 181.580 seconds with 2 issues.
+cov timeouts 1
+ls: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/out/Products/Debug/codecov/default.profdata: No such file or directory
+export exit 1
+cov gate exit 1
+  File "/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/Scripts/gates.py", line 342, in <module>
+    sys.exit(main())
+  File "/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/Scripts/gates.py", line 338, in main
+    return args.fn(args)
+  File "/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/Scripts/gates.py", line 100, in cmd_coverage
+    ok, out = coverage_check(json.load(open(args.json, encoding="utf-8")), load_cfg(args.config))
+  File "/Users/admin/.pyenv/versions/3.10.12/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/Users/admin/.pyenv/versions/3.10.12/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/Users/admin/.pyenv/versions/3.10.12/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/Users/admin/.pyenv/versions/3.10.12/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+=== sync1 02:50:38 { 27.24 77.08 74.39 }
+sync1 exit 0
+✔ Test run with 474 tests in 53 suites passed after 78.110 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainA.sh: line 26: 78891 Terminated: 15          sample > $L/load-sync$i.txt
+sync1 timeouts 0
+=== sync2 02:52:58 { 26.69 57.99 67.04 }
+sync2 exit 0
+✔ Test run with 474 tests in 53 suites passed after 65.526 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainA.sh: line 26: 80126 Terminated: 15          sample > $L/load-sync$i.txt
+sync2 timeouts 0
+=== sync3 02:54:07 { 31.57 53.67 64.77 }
+sync3 exit 1
+✘ Test run with 474 tests in 53 suites failed after 238.812 seconds with 2 issues.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainA.sh: line 26: 80480 Terminated: 15          sample > $L/load-sync$i.txt
+✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" with 2 test cases failed after 184.030 seconds with 2 issues.
+sync3 timeouts 1
+=== tsan 02:58:08 { 13.93 33.24 53.03 }
+tsan exit 0
+✔ Test run with 474 tests in 53 suites passed after 328.991 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainA.sh: line 40: 82067 Terminated: 15          sample > $L/load-tsan.txt
+tsan reports 0 timeouts 0
+=== doneA 03:06:10 { 10.93 29.88 44.77 }

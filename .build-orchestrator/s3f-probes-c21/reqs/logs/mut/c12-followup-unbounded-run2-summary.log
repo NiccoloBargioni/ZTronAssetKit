@@ -1,0 +1,4 @@
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a commit of more interests than a turn answers owes their answers and resumes them a turn's worth a turn (C2, T-A1)" started.
+✘ Test "R-SYN-11: a commit of more interests than a turn answers owes their answers and resumes them a turn's worth a turn (C2, T-A1)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineOwedAnswersTests.swift:122:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-11: a commit of more interests than a turn answers owes their answers and resumes them a turn's worth a turn (C2, T-A1)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineOwedAnswersTests.swift:133:9: Expectation failed: left == [6, 2, 0]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a commit of more interests than a turn answers owes their answers and resumes them a turn's worth a turn (C2, T-A1)" started.

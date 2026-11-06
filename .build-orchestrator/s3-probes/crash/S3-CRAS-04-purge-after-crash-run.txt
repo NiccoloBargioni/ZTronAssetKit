@@ -1,0 +1,4 @@
+# S3PurgeAfterCrashProbe run (load ~15-29)
+✔ Test "R-CLN-7: a crash at every boundary, then an OS purge between launches, heals without a stale synced claim" with 8 test cases passed after 4.473 seconds.
+✔ Suite "S3 probe: OS purge after a crash" passed after 4.473 seconds.
+✔ Test run with 1 test in 1 suite passed after 4.473 seconds.

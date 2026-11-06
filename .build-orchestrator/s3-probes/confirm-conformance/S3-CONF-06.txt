@@ -1,0 +1,29 @@
+# Confirmer run on s3-base (b5796ba) in a detached worktree; probes copied from .build-orchestrator/s3-probes/conformance/ unchanged
+# probe on s3-base:
+◇ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" started.
+✔ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" passed after 0.006 seconds.
+# with S3-CONF-06.mutant.diff, --filter 'ZTronAssetStorageTests|ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests':
+=== MUTANT 06 (load 27.69 28.55 30.73)
+exit=1
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" recorded an issue at S3ConformanceProbeTests.swift:171:9: Expectation failed: state.running <= ha
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" failed after 1.493 seconds with 1 issue.
+✘ Test run with 356 tests in 53 suites failed after 16.283 seconds with 1 issue.
+◇ Test "Test support: misuse of the seam is reported as an error: oversized reads, relative URLs, directories as files" started.
+✘ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" recorded an issue at S3ConformanceDedupeOnChangeTests.swift:33:9: Expectation failed: !harness.exists(oldBlob)
+✘ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" recorded an issue at S3ConformanceDedupeOnChangeTests.swift:35:9: Expectation failed: oldState == nil
+✔ Test "Test support: misuse of the seam is reported as an error: oversized reads, relative URLs, directories as files" passed after 0.867 seconds.
+✘ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" failed after 1.245 seconds with 2 issues.
+✘ Test run with 461 tests in 62 suites failed after 94.628 seconds with 2 issues.
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" recorded an issue at S3ConformanceFallbackProbeTests.swift:32:9: Expectation failed: started.isEmpty
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" failed after 0.136 seconds with 1 issue.
+✘ Test run with 86 tests in 12 suites failed after 2.949 seconds with 1 issue.
+✔ Test run with 71 tests in 10 suites passed after 0.509 seconds.
+done (load 31.21 29.36 30.74)
+# 461 = 459 existing + 2 probes; both issues are the probe's
+# Confirmer's leak-duration probe (S3-CONF-06.leak-duration.swift), base then mutant:
+S3-CONFIRM-06 in lifetime after reap and orphan GC: old blob on disk = false, table = nil
+S3-CONFIRM-06 after relaunch: table = nil, orphan = nil
+S3-CONFIRM-06 after relaunch and orphan GC: old blob on disk = false
+S3-CONFIRM-06 in lifetime after reap and orphan GC: old blob on disk = true, table = Optional(ZTronAssetStorage.BlobState.live(references: 1))
+S3-CONFIRM-06 after relaunch: table = nil, orphan = Optional(400)
+S3-CONFIRM-06 after relaunch and orphan GC: old blob on disk = false

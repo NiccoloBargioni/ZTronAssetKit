@@ -1,0 +1,10 @@
+✔ Test run with 151 tests in 16 suites passed after 0.951 seconds.
+✔ Test run with 448 tests in 53 suites passed after 51.209 seconds.
+✔ Test run with 459 tests in 60 suites passed after 228.242 seconds.
+✔ Test run with 84 tests in 18 suites passed after 167.694 seconds.
+✔ Test run with 85 tests in 11 suites passed after 3.617 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.425 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.743 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.925 seconds.
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS

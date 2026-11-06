@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Policy/PriorityAndSize.swift b/Sources/ZTronAssetTransport/Policy/PriorityAndSize.swift
+index 7d5c56c..0819eef 100644
+--- a/Sources/ZTronAssetTransport/Policy/PriorityAndSize.swift
++++ b/Sources/ZTronAssetTransport/Policy/PriorityAndSize.swift
+@@ -39,7 +39,7 @@ public enum SizeVerdict: Sendable, Hashable {
+ public enum SizeGuard {
+     /// The verdict for the bytes seen so far.
+     public static func verdict(written: Int64, announced: Int64?, expected: Int64?, limit: Int64) -> SizeVerdict {
+-        if written > limit {
++        if written >= limit {
+             return .abortOversize
+         }
+         if let announced, announced >= 0, announced > Saturating.add(limit, limit / 1_024 + 64) {

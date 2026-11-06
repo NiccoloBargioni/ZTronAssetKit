@@ -1,0 +1,143 @@
+{
+ "source": "Level 5 main run wf_6593085d-170 (WP-G facade), verification round 3 (unfixed); HEAD 25b7c8b",
+ "issues": [
+  {
+   "lens": "reqs",
+   "blocking": true,
+   "area": "requirements (R-CAR-3 MUST, sync-1 S1-05). Blocking in rounds 1 and 2, still not fixed (CCR-G2). There is still no orchestrator ruling in the repository.",
+   "location": "Tests/ZTronAssetKitTests/PrefetchFacadeTests.swift:62-65 and :106-109. The root cause is outside WP-G's files: Sources/ZTronAssetSync/Engine/EngineCommands.swift:186-201. performRegisterGroup creates the group with no interest (:193), spawns joinGroup as an owned task (:196-199) and returns .success(token) (:201). The file is unchanged since l4-merged.",
+   "problem": "R-CAR-3 ('cancelling assets that left the window and never duplicating transfers') still fails end to end in the integrated build, while the suite reports green. Every run this round recorded the same 4 known issues at PrefetchFacadeTests.swift:63, :64, :107 and :108: verify --quick, my own full-suite coverage run, three Kit runs, the TSan run, and the iOS Simulator (reported there as 2 expected failures). In those runs 995 to 1,001 of 1,002 transfers started more than once. Only 11, 67, 66, 69, 106 and 69 of 1,000 promotions reached the transport as setPriority(.userInitiated). The window-move wrapper is marked isIntermittent: true, so its two 'exactly' expectations can never fail that test; the 1,000-move test is the only tripwire. WP-G cannot fix this in its own files: no package API reports when a group's join has finished.",
+   "fix": "The orchestrator rules on CCR-G2 before the L5 merge. WP-F then makes the minimal engine change in performRegisterGroup: add the group's interest synchronously to every listed id that already has a job, and leave only ids without a job to joinGroup. WP-G's round-2 probe validated this change (docs/adr-drafts/g.md CCR-G2). Then remove both withKnownIssue wrappers, the isIntermittent one included, and re-run the Kit tests 3 times, TSan and the simulator. If the merge goes first, record R-CAR-3 and S1-05 as failing (not verified) in docs/VERIFICATION.md and in the trace.",
+   "id": "L5-V3-00"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "requirements (R-NET-3 SHOULD, run-time half). Open since round 1 (CCR-G1, no ruling).",
+   "location": "Tests/ZTronAssetKitTests/CompositionTests.swift:39-63",
+   "problem": "Unchanged. The test covers only the attestation half: with BackgroundTransferPolicy.disabled, the live factory builds no background session and every bulk transfer runs in the foreground. A hook that was attested but never wired (transport.md F-26) is neither detected nor tested. The gap is documented honestly (g.md G-6 and G-11, and under 'Not verified').",
+   "fix": "The orchestrator rules on CCR-G1. One option: WP-D disables background transfers on an unclaimed urlSessionDidFinishEvents, and WP-G adds the run-time test. The other: the ruling accepts attestation as the meaning of 'wired' (ADR-026), and VERIFICATION.md lists the run-time half under 'Not verified'.",
+   "id": "L5-V3-01"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "requirements (R-STO-9 / B-15 reopen trigger). Open since round 1 (CCR-G3, no ruling).",
+   "location": "Sources/ZTronAssetKit/Facade/AssetClient.swift:180 (withAsset) and :212 (sync); Tests/ZTronAssetKitTests/FacadeReopenTests.swift:109-112",
+   "problem": "Unchanged. After the store root is replaced, sync fails with .storageUnavailable(.ioFailure) and does not reopen. withAsset can still get a lease on the old store and run its body with a URL under the vanished root. Only a later call that meets rootVanished reaches the replacement store. FacadeReopenTests.swift:112 pins the .ioFailure.",
+   "fix": "The orchestrator rules on CCR-G3: WP-B adds `package var unavailableReason` on AssetStore. The facade then checks it before withAsset takes its lease and after any .storageUnavailable result, and reopens. Update the pinned assertion at FacadeReopenTests.swift:112 to match.",
+   "id": "L5-V3-02"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "benchmarks (not WP-G code; WP-B's P-13)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (P-13)",
+   "problem": "All 35 release benchmarks were run. The only miss was P-13: 'unit max 7.850792 ms' against the 5.0 ms per-batch budget. Its p50 was 0.962 ms and its p95 0.991 ms; on-CPU time peaked at 1.0 ms, and individual blob unlinks inside the reclaim took up to 7.0 ms. I re-ran P-13 twice in isolation at a 1-minute load average of about 2.8 to 3.0, and it missed again (9.497917 ms and 7.700917 ms; the 5-minute average was still about 32). An idle-host re-run alone may therefore not clear it. Every WP-G benchmark passed.",
+   "fix": "The orchestrator re-runs the suite on an idle host at merge. If P-13 still misses, the orchestrator rules on it with WP-B; the Stage 3 plan already lists 'P-13 once ruled'. WP-G needs no action.",
+   "id": "L5-V3-03"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "docs accuracy (ARCHITECTURE \u00a72, orchestrator-owned). Carried from round 2.",
+   "location": "docs/ARCHITECTURE.md:85; Tests/ZTronAssetKitBenchmarks/BenchKit.swift:26 and :381-386",
+   "problem": "\u00a72 says 'nothing ever sleeps for real except the P-11 benchmark's loopback latency'. But P-9's Heartbeat sleeps on LiveTimeSource, as SPEC P-9 requires, and the Kit benchmark fixture runs the store over LiveTimeSource. No deterministic Kit test sleeps or reads the wall clock, so only the document is wrong.",
+   "fix": "At merge the orchestrator amends the sentence to name P-9's heartbeat and the Kit benchmarks' live clock. This is already in the g.md merge notes (line 24). No code change is needed.",
+   "id": "L5-V3-04"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "concurrency / R-SYN-15 (MUST): the memory-pressure observer outlives shutdown() while the engine is still `created` (new this round)",
+   "location": "Two facade paths reach it. (1) Sources/ZTronAssetKit/Facade/AssetClient.swift:358-364 and :417-425: register(_:) \u2192 apply(.start) \u2192 ClientLifecycle.observeMemoryPressure \u2192 self.core.engine.observeMemoryPressure at Sources/ZTronAssetKit/Facade/ClientLifecycle.swift:317. Nothing requires start() first. (2) ClientLifecycle.swift:201-205: performReopen applies the recorded request to the `created` replacement before `next.engine.start()` at :224. In both cases ClientLifecycle.shutdown() (:238-253) then shuts down an engine that is still `created`. The root cause is in WP-F's files: Sources/ZTronAssetSync/Engine/EngineLifecycle.swift:466-470. The `.created` branch of performShutdown sets shuttingDown and calls finishShutdown without cancelling or joining state.tasks. Meanwhile EngineCommands.swift:1134-1154 (performObserveMemoryPressure) spawns the `.pressure` owned task in `created`, which spawn allows (EngineLifecycle.swift:52-58).",
+   "problem": "After AssetClient.shutdown(), or after AssetClient.deinit's shutdown, the engine is `.shutDown` but still owns a live observer task. That task holds a live memory-pressure subscription. It ends only at the next memory-pressure event, when its loop finally sees the shutdown. spawn's closure captures the engine, so until then the task keeps the engine, store and environment alive. R-SYN-15 requires 'shutdown() cancels all tasks \u2026 tests prove no task leaks'; AssetClient.shutdown()'s own doc says 'Cancels every task'. PROVEN with a scratch copy of the tree (.build-verify-g-correct-r3/probes/pkg, worktree untouched). PROBE-1: register a cache before start, then shutdown. Output: 'before: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=1 observer=true liveObservations=1'. The observer went away only after one more pressure event ('liveObservations=0 purges=0'). Control, register after start: 'after: lifecycle=shutDown ownedTasks=0 observer=false'. PROBE-2 covers the reopen path. A probe-only seam point sits right after the replacement's pressure request, which is exactly where the shipped code goes on to start(); it changes no logic. Output: 'generation=1 before shutdown: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=1 observer=true liveObservations=1; purge=failure(shutDown)'. The same branch also lets a joinGroup task, spawned by a prefetch made before start, run after shutdown returns (briefly).",
+   "fix": "The orchestrator rules on a contract change request to WP-F, as for CCR-G2. The change: the `.created` branch of performShutdown cancels every owned task, calls resumeEverything(with: .shutDown) and joins the tasks with the same loop the other branches use, then calls finishShutdown. I validated this change in the probe copy. PROBE-1 and PROBE-2 then pass ('after: lifecycle=shutDown ownedTasks=0 observer=false liveObservations=0'). ZTronAssetSyncTests passed 305 of 305, and the Kit tests all passed with the same 4 CCR-G2 known issues. WP-G's part: (a) add a regression test in PROBE-1's shape to FacadeLifecycleTests or FacadeRaceTests: register before start, then shutdown, then assert introspect().ownedTasks == 0, memoryPressureObserverActive == false and pressure.activeObservers == 0. (b) Optionally, in performReopen, apply the recorded pressure request after `next.engine.start()` rather than before it, so a reopen never starts an observer on a `created` engine. (c) Note the facade-only stopgap and its limit: a newer-epoch stop before the engine's shutdown cancels the observer but cannot join it, so the guarantee needs the engine change.",
+   "id": "L5-V3-05"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "events / R-SYN-12 (MUST: 'terminal events never dropped'): a client stream follows a reopen only after the replacement has started, and drops the replacement's terminal events (new this round)",
+   "location": "Sources/ZTronAssetKit/Facade/EventForwarder.swift:166-169: the pump switches engines through lifecycle.current(), then registers through makeEventStream(), which registers on its first pull. Sources/ZTronAssetKit/Facade/ClientLifecycle.swift:132-138: current() waits for the whole reopen task (`await reopening.value`). That task's value arrives only after group re-registration (:206-218) and `await next.engine.start()` (:224), although the replacement is installed much earlier, at endReopen(next) (:200). The engine's replay, Sources/ZTronAssetSync/Engine/EngineEvents.swift:108-132, repeats snapshot, conditions and run state only.",
+   "problem": "Take a consumer that holds `events` or a `subscribe()` stream through a B-15 reopen. Suppose the pump asked for the current pair before endReopen. This is the common case: the retired engine's clientShutDown reaches the pump while the reopen is still in its main-actor hop to reset the mirror. That consumer never receives the terminal events the replacement publishes between its installation and the end of performReopen. The replacement's `clientStarted(generation:)` ('Terminal: start() finished and the first snapshot is installed') is always among them. The same goes for `assetAvailable`, `assetFailed` and similar events from callers that reach the replacement after endReopen, or from re-registered prefetch groups. PROVEN in the scratch copy. PROBE-3 registers the consumer before start, then reopens through purge(.all). Result: 'the replacement's clientStarted was missing in 20 of 20 rounds'; after the switch the consumer got only the replay. PROBE-4 uses a prefetch group so the reopen parks at the shipped `registrationAnswered` seam point, then runs resolve(\"x\") on the replacement while it is parked; a direct subscriber of the replacement, registered before the resolve, is the control. In the 2 of 4 runs where the pump had not yet followed (subscribersWhileParked=0), the consumer never received assetAvailable(x) ('received=false'). In the one of those runs with the control, the control printed 'the direct subscriber of the replacement saw assetAvailable(x): true'. In the 2 runs where the pump had already followed, the event arrived.",
+   "fix": "Make the forwarder follow the replacement as soon as it is installed. For example, current() could wait only until the running reopen installs its pair or ends without one: continuations stored by current() and resumed in endReopen, instead of `await reopening.value`; reopen(replacing:) keeps awaiting the task. I validated exactly this change in the probe copy. PROBE-3 then missed the event in 0 of 20 rounds and PROBE-4 printed 'received=true'. All 67 original Kit tests passed in 3 of 3 runs, with the same 4 CCR-G2 known issues; the G-12 and shutdown-during-reopen tests passed too. Add a regression test in PROBE-3's shape to FacadeReopenTests: consumer registered before start, reopen, then assert the replacement's clientStarted (or a terminal asset event) arrives. PROBE-3 fails deterministically today. Update g-1's REENTRANCY row to say the wait ends at install. If the design means to hide the replacement's clientStarted, as it hides the retired clientShutDown, filter it explicitly and say so in G-2; asset events must still arrive.",
+   "id": "L5-V3-06"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "requirements R-CAR-3 (MUST) / sync-1 S1-05, carried from rounds 1 and 2 and still NOT fixed (CCR-G2)",
+   "location": "Tests/ZTronAssetKitTests/PrefetchFacadeTests.swift:62-65 and :106-109: both withKnownIssue wrappers are still present, the first marked isIntermittent. The root cause is outside WP-G's files: Sources/ZTronAssetSync/Engine/EngineCommands.swift:186-202. performRegisterGroup returns .success(token) before joinGroup, an owned task, adds the group's interests.",
+   "problem": "Unchanged. Every run I made recorded the same 4 known issues, at :63 (starts == [entries[5].transferID]), :64 (cancels == [left]), :107 (restarted.isEmpty) and :108 (promotions == 1_000). verify --quick: '1001 transfers started more than once', 'every promotion reached the transport as a priority change: 1'. Coverage run: 999 and 45. TSan run: 1001 and 202. On the iOS Simulator they appear as the 2 expected failures. Neither docs/DECISIONS.md nor any file on feature/asset-kit contains a CCR-G2 ruling, and .build-orchestrator/l5-rulings.md does not exist. A MUST requirement and S1-05's regression fail end to end while the suite reports green.",
+   "fix": "The orchestrator rules on CCR-G2 before the L5 merge. WP-F makes performRegisterGroup join synchronously every listed id that already has a job, leaving only the others to joinGroup. Then both withKnownIssue wrappers come out, and the Kit tests, TSan and the simulator are re-run. If the merge happens first, record R-CAR-3 and S1-05 as failing (not verified) in docs/VERIFICATION.md and in the trace.",
+   "id": "L5-V3-07"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "benchmarks (not WP-G code; environment)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (P-13, WP-B); BenchSync.swift:103 (P-11, WP-F); BenchSync.swift:317 (R-SYN-5 C2 benchmark, WP-F)",
+   "problem": "In my release run, 32 of 35 benchmarks passed. The 3 failures, all in other work packages: P-13 'the longest deletion unit took 9.445333 ms' (batch budget 5.0 ms); P-11 'speedup \u2192 2.938747188734022' (minimum 3.0); R-SYN-5 C2 'runs [11.98975, 37.326208, 31.811375]', minimum above the 10 ms limit. Other agents were running at the same time; load averages ranged from 17 to 141 during my session. Every WP-G benchmark passed: P-1, both P-8 tests, P-9 and P-12.",
+   "fix": "The orchestrator re-runs the whole benchmark suite on an idle host at merge. WP-G needs no action.",
+   "id": "L5-V3-08"
+  }
+ ],
+ "author_open": [
+  "The two R-CAR-3 tests (window move by one; 1,000 in-flight promotions) record CCR-G2 as known issues (4 known-issue records in the Kit run, 2 expected failures on the simulator). Remove the withKnownIssue wrappers once WP-F's engine adds group interests in the same turn.",
+  "R-NET-3 'hook not wired' covers only the attestation half until CCR-G1 lands.",
+  "The reopen fires only on an explicit rootVanished result: a sync on a vanished root reports .storageUnavailable(.ioFailure), and withAsset can lease from the vanished store (CCR-G3).",
+  "Owner review: G-1 and G-5 add facade behaviour that ARCHITECTURE \u00a78 left open: how the reopen is triggered, and that prefetch groups, the memory-pressure observer and the run-time retention scope survive it. Pins are lost with a vanished root. No public signature changed.",
+  "WP-B's P-13 benchmark failed in this run (unit max 8.61 ms against a 5 ms batch budget). This is the existing L4-R11 item, outside WP-G.",
+  "Not verified here (recorded in g.md for VERIFICATION.md): a real rootVanished on a device, UIKit's background-events hook end to end, MainBundleLookup against an app bundle that has resources, and P-8/P-9 on a device; benchmarks were built but not run on the simulator.",
+  "CCR-G1 (WP-D transport, behaviour only): BackgroundTransferCoordinator.process(.backgroundEventsFinished) should set disabled = true and log a fault when finishWaiters is empty (didFinishEvents arrived but the hook never forwarded handleBackgroundEvents). That is the 'hook not wired' fallback of R-NET-3 / transport.md F-26, which the facade cannot see. No signature change.",
+  "CCR-G2 (WP-F engine, behaviour only): SyncEngine.registerGroup returns before the group holds any interest (joinGroup adds them later, in an owned task after a store read), so a re-laned prefetch handle's ordered release drops the asset's last interest and its transfer restarts (S1-05 broken end to end; reproduced 6/6 through the facade). Minimal fix: performRegisterGroup adds the group's interest synchronously to ids that already have a job. No signature change.",
+  "CCR-G3 (WP-B store, one package read): add `package var unavailableReason: StorageUnavailableReason?` (state.core.unavailable) to AssetStore. The facade could then reopen before withAsset leases from a vanished root, and after a sync that fails with .ioFailure on one."
+ ],
+ "history": [
+  {
+   "round": 1,
+   "blocking": 2,
+   "total": 16,
+   "fix_open": [
+    "BLOCKING, needs the orchestrator and WP-F: CCR-G2 is unresolved, so R-CAR-3 (MUST) and sync-1 S1-05 still fail end to end in the integrated build. Both tests keep asserting the correct behaviour inside withKnownIssue. The window-move test is now isIntermittent: after round 1 the engine joined first in 2 of 80 runs and 'Known issue was not recorded' failed the suite; the pre-round tree 78cad0c showed 0 misses in 30 runs, which this rate cannot tell apart. The 1,000-move test stays the strict tripwire. If the merge precedes WP-F's fix, VERIFICATION.md and the trace must list R-CAR-3 / S1-05 as failing, not verified; WP-G may not edit those files.",
+    "CCR-G1 not ruled: R-NET-3's run-time half (an attested but unwired hook) is neither implemented nor tested. It is listed under 'Not verified' in docs/adr-drafts/g.md for VERIFICATION.md.",
+    "CCR-G3 declined pending the ruling (G-11): a facade-side root probe would duplicate the store's root-identity check and add facade I/O. After a replaced root, sync still reports .storageUnavailable(.ioFailure) and withAsset can lease under the vanished root until a mutating call meets rootVanished.",
+    "No deterministic tests for two round-1 fixes: subscribe() through performOnCore (would need a reopen between two hops), and the setRetentionScope lost update (would need a reopen between the engine's answer and the record; the new record-first order removes that window by construction). Both R-CAR-5 regression tests also pass on the old order.",
+    "bind's early return for a group already bound to the current engine cannot be reached while the reopen loop stops at a newer generation. It was kept, as the verifier asked, as an invariant guard and is listed as deliberately untested. Still uncovered: EventForwarder's offer-after-stop and the pump's last pull after it, perform's .shutDown when a reopen ends because the client shut down, setRetentionScope's shutdown branches, and the reopen and shutdown interleavings already listed in g.md.",
+    "Not WP-G's: in the release benchmark run P-13 (WP-B, BenchStorage.swift:249) missed again, longest deletion unit 8.748458 ms against a 5.0 ms budget, at a load average of about 5. The other 34 of 35 benchmarks passed. The orchestrator should re-run on a quiet host.",
+    "For the orchestrator at merge: copy the new REENTRANCY row g-8 and the decisions G-10 and G-11 from docs/adr-drafts/g.md (G-1\u2026G-11, g-1\u2026g-8)."
+   ],
+   "fix_contract": [
+    "CCR-G2 (WP-F engine, behaviour only; BLOCKING for R-CAR-3 / S1-05): in SyncEngine.performRegisterGroup, add the group's interest synchronously to every listed id that already has a job and leave only ids without a job to joinGroup (EngineCommands.swift ~186-200), or defer job retirement in performReleaseGroup until earlier groups naming the id have joined. No signature change. Once it lands, remove both withKnownIssue wrappers in Tests/ZTronAssetKitTests/PrefetchFacadeTests.swift.",
+    "CCR-G1 (WP-D transport, behaviour only): BackgroundTransferCoordinator.process(.backgroundEventsFinished) with no finish waiter sets disabled = true and logs a fault, so an attested but unwired hook falls back to the foreground at run time (R-NET-3, transport.md F-26). Otherwise the ruling accepts attestation as 'wired' (ADR-026) and records the run-time half as Not verified.",
+    "CCR-G3 (WP-B store, one package read): `package var unavailableReason: StorageUnavailableReason?` on AssetStore, so the facade can reopen after a replaced root when sync fails with .ioFailure, and before withAsset's lease (B-15). Then update the pinned .ioFailure assertion at FacadeReopenTests.swift:110."
+   ]
+  },
+  {
+   "round": 2,
+   "blocking": 3,
+   "total": 12,
+   "fix_open": [
+    "R-CAR-3 (MUST) / sync-1 S1-05 still fail end to end behind withKnownIssue (blocking in both lenses). The fix is WP-F's engine change (CCR-G2), outside WP-G's files; the orchestrator must rule before the L5 merge. If the merge comes first, record both as failing (not verified) in VERIFICATION.md and the trace. Remove both wrappers once the engine change lands.",
+    "R-NET-3 (SHOULD) run-time half: declined pending the CCR-G1 ruling (g.md G-6, G-11). It is listed under 'Not verified'.",
+    "Reopen trigger for sync/withAsset after a replaced root: declined pending the CCR-G3 ruling (g.md G-11). FacadeReopenTests still pins the .ioFailure.",
+    "ARCHITECTURE \u00a72 is orchestrator-owned. At merge, amend 'nothing ever sleeps for real except the P-11 benchmark's loopback latency' to also name P-9's Heartbeat on LiveTimeSource (BenchKit.swift:376-386) and the Kit benchmarks' live clock (recorded in g.md's merge notes).",
+    "P-13 (WP-B, not WP-G code) missed its per-batch budget at a host load average of about 3.4 to 6.3: 'unit max 7.617333 ms (p50 0.952459 ms, p95 0.995542 ms); budgets 2.0 s, 5.0 ms per batch; ... unit on-CPU max 1.059292 ms'. Re-run the whole benchmark suite on an idle host at merge.",
+    "Interleavings left untested by design (listed in g.md's untested-lines paragraph): EventForwarder.swift:111 (offer refused when the stop lands between the pump's pull and its offer); AssetClient.swift:349 (the report gets .shutDown between its reads); :121 (perform's call after its last allowed repetition); and the ClientLifecycle lines listed there. The reopen routing for background events and the report has no test, because it needs a reopen between two steps of one call."
+   ],
+   "fix_contract": [
+    "CCR-G2 (WP-F, behaviour only, blocking for R-CAR-3 / S1-05; no ruling yet). performRegisterGroup should join synchronously every listed id whose content already has a job, and leave only the other ids to joinGroup. Validated in a scratch copy (.build-g/ccr-g2): with both withKnownIssue wrappers removed the Kit tests passed 3 of 3 runs (67 tests, no issues) and ZTronAssetSyncTests passed (305 tests). The diff and the open points for WP-F are in g.md under CCR-G2: joinMember(record: nil) hands heldBackError no record, the C2 cost at 10,000 ids is unmeasured, and the spawn must keep its RE-S30 note.",
+    "CCR-G1 (WP-D, behaviour only; unchanged; no ruling): disable background transfers on a urlSessionDidFinishEvents that no handleBackgroundEvents claimed. Otherwise rule that attestation is the meaning of 'wired' (ADR-026).",
+    "CCR-G3 (WP-B, one package read; unchanged; no ruling): `package var unavailableReason` on AssetStore, so the facade can reopen before withAsset's lease and after any .storageUnavailable."
+   ]
+  },
+  {
+   "round": 3,
+   "blocking": 4,
+   "total": 9,
+   "fix_open": [],
+   "fix_contract": []
+  }
+ ]
+}

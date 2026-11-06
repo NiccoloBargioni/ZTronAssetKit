@@ -1,0 +1,446 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+✔ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" with 2 test cases passed after 0.576 seconds.
+◇ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+✔ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" with 2 test cases passed after 0.605 seconds.
+◇ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" started.
+✔ Test "R-CLN-6: a purge during an owed follow forgets a heal whose join waits for the follow (F-28)" with 2 test cases passed after 0.613 seconds.
+◇ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+✔ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" with 2 test cases passed after 0.725 seconds.
+◇ Test "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" started.
+✔ Test "R-SYN-5: a user request during an owed follow with a reserved slot free is gated on the live throttle, its arrival's when visited first (F-28)" with 2 test cases passed after 0.733 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" with 2 test cases passed after 0.708 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" with 2 test cases passed after 0.659 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" with 2 test cases passed after 0.663 seconds.
+◇ Test "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+✔ Test "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" with 2 test cases passed after 1.005 seconds.
+◇ Test "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+✔ Test "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" with 2 test cases passed after 1.012 seconds.
+◇ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+✔ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" with 2 test cases passed after 0.949 seconds.
+◇ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+✔ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" with 2 test cases passed after 1.128 seconds.
+◇ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+✔ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" with 2 test cases passed after 0.799 seconds.
+◇ Test "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)" started.
+✔ Test "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)" with 2 test cases passed after 0.745 seconds.
+◇ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+✔ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" with 2 test cases passed after 0.714 seconds.
+◇ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+✔ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" with 2 test cases passed after 0.221 seconds.
+◇ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+✔ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" with 2 test cases passed after 0.680 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" with 2 test cases passed after 0.672 seconds.
+◇ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+✔ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" with 2 test cases passed after 0.699 seconds.
+◇ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+✔ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" with 2 test cases passed after 0.668 seconds.
+◇ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+✔ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" with 2 test cases passed after 0.665 seconds.
+◇ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+✔ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" with 2 test cases passed after 0.667 seconds.
+◇ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+✔ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" with 2 test cases passed after 0.670 seconds.
+◇ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+✔ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" with 2 test cases passed after 0.960 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow on a job whose interests all withdraw throttles as its own lane's (F-28)" with 2 test cases passed after 0.662 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a purged heal's waiting join (F-28)" with 2 test cases passed after 0.503 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a moved interest whose withdrawal waits (F-28)" with 2 test cases passed after 0.666 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow counts a waiting join a later apply moved onto its content (F-28)" with 2 test cases passed after 1.081 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .otherContent to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter to "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow is decided without a waiting request that does not join its job (F-28)" with 6 test cases passed after 2.042 seconds.
+◇ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+✔ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" with 2 test cases passed after 0.665 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" with 2 test cases passed after 0.674 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch to "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow counts the interest a publication begun after the apply had moved (F-28)" with 4 test cases passed after 1.916 seconds.
+◇ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" started.
+✔ Test "R-SYN-5: a 429 after an owed follow's drain counts the interest a publication begun after the apply had moved (F-28)" with 2 test cases passed after 0.953 seconds.
+◇ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" started.
+✔ Test "R-SYN-4: a 404 during an owed follow answers the id a publication begun after the apply had moved (F-28)" with 2 test cases passed after 1.002 seconds.
+◇ Test "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" started.
+✔ Test "R-SYN-4: a 404 after an owed follow's drain answers the id a publication begun after the apply had moved (F-28)" with 2 test cases passed after 1.005 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow does not count the interest a job publishing at the apply keeps (F-28)" with 2 test cases passed after 0.999 seconds.
+◇ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+✔ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" with 2 test cases passed after 1.146 seconds.
+◇ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+✔ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" with 2 test cases passed after 1.148 seconds.
+◇ Test "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" started.
+✔ Test "R-INT-3: a publication begun before an owed follow's apply that fails before its visit answers as visited first (F-28)" with 2 test cases passed after 0.959 seconds.
+◇ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" started.
+✔ Test "R-SYN-11: an ENOSPC of a publication begun before an owed follow's apply leaves its moved id to the retry (F-28)" with 2 test cases passed after 0.972 seconds.
+◇ Test "R-SYN-5: a 429 beyond maxRetryAfter during an owed follow fails its job with the throttle's answer (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 beyond maxRetryAfter during an owed follow fails its job with the throttle's answer (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 beyond maxRetryAfter during an owed follow fails its job with the throttle's answer (F-28)" started.
+✔ Test "R-SYN-5: a 429 beyond maxRetryAfter during an owed follow fails its job with the throttle's answer (F-28)" with 2 test cases passed after 0.457 seconds.
+◇ Test "R-SYN-13: an offline failure after an edge during an owed follow is retried at once (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: an offline failure after an edge during an owed follow is retried at once (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: an offline failure after an edge during an owed follow is retried at once (F-28)" started.
+✔ Test "R-SYN-13: an offline failure after an edge during an owed follow is retried at once (F-28)" with 2 test cases passed after 0.504 seconds.
+◇ Test "R-SYN-7: a conditions element during an owed follow pauses on its own conditions, not a later element's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a conditions element during an owed follow pauses on its own conditions, not a later element's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a conditions element during an owed follow pauses on its own conditions, not a later element's (F-28)" started.
+✔ Test "R-SYN-7: a conditions element during an owed follow pauses on its own conditions, not a later element's (F-28)" with 2 test cases passed after 0.443 seconds.
+◇ Test "R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)" started.
+✔ Test "R-INT-3: an integrity failure during an owed follow answers a moved id with its new content (F-28)" with 2 test cases passed after 0.487 seconds.
+◇ Test "R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)" started.
+✔ Test "R-CAR-4: a group registered after a withdrawal during an owed follow gets its member (F-28)" with 2 test cases passed after 0.473 seconds.
+◇ Test "R-SYN-5: a request during an owed follow is answered on the breaker as it stood at the request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request during an owed follow is answered on the breaker as it stood at the request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request during an owed follow is answered on the breaker as it stood at the request (F-28)" started.
+✔ Test "R-SYN-5: a request during an owed follow is answered on the breaker as it stood at the request (F-28)" with 2 test cases passed after 0.473 seconds.
+◇ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" started.
+✔ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" with 2 test cases passed after 1.652 seconds.
+◇ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+✔ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" with 2 test cases passed after 0.651 seconds.
+◇ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" started.
+✔ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" with 2 test cases passed after 0.650 seconds.
+◇ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" started.
+✔ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" with 2 test cases passed after 0.682 seconds.
+◇ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" started.
+✔ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" with 2 test cases passed after 0.709 seconds.
+◇ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" started.
+✔ Test "R-INT-3: a later apply's follow passes again the id an earlier follow passed when a retried publication carries it (F-28)" with 2 test cases passed after 1.101 seconds.
+◇ Test "R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)" started.
+✔ Test "R-SYN-4: a retry's 404 during an owed follow before its visit answers a moved id with its new content (F-28)" with 2 test cases passed after 1.010 seconds.
+◇ Test "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" started.
+✔ Test "R-SYN-3: a place behind an owed follow waits for the slot an earlier place took, as visited first (F-28)" with 2 test cases passed after 0.666 seconds.
+◇ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+✔ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" with 2 test cases passed after 1.492 seconds.
+◇ Test "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" started.
+✔ Test "R-INT-3: a later apply's follow that passes a publication again leaves an id moved back and away to the publication (F-28)" with 2 test cases passed after 1.170 seconds.
+◇ Test "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" started.
+✔ Test "R-INT-3: a re-route is spent once the follow it belongs to ends without the visit (F-28)" with 2 test cases passed after 1.186 seconds.
+◇ Test "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" started.
+✔ Test "R-INT-3: a visit spends the re-route it used, for the later visits of the same follow (F-28)" with 2 test cases passed after 1.270 seconds.
+◇ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" started.
+✔ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)" with 2 test cases passed after 0.766 seconds.
+◇ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" started.
+✔ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" with 2 test cases passed after 0.626 seconds.
+◇ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+✔ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" with 2 test cases passed after 3.195 seconds.
+◇ Test "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" started.
+✔ Test "R-SYN-11: a user request made while the follow owes the visit that abandons a download is gated on the room that visit frees (F-28)" with 2 test cases passed after 0.838 seconds.
+◇ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+✔ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" with 2 test cases passed after 0.865 seconds.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" started.
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the queued job the follow raises to user work, not to prefetch work queued before it (F-28)" with 2 test cases passed after 1.170 seconds.
+◇ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" started.
+✔ Test "R-SYN-2: with one slot, the queued job an owed follow raises to user work takes the freed slot and the room before prefetch work (F-28)" with 2 test cases passed after 1.096 seconds.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" started.
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the new content's user job the follow creates, before prefetch work queued earlier (F-28)" with 2 test cases passed after 1.025 seconds.
+◇ Test "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" started.
+✔ Test "R-SYN-2: a slot freed during an owed follow goes to the user work queued behind a job the follow ends, not to prefetch work (F-28)" with 2 test cases passed after 1.056 seconds.
+◇ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" started.
+✔ Test "R-SYN-2: no transfer starts between two turns of the drain of an owed follow's deferred places, so a user request placed in a later turn is served first (F-28)" passed after 0.564 seconds.
+◇ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" started.
+✔ Test "R-SYN-3: a user request made during an owed follow queues after the new-content job the follow creates for an earlier waiter (F-28)" with 2 test cases passed after 1.146 seconds.
+◇ Test "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" started.
+✔ Test "R-SYN-3: a queued job that holds no moved id keeps its ticket through an owed follow (F-28)" with 2 test cases passed after 1.931 seconds.
+◇ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" started.
+✔ Test "R-SYN-3: a transfer whose pause completes during an owed follow resumes at its queue's front, and a deferred place keeps its request time (F-28)" with 2 test cases passed after 0.773 seconds.
+◇ Test "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" started.
+✔ Test "R-SYN-3: a released member wanted by user work during an owed follow returns to its place when the follow ends (F-28)" with 2 test cases passed after 4.002 seconds.
+◇ Test "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" started.
+✔ Test "R-SYN-11: a reclaim's sweep judges a parked user job without the bytes in flight of a download the owed follow abandons (F-28)" with 2 test cases passed after 0.746 seconds.
+◇ Test "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" started.
+✔ Test "R-SYN-11: a user request parked awaiting space during an owed follow is decided by the reclaim's sweep on the followed state (F-28)" with 2 test cases passed after 0.703 seconds.
+◇ Test "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" started.
+✔ Test "R-SYN-11: the new-content jobs an owed follow creates are created and served in the follow's order, whatever a sweep would judge first (F-28)" with 2 test cases passed after 0.680 seconds.
+◇ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" started.
+✔ Test "R-SYN-11: a second follow begun while visits are owed keeps their order, so new contents are created and served as visit-first (F-28)" with 2 test cases passed after 0.878 seconds.
+◇ Test "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" started.
+✔ Test "R-SYN-11: an ENOSPC during an owed follow is decided on the room the follow's visits leave (F-28)" with 2 test cases passed after 1.557 seconds.
+◇ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+✔ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" with 2 test cases passed after 0.730 seconds.
+◇ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+✔ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" with 2 test cases passed after 0.695 seconds.
+◇ Test "R-SYN-11: a second follow begun while the first still owes visits keeps the barrier, and every waiter gets the visit-first answer (F-28)" started.
+✔ Test "R-SYN-11: a second follow begun while the first still owes visits keeps the barrier, and every waiter gets the visit-first answer (F-28)" passed after 0.343 seconds.
+◇ Test "R-SYN-11: shutdown while requests, joins and sweeps wait for an owed follow answers every waiter (F-28)" started.
+✔ Test "R-SYN-11: shutdown while requests, joins and sweeps wait for an owed follow answers every waiter (F-28)" passed after 0.355 seconds.
+◇ Test "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+✔ Test "R-SYN-4: a 404 that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" with 2 test cases passed after 1.210 seconds.
+◇ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+✔ Test "R-SYN-11: an ENOSPC verdict that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" with 2 test cases passed after 1.122 seconds.
+◇ Test "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" started.
+✔ Test "R-SYN-5: a retry at the cap that waits for an owed follow answers an id a later apply moved, as at its arrival (F-28)" with 2 test cases passed after 1.096 seconds.
+◇ Test "R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+✔ Test "R-SYN-4: a retry that waits for an owed follow moves a later apply's id once it is given (F-28)" with 2 test cases passed after 1.202 seconds.
+◇ Test "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" started.
+✔ Test "R-SYN-11: an ENOSPC retry that waits for an owed follow moves a later apply's id once it is given (F-28)" with 2 test cases passed after 1.198 seconds.
+◇ Test "R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)" started.
+✔ Test "R-SYN-4: an owed visit supersedes a failed job whose every id an apply moved before its failure (F-28)" with 2 test cases passed after 0.976 seconds.
+◇ Test "R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)" started.
+✔ Test "R-SYN-4: an owed visit supersedes a failed job whose ids all moved, though a claim names its content (F-28)" with 2 test cases passed after 0.979 seconds.
+◇ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✔ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" with 8 test cases passed after 4.489 seconds.
+◇ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" started.
+✔ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)" with 2 test cases passed after 0.668 seconds.
+◇ Test "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" started.
+✔ Test "R-SYN-3: a user request that joins a job whose retry waits for the follow re-queues it at the request's own place (F-28)" with 2 test cases passed after 0.670 seconds.
+◇ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+✔ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" with 2 test cases passed after 0.677 seconds.
+◇ Test "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" started.
+✔ Test "R-SYN-3: a queue place that waited for the follow is not given to a later job of the same transfer (F-28)" with 2 test cases passed after 0.662 seconds.
+◇ Test "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" started.
+✔ Test "R-SYN-3: without a removed job's waiting place, the follow's new contents start in the follow's order (F-28)" with 2 test cases passed after 0.658 seconds.
+◇ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" started.
+✔ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" with 2 test cases passed after 0.658 seconds.
+◇ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" started.
+✔ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" with 2 test cases passed after 0.678 seconds.
+◇ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" started.
+✔ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" with 2 test cases passed after 0.671 seconds.
+◇ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" started.
+✔ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" with 2 test cases passed after 0.707 seconds.
+◇ Test "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" started.
+✔ Test "R-INT-3: an owed visit inside a publication failure's bookkeeping passes the job for an apply made while it published (F-28)" with 2 test cases passed after 0.983 seconds.
+◇ Test "R-INT-3: an apply inside a publication failure's bookkeeping moves the job's moved ids, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an apply inside a publication failure's bookkeeping moves the job's moved ids, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an apply inside a publication failure's bookkeeping moves the job's moved ids, as visited first (F-28)" started.
+✔ Test "R-INT-3: an apply inside a publication failure's bookkeeping moves the job's moved ids, as visited first (F-28)" with 2 test cases passed after 0.990 seconds.
+◇ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" started.
+✔ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" passed after 0.328 seconds.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+✔ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" with 2 test cases passed after 0.651 seconds.
+◇ Test "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+✔ Test "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" with 2 test cases passed after 0.651 seconds.
+◇ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+✔ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" with 2 test cases passed after 0.655 seconds.
+◇ Test "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" started.
+✔ Test "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" with 2 test cases passed after 0.650 seconds.
+◇ Test "R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)" started.
+✔ Test "R-SYN-5: the new content an owed follow's visit queues is gated on the live throttle, the apply's when visited first (F-28)" with 2 test cases passed after 0.651 seconds.
+◇ Test "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" started.
+✔ Test "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" with 2 test cases passed after 0.686 seconds.
+◇ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+✔ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" with 2 test cases passed after 0.699 seconds.
+◇ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+✔ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" with 2 test cases passed after 0.651 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 100.725 seconds.
+✔ Test run with 109 tests in 1 suite passed after 100.725 seconds.

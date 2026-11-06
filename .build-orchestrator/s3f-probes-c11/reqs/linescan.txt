@@ -1,0 +1,119 @@
+--- Sources/ZTronAssetSync/Engine/EngineReadmission.swift 110,116p
+  110|       |    /// are those the visits and the verdicts before it leave, read under the conditions of its arrival.
+  111|       |    @discardableResult
+  112|  2.67k|    func readmit(_ passes: Readmissions) -> Bool {
+  113|  2.67k|        if self.defersToFollow {
+  114|      0|            self.deferToFollow(.readmit(passes, self.conditionsSnapshot))
+  115|      0|            self.notifyObservers()
+  116|      0|            return false
+--- Sources/ZTronAssetSync/Engine/EngineReadmission.swift 196,201p
+  196|       |    /// park, as on a visit-first engine.
+  197|  1.78k|    func unblockOrigin(_ kind: OriginBlock) {
+  198|  1.78k|        if self.defersToFollow {
+  199|      0|            self.deferToFollow(.unblock(kind))
+  200|      0|            self.notifyObservers()
+  201|      0|            return
+--- Sources/ZTronAssetSync/Engine/EngineTimers.swift 112,119p
+  112|      2|                    continue
+  113|  1.02k|                }
+  114|  1.02k|                if self.defersToFollow {
+  115|      0|                    // The backoff's end is the clock's; the re-queue and its place wait as the events before them do
+  116|      0|                    // (`EventAfterFollow.retryDue`, S3-R14).
+  117|      0|                    self.deferToFollow(.retryDue(transfer, epoch: epoch))
+  118|      0|                    continue
+  119|  1.02k|                }
+--- Sources/ZTronAssetSync/Engine/EngineJobs.swift 325,330p
+  325|  1.63k|            return
+  326|  89.1k|        }
+  327|  89.1k|        if self.defersToFollow {
+  328|      0|            self.deferToFollow(.removal(token, transfer))
+  329|      0|            self.notifyObservers()
+  330|      0|            return
+--- Sources/ZTronAssetSync/Engine/EngineJobs.swift 471,479p
+  471|   111k|            job.queuedAt = self.decisionNow()
+  472|   111k|        }
+  473|   111k|        if self.defersToFollow {
+  474|      0|            self.state.jobs[transfer] = job
+  475|      0|            self.deferToFollow(.enqueue(transfer, epoch: job.epoch, front: front))
+  476|      0|            self.notePlaceWaits(transfer)
+  477|      0|            return
+  478|   111k|        }
+  479|   111k|        self.state.lastTicket += 1
+--- Sources/ZTronAssetSync/Engine/EngineFollow.swift 193,233p
+  193|     21|            self.replayVerdict(transfer, epoch: epoch, verdict)
+  194|    561|        case .enqueue(let transfer, let epoch, let front):
+  195|      0|            self.notePlaceTaken(transfer)
+  196|      0|            // A place belongs to the job that asked for it: one removed meanwhile, and re-created by the follow's
+  197|      0|            // visit, has its own place (PROBE-C9-STALE-PLACE).
+  198|      0|            guard self.state.jobs[transfer]?.epoch == epoch else {
+  199|      0|                return
+  200|      0|            }
+  201|      0|            self.enqueue(transfer, front: front, askedBefore: true)
+  202|    561|        case .join(let join):
+  203|    527|            self.replayJoin(join)
+  204|    561|        case .endClaim(let token, let member):
+  205|      0|            self.endClaim(token, member: member)
+  206|    561|        case .endClaims(let token):
+  207|      0|            self.endClaims(of: token)
+  208|    561|        case .removal(let token, let transfer):
+  209|      3|            self.replayRemoval(token, from: transfer)
+  210|    561|        case .release(let token, let entry):
+  211|      1|            if entry {
+  212|      0|                self.releaseEntryGroup(token)
+  213|      1|            } else {
+  214|      1|                self.performReleaseGroup(token)
+  215|      1|            }
+  216|    561|        case .continueReleases:
+  217|      0|            self.resumeReleases()
+  218|    561|        case .purge(let request):
+  219|      0|            self.withdrawPurged(request)
+  220|    561|        case .conditions(let conditions, let edge):
+  221|      6|            self.withConditions(conditions) {
+  222|      6|                self.applyConditionsToJobs(edge: edge)
+  223|      6|            }
+  224|    561|        case .readmit(let passes, let conditions):
+  225|      0|            self.withConditions(conditions) {
+  226|      0|                self.readmit(passes)
+  227|      0|            }
+  228|    561|        case .unblock(let kind):
+  229|      0|            self.unblockOrigin(kind)
+  230|    561|        case .retryDue(let transfer, let epoch):
+  231|      0|            self.retryDue(transfer, epoch: epoch)
+  232|    561|        case .throttleAnswers:
+  233|      1|            self.answerThrottledUsersNow()
+--- Sources/ZTronAssetSync/Engine/EngineFollow.swift 434,440p
+  434|    527|            self.state.joinsAfterFollow[join.token] = nil
+  435|    527|        }
+  436|    527|        guard self.stillWants(join) else {
+  437|      0|            return
+  438|    527|        }
+  439|    527|        if join.listed, self.state.applied.entry(for: join.asset).map({ !SyncEngine.sameTransfer($0, join.entry) }) ?? true {
+  440|      1|            self.reroute(join.token, interest: JobInterest(lane: join.lane, kind: join.kind, assets: [join.asset]), asset: join.asset, from: transfer)
+--- Sources/ZTronAssetSync/Engine/EngineCommands.swift 462,467p
+  462|     95|        }
+  463|     95|        if self.defersToFollow {
+  464|      0|            // Behind the follow barrier the turn's claim ends and removals wait as the release's own (S3-R14 item 3).
+  465|      0|            self.deferToFollow(.continueReleases)
+  466|      0|            self.notifyObservers()
+  467|      0|            return
+--- Sources/ZTronAssetSync/Engine/EngineCommands.swift 527,532p
+  527|      5|            return
+  528|      5|        }
+  529|      5|        if self.defersToFollow {
+  530|      0|            self.deferToFollow(.endClaims(token))
+  531|      0|            self.notifyObservers()
+  532|      0|            return
+--- Sources/ZTronAssetSync/Engine/EngineCommands.swift 997,1002p
+  997|     25|        if self.defersToFollow {
+  998|      0|            // A request: its withdrawals wait for the follow and meet the jobs the visits and earlier events leave
+  999|      0|            // (S3-R14 item 3).
+ 1000|      0|            self.deferToFollow(.purge(request))
+ 1001|      0|            self.notifyObservers()
+ 1002|     25|        } else {
+--- Sources/ZTronAssetSync/Engine/EngineCommands.swift 1524,1529p
+ 1524|      0|                let waiting = self.state.groups[token]?.continuation
+ 1525|      0|                self.state.groups[token]?.continuation = nil
+ 1526|      0|                waiting?.resume(returning: false)
+ 1527|      0|                self.deferToFollow(.release(token, entry: true))
+ 1528|      0|                self.notifyObservers()
+ 1529|     13|            } else {

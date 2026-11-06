@@ -1,0 +1,132 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16ReqsProbes" started.
+◇ Test "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 0 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 3 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 1 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 1 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 4 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 2 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 0 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 6 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 5 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 7 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 5 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 10 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 8 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 2 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 4 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 3 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 12 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 11 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 6 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 8 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 15 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 10 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 7 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 13 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 16 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 9 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 9 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 11 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 14 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 12 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 18 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 13 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 19 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 20 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 14 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 15 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 17 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 16 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 21 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 22 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 23 to "PROBE-C16R-RETRY-END-DIAG" started.
+◇ Test case passing 1 argument copy → 18 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 19 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 20 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 17 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 21 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 22 to "PROBE-C16R-RETRY-END-STRESS" started.
+◇ Test case passing 1 argument copy → 23 to "PROBE-C16R-RETRY-END-STRESS" started.
+✘ Test "PROBE-C16R-RETRY-END-DIAG" recorded an issue with 1 argument copy → 3 at VerifyC16ReqsProbes.swift:49:9: Expectation failed: !read.owed && read.end != nil
+↳ PROBE-C16R-RETRY-END-DIAG copy 3: before A's request (edge: 2, conditionsNil: true); at the committed read (owed: false, end: nil, state: "downloading", attempts: 1, transient: true, edge: 3, conditionsNil: false)
+↳ !read.owed && read.end != nil → false
+↳   !read.owed → true
+↳   read.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-DIAG" recorded an issue with 1 argument copy → 6 at VerifyC16ReqsProbes.swift:49:9: Expectation failed: !read.owed && read.end != nil
+↳ PROBE-C16R-RETRY-END-DIAG copy 6: before A's request (edge: 2, conditionsNil: true); at the committed read (owed: false, end: nil, state: "downloading", attempts: 1, transient: true, edge: 3, conditionsNil: false)
+↳ !read.owed && read.end != nil → false
+↳   !read.owed → true
+↳   read.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 3 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 5 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-DIAG" recorded an issue with 1 argument copy → 14 at VerifyC16ReqsProbes.swift:49:9: Expectation failed: !read.owed && read.end != nil
+↳ PROBE-C16R-RETRY-END-DIAG copy 14: before A's request (edge: 2, conditionsNil: true); at the committed read (owed: false, end: nil, state: "downloading", attempts: 1, transient: true, edge: 3, conditionsNil: false)
+↳ !read.owed && read.end != nil → false
+↳   !read.owed → true
+↳   read.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 7 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-DIAG" recorded an issue with 1 argument copy → 12 at VerifyC16ReqsProbes.swift:49:9: Expectation failed: !read.owed && read.end != nil
+↳ PROBE-C16R-RETRY-END-DIAG copy 12: before A's request (edge: 2, conditionsNil: true); at the committed read (owed: false, end: nil, state: "downloading", attempts: 1, transient: true, edge: 3, conditionsNil: false)
+↳ !read.owed && read.end != nil → false
+↳   !read.owed → true
+↳   read.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 15 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 13 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 21 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 12 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-STRESS" recorded an issue with 1 argument copy → 16 at EngineFollowBarrierWindowTests.swift:211:13: Expectation failed: !backingOff.owed && backingOff.end != nil
+↳ setup: the failed publication's end stays on C through its backoff: (owed: false, end: nil)
+↳ !backingOff.owed && backingOff.end != nil → false
+↳   !backingOff.owed → true
+↳   backingOff.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-DIAG" recorded an issue with 1 argument copy → 23 at VerifyC16ReqsProbes.swift:49:9: Expectation failed: !read.owed && read.end != nil
+↳ PROBE-C16R-RETRY-END-DIAG copy 23: before A's request (edge: 2, conditionsNil: true); at the committed read (owed: false, end: nil, state: "downloading", attempts: 1, transient: true, edge: 3, conditionsNil: false)
+↳ !read.owed && read.end != nil → false
+↳   !read.owed → true
+↳   read.end != nil → false
+✘ Test "PROBE-C16R-RETRY-END-DIAG" with 24 test cases failed after 4.147 seconds with 5 issues.
+↳ /// PROBE-C16R-RETRY-END-DIAG: the steps of `barrierRetriesAFailedPublicationWithNothingOfItsEnd` (WindowTests `:189`)
+↳ /// up to its setup `#require` (`:211`), in concurrent copies, reading at that point what the committed test reads
+↳ /// plus the job's state, its attempts, the network edge serial and whether the engine had a conditions reading
+↳ /// before A's request. A copy whose read finds the end gone says why.
+✘ Test "PROBE-C16R-RETRY-END-STRESS" with 24 test cases failed after 4.169 seconds with 8 issues.
+↳ /// PROBE-C16R-RETRY-END-STRESS: the committed `barrierRetriesAFailedPublicationWithNothingOfItsEnd` itself, in
+↳ /// concurrent copies.
+✘ Suite "VerifyC16ReqsProbes" failed after 4.170 seconds with 13 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, requirements lens). Never committed.
+✘ Test run with 2 tests in 1 suite failed after 4.170 seconds with 13 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

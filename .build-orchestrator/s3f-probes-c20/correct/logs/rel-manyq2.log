@@ -1,0 +1,65 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20Correct" started.
+◇ Test "PROBE-C20C-MANY-MOVES" started.
+PROBE-C20C-MANY-MOVES count=10000 moves=1 run 0: publishing 1; H ids after v3 10000; owed moves after v4 1 (off H 1); longest follow turn 8.22 ms (thread CPU 8.21 ms); violations []; turns [follow 8.22ms cpu 8.21ms E0->0 H9999, follow 1.26ms cpu 1.26ms E0->0 H9999]
+PROBE-C20C-MANY-MOVES count=10000 moves=1 run 1: publishing 1; H ids after v3 10000; owed moves after v4 1 (off H 1); longest follow turn 7.99 ms (thread CPU 7.99 ms); violations []; turns [follow 7.99ms cpu 7.99ms E0->0 H9999, follow 1.26ms cpu 1.26ms E0->0 H9999]
+PROBE-C20C-MANY-MOVES count=10000 moves=1 run 2: publishing 1; H ids after v3 10000; owed moves after v4 1 (off H 1); longest follow turn 8.52 ms (thread CPU 8.52 ms); violations []; turns [follow 8.52ms cpu 8.52ms E0->0 H9999, follow 1.26ms cpu 1.26ms E0->0 H9999]
+PROBE-C20C-MANY-MOVES count=10000 moves=1: longest follow turn per run [8.21825, 7.987208, 8.522125] ms, best 7.987208 ms; thread CPU per run [8.210583, 7.988334, 8.523666] ms; load { 2.19 7.44 115.85 }
+PROBE-C20C-MANY-MOVES count=10000 moves=16 run 0: publishing 16; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.97 ms (thread CPU 1.97 ms); violations []; turns [follow 1.97ms cpu 1.97ms E0->0 H0, follow 1.26ms cpu 1.26ms E0->0 H0]
+PROBE-C20C-MANY-MOVES count=10000 moves=16 run 1: publishing 16; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 2.03 ms (thread CPU 2.04 ms); violations []; turns [follow 2.03ms cpu 2.04ms E0->0 H0, follow 1.31ms cpu 1.31ms E0->0 H0]
+PROBE-C20C-MANY-MOVES count=10000 moves=16 run 2: publishing 16; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.96 ms (thread CPU 1.96 ms); violations []; turns [follow 1.96ms cpu 1.96ms E0->0 H0, follow 1.27ms cpu 1.27ms E0->0 H0]
+PROBE-C20C-MANY-MOVES count=10000 moves=16: longest follow turn per run [1.972542, 2.03425, 1.962833] ms, best 1.962833 ms; thread CPU per run [1.973625, 2.035917, 1.964] ms; load { 2.19 7.44 115.85 }
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:436:17: Expectation failed: run.publishing == moves && run.owedOffH == moves
+↳ setup: one owed move off H per publication: publishing 16; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.97 ms (thread CPU 1.97 ms); violations []; turns [follow 1.97ms cpu 1.97ms E0->0 H0, follow 1.26ms cpu 1.26ms E0->0 H0]
+↳ run.publishing == moves && run.owedOffH == moves → false
+↳   run.publishing == moves → true
+↳   run.owedOffH == moves → false
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:436:17: Expectation failed: run.publishing == moves && run.owedOffH == moves
+↳ setup: one owed move off H per publication: publishing 16; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 2.03 ms (thread CPU 2.04 ms); violations []; turns [follow 2.03ms cpu 2.04ms E0->0 H0, follow 1.31ms cpu 1.31ms E0->0 H0]
+↳ run.publishing == moves && run.owedOffH == moves → false
+↳   run.publishing == moves → true
+↳   run.owedOffH == moves → false
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:436:17: Expectation failed: run.publishing == moves && run.owedOffH == moves
+↳ setup: one owed move off H per publication: publishing 16; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.96 ms (thread CPU 1.96 ms); violations []; turns [follow 1.96ms cpu 1.96ms E0->0 H0, follow 1.27ms cpu 1.27ms E0->0 H0]
+↳ run.publishing == moves && run.owedOffH == moves → false
+↳   run.publishing == moves → true
+↳   run.owedOffH == moves → false
+PROBE-C20C-MANY-MOVES count=10000 moves=64 run 0: publishing 64; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.94 ms (thread CPU 1.94 ms); violations []; turns [follow 1.94ms cpu 1.94ms E0->0 H0, follow 1.30ms cpu 1.30ms E0->0 H0]
+PROBE-C20C-MANY-MOVES count=10000 moves=64 run 1: publishing 64; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.94 ms (thread CPU 1.94 ms); violations []; turns [follow 1.94ms cpu 1.94ms E0->0 H0, follow 1.30ms cpu 1.30ms E0->0 H0]
+PROBE-C20C-MANY-MOVES count=10000 moves=64 run 2: publishing 64; H ids after v3 10000; owed moves after v4 0 (off H 0); longest follow turn 1.92 ms (thread CPU 1.92 ms); violations []; turns [follow 1.92ms cpu 1.92ms E64->64 H0, follow 1.60ms cpu 1.60ms E64->0 H0]
+PROBE-C20C-MANY-MOVES count=10000 moves=64: longest follow turn per run [1.938834, 1.936125, 1.920458] ms, best 1.920458 ms; thread CPU per run [1.939958, 1.9375, 1.921459] ms; load { 2.19 7.44 115.85 }
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:436:17: Expectation failed: run.publishing == moves && run.owedOffH == moves
+↳ setup: one owed move off H per publication: publishing 64; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.94 ms (thread CPU 1.94 ms); violations []; turns [follow 1.94ms cpu 1.94ms E0->0 H0, follow 1.30ms cpu 1.30ms E0->0 H0]
+↳ run.publishing == moves && run.owedOffH == moves → false
+↳   run.publishing == moves → true
+↳   run.owedOffH == moves → false
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:436:17: Expectation failed: run.publishing == moves && run.owedOffH == moves
+↳ setup: one owed move off H per publication: publishing 64; H ids after v3 -1; owed moves after v4 0 (off H 0); longest follow turn 1.94 ms (thread CPU 1.94 ms); violations []; turns [follow 1.94ms cpu 1.94ms E0->0 H0, follow 1.30ms cpu 1.30ms E0->0 H0]
+↳ run.publishing == moves && run.owedOffH == moves → false
+↳   run.publishing == moves → true
+↳   run.owedOffH == moves → false
+✘ Test "PROBE-C20C-MANY-MOVES" recorded an issue at VerifyC20CorrectProbes.swift:436:17: Expectation failed: run.publishing == moves && run.owedOffH == moves
+↳ setup: one owed move off H per publication: publishing 64; H ids after v3 10000; owed moves after v4 0 (off H 0); longest follow turn 1.92 ms (thread CPU 1.92 ms); violations []; turns [follow 1.92ms cpu 1.92ms E64->64 H0, follow 1.60ms cpu 1.60ms E64->0 H0]
+↳ run.publishing == moves && run.owedOffH == moves → false
+↳   run.publishing == moves → true
+↳   run.owedOffH == moves → false
+✘ Test "PROBE-C20C-MANY-MOVES" failed after 5.666 seconds with 6 issues.
+✘ Suite "VerifyC20Correct" failed after 5.666 seconds with 6 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 20, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C20C-DEFER-BEHIND: a follow's visit that moves ids onto a job whose exit verdict waits defers each join behind
+↳ /// that verdict (`deferBehindVerdict`), which scans the waiting events back to the verdict (`lastIndex`) and inserts the
+↳ /// join right after it (an O(E) shift), once per id: a turn of `followIDsPerTurn` ids costs O(ids x E), and E grows by
+↳ /// one per join deferred. Shape: T (zz-t0, zz-t1, 16 B, a user waiter each) downloads; H, `count` prefetch members of one
+↳ /// group sharing 16 B, downloads. v3 moves zz-t1 to a content of its own (T holds a moved id); T's attempt times out, so
+↳ /// its verdict waits (`waits`). v4 maps every H member to T's content: H's visit, over the follow's held turns, moves
+↳ /// 512 ids a turn onto T, each behind T's waiting verdict. Each held follow or drain turn is timed inside the actor.
+↳ /// The control (`waits == false`) leaves T downloading, so the same joins land on T in place.
+↳ ///
+↳ /// PROBE-C20C-DRAIN-BOUND-ALL: the cycle-19 PROBE-C19C-DRAIN-BOUND shape, with the drain's follow-up turns held and
+↳ /// counted as well as the follow's (the cycle-19 probe counted the follow's turns and the drain turn only).
+✘ Test run with 1 test in 1 suite failed after 5.666 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

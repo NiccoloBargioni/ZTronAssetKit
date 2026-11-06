@@ -1,0 +1,321 @@
+{
+ "readmitNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineReadmission.swift",
+    "        if self.defersToFollow {\n            self.deferToFollow(.readmit(passes))",
+    "        if false {\n            self.deferToFollow(.readmit(passes))",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "unblockNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineReadmission.swift",
+    "        if self.defersToFollow {\n            self.deferToFollow(.unblock(kind))",
+    "        if false {\n            self.deferToFollow(.unblock(kind))",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "retryDueNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineTimers.swift",
+    "                if self.defersToFollow {\n                    // The backoff's end",
+    "                if false {\n                    // The backoff's end",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "removeInterestNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineJobs.swift",
+    "        if self.defersToFollow {\n            self.deferToFollow(.removal(token, transfer))",
+    "        if false {\n            self.deferToFollow(.removal(token, transfer))",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "endClaimNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "            if self.defersToFollow {\n                self.deferToFollow(.endClaim(token, member: id))",
+    "            if false {\n                self.deferToFollow(.endClaim(token, member: id))",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "releaseNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "        if self.defersToFollow, self.state.groups[token] != nil {\n            let continuation",
+    "        if false, self.state.groups[token] != nil {\n            let continuation",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "continueReleasesNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "        if self.defersToFollow {\n            // Behind the follow barrier the turn's claim ends",
+    "        if false {\n            // Behind the follow barrier the turn's claim ends",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "endClaimsNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "        if self.defersToFollow {\n            self.deferToFollow(.endClaims(token))",
+    "        if false {\n            self.deferToFollow(.endClaims(token))",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "purgeNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "        if self.defersToFollow {\n            // A request: its withdrawals wait",
+    "        if false {\n            // A request: its withdrawals wait",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "releaseEntryNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "            if self.defersToFollow, self.state.groups[token] != nil {\n                // The caller is answered; the group's removal",
+    "            if false, self.state.groups[token] != nil {\n                // The caller is answered; the group's removal",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "stillWantsAlways": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        guard self.stillWants(join) else {",
+    "        guard self.stillWants(join) || true else {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "pauseParkDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            if policy, let lane = self.state.jobs[transfer]?.lane, lane < .userInitiated,",
+    "            if false, policy, let lane = self.state.jobs[transfer]?.lane, lane < .userInitiated,",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "requeueReplayDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        case .requeue:\n            if self.transition(transfer, to: .queued) {",
+    "        case .requeue:\n            if false, self.transition(transfer, to: .queued) {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "committedNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "        guard self.defersToFollow, self.state.publishedOwingVisit.contains(commit.transfer)",
+    "        guard false, self.state.publishedOwingVisit.contains(commit.transfer)",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "noPublishedVisit": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            guard self.state.publishedOwingVisit.remove(transfer) != nil || publishing else {",
+    "            guard publishing else {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "supersedeNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "            if self.defersFailure(transfer, .supersede) {",
+    "            if false, self.defersFailure(transfer, .supersede) {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "enoentNow": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "            if self.defersFailure(transfer, .requeue) {\n                break",
+    "            if false, self.defersFailure(transfer, .requeue) {\n                break",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "placeStampsIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "        if let stamp = self.state.placeStamps[transfer] {\n            let view = self.state.worldHistory[stamp.view]",
+    "        if false, let stamp = self.state.placeStamps[transfer] {\n            let view = self.state.worldHistory[stamp.view]",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "noArrivalThrottle": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "                    self.state.throttles[origin] = max(decided ?? .zero, until)\n                    self.state.metrics.retries[.throttled] += 1",
+    "                    self.state.metrics.retries[.throttled] += 1",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "arrivalJobLane": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "            if let lane = self.followedLane(job) {",
+    "            if let lane = Optional(job.lane) {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "throttleReadLive": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        if let view = self.readingView {\n            return view.throttle",
+    "        if false, let view = self.readingView {\n            return view.throttle",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "breakerReadLive": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        if let view = self.readingView {\n            return view.breaker",
+    "        if false, let view = self.readingView {\n            return view.breaker",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "visitsLive": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        return self.withReading(stamp) {\n            self.follow(transfer, publishing: publishing)\n        }",
+    "        return self.follow(transfer, publishing: publishing)",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "viewBreakerOutcomeDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "            view.breaker = viewed\n",
+    "            _ = viewed\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "endThrottleLiveGuardDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineOriginGate.swift",
+    "        if let end = self.state.throttles[origin], end > self.decisionNow() {",
+    "        if false, let end = self.state.throttles[origin], end > self.decisionNow() {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "timerUnblockDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineTimers.swift",
+    "                    if !self.state.throttleParked.isEmpty {\n                        self.unblockOrigin(.throttled)",
+    "                    if false, !self.state.throttleParked.isEmpty {\n                        self.unblockOrigin(.throttled)",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "alarmAtPark": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "self.state.heap.schedule(.throttle(origin), at: max(self.state.throttles[origin] ?? .zero, until))",
+    "self.state.heap.schedule(.throttle(origin), at: until)",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "noDispatchOwedFlag": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineRuns.swift",
+    "|| !self.state.originOwed.isEmpty || self.state.pumpWaitsForFollow",
+    "|| !self.state.originOwed.isEmpty",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ },
+ "readingConditionsLive": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        self.state.conditions = view.conditions.conditions\n        self.state.pausedForThermal = view.conditions.pausedForThermal\n",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrierTests|probeSupersededFreesSlot"
+ }
+}

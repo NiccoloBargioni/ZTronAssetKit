@@ -1,0 +1,11 @@
+exit=1
+✘ Test "PROBE-D3-READ-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:373:25: Issue recorded
+✘ Test "PROBE-D3-READ-PROMOTE" with 2 test cases failed after 1.655 seconds with 1 issue.
+✘ Test "PROBE-D3-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:422:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(nBytes.count)
+✘ Test "PROBE-D3-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:423:9: Expectation failed: (try? kResult.get()) == nil
+✘ Test "PROBE-D3-TICKET" with 2 test cases failed after 0.878 seconds with 2 issues.
+✘ Test "PROBE-D2-FOLLOW-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:65:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-D2-FOLLOW-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:135:9: Expectation failed: (try? a1Result.get())?.byteSize == Int64(n1Bytes.count)
+✘ Test "PROBE-D2-FOLLOW-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:139:25: Issue recorded
+✘ Test "PROBE-D2-FOLLOW-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:142:9: Expectation failed: outcome.completeReport != nil
+✘ Test "PROBE-D2-FOLLOW-ORDER" with 2 test cases failed after 192.055 seconds with 4 issues.

@@ -1,0 +1,11 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 4] ZTronAssetModel
+[8 / 10] ZTronAssetModelTests-product
+[16 / 25] ZTronAssetSyncTests-product
+[18 / 27] ZTronAssetSyncTests-product
+[25 / 27] ZTronAssetSyncTests-product
+[27 / 27] ZTronAssetSyncTests-product
+Build complete! (5,72 s)

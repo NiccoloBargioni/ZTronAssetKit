@@ -1,0 +1,7 @@
+4455:◇ Test "R-NET-7: the size guard aborts when the written or announced size exceeds the cap or byteSize is exceeded" started.
+4479:​​​​​​✔ Test "R-NET-7: the size guard aborts when the written or announced size exceeds the cap or byteSize is exceeded" passed after 0.082 seconds.
+6412:✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:721:6: Time limit was 
+10470:Failing tests:
+10471:	-[EngineFollowBarrierTests barrierAnswersAPassedJobsRetryAsVisitedFirst(_:)]
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:721:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:781:9: Expectation failed: (try? bResult.get())?.byteSize == 16

@@ -1,0 +1,32 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20Correct" started.
+◇ Test "PROBE-C20C-DEFER-BEHIND" started.
+◇ Test case passing 1 argument waits → true to "PROBE-C20C-DEFER-BEHIND" started.
+PROBE-C20C-DEFER-BEHIND waits=true count=2000 run 0: apply window 4.30 ms; longest follow turn 5.32 ms (thread CPU 5.32 ms); peak joins waiting for T 1489; t0 failure(ZTronAssetModel.AssetError.shutDown); violations []; turns [follow 2.92ms cpu 2.92ms E1->1 H976, follow 3.39ms cpu 3.39ms E1->1 H464, follow 5.32ms cpu 5.32ms E1->1489 H0, drain 2.86ms cpu 2.86ms E1489->977 H0, drain 2.58ms cpu 2.58ms E977->465 H0, drain 2.47ms cpu 2.47ms E465->0 H0]
+PROBE-C20C-DEFER-BEHIND waits=true count=2000: longest follow turn per run [5.315958] ms, best 5.315958 ms; thread CPU per run [5.316417] ms; stride 192 B; load ?
+◇ Test case passing 1 argument waits → false to "PROBE-C20C-DEFER-BEHIND" started.
+PROBE-C20C-DEFER-BEHIND waits=false count=2000 run 0: apply window 5.23 ms; longest follow turn 4.34 ms (thread CPU 4.34 ms); peak joins waiting for T 0; t0 failure(ZTronAssetModel.AssetError.shutDown); violations []; turns [follow 3.98ms cpu 3.98ms E0->0 H976, follow 4.34ms cpu 4.34ms E0->0 H464, follow 3.30ms cpu 3.30ms E0->0 H0]
+PROBE-C20C-DEFER-BEHIND waits=false count=2000: longest follow turn per run [4.34225] ms, best 4.34225 ms; thread CPU per run [4.342458] ms; stride 192 B; load ?
+✔ Test "PROBE-C20C-DEFER-BEHIND" with 2 test cases passed after 0.292 seconds.
+◇ Test "PROBE-C20C-DRAIN-BOUND-ALL" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, jobsCount → 3 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL followVisitedFirst jobs 3 bound 4 atV4 9 turns [9] kinds ["apply"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+◇ Test case passing 2 arguments visit → .followVisitedFirst, jobsCount → 4 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL followVisitedFirst jobs 4 bound 4 atV4 12 turns [12] kinds ["apply"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 4
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, jobsCount → 3 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL sweepFollowsFirst jobs 3 bound 4 atV4 9 turns [0, 0, 4, 4, 1] kinds ["apply", "follow", "follow", "follow", "follow"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, jobsCount → 4 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL sweepFollowsFirst jobs 4 bound 4 atV4 12 turns [0, 0, 4, 4, 4] kinds ["apply", "follow", "follow", "follow", "follow"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 4
+✔ Test "PROBE-C20C-DRAIN-BOUND-ALL" with 4 test cases passed after 0.316 seconds.
+◇ Test "PROBE-C20C-MANY-MOVES" started.
+PROBE-C20C-MANY-MOVES count=2000 moves=1 run 0: publishing 1; H ids after v3 2000; owed moves after v4 1 (off H 1); longest follow turn 1.33 ms (thread CPU 1.33 ms); violations []; turns [follow 1.33ms cpu 1.33ms E0->0 H1999, follow 0.33ms cpu 0.33ms E0->0 H1999]
+PROBE-C20C-MANY-MOVES count=2000 moves=1: longest follow turn per run [1.32975] ms, best 1.32975 ms; thread CPU per run [1.330875] ms; load ?
+PROBE-C20C-MANY-MOVES count=2000 moves=16 run 0: publishing 16; H ids after v3 2000; owed moves after v4 16 (off H 16); longest follow turn 1.48 ms (thread CPU 1.48 ms); violations []; turns [follow 1.48ms cpu 1.48ms E0->0 H1984, follow 0.34ms cpu 0.34ms E0->0 H1984]
+PROBE-C20C-MANY-MOVES count=2000 moves=16: longest follow turn per run [1.475292] ms, best 1.475292 ms; thread CPU per run [1.47625] ms; load ?
+PROBE-C20C-MANY-MOVES count=2000 moves=64 run 0: publishing 64; H ids after v3 2000; owed moves after v4 64 (off H 64); longest follow turn 1.81 ms (thread CPU 1.81 ms); violations []; turns [follow 1.81ms cpu 1.81ms E0->0 H1936, follow 0.38ms cpu 0.38ms E0->0 H1936]
+PROBE-C20C-MANY-MOVES count=2000 moves=64: longest follow turn per run [1.814209] ms, best 1.814209 ms; thread CPU per run [1.814708] ms; load ?
+✔ Test "PROBE-C20C-MANY-MOVES" passed after 0.272 seconds.
+✔ Suite "VerifyC20Correct" passed after 0.880 seconds.
+✔ Test run with 3 tests in 1 suite passed after 0.880 seconds.

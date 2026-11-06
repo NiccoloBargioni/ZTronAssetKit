@@ -1,0 +1,39 @@
+# swift test --scratch-path .build-s3-conformance --skip Benchmarks --filter S3Conformance  (s3-base + probe files only)
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "R-SYN-7: an Apple-tier catalog update check is refused on an expensive network the bulk policy forbids" passed after 0.009 seconds.
+✔ Test "R-CAR-7: ensureAvailable while the auth breaker is open throws authRejected for a scope with missing assets" passed after 0.009 seconds.
+✔ Test "R-SYN-7: at a critical thermal state user-initiated transfers are capped at interactiveConcurrencyAtCritical once the conditions are known" passed after 0.009 seconds.
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" recorded an issue at S3ConformanceProbeTests.swift:170:9: Expectation failed: state.running <= harness.configuration.power.interactiveConcurrencyAtCritical
+↳ running at .critical: 3
+↳ state.running <= harness.configuration.power.interactiveConcurrencyAtCritical → false
+↳   state.running → 3
+↳   harness.configuration.power.interactiveConcurrencyAtCritical → 1
+✘ Test "R-SYN-7: user-initiated work started while the conditions are unknown is held to interactiveConcurrencyAtCritical once a critical thermal state arrives" failed after 0.012 seconds with 1 issue.
+↳ /// S3-CONF-04 (b): the first burst of user-initiated work after the engine went idle (which drops the conditions,
+↳ /// R-SYN-14) is dispatched before the watcher's first element and is never trimmed once `.critical` arrives. The
+↳ /// gated source holds the watcher's observation until the burst is dispatched, so the window is deterministic.
+✔ Test "R-SYN-6: a run over an asset failed at the integrity cap ends completeWithFailures with an integrity failure for it" passed after 0.013 seconds.
+✘ Suite "S3 conformance probes: engine" failed after 0.013 seconds with 1 issue.
+↳ /// Stage 3 conformance probes (lens "conformance"): behaviour no existing test reaches, each killing a mutant that
+↳ /// survives the requirement's existing tests.
+✘ Test run with 5 tests in 1 suite failed after 0.013 seconds with 1 issue.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" passed after 0.009 seconds.
+✔ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" with 4 test cases passed after 0.650 seconds.
+✔ Test run with 2 tests in 2 suites passed after 0.651 seconds.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" recorded an issue at S3ConformanceFallbackProbeTests.swift:31:9: Expectation failed: started.isEmpty
+↳ an .mp4 was downloaded at [ZTronAssetModel.AssetPriority.userInitiated] for an image request
+↳ started.isEmpty → false
+↳   started → [ZTronAssetModel.TransferRequest(id: c-b68629cb1280954e578a5ff5085b28ce6a772bd55613ee48c00189dd5e8db334, attempt: 1-2, purpose: ZTronAssetModel.TransferPurpose.asset, remotePath: "media/clip.mp4", expectedBytes: Optional(300), maxBytes: 4294967296, priority: ZTronAssetModel.AssetPriority.userInitiated, access: ZTronAssetModel.NetworkAccess(allowsCellular: true, allowsExpensive: t
+↳   isEmpty → false
+✘ Test "R-CAR-2: fetch of an asset whose extension is not a candidate fails with notFound and downloads nothing" failed after 0.133 seconds with 1 issue.
+✘ Suite "S3 conformance probe: fallback chain network step" failed after 0.134 seconds with 1 issue.
+↳ /// S3-CONF-07: the prior art's network step (`CDNAssetResolver.resolveViaNetwork`, ZTronCarouselCore
+↳ /// `CDNAssetResolver.swift:46`) refuses an asset whose extension is not a candidate *before* downloading it; the
+↳ /// fallback chain's `fetch` resolves first and checks the extension afterwards (R-CAR-2 "identical observable
+↳ /// behaviour").
+✘ Test run with 1 test in 1 suite failed after 0.134 seconds with 1 issue.

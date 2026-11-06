@@ -1,0 +1,19 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+index ed34d95..78c6ddf 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+@@ -94,6 +94,14 @@ extension SyncEngine {
+         self.materializeEnsures()
+         // Set again below by a queue head that still waits for the follow (`dispatch`).
+         self.state.pumpWaitsForFollow = false
++        if self.followVisitsPending {
++            // EXTENSION P1 (prototype): no start and no park for space while the follow owes visits nobody has done yet:
++            // a start takes room and a slot a visit may give to a job it raises (PROBE-D2-PUMP-PROMOTE), and a park
++            // reads in-flight bytes a visit may abandon (PROBE-D2-GATE-ABANDON). Every follow turn pumps again, and the
++            // last visit (the follow's or a sweep's) pumps with the jobs as the follow leaves them.
++            self.state.pumpWaitsForFollow = true
++            return
++        }
+         let maximum = self.tuning.maxConcurrentTransfers
+         let userCap = self.userCap
+         var guardCount = 0

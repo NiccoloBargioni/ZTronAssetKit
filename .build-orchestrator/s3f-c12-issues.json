@@ -1,0 +1,158 @@
+{
+ "cycle": 12,
+ "head": "3f10eaa",
+ "issues": [
+  {
+   "blocking": true,
+   "area": "tests / flake (any flake is blocking; CLAUDE.md G2): the cycle-12 test barrierRetriesBehindTheOwedVisitsPlaces hangs",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierReplayTests.swift:118-133 (R joins with no wait for the first conditions reading); hang at the wait at :133; reported at :106 (time limit) and :141 (`#require(backoffEnd)`). Engine side: EngineConditions.swift:95-105 (a satisfied first reading is an edge) and EngineReadmission.swift:55-60 (`owedOnEdge`: `failed(.at)` is owed when `transientFailure` is set)",
+   "problem": "The test timed out at 180 s in 4 of 6 full-bundle runs:\n- `--quick`: both orders. Result `VERIFY: FAIL (1 failed: tests)`.\n- ZTronAssetSyncTests run 1 and run 2: both orders, `\u2718 Test run with 474 tests in 53 suites failed ... with 4 issues`, 2 time-outs each. Run 3 passed.\n- iOS Simulator 6BE15CAF: `failedTests 1`, 'Test exceeded execution time allowance of 3 minutes'.\nIt also timed out in 1 of 2 runs of the 55-test barrier suite (placeStampsIgnored run 1, load about 9 to 50), and in 1 of 30 isolated runs made six at a time (load about 40).\n\nThe instrumented copy (reps-5-2.log) shows the mechanism:\n- step 1: `cond=false`, so the first conditions reading had not arrived when R joined;\n- R failed with its 500 and entered `failed(.at)` with `transientFailure` set;\n- the first satisfied reading counted as an edge and re-queued R, with `now` unchanged and no sleepers;\n- step 2: R is `downloading` on its `.hold` step and holds the only slot;\n- H stays `queued`, so the wait at :133 never ends.\nThe engine behaviour is the S3F-1 design. The test lacks the `driving { awaitCondition { $0.state.conditions != nil ... } }` wait that its sibling tests have.",
+   "fix": "Before `rWaiter` joins, wait for the first reading while driving the clock: `await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await engine.awaitCondition { $0.state.conditions != nil } }`. Do this in the test and in any barrier test whose first scripted step fails before the reading arrives. This changes waits only; keep every assertion.\n\nThen show stability:\n- the full Sync bundle 3 times in a row on a loaded host;\n- the test in a loop of at least 30 runs, six at a time;\n- the simulator run.\nKeep the retryDueNow kill (ReplayTests:169/:170) and show it again.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": true,
+   "area": "requirements / follow barrier, S3-R15 item 2: residual R-H proven, so the 429's lane on arrival is not the visit-first lane",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:660 (`followedLane`, which counts only the job's own interests) and :346 (`throttled`, which sets `throttles[origin]` on arrival from that lane); draft docs/adr-drafts/s3f.md:1873-1874, :2003-2004",
+   "problem": "PROBE-C12R-FOLLOWED-LANE (.build-orchestrator/s3f-probes-c12/reqs/Verify/VerifyC12ReqsProbes.swift) fails sweep-first 2/2 (logs/rh-1.log, rh-2.log).\n\nScenario:\n- C (1 MB, zz-b) runs for a prefetch waiter; Y (1 MB, zz-u) runs for a user waiter U.\n- v3 moves zz-u onto C's content, so Y's owed visit moves U's interest onto C.\n- C then gets a 429 without Retry-After.\n\nVisit-first: before the 429, C's lane is `userInitiated`. The throttle is 0.209572016 s, the interactive first backoff.\nBehind the barrier: before the 429, C's lane is `prefetch` and `followedLane(C)` returns it. The throttle is 0.838288067 s, the background backoff. It reads the same right after the 429 and after the drain (VerifyC12ReqsProbes.swift:76, :81).\n\nThe origin's throttle is a decision in the class. S3-R15 item 2 asked for exactly this case to be shown with a probe. The draft records R-H as 'not probed'.",
+   "fix": "First commit the probe to the serialized barrier suite, in both orders, and show it failing.\n\nThen give `followedLane` the visit's full rule: also count the interests that the owed visits move onto this content. That means the interests, held by other jobs, in ids whose applied entry now maps to `job.transfer`. Use an index from the apply's changed ids to stay O(changed). Alternatively, record that the lane cannot be derived and obtain a ruling.\n\nUpdate rows I12 and R-H.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": true,
+   "area": "requirements / follow barrier, S3-R15 item 3: R-C (the sweep's place among drained events) not implemented",
+   "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:757 (`sweepSpaceParked`, which judges in a follow-up sweep after the drain); draft docs/adr-drafts/s3f.md:1788, :1960-1968",
+   "problem": "S3-R15 item 3 puts R-C in the class: blocking, failing test first in both orders, then the fix. The draft records it as 'Open ... not implemented, no test'. Behind the barrier the space re-queue is decided after every drained event. Visit-first decided it at the sweep's arrival, so a later request can take S's place.",
+   "fix": "Commit the scenario the draft describes, in both orders, and show it failing:\n- one slot;\n- a free-space read's sweep re-queues S while the follow is owed;\n- then request J arrives;\n- visit-first, S is queued before J.\n\nThen add a `.spaceSweep` event judged in the drain under its stamp. It must coexist with the sweep's own follow-advancing turns, and a later follow-up sweep must not change its verdict. Alternatively, obtain a ruling.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": true,
+   "area": "G4 / S3-R15 item 6: replay and world-view branches with surviving mutants",
+   "location": "Removal deferrals:\n- EngineJobs.swift:323 (`removeInterest` `.removal`)\n- EngineCommands.swift:324 (`.endClaim`), :465 (`.continueReleases`), :530 (`.endClaims`), :1000 (`.purge`), and the `.release(entry:)` deferrals in `performReleaseGroup` and `releaseEntryGroup`\n\nExit deferrals:\n- EngineDispatch.swift:1222 (`.supersede`), :1237 (ENOENT `.requeue`)\n\nWorld-view reads:\n- EngineFollow.swift:248 (`breakerRecorded`), :225 (`withReading`'s conditions swap)\n- EngineOriginGate.swift:126 (`endThrottle`'s live-end guard)\n\nDraft docs/adr-drafts/s3f.md:1932-1943, :1970-1992",
+   "problem": "Twelve mutants survive with no killing test, by the fixer's own table: removeInterestNow, endClaimNow, endClaimsNow, releaseNow, releaseEntryNow, continueReleasesNow, purgeNow, supersedeNow, enoentNow, breakerReadLive, endThrottleLiveGuardDropped and readingConditionsLive.\n\nS3-R15 item 6 requires one of two things for each deferral that 6cc4d92 and this cycle added: a test in the serialized barrier suites, in both orders, that a mutant dropping the branch fails 2/2; or the branch's removal with a reason.\n\nI did not re-run these 12 (the draft reports them as 'passed' in its suite run). I did re-run the 15 claimed kills, and all are confirmed 2/2.",
+   "fix": "For each branch, do one of the following:\n- Add a test in both orders asserting the visit-first outcome, using seams such as holdFollowFollowUps, holdReleaseFollowUps or a held store read for a group's join, and show the mutant failing 2/2.\n- If no scenario can reach the branch, remove it and record the reason (for example, a `.release(entry:)` reached only through a caller that already defers).\n\nUpdate the mutant table with the killing lines.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": true,
+   "area": "requirements / follow barrier, S3-R15 item 3: R-A remainder (a publication's integrity failure) open while R-A is counted Fixed",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:502-539 (`integrityFailed`: `transition(.failed(.untilEntryChanges))` and `sparePresent`'s `answerPresentMembers` run at once); EngineDispatch.swift publicationFailed `.integrity`; draft docs/adr-drafts/s3f.md:1787 (R-A 'Fixed') versus :2049-2051 (I13b 'Open ... Not probed')",
+   "problem": "S3-R15 item 3: 'The publication or commit outcome of a job that holds a moved id waits as an event'. Cycle 12 defers the commit (`deferCommit`) and the `.superseded` and ENOENT exits. A publication's integrity failure still transitions the job and answers the store-held members at once, even when the job holds an id the follow moves.\n\nThe disposition table reports R-A as Fixed, but row I13b admits this part is open and not probed.",
+   "fix": "Treat the `.integrity` publication outcome of a job in `publishedOwingVisit` like a commit: wait as an event until the follow's visit of the job, with a failing test first in both orders. Otherwise show with a probe that the outcomes match, and cite it.\n\nThen make the R-A disposition row match I13b.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": true,
+   "area": "S3-R14 item 1 / S3-R15 item 7: inventory and disposition records wrong or uncited",
+   "location": "docs/adr-drafts/s3f.md:1569-1618 (rows that still stand), :1546, :1796, :2079-2081",
+   "problem": "S3-R15 item 7 requires 'Every row cites its test or probe'. The disposition row at :1796 claims this is Done, but it is not:\n- The rows that still stand cite no test or probe: I2, I3, I4, I7, I9, I10, I11, I13, I15, I17, I19, I20, I21, I22, I23, I24, I25, I27, I28, I29, I30, I31, I32, I33, I34, I37 and I38. So do the corrected rows I13b and I36 ('Not probed').\n- Rows I22 (`.readmit(passes, conditions)`) and I25 (`.conditions(snapshot, edge:)`), and the preamble at :1572-1574 (`replayInstant`), describe mechanisms this cycle removed. The cases are now `.readmit(Readmissions)` and `.conditions(edge:)`, with stamps.\n- The cycle-11 `readmit` disposition row (:1546; the previous verifier's :1514 at 3a86b92) still credits `barrierPlacesAReadmissionAsTheFollowLeavesIt`, which passes under readmitNow. My run: `2 tests ... 1 issue`, only at ReplayTests:92. The fixer instead corrected the 'visit re-lane' row (:1549).",
+   "fix": "Give every row its test, probe or mutant. Rewrite I21, I22, I25 and the preamble for the stamp mechanism. Make the :1546 row cite `barrierReadmitsBehindTheOwedVisitsPlaces` (readmitNow killed at ReplayTests:92).",
+   "lens": "reqs"
+  },
+  {
+   "blocking": false,
+   "area": "test strength: the `alarmAtPark` equivalence is recorded by reasoning only",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift (`park`'s `.throttle` alarm at `max(live end, until)`); EngineTimers.swift:121-136; draft :1952-1956",
+   "problem": "The cycle-11 fix asked for the equivalence to be recorded 'with a probe's output'. The draft argues it from code alone. I read `fireDue`'s `.throttle` case and agree: an earlier alarm with a live later end re-schedules at the live end, so the re-admission instant is the same and the mutant adds only one alarm turn.",
+   "fix": "Add one probe line, or a barrier-test assertion on the alarm count or instant, or keep the reasoning and say that no probe output exists.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": false,
+   "area": "open residuals R-F, R-G, R-I (unproven class suspicions)",
+   "location": "docs/adr-drafts/s3f.md:1996-2006 (R-F: `recordGroup`'s claims at registration; R-G: `finishRun`'s `.removal` targets after a re-route; R-I: place stamps assume a free slot, a `.probe` admission reads the live breaker)",
+   "problem": "All three fall inside S3-R15's class (requests, removals and breaker decisions), but the draft has only analysis. No probe shows a difference, so they are not blocking yet. R-G repeats the cycle-11 correctness verifier's `.removal` suspicion.",
+   "fix": "Probe each in both orders. If one differs, commit a failing test, then fix it; if not, cite the probe in the inventory.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": false,
+   "area": "other-wp:b: P-13 wall-time miss",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249",
+   "problem": "P-13 reclaim of 10000 blobs took 0.671510084 s in 526 units: unit max 8.91875 ms against the 5.0 ms batch budget (p95 0.991792 ms, on-CPU max 6.867875 ms). Perf-run 1-minute load: mean 17.83, min 5.40, max 31.81, n=84. `\u2714 Suite \"SyncBenchmarks\" passed after 64.756 seconds.`",
+   "fix": "None for WP-F. Route it to WP-B.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": false,
+   "area": "environment",
+   "location": "Scripts/verify.sh (`.verify-logs/tests.log`); host load",
+   "problem": "Two caveats on the environment:\n- `.verify-logs/tests.log` is shared with the concurrent correctness verifier, so I read `--quick`'s result from my own stdout log and its exit status.\n- 1-minute load means: `--quick` 114.7 (max 494.8), simulator 137.4, sync run 1 74.0, TSan 26.35 (from 60 s, max 50.87).\nThe flake in blocking issue 1 is not a load-only margin: it also reproduces in isolation at load about 40, and its mechanism is a missed wait.",
+   "fix": "Orchestrator: give each verifier its own log directory.",
+   "lens": "reqs"
+  },
+  {
+   "blocking": true,
+   "area": "follow barrier: a place stamp admits on a view with no free slot (residual R-I proven; S3-R15 items 1 and 3; R-SYN-5 'honour Retry-After')",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:526-541 (gate: a placeStamps view admits `.start` whatever the live throttle) and :373 (dispatch parks at the stamp's instant); Sources/ZTronAssetSync/Engine/EngineJobs.swift:476-478 (enqueue records the reading's stamp); draft docs/adr-drafts/s3f.md:2005 (R-I 'not probed') and the disposition rows for items 1 and 3 (PROBE-C9-THROTTLE 'Fixed')",
+   "problem": "The barrier-end pump admits a place given behind the barrier on the throttle and breaker of the place's stamp. Its comment ('a later throttle ... stops no transfer that runs, so admitting on that view is the visit-first admission') holds only if a slot was free at that instant.\n\nPROBE-C12-PLACE-SLOT (one slot):\n- C holds the slot for user waiters A (zz-a) and B (zz-b).\n- v3 moves zz-a to N (16 B) while the follow owes C's visit.\n- C then gets a 429 with Retry-After 60.\n\nVisit-first: N is queued at the apply behind the busy slot. After the 429 the pump refuses N on the live throttle, A gets `serverUnavailable(retryAfter: 60.0)`, and N never starts.\n\nBehind the barrier (sweep-first, 2/2, VerifyC12CorrectProbes.swift:75 and :82):\n- At the barrier's end the state is `(throttled: true, n: downloading)` with `nStarted=true`.\n- N's request goes to the origin under the live 60 s throttle, and A is served 16 bytes.\n- The visit-first order passes both runs.",
+   "fix": "Commit PROBE-C12-PLACE-SLOT (`.build-orchestrator/s3f-probes-c12/correct/Verify/VerifyC12CorrectProbes.swift`) as a barrier test in both LaneDropVisit orders and show it failing first.\n\nThen admit a stamped place on the view at the instant a visit-first pump would have started it, not at its place stamp:\n- record each slot freed behind the barrier (an ended transfer, an R1 input applied on arrival) with its world stamp;\n- give the k-th stamped place the view at the later of its place stamp and the stamp of the slot it takes (slots already free at the place count at the place's own stamp).\n\nApply the same to the stamped park's `answeredAt` and `answerEnd`, and to the `.probe` fall-through. Then move R-I from residual to fixed and correct the item-1 and item-3 disposition rows and I14/I18.",
+   "lens": "correct"
+  },
+  {
+   "blocking": true,
+   "area": "follow barrier: a 429 whose lane comes from another owed visit does not throttle on arrival (residual R-H proven; S3-R15 item 2)",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:660-675 (followedLane counts only job.interests) and :366-373 (`.undecided`: no throttle without Retry-After; the comment 'Every id moves: a visit-first engine had cancelled this attempt' is false here); Sources/ZTronAssetSync/Engine/EngineFollow.swift:508-522 (replayThrottle sets the throttle at the drain); draft docs/adr-drafts/s3f.md:2003 (R-H 'not probed') and inventory I12",
+   "problem": "PROBE-C12-UNDECIDED-LANE (2/2, sweep-first only):\n- D (content Z) downloads for user waiter WA (zz-a); C (content X) downloads for user waiter WB (zz-b).\n- v3 maps zz-a to X and zz-b to Y; the follow owes D's visit, then C's.\n- C gets a 429 without Retry-After. A user then awaits zz-none, which needs a manifest fetch.\n\nVisit-first: D's visit re-routes WA onto C, so C keeps zz-a on the user lane. The 429 throttles the origin for 0.2096 s, the fetch is refused without a request (manifestRequests 3 -> 3), and the caller gets `serverUnavailable(retryAfter: 0.209572016)`.\n\nBehind the barrier: `followedLane(C)` is nil because D's interest is not counted, so the decision is `.undecided` and `throttle: nil` after the 429. The throttled origin gets a manifest request (3 -> 4) and the caller is answered `.notFound` (VerifyC12CorrectProbes.swift:135, :140, :143).\n\nThe lane is derivable without performing the visit. S3-R15 item 2's own rule is 'the interests whose ids the copy still maps to this transfer', and the copy maps zz-a to C's transfer.",
+   "fix": "Commit PROBE-C12-UNDECIDED-LANE as a test in both orders and show it failing first.\n\nCompute `followedLane` over every interest whose id the copy maps to the job's content, including interests held by other jobs that still owe a visit and the entries of the passes not yet scanned. Use per-id lookups so it stays C2-bounded. Throttle the origin on arrival; `replayThrottle` then only parks and answers.\n\nIf some case truly cannot be derived, record it with this probe as item 2 requires. Correct row I12 and the `.undecided` comment.",
+   "lens": "correct"
+  },
+  {
+   "blocking": true,
+   "area": "test defect: `barrierRetriesBehindTheOwedVisitsPlaces` hangs when the first conditions reading arrives after R's 500 (VERIFY gate; S3-R12 2(i))",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierReplayTests.swift:106-141 (30c2a39): R scripted `[.fail(500), .hold, .stage]` at :121 and requested at :124 with no reading yet; the wait for H downloading at :131; `#require(backoffEnd)` at :141",
+   "problem": "The setup leaves the engine idle (watcher stopped, conditions nil). R's user request is dispatched before any reading and fails with a 500, so R is `failed(.at)`.\n\nIf the watcher's first reading arrives after that failure, it is an edge (S3-CONC-04). The edge re-queues R's transient failure, R restarts on its `.hold` step and keeps the only slot. The wait for H downloading never holds: a 180 s time-out, then `#require(backoffEnd)` fails at :141.\n\nPROBE-C12-RETRY-SETUP-RACE (gated first reading, 2/2): before the reading R is `failed(.at(1005615401ns))`, after it R is `downloading`, and the test's H wait times out.\n\nAt HEAD the committed test failed in 3 of 5 full-bundle runs:\n- verify --quick, both orders: `VERIFY: FAIL (1 failed: tests)`;\n- the first coverage run, followVisitedFirst, load mean 104.71;\n- Sync run 3, sweepFollowsFirst, S3-R12 rule-1 mean 19.87 (min 12.61, max 29.16), which meets S3-R12 2(i).\n\nIt passed in Sync runs 1 and 2, in the coverage rerun, and 3/3 isolated in 0.64 s.",
+   "fix": "Make the setup independent of when the first reading arrives:\n- start the watcher and await `$0.state.conditions != nil` with `EngineRegressionCycle6Tests.driving` before R's request, as the other barrier tests do (for example, request H first and wait for the reading and H downloading); or\n- script R's 500 after a `.hold` that is released once a reading exists.\n\nKeep the assertions and the scenario unchanged (G3), then re-run the full Sync bundle under load.",
+   "lens": "correct"
+  },
+  {
+   "blocking": true,
+   "area": "G4 / S3-R15 item 6: replay and decision branches still unreached or unkilled",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:307 (.endClaim), :309 (.endClaims), :314 (.release entry: true), :319 (.continueReleases), :458-461 (.offline requeue), :481-486 (.supersede replay), :502-505 (replayThrottle .exhausted), :508-522 (.undecided); Sources/ZTronAssetSync/Engine/EngineFailures.swift:363-365 (.exhausted on arrival), :366-373 (.undecided on arrival); draft docs/adr-drafts/s3f.md:1897-1957 (mutant table) and :1970-1999",
+   "problem": "My fresh all-bundle coverage profile at HEAD (coverage rerun, every bundle passed; llvm-cov show of EngineFollow.swift and EngineFailures.swift) shows these with 0 hits:\n- the `.endClaim`, `.endClaims`, `.release(entry: true)` and `.continueReleases` replays;\n- the replayVerdict `.supersede` branch, added this cycle;\n- `.offline(requeue: true)`;\n- this cycle's `ThrottleDecision.exhausted` and `.undecided`, both on arrival and in replayThrottle. These two are not in the fixer's mutant table.\n\nThe draft also records 9 branch mutants and 3 world-view mutants surviving with no killing test:\n- branch mutants: removeInterestNow, endClaimNow, endClaimsNow, releaseNow, releaseEntryNow, continueReleasesNow, purgeNow, supersedeNow, enoentNow;\n- world-view mutants: breakerReadLive, endThrottleLiveGuardDropped, readingConditionsLive.\n\nThe item-2 disposition counts `.until/.exhausted/.undecided` as Fixed although no test reaches the last two. I did not re-run the fixer's mutants; the survivors are as the draft records them.",
+   "fix": "For each listed branch, do one of the following, per S3-R15 item 6:\n- add a test in the serialized barrier suites, both orders, asserting the visit-first outcome, and show a mutant dropping the branch failing 2/2;\n- or remove the branch with its reason in the draft.\n\nPROBE-C12-UNDECIDED-LANE reaches `.undecided`, once that branch is fixed. Add `.exhausted` and `.undecided` to the mutant table.",
+   "lens": "correct"
+  },
+  {
+   "blocking": true,
+   "area": "S3-R15 item 3: class members still open by the fixer's own record (R-C; the I13b part of R-A)",
+   "location": "docs/adr-drafts/s3f.md:1960-1968 (R-C 'Not implemented'); :2049-2052 (I13b 'Open ... not probed'); Sources/ZTronAssetSync/Engine/EngineSweep / sweepSpaceParked (R-C); EngineFailures.swift integrityFailed / sparePresent (I13b)",
+   "problem": "Both are in the class:\n- R-C, the sweep's place among drained events, is in the class by S3-R15 item 3. The draft says it is not implemented and has no failing test.\n- The cycle-11 R-A finding asked for the same fix in I13b, the integrity failure's publication outcome. The draft leaves that open and not probed.\n\nBoth are reported as open, not Fixed, but S3-R15 item 3 makes them blocking.",
+   "fix": "R-C: write the failing test the draft describes (one slot; a sweep re-queues S while the follow is owed, then J's request), in both orders. Then queue the sweep's verdict as an event under its stamp, alongside the advancing sweep turns.\n\nI13b: defer the integrity failure's outcome of a job that holds a moved id, as `.committed` and `.supersede` are deferred. Probe it first.",
+   "lens": "correct"
+  },
+  {
+   "blocking": false,
+   "area": "unproven suspicion: a follow visit now removes a verifying or committing job while its publication runs",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:700-718 (follow() moves a publishedOwingVisit job in .verifying/.committing; when every id moved it calls supersede -> removeJob); Sources/ZTronAssetSync/Engine/EngineJobs.swift:408-411 (removeJob frees ledgerBytes and the inFlight slot); EngineDispatch.swift:1071-1077 (the publication's success for a removed job only refreshes the store deadline)",
+   "problem": "This path is new in 2e22cf6. Before cycle 12, visits skipped verifying and committing jobs.\n\nWhen the follow visits a published job whose ids all moved, `removeJob` returns its headroom bytes and its slot at once, while the store's publication of the staged file continues. The barrier-end pump can then start another transfer and judge space against bytes the ledger no longer counts.\n\nVisit-first, the download had been abandoned before anything was staged. Not probed.",
+   "fix": "Probe it: a space-limited volume, a held store publication, all ids of C moved, then a space-gated admission. Either keep the ledger bytes and the slot until the publication's outcome arrives, or record why the store's own accounting makes this equivalent.",
+   "lens": "correct"
+  },
+  {
+   "blocking": false,
+   "area": "residuals R-F and R-G still unprobed (fixer's record)",
+   "location": "docs/adr-drafts/s3f.md:1999-2004 (R-F claims at registration, R-G a run's removals after a re-route); EngineFollow.swift:578-590 (replayRemoval re-targets only waiter records)",
+   "problem": "Both are analysed in the draft but have no probe. The cycle-11 suspicion that a `.removal` of a system or run interest targets the transfer it had at arrival (R-G) remains unproven.",
+   "fix": "Probe each in both orders. Resolve a deferred removal's target by the token's current holder when it is replayed.",
+   "lens": "correct"
+  },
+  {
+   "blocking": false,
+   "area": "R-E confirmed as the probe's own wait (no defect)",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierSurvivorTests.swift:75-160 (barrierHoldsAPendingRunBehindTheOwedPump); the cycle-11 probe VerifyREProbe.swift:79-82",
+   "problem": "At HEAD the cycle-11 probe still stalls 60 s in sweep-first, at its own wait for the breaker to leave `.open` (stuck state: `DBGE run=(run-4, false, true, false)`, breaker closed after cancellation, `DBGW sightings=[(4, 0)]`). The re-admission that would admit a probe is deferred behind the held follow by design, so the fixer's diagnosis holds. The committed test passed in Sync runs 1-3, TSan and the simulator.",
+   "fix": "None required.",
+   "lens": "correct"
+  },
+  {
+   "blocking": false,
+   "area": "other-wp:b: P-13 wall-time miss (load-only)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249",
+   "problem": "P-13 reclaimed 10,000 blobs in 0.697953833 s over 563 units, with a unit max of 12.884292 ms against the 5.0 ms batch budget. p95 was 0.990959 ms and the unit on-CPU max 1.002208 ms. Perf-run 1-minute load: mean 16.98, min 4.78, max 31.81, n=83.\n\nSyncBenchmarks passed in 67.592 s. The follow end and drain at 10,000 had a longest actor wait of 4.604125 ms (runs 4.60, 4.52, 4.93).",
+   "fix": "None for WP-F. Route to WP-B.",
+   "lens": "correct"
+  }
+ ]
+}

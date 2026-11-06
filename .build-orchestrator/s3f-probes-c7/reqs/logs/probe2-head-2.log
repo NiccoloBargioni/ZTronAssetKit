@@ -1,0 +1,12 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC7ReqsProbes" started.
+◇ Test "PROBE-C7R-GAIN-AHEAD" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C7R-GAIN-AHEAD" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C7R-GAIN-AHEAD" started.
+PROBE-GAIN-AHEAD visit=followVisitedFirst dResult=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 7000000, available: 4999987)) dStarted=false
+PROBE-GAIN-AHEAD visit=sweepFollowsFirst dResult=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 7000000, available: 5000003)) dStarted=false
+✔ Test "PROBE-C7R-GAIN-AHEAD" with 2 test cases passed after 2.003 seconds.
+✔ Suite "VerifyC7ReqsProbes" passed after 2.004 seconds.
+✔ Test run with 1 test in 1 suite passed after 2.004 seconds.

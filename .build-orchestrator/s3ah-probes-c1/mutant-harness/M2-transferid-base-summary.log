@@ -1,0 +1,5 @@
+✘ Test "R-SEC-2: staging names and attempt tokens parse only in the canonical spelling the module writes" with 7 test cases failed after 0.006 seconds with 42 issues.
+✘ Test "R-SEC-2: every staging name that parses round-trips to the same file name, and every attempt token to the same text" failed after 0.134 seconds with 456 issues.
+✘ Test run with 34 tests in 4 suites failed after 1.042 seconds with 498 issues.
+✔ Test run with 8 tests in 1 suite passed after 0.008 seconds.
+exit 1

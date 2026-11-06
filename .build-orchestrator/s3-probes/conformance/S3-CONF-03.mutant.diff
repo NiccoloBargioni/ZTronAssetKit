@@ -1,0 +1,14 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineRuns.swift b/Sources/ZTronAssetSync/Engine/EngineRuns.swift
+index 13d2869..283436c 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineRuns.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineRuns.swift
+@@ -468,8 +468,7 @@ extension SyncEngine {
+                     error = .notFound
+                     failureClass = .notFound
+                 } else {
+-                    error = .integrityFailure
+-                    failureClass = .integrity
++                    continue // MUTANT S3-CONF-03
+                 }
+             case .integrityQuarantined:
+                 error = .integrityFailure

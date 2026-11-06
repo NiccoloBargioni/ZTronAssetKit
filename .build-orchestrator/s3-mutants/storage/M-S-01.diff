@@ -1,0 +1,16 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift
+index 1007c57..8f0ce10 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift
+@@ -118,10 +118,7 @@ extension AssetStore {
+             try await self.rejectIntegrity(.sizeMismatch(expected: size, actual: hashedBytes), verifying, sidecar)
+         }
+         // (5) Compare with the manifest's claim; checksum-less entries record our digest instead (R-INT-5/6).
+-        if case .checksum(let expected) = identity, expected != digest {
+-            // REENTRANCY: b-3 (proposed) — nothing: the call throws right after.
+-            try await self.rejectIntegrity(.checksumMismatch(expected: expected, actual: digest), verifying, sidecar)
+-        }
++
+         // (6)–(10) Sidecar, reference, barrier, rename, bind; ids with another extension get their own copy.
+         let groups = self.extensionGroups(ids, expectation)
+         guard let primary = groups.first else {

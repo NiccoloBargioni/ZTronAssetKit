@@ -1,0 +1,233 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+✘ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierPublicationTests.swift:272:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ zz-c's user gets C's integrity failure: v4's follow passed C, publishing, in both orders (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" started.
+✘ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:272:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ zz-c's user gets C's integrity failure: v4's follow passed C, publishing, in both orders (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/94/941ae4217e2ad23fbb06cf1847abb397dafaa10dc29c9917998b89eecc87baaf.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: a later apply's follow that passes a publication leaves its moved id to the publication's failure (F-28)" with 2 test cases failed after 1.419 seconds with 2 issues.
+↳ /// A later apply's follow that passes a publication begun before that apply leaves its moved id to the publication's
+↳ /// outcome, whatever an earlier apply's visit of the same publication did (`twoApplies`, v4 after v3's follow ended).
+↳ /// Behind v3's barrier, cycle 14's mark of v3's pass outlived v4's pass, and the failure moved zz-c onto N2 too,
+↳ /// which served zz-c's user (PROBE-C14C-MARK-TWO-APPLIES, the cycle-14 correctness verifier).
+◇ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+✘ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierPublicationTests.swift:286:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ zz-c's user gets C's integrity failure: v4 moved zz-c while C published (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" started.
+✘ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:286:9: Expectation failed: cResult == .failure(.integrityFailure)
+↳ zz-c's user gets C's integrity failure: v4 moved zz-c while C published (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ cResult == .failure(.integrityFailure) → false
+↳   cResult → success(ZTronAssetModel.AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-c, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-c
+↳         rawValue → "zz-c"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/73/7343dcf884bb3334f0174f4147b9922691fb998c55ef6fadf8431ccc56b7e47d.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 24
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: a later apply that lands while an owed follow still owes a publishing job's visit leaves its moved id to the publication (F-28)" with 2 test cases failed after 2.034 seconds with 2 issues.
+↳ /// As above, with v4 applied while v3's follow still owes the visit of C, which publishes since after v3's apply
+↳ /// (ruling S3-R18a item 1): that visit meets v4's copy, in which zz-b and zz-c both moved. Only zz-b, moved as of the
+↳ /// apply C's publication began after, is re-routed; zz-c, which v4 moved while C already published, is passed as a
+↳ /// visit-first engine's v4 follow passed it, and answered with C's failure. Cycle 14's mark, set by that visit,
+↳ /// moved zz-c at the failure too.
+✘ Suite "Engine follow barrier (F-28)" failed after 3.454 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 3.454 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

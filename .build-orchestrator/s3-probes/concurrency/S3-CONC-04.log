@@ -1,0 +1,7 @@
+✘ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" recorded an issue at S3ConcurrencyProbeTests.swift:198:9: Expectation failed: after != .failed(.whenOnline)
+↳ the path is satisfied, yet the asset waits for another edge: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.whenOnline))
+✘ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" recorded an issue at S3ConcurrencyProbeTests.swift:200:9: Expectation failed: starts == 2 || after == .queued || after == .downloading
+↳ a retry was started or queued: starts 1, state Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.whenOnline))
+✘ Test "R-SYN-13: an asset that failed offline before the engine's first conditions reading is retried once that reading shows a satisfied path" failed after 0.030 seconds with 2 issues.
+✘ Suite "S3 concurrency probes: offline retry" failed after 0.030 seconds with 2 issues.
+✘ Test run with 1 test in 1 suite failed after 0.030 seconds with 2 issues.

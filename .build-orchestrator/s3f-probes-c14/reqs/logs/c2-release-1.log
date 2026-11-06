@@ -1,0 +1,13 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "VerifyC14ReqsC2" started.
+◇ Test "PROBE-C14R-LANE-C2" started.
+PROBE-C14R-LANE-C2 members=1000 followedLane ms=["0.248", "0.218", "0.214", "0.215", "0.232"] lane=Optional(ZTronAssetModel.AssetPriority.prefetch) owed=true barrier=true jobs=1000 events=0
+PROBE-C14R-LANE-C2 members=10000 followedLane ms=["4.265", "4.845", "7.997", "5.156", "2.686"] lane=nil owed=true barrier=true jobs=10000 events=0
+✔ Test "PROBE-C14R-LANE-C2" passed after 1.992 seconds.
+✔ Suite "VerifyC14ReqsC2" passed after 1.992 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 1.992 seconds.
+✔ Test run with 1 test in 2 suites passed after 1.992 seconds.
+1793458928 { 105.97 97.81 67.39 }

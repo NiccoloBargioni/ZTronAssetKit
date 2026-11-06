@@ -1,0 +1,163 @@
+# s3-base, no probes; swift test --enable-code-coverage --skip Benchmarks --filter 'ZTronAssetStorageTests|ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests' (459+351+85+71 passed); llvm-cov show over those 4 bundles
+== ZTronAssetSync/Engine/EngineRuns.swift:466-473
+  466|  49.9k|            case .failedUntilEntryChanges:
+  467|    212|                if case .failed(.notFound)? = view.records[skip.id]?.residency {
+  468|    212|                    error = .notFound
+  469|    212|                    failureClass = .notFound
+  470|    212|                } else {
+  471|      0|                    error = .integrityFailure
+  472|      0|                    failureClass = .integrity
+  473|      0|                }
+== ZTronAssetStorage/Store/AssetStore+Apply.swift:342-347
+  342|    650|        record.storedAt = now
+  343|    650|        self.state.core.records[id] = record
+  344|    650|        if let previous, previous != key {
+  345|      0|            self.releaseReference(previous, dooming: .unreferenced)
+  346|      0|        }
+  347|    650|        self.state.core.commits.dirtyFanOuts.insert(key.hash.fanOut)
+== ZTronAssetSync/Engine/EngineDispatch.swift:77-81
+   77|  69.7k|    private var userCap: Int {
+   78|  69.7k|        if self.state.conditions?.power.thermal == .critical {
+   79|      0|            return max(1, self.configuration.power.interactiveConcurrencyAtCritical)
+   80|  69.7k|        }
+   81|  69.7k|        return self.tuning.maxConcurrentTransfers
+== ZTronAssetSync/Engine/EngineDispatch.swift:539-542
+  539|     29|        }
+  540|     29|        if conditions.network.expensive, !access.allowsExpensive 
+  541|      0|            return .policy(.expensiveNetwork)
+  542|     29|        }
+== ZTronAssetSync/Engine/EngineCommands.swift:726-729
+  726|      1|            return error.assetError(now: self.environment.time.now())
+  727|      4|        case .circuitOpen(let cause):
+  728|      0|            return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAf
+  729|      4|        case .throttled(let until):
+== ZTronAssetSync/Engine/EngineDispatch.swift:1107-1113
+ 1107|      1|            self.retryLater(transfer, error: .transient(.localIO(posixCode: FileSystemErrorMapping.p
+ 1108|     14|        case .unknownAsset, .notPresent:
+ 1109|      0|            self.transition(transfer, to: .failed(.untilEntryChanges))
+ 1110|      0|            self.resolveAll(transfer, with: .failed(.notFound))
+ 1111|     14|        case .assetFailed, .unverifiedRejected:
+ 1112|      0|            self.transition(transfer, to: .failed(.untilEntryChanges))
+ 1113|      0|            self.resolveAll(transfer, with: .failed(error.assetError))
+== ZTronAssetSync/Engine/EngineFailures.swift:73-77
+   73|  2.38k|        switch error {
+   74|  2.38k|        case .cancelled(.byClient):
+   75|      0|            // Not a failure (T7/T13): a cancel the engine did not ask for re-queues the job.
+   76|      0|            self.requeue(transfer, discarding: request)
+   77|  2.38k|        case .cancelled(.bySystem):
+== ZTronAssetSync/Engine/EngineEvents.swift:126-130
+  126|    580|                replay(.syncStarted(run.id, run.trigger))
+  127|    580|                if let progress = self.state.progress.latestRun {
+  128|      0|                    replay(progress)
+  129|      0|                }
+  130|    580|            }
+== ZTronAssetStorage/Store/AssetStore+Apply.swift:203-210
+  203|  83.8k|            if let record = newRecords[id] {
+  204|  83.8k|                // A record the manifest did not list (detached) is replaced as `insertRecord` would
+  205|  83.8k|                if let previous = self.state.core.records.updateValue(record, forKey: id) {
+  206|      0|                    if let blob = previous.referencedBlob {
+  207|      0|                        self.releaseReference(blob, dooming: .unreferenced)
+  208|      0|                    }
+  209|      0|                    self.refreshPresentEntry(id)
+  210|      0|                }
+== ZTronAssetSync/Engine/EngineCommands.swift:1052-1057
+ 1052|    431|            report.gcBytes = PlanBuilder.adding(report.gcBytes, garbage.bytesFreed)
+ 1053|    431|            if expired() {
+ 1054|      0|                report.budgetExhausted = true
+ 1055|      0|                // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the li
+ 1056|      0|                return await self.finishMaintenance(report)
+ 1057|    431|            }
+== ZTronAssetSync/Engine/EngineCommands.swift:1079-1092
+ 1079|      1|            }
+ 1080|    431|        } catch .cancelled {
+ 1081|      0|            // The step that threw may have evicted or quarantined in memory first (ADR-050): no bin
+ 1082|      0|            // maintenance is trusted (L4-R5).
+ 1083|      0|            self.storeMutationFailed()
+ 1084|      0|            report.budgetExhausted = true
+ 1085|      0|        } catch {
+ 1086|      0|            // As above.
+ 1087|      0|            self.storeMutationFailed()
+ 1088|      0|            // That step may also have doomed blobs, which leaves a snapshot install due and a reap 
+ 1089|      0|            // (orchestrator ruling L5K-R16).
+ 1090|      0|            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by 
+ 1091|      0|            await self.refreshStoreDeadline()
+ 1092|      0|            return .failure(self.isShuttingDown ? .shutDown : error.assetError)
+== ZTronAssetSync/Engine/EngineRuns.swift:990-1005
+  990|  1.42k|            return
+  991|  1.81k|        case .unarmed:
+  992|      0|            switch pending.gate {
+  993|      0|            case .conditions:
+  994|      0|                self.considerPendingRun()
+  995|      0|                self.ensureWatcher()
+  996|      0|            case .breaker:
+  997|      0|                self.scheduleBreakerDeadline()
+  998|      0|            case .throttle:
+  999|      0|                if let origin = self.state.remote?.originID, let until = self.state.throttles[origin
+ 1000|      0|                    self.state.heap.schedule(.pendingRun, at: until)
+ 1001|      0|                    self.state.pendingRun?.scheduled = true
+ 1002|      0|                    self.rearm()
+ 1003|      0|                }
+ 1004|      0|            }
+ 1005|  1.81k|        }
+== ZTronAssetSync/Engine/EngineRuns.swift:1032-1038
+ 1032|     18|            let reclaim = await remote.reclaimSourceCopies(report)
+ 1033|     18|            if !reclaim.failed.isEmpty {
+ 1034|      0|                self.record(nil, .transient, "\(reclaim.failed.count) source copies could not be rel
+ 1035|      0|            }
+ 1036|     18|        } catch {
+ 1037|      0|            self.record(nil, .storage, "adoption report failed: \(error)")
+ 1038|     18|        }
+== ZTronAssetSync/Engine/EngineReadmission.swift:126-148
+  126|     90|            for transfer in self.state.edgeOwed {
+  127|     12|                guard let job = self.state.jobs[transfer], job.state.owedOnEdge(transient: job.trans
+  128|      0|                    stale.append(transfer)
+  129|      0|                    continue
+  130|     12|                }
+  131|     12|                candidates.append((self.queueRank(job), job.ticket, transfer))
+  132|     90|            }
+  133|     90|            for transfer in stale {
+  134|      0|                self.state.edgeOwed.remove(transfer)
+  135|     90|            }
+  136|     90|        }
+  137|  5.48k|        if passes.contains(.origin) {
+  138|  1.70k|            var stale: [TransferID] = []
+  139|  2.96k|            for transfer in self.state.originOwed {
+  140|  2.96k|                guard let job = self.state.jobs[transfer], job.state.isOriginParked else {
+  141|      0|                    stale.append(transfer)
+  142|      0|                    continue
+  143|  2.96k|                }
+  144|  2.96k|                candidates.append((self.queueRank(job), job.ticket, transfer))
+  145|  2.96k|            }
+  146|  1.70k|            for transfer in stale {
+  147|      0|                self.state.originOwed.remove(transfer)
+  148|  1.70k|            }
+== ZTronAssetKit/Facade/ClientLifecycle.swift:244-254
+  244|    967|            handed.insert(key)
+  245|    967|            guard let forwarder = self.followers[key]?.forwarder else {
+  246|      0|                self.followers[key] = nil
+  247|      0|                self.followerObserver?(self.followers.count, self.lastFollower)
+  248|      0|                continue
+  249|    967|            }
+  250|    967|            // REENTRANCY: g-10 (proposed) — the followers and `closed`, re-read at the loop's top
+  251|    967|            // meanwhile is handed a stream too); `next` cannot publish meanwhile.
+  252|    967|            guard case .success(let stream) = await next.engine.subscribe() else {
+  253|      0|                continue
+  254|    967|            }
+== ZTronAssetKit/Facade/ClientLifecycle.swift:506-516
+  506|  3.65k|        while true {
+  507|  3.65k|            guard !self.closed else {
+  508|      0|                self.groups.removeValue(forKey: token)
+  509|      0|                return .failure(.shutDown)
+  510|  3.65k|            }
+  511|  3.65k|            guard let group = self.groups[token] else {
+  512|      0|                return .success(token)
+  513|  3.65k|            }
+  514|  3.65k|            if let bound = group.binding?.generation, bound == self.core.generation, self.retiring !
+  515|      0|                return .success(token)
+  516|  3.65k|            }
+== ZTronAssetKit/Facade/AssetClient.swift:146-150
+  146|  18.4E|        }
+  147|  18.4E|        if reopensVanishedRootFirst, await core.store.unavailableReason == .rootVanished {
+  148|      0|            // The root vanished again after every reopen allowed: the failure is reported, never a 
+  149|      0|            throw .storageUnavailable(.rootVanished)
+  150|  18.4E|        }

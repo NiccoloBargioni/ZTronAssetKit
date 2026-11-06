@@ -1,0 +1,28 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:158:13: Expectation failed: waiting.violations.isEmpty
+↳ ["nothing will re-admit the 1 jobs the breaker parked while it is closed"]
+↳ waiting.violations.isEmpty → false
+↳   waiting.violations → ["nothing will re-admit the 1 jobs the breaker parked while it is closed"]
+↳   isEmpty → false
+✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" with 2 test cases failed after 0.937 seconds with 1 issue.
+↳ /// The new content an owed follow's visit queues behind a half-open breaker starts once the breaker closes: X's 403
+↳ /// opens the breaker (one distinct asset trips it); prefetch members M and K park; at the cooldown's end one of them
+↳ /// probes and holds. v3 moves the parked member's id to N while the follow owes its visits; then the probe commits
+↳ /// and closes the breaker. Three slots, so one is free at the apply (H and the probe hold two). Visited first, the
+↳ /// pump tried N at the apply, the half-open breaker refused it, and the close re-admitted it. Refused on the breaker
+↳ /// of its place's stamp after the close's re-admission had run in the drain, N parked `circuitOpen` behind a closed
+↳ /// breaker that nothing re-admits (the cycle-13 requirements verifier).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.938 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.939 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

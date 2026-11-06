@@ -1,0 +1,33 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "VerifyC18ReqsDivergence" started.
+◇ Test "VERIFY-C18R-DIVERGENCE: 10,000 ids converged on one content mapped away again" started.
+VERIFY-C18R-DIVERGENCE warm-up 1,000: wait 6.575958 ms (convergence control 3.164 ms); O held 1001 ids before v4, 1 after; 1001 jobs after, follow owed false
+VERIFY-C18R-DIVERGENCE 10,000 back to their own contents: longest actor wait [66.091375, 66.272166, 67.287458] ms, best 66.091375 ms; runs [wait 66.091375 ms (convergence control 5.291083 ms); O held 10001 ids before v4, 1 after; 10001 jobs after, follow owed false, wait 66.272166 ms (convergence control 5.443542 ms); O held 10001 ids before v4, 1 after; 10001 jobs after, follow owed false, wait 67.287458 ms (convergence control 5.0925 ms); O held 10001 ids before v4, 1 after; 10001 jobs after, follow owed false]
+VERIFY-C18R-DIVERGENCE 10,000 on to fresh contents: longest actor wait [63.630625, 63.44775, 63.037334] ms, best 63.037334 ms; runs [wait 63.630625 ms (convergence control 5.154291 ms); O held 10001 ids before v4, 1 after; 10001 jobs after, follow owed false, wait 63.44775 ms (convergence control 5.114709 ms); O held 10001 ids before v4, 1 after; 10001 jobs after, follow owed false, wait 63.037334 ms (convergence control 4.9655 ms); O held 10001 ids before v4, 1 after; 10001 jobs after, follow owed false]
+✘ Test "VERIFY-C18R-DIVERGENCE: 10,000 ids converged on one content mapped away again" recorded an issue at VerifyC18ReqsDivergence.swift:35:13: Expectation failed: (waits.min() ?? .infinity) <= SyncBenchmarks.c2Budget
+↳ own contents: [66.091375, 66.272166, 67.287458]
+↳ (waits.min() ?? .infinity) <= SyncBenchmarks.c2Budget → false
+↳   (waits.min() ?? .infinity) → 66.091375
+↳   SyncBenchmarks.c2Budget → 10.0
+✘ Test "VERIFY-C18R-DIVERGENCE: 10,000 ids converged on one content mapped away again" recorded an issue at VerifyC18ReqsDivergence.swift:36:13: Expectation failed: (freshWaits.min() ?? .infinity) <= SyncBenchmarks.c2Budget
+↳ fresh contents: [63.630625, 63.44775, 63.037334]
+↳ (freshWaits.min() ?? .infinity) <= SyncBenchmarks.c2Budget → false
+↳   (freshWaits.min() ?? .infinity) → 63.037334
+↳   SyncBenchmarks.c2Budget → 10.0
+✘ Test "VERIFY-C18R-DIVERGENCE: 10,000 ids converged on one content mapped away again" failed after 8.754 seconds with 2 issues.
+✘ Suite "VerifyC18ReqsDivergence" failed after 8.754 seconds with 2 issues.
+✘ Suite ZTronAssetKitBenchmarks failed after 8.754 seconds with 2 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 1 test in 2 suites failed after 8.754 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

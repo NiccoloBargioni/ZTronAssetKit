@@ -1,0 +1,27 @@
+diff --git a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+index 91bcc60..4025a36 100644
+--- a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
++++ b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+@@ -204,7 +204,7 @@ enum EvictionOrder {
+             order.reserveCapacity(self.tallies.count)
+             for slot in self.tallies.indices where self.tallies[slot].evictable {
+                 let key = self.tallies[slot].key
+-                guard case .live? = blobTable[key], publishing.isEmpty || !publishing.contains(key), leases.isEmpty || leases[key]?.isEmpty ?? true else {
++                guard case .live? = blobTable[key], publishing.isEmpty || !publishing.contains(key) else {
+                     continue
+                 }
+                 order.append(
+diff --git a/Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift b/Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift
+index 42b0d31..9479665 100644
+--- a/Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift
++++ b/Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift
+@@ -265,8 +265,7 @@ extension AssetStore {
+     /// or `nil` when nothing was evicted.
+     func evict(_ victims: ArraySlice<EvictionVictim>, rules: EvictionOrder.Rules, scan: inout HolderScan) -> BlobEviction? {
+         guard let key = victims.first?.blob, case .live(let references)? = self.state.core.blobTable[key],
+-            self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key),
+-            self.state.cleanup.leases.isEmpty || self.state.cleanup.leases[key]?.isEmpty ?? true
++            self.state.core.publishing.isEmpty || !self.state.core.publishing.contains(key)
+         else {
+             return nil
+         }

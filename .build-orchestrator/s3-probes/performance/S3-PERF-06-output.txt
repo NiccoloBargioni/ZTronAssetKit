@@ -1,0 +1,5 @@
+S3-PERF mirror reset of 10,000 entries on the main actor: median 0.602041 ms (runs [0.893667, 0.596875, 0.587708, 0.608333, 0.602041]); install with retired hand-back: median 9.746375 ms; budget 1.0 ms
+✔ Test "P-8: the mirror's reset at 10,000 assets keeps the main actor within ui_call_ms_max" passed after 0.106 seconds.
+S3-PERF prefetch window over 10 pages: radius 10 0.043542000000000004 ms, radius 10,000,000 9.267292 ms (10 targets); budget 1.0 ms
+✘ Test "P-8: the prefetch window over 10 pages stays within ui_call_ms_max whatever the radius" recorded an issue at S3PerfMirrorResetProbe.swift:75:9: Expectation failed: timings.large <= budget
+↳ /// S3-PERF probe: `PrefetchWindow.targets` (run on the main actor by `PrefetchWindowController.update`, a UI-facing

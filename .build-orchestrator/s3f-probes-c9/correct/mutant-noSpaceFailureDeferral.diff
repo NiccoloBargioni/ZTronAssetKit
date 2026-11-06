@@ -1,0 +1,11 @@
+--- Sources/ZTronAssetSync/Engine/EngineFailures.swift	2026-10-30 13:29:05
++++ Sources/ZTronAssetSync/Engine/EngineFailures.swift	2026-10-30 15:20:33
+@@ -511,7 +511,7 @@
+         guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch else {
+             return
+         }
+-        if self.defersToFollow {
++        if false, self.defersToFollow {
+             // The verdict reads the room, the bytes in flight and the job's lane, which the owed visits change: it waits
+             // for the follow's end (F-28). The read above is adopted already (S3-R11 R1).
+             self.state.eventsAfterFollow.append(.spaceFailure(transfer, epoch: epoch, required: required))

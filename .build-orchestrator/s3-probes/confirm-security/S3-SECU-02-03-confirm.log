@@ -1,0 +1,36 @@
+# confirm probes S3-SECU-02.swift, S3-SECU-03.swift at s3-base
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" recorded an issue with 1 argument path → "media/" at S3ConfirmSecurityRemoteURLProbe.swift:23:9: Expectation failed: !accepted || url != nil
+↳ media/: decoder accepted=true, RemoteURL.make=nil
+↳ !accepted || url != nil → false
+↳   !accepted → false
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" recorded an issue with 1 argument path → "media\a.png" at S3ConfirmSecurityRemoteURLProbe.swift:23:9: Expectation failed: !accepted || url != nil
+↳ media\a.png: decoder accepted=true, RemoteURL.make=nil
+↳ !accepted || url != nil → false
+↳   !accepted → false
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" recorded an issue with 1 argument path → "media//a.png" at S3ConfirmSecurityRemoteURLProbe.swift:23:9: Expectation failed: !accepted || url != nil
+↳ media//a.png: decoder accepted=true, RemoteURL.make=nil
+↳ !accepted || url != nil → false
+↳   !accepted → false
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" recorded an issue with 1 argument path → "media/%2E/a.png" at S3ConfirmSecurityRemoteURLProbe.swift:23:9: Expectation failed: !accepted || url != nil
+↳ media/%2E/a.png: decoder accepted=true, RemoteURL.make=nil
+↳ !accepted || url != nil → false
+↳   !accepted → false
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" recorded an issue with 1 argument path → "./a.png" at S3ConfirmSecurityRemoteURLProbe.swift:23:9: Expectation failed: !accepted || url != nil
+↳ ./a.png: decoder accepted=true, RemoteURL.make=nil
+↳ !accepted || url != nil → false
+↳   !accepted → false
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" recorded an issue with 1 argument path → "media/./a.png" at S3ConfirmSecurityRemoteURLProbe.swift:23:9: Expectation failed: !accepted || url != nil
+↳ media/./a.png: decoder accepted=true, RemoteURL.make=nil
+↳ !accepted || url != nil → false
+↳   !accepted → false
+✘ Test "S3-SECU-02: a decoder-accepted remote path always yields a URL from RemoteURL.make" with 7 test cases failed after 0.001 seconds with 6 issues.
+✘ Suite "S3 confirm security: decoder vs RemoteURL" failed after 0.001 seconds with 6 issues.
+✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 6 issues.
+✘ Test "S3-SECU-03: two directory entries never parse to the same staging name" recorded an issue at S3ConfirmSecurityStagingProbe.swift:27:9: Expectation failed: canonical == nil || padded == nil || canonical != padded
+↳ both entries parse to c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.1-2.part
+✘ Test "S3-SECU-03: two directory entries never parse to the same staging name" failed after 0.001 seconds with 1 issue.
+✘ Test "S3-SECU-03: a fresh, non-canonical staging name is collected as foreign" recorded an issue at S3ConfirmSecurityStagingProbe.swift:20:9: Expectation failed: garbage.map(\.name) == [name]
+↳ non-canonical c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.01-2.part kept by age rules instead of removed as foreign
+✘ Test "S3-SECU-03: a fresh, non-canonical staging name is collected as foreign" failed after 0.001 seconds with 1 issue.
+✘ Suite "S3 confirm security: staging names" failed after 0.001 seconds with 2 issues.
+✘ Test run with 2 tests in 1 suite failed after 0.001 seconds with 2 issues.

@@ -1,0 +1,22 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a network edge between a drained publication's ENOENT re-queue and the owed move onto its job leaves the visit-first answers (F-28, e1-P3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a network edge between a drained publication's ENOENT re-queue and the owed move onto its job leaves the visit-first answers (F-28, e1-P3)" started.
+E1P3-SHAPEA followVisitedFirst: at the move T verifying at epoch 8, move owed false, 0 events waiting; A success(100000); X success(100000); T started 2 times
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a network edge between a drained publication's ENOENT re-queue and the owed move onto its job leaves the visit-first answers (F-28, e1-P3)" started.
+E1P3-SHAPEA sweepFollowsFirst: at the move T queued at epoch 8, move owed true, 2 events waiting; A success(100000); X success(100000); T started 2 times
+✔ Test "R-SYN-11: a network edge between a drained publication's ENOENT re-queue and the owed move onto its job leaves the visit-first answers (F-28, e1-P3)" with 2 test cases passed after 1.632 seconds.
+◇ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+E1P3-T8B followVisitedFirst edge=false: X at the replay queued at epoch 6, pin epoch Optional(6); replayed (x: [zz-a1, zz-a2, zz-a3, zz-x], w: [])
+◇ Test case passing 2 arguments visit → .followVisitedFirst, edge → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+E1P3-T8B followVisitedFirst edge=true: X at the replay queued at epoch 6, pin epoch Optional(6); replayed (x: [zz-a1, zz-a2, zz-a3, zz-x], w: [])
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → false to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+E1P3-T8B sweepFollowsFirst edge=false: X at the replay queued at epoch 6, pin epoch Optional(6); replayed (x: [zz-a1, zz-a2, zz-a3, zz-x], w: [])
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, edge → true to "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" started.
+E1P3-T8B sweepFollowsFirst edge=true: X at the replay queued at epoch 6, pin epoch Optional(6); replayed (x: [zz-a1, zz-a2, zz-a3, zz-x], w: [])
+✔ Test "R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)" with 4 test cases passed after 2.388 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 4.021 seconds.
+✔ Test run with 2 tests in 1 suite passed after 4.021 seconds.

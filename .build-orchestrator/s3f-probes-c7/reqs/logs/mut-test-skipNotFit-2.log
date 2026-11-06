@@ -1,0 +1,55 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" started.
+✘ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowTests.swift:901:9: Expectation failed: watch.state == .blocked(.insufficientSpace)
+↳ in the sweep's turn C's job, which does not fit its prefetch lane, is parked insufficientSpace (re-checked at every read), not left awaitingSpace with nothing pending and no wake: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace))
+↳ watch.state == .blocked(.insufficientSpace) → false
+↳   watch.state → .blocked(ZTronAssetModel.BlockReason.awaitingSpace)
+↳     some → .blocked(ZTronAssetModel.BlockReason.awaitingSpace)
+↳       blocked → .awaitingSpace
+↳   .blocked(.insufficientSpace) → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳     some → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳       blocked → .insufficientSpace
+✔ Test "R-SYN-11: the kept prefetch waiter of a job a space sweep parks after its follow gets its own lane's figures (F-22)" with 2 test cases passed after 0.934 seconds.
+✔ Test "R-SYN-11: a free-space read's sweep judges a followed job again on its new lane, so a lane the follow lowered takes no room from the next parked job" with 2 test cases passed after 0.940 seconds.
+✔ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it parks it, so a lane whose volume has room re-queues it (F-22)" with 2 test cases passed after 0.951 seconds.
+✘ Test "R-SYN-11: a space sweep judges a job again on the lane its follow leaves before it re-queues it, so a lane the follow lowered takes no room from the next waiter (F-22)" with 2 test cases failed after 0.966 seconds with 1 issue.
+↳ /// A space sweep that follows a job before re-queuing it judges the job again on the lane the follow leaves it, and
+↳ /// neither re-queues it nor counts its bytes ahead of the jobs behind it when it no longer fits. Content C (5 MB) is
+↳ /// listed by A, which has a user waiter, and by B, a prefetch group's member, so its job is user-lane; K (3 MB, a user
+↳ /// waiter) waits behind it. Both wait `awaitingSpace`: 2 MB of room for user work, none for prefetch work (the
+↳ /// opportunistic volume is 6 MB smaller), and 4 MB of a pruned blob pending the reclaim. A forced sync moves A to a
+↳ /// 16-byte content while 2,100 changed entries sort before it, so the bounded follow owes C's visit (its turns held).
+↳ /// The reclaim leaves 6 MB for user work and still none for prefetch work. Followed first, C's job is prefetch-lane
+↳ /// and parked, and K is fetched. Judged on its pre-follow user lane, the sweep found that C fits, followed it (A
+↳ /// left, B stayed: prefetch), re-queued it anyway and counted its 5 MB ahead: K was judged against 1 MB, parked
+↳ /// `insufficientSpace`, and its fail-fast answered K's waiter `insufficientSpace(required: 3000000, available:
+↳ /// 999000)` although 6 MB were free and the gate then parked C's job (F-22: the figures are the room the asset
+↳ /// lacks; the close-out cycle-5 correctness lens, PROBE-C5-LANEDROP). At `s3-base` the follow moved every job in the
+↳ /// apply's turn, so no sweep could act between the two. In the sweep's own turn C's job is parked `insufficientSpace`
+↳ /// in both cases: a sweep that skipped the job once its re-judgement failed left it `awaitingSpace` with nothing
+↳ /// pending and no wake until the store's settle read parked it a turn later (the close-out cycle-6 requirements
+↳ /// lens, mutant `skipNotFit`).
+↳ ///
+↳ /// Hang guard (S3-R4): under TSan in the whole Sync bundle it took 45.7 to 47.0 s beside a second TSan process at a
+↳ /// load of 20 to 35 (78 % of 60 s) and 19.2 s alone at a load of 13 to 18 (Stage 3 close-out cycle 7; the cycle-6
+↳ /// verifier measured 35.0 to 35.1 s paired at a load of 17 to 34), over half its 60 s, so the guard is
+↳ /// `.minutes(3)`.
+✘ Suite "Engine runs" failed after 0.967 seconds with 1 issue.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 4 tests in 1 suite failed after 0.967 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

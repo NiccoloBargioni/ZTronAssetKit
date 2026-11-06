@@ -1,0 +1,61 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+index 1f6deca..db9d622 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+@@ -155,15 +155,19 @@ extension AssetStore {
+         guard self.state.core.phase == .open, maxKeys > 0, let layout = self.state.core.layout else {
+             return result
+         }
+-        var queue = self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted()[...]
++        let queue = self.state.core.blobTable.keys.filter { self.deletionBlocker($0) == .none }.sorted()
++        var cursor = 0
+         let batchSize = max(1, self.configuration.deletionBatchSize)
+         let fileSystem = self.environment.fileSystem
+         let time = self.environment.time
+         var budget = maxKeys
+-        while !queue.isEmpty, budget > 0, self.state.core.phase == .open {
++        while cursor < queue.count, budget > 0, self.state.core.phase == .open {
+             var batch: [BlobKey] = []
+-            while let key = queue.first, batch.count < min(batchSize, budget) {
+-                queue.removeFirst()
++            var indices: [Int] = []
++            var scan = cursor
++            while scan < queue.count, batch.count < min(batchSize, budget) {
++                let key = queue[scan]
++                scan += 1
+                 // Re-validated per key: the state may have changed during the previous unit.
+                 guard self.deletionBlocker(key) == .none, case .doomed(let info)? = self.state.core.blobTable[key] else {
+                     continue
+@@ -171,6 +175,7 @@ extension AssetStore {
+                 self.state.core.deletingDooms[key] = info
+                 self.state.core.blobTable[key] = .deleting
+                 batch.append(key)
++                indices.append(scan - 1)
+             }
+             guard !batch.isEmpty else {
+                 break
+@@ -183,6 +188,7 @@ extension AssetStore {
+                 BlobDeletionUnit.run(fileSystem: fileSystem, layout: layout, keys: keys, time: time, budget: BlobDeletionUnit.budget)
+             }
+             let uptime = self.environment.time.uptimeNow()
++            var next = scan
+             for (position, key) in batch.enumerated() {
+                 let info = self.state.core.deletingDooms.removeValue(forKey: key)
+                 if position >= outcome.attempted {
+@@ -190,7 +196,7 @@ extension AssetStore {
+                     if let info {
+                         self.state.core.blobTable[key] = .doomed(info)
+                     }
+-                    queue.insert(key, at: queue.startIndex + (position - outcome.attempted))
++                    next = min(next, indices[position])
+                 } else if outcome.failures[key] != nil, var doom = info {
+                     doom.failedUnlinks += 1
+                     doom.eligibleAt = uptime.adding(seconds: AssetStore.unlinkBackoff(afterFailures: doom.failedUnlinks))
+@@ -203,6 +209,7 @@ extension AssetStore {
+                 self.resumeKeyWaiters(key)
+             }
+             budget -= outcome.attempted
++            cursor = next
+             // The processed keys leave DOOMED with the next commit (a lazy mutation).
+             self.markDirtyInternal(.lazy)
+         }

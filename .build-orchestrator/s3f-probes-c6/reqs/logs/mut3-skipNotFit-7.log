@@ -1,0 +1,25 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC6ReqsProbes" started.
+◇ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" started.
+✘ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC6ReqsProbes.swift:121:9: Expectation failed: afterSweep.shared == .blocked(.insufficientSpace)
+↳ // PROBE: the job a follow lowered is parked `insufficientSpace` (re-checked at every read), not left `awaitingSpace`
+↳ // with nothing pending and no wake.
+↳ PROBE-PARK: C's job after the sweep: (owed: true, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), shared: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), violations: [])
+↳ afterSweep.shared == .blocked(.insufficientSpace) → false
+↳   afterSweep.shared → .blocked(ZTronAssetModel.BlockReason.awaitingSpace)
+↳     some → .blocked(ZTronAssetModel.BlockReason.awaitingSpace)
+↳       blocked → .awaitingSpace
+↳   .blocked(.insufficientSpace) → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳     some → .blocked(ZTronAssetModel.BlockReason.insufficientSpace)
+↳       blocked → .insufficientSpace
+✘ Test "PROBE-C6R-LANEDROP-PARK: the lane-dropped job is parked insufficientSpace and a later read re-admits it" with 2 test cases failed after 0.769 seconds with 1 issue.
+✘ Suite "VerifyC6ReqsProbes" failed after 0.769 seconds with 1 issue.
+↳ /// Scratch probe (s3f close-out verification, cycle 6, requirements lens). Never committed. A copy of
+↳ /// `spaceSweepJudgesAFollowedJobOnItsNewLane` up to K's and A's answers, plus two probes on the lane-dropped job itself.
+✘ Test run with 1 test in 1 suite failed after 0.769 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

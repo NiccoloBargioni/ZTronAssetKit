@@ -1,0 +1,20 @@
+[07:34:20 load { 108.27 158.08 109.08 }] build head exit 0
+[07:34:26 load { 103.12 156.18 108.70 }] probe head run1 exit 1
+[07:34:43 load { 125.01 157.51 110.26 }] probe head run2 exit 1
+[07:34:49 load { 136.22 159.29 111.17 }] probe head run3 exit 1
+[07:34:58 load { 167.83 165.29 113.86 }] build gainNoAhead exit 0
+[07:35:05 load { 184.42 168.78 115.39 }] probe gainNoAhead run1 exit 1
+[07:35:12 load { 218.61 176.58 118.78 }] probe gainNoAhead run2 exit 1
+[07:35:18 load { 239.38 181.58 120.89 }] probe gainNoAhead run3 exit 1
+[07:36:07 load { 366.28 225.37 140.58 }] build2 head exit 0
+[07:36:16 load { 374.66 229.45 142.52 }] probe2 head run1 exit 0
+[07:36:25 load { 389.19 237.35 146.34 }] probe2 head run2 exit 0
+[07:36:32 load { 403.24 245.36 150.24 }] probe2 head run3 exit 0
+[07:36:40 load { 410.19 249.42 152.23 }] probe2 head run4 exit 0
+[07:36:46 load { 413.94 252.86 154.02 }] probe2 head run5 exit 0
+[07:36:53 load { 411.53 257.68 156.88 }] build2 gainNoAhead exit 0
+[07:36:57 load { 406.36 259.16 158.00 }] probe2 gainNoAhead run1 exit 1
+[07:37:02 load { 400.16 260.32 159.00 }] probe2 gainNoAhead run2 exit 1
+[07:37:06 load { 400.16 260.32 159.00 }] probe2 gainNoAhead run3 exit 1
+[07:37:10 load { 390.62 260.67 159.71 }] probe2 gainNoAhead run4 exit 1
+[07:37:14 load { 381.92 261.02 160.43 }] probe2 gainNoAhead run5 exit 1

@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15R-SPACE-EPOCH" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-SPACE-EPOCH" started.
+PROBE-C15R-SPACE-EPOCH followVisitedFirst after the drain: (c: nil, lastError: nil)
+PROBE-C15R-SPACE-EPOCH followVisitedFirst x=success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f87470655b64b525c37f937cdabbbe5751a4f560c2dd260c71c59d9a05e2e9f8.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-SPACE-EPOCH" started.
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst before the ENOSPC: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), found: false)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst after the ENOSPC: (waits: false, c: nil, epoch: nil)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst after the drain: (c: nil, lastError: nil)
+PROBE-C15R-SPACE-EPOCH sweepFollowsFirst x=failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 5000000)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/23/23e6005f3ec4021dd78dd0adb7d46c852a05c1293ca7295df172cf3dd9cbc222.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C15R-SPACE-EPOCH" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:202:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+↳ PROBE-C15R-SPACE-EPOCH: zz-x's caller is served C's content by a new job (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 5000000))
+↳ (try? xResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "PROBE-C15R-SPACE-EPOCH" with 2 test cases failed after 5.111 seconds with 1 issue.
+↳ /// PROBE-C15R-SPACE-EPOCH (the surviving mutant `spaceFailureEpochDropped`; the draft says it "only writes its
+↳ /// lastError"). C (1 MB) is zz-a's content; v3 moves zz-a to N (16 B) and maps zz-x onto C's content. While v3's follow
+↳ /// is owed (300 prefetch members before zz-a keep C's visit owed past the ENOSPC read's own follow turn), a user asks
+↳ /// for zz-x (the join waits), then C's attempt fails ENOSPC reporting 20 MB with 5 MB of room (the verdict waits). The
+↳ /// follow's visit supersedes C, the drain's join creates a new job C' for C's content, and the `.spaceFailure` replay
+↳ /// must skip it. Visited first, C was superseded at the apply, C' started for zz-x and served it.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.112 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 5.112 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

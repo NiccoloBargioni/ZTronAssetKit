@@ -1,0 +1,2 @@
+S3-PERF publish scaling: user-initiated [(key: 2500, value: 1.315904465), (key: 5000, value: 3.9373557310000002), (key: 10000, value: 10.667697384)] s (10,000 / 5,000 = 2.709355748582728); bulk [(key: 2500, value: 1.058472739), (key: 5000, value: 2.155753501), (key: 10000, value: 2.324882279)] s (ratio 1.0784545997126043); max 2.5
+✘ Test "R-SYN-10: user-initiated publications of a doubled catalog cost the store at most doubling_ratio_max times as much" recorded an issue at S3PerfPublishProbe.swift:29:9: Expectation failed: userRatio <= ratioMax

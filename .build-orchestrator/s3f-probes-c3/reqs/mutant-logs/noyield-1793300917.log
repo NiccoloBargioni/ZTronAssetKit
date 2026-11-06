@@ -1,0 +1,31 @@
+Building for debugging...
+[Computing dependencies]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[21 / 21] ZTronAssetSyncTests-product
+Build complete! (4,71 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine idle and shutdown" started.
+◇ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" started.
+✘ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" recorded an issue at EngineShutdownDrainTests.swift:62:9: Expectation failed: seen.contains { $0 > 0 && $0 < slices.count }
+↳ the engine's actor ran other work between the settle's slices: [0, 3]
+↳ seen.contains { $0 > 0 && $0 < slices.count } → <not evaluated>
+✘ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" failed after 0.172 seconds with 1 issue.
+↳ /// A shutdown answers its waiters and frees its job table over turns of at most `shutdownStepsPerTurn` steps (C2;
+↳ /// Stage 3, S3-PERF-01): with more waiters and jobs than one turn takes, every waiter is still answered `shutDown`
+↳ /// exactly once, the group's join ends, the engine owns nothing afterwards, and the drain holds every continuation
+↳ /// and job the state held (none is left behind for a later turn to miss). The settle's slices are recorded
+↳ /// (`shutdownSlices`): none takes more than `shutdownStepsPerTurn` steps, and together they take every waiter and job,
+↳ /// so the bound holds on any device, not only where the benchmark measures it.
+✘ Suite "Engine idle and shutdown" failed after 0.173 seconds with 1 issue.
+↳ /// Idle silence, `waitUntil`, shutdown and the last event (R-SYN-14, R-SYN-15, R-SYN-12).
+✘ Test run with 1 test in 1 suite failed after 0.173 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

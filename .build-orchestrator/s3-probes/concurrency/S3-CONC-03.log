@@ -1,0 +1,8 @@
+✘ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" recorded an issue at S3ConcurrencyProbeTests.swift:31:9: Expectation failed: started != nil && progress != nil && started! < progress!
+↳ run 2's progress precedes its start: [ZTronAssetModel.AssetEvent.syncProgress(run-2, ZTronAssetModel.SyncProgress(fraction: 0.5, completedCount: 1, totalCount: 2, bytesReceived: 1, bytesExpected: 2)), ZTronAssetModel.AssetEvent.syncFinished(run-1, ZTronAssetModel.SyncOutcome.failed(ZTronAssetModel.AssetError.cancelled)), ZTronAssetModel.AssetEvent.syncStarted(run-2, ZTronAssetModel.SyncTrigger.explicit)]
+✘ Test "R-SYN-12: a lagging subscriber receives a run's syncStarted before that run's syncProgress" failed after 0.001 seconds with 1 issue.
+✘ Test "R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress" recorded an issue at S3ConcurrencyProbeTests.swift:70:13: Expectation failed: started < progress
+↳ run 2's syncProgress at 3 precedes its syncStarted at 4: ["client", "conditions", "snapshot", "run", "runStarted", "runFinished", "clientEnd"]
+✘ Test "R-SYN-12: a subscriber stalled across two runs receives the second run's syncStarted before its syncProgress" failed after 0.017 seconds with 1 issue.
+✘ Suite "S3 concurrency probes: engine events" failed after 0.018 seconds with 2 issues.
+✘ Test run with 2 tests in 1 suite failed after 0.018 seconds with 2 issues.

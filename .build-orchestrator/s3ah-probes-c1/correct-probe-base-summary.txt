@@ -1,0 +1,13 @@
+✘ Test "C1: a background task tag with a non-canonical staging name is not ours" failed after 0.002 seconds with 1 issue.
+✘ Test "C1: the confirmer's reproduction: a fresh non-canonical staging name is collected as foreign" failed after 0.011 seconds with 5 issues.
+✘ Test "C1: the finding's spellings are quarantined; ordinary and escaped legitimate paths are still accepted" failed after 0.011 seconds with 9 issues.
+✔ Test "C1: racing advance(to:) and advance(by:) from many tasks against sleepers: each sleeper resumes once, all wake" passed after 0.048 seconds.
+✘ Test "C1: adding(seconds:) is monotone in its argument, saturates, and ignores NaN/negative/zero" failed after 0.163 seconds with 1 issue.
+C1 S3AH-1 parser agreement: 14760 decodes, missing diagnostics 0, mismatches 0: []
+✔ Test "C1: streaming parser (raw and fully escaped) agrees with violations(of:) on every enumerated path" passed after 0.457 seconds.
+C1 S3AH-2: parsed 32100 tokens, aliases 8200: ["00-0", "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.00-0.resume", "00-1", "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.00-1.resume", "00-2", "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.00-2.resume", "00-3", "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.00-3.resume", "00-4", "c-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.00-4.resume"]
+✘ Test "C1: exhaustive tokens over [0-9-] up to 5 characters and unicode digits: parse implies identical text" failed after 0.959 seconds with 1 issue.
+C1 S3AH-3: round-trip misses below 2^51: 32148 [(8337534238901892060, 32129), (1229704285215611610, 8558534511724), (6226818188434611747, 8289952101222), (5123022328991413964, 8037), (3024201533418703409, 15)]
+✘ Test "C1: adding(seconds: b.seconds(since: a)) == b for 1,000,000 random gaps below 2^51 and random starts" failed after 1.426 seconds with 1 issue.
+C1 S3AH-1: enumerated 218525, accepted 174495, accepted-but-refused 79820: ["\".\"", "\"\\\\\"", "\"a/\"", "\"a\\\\\"", "\"./\"", "\".\\\\\"", "\"\\\\a\"", "\"\\\\.\"", "\"\\\\/\"", "\"\\\\\\\\\"", "\"\\\\%\"", "\"\\\\2\"", "\"\\\\E\"", "\"\\\\e\"", "\"\\\\F\"", "\"\\\\5\"", "\"\\\\C\"", "\"%/\"", "\"%\\\\\"", "\"2/\""]
+C1 S3AH-1: decoder stricter than transport on plain paths: 636: ["\"/́\"", "\"?́\"", "\"#́\"", "\":́\"", "\"a?́\"", "\"a#́\"", "\"a:́\"", "\".?́\"", "\".#́\"", "\".:́\"", "\"/́a\"", "\"/́.\"", "\"/́%2E\"", "\"/́%2e\"", "\"/́%\"", "\"/́é\"", "\"/́́\"", "\"%2E?́\"", "\"%2E#́\"", "\"%2E:́\"", "\"%2e?́\"", "\"%2e#́\"", "\"%2e:́\"", "\"?́a\"", "\"?́.\"", "\"?́%2E\"", "\"?́%2e\"", "\"?́%\"", "\"?́é\"", "\"?́́\""]

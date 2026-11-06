@@ -1,0 +1,98 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests (R-NET-9, G4 strength)",
+  "location": "Tests/ZTronAssetTransportTests/ConditionsTests.swift:83-100",
+  "problem": "The test carrying the required \u00a711 name 'R-NET-9: the live conditions source yields the current state first, then on change, without polling' does not prove the 'without polling' part on its own. It only checks that each post yields an element whose power or network equals the previous one, so a source that polls (or emits extra elements) would still pass. The proof sits in the companion test pathSeam (lines 103-129: reads.count == 4, path.reads == 1). D-17 #6 records this and declines to change it.",
+  "fix": "Add an event-count check to the required-name test without depending on the host network. Build the source with the package init LiveDeviceConditionsSource(center:makePathObserver:power:), using a counting power closure and the live path observer factory. After the two posts, assert the power read count equals 1 + number of posts. Alternatively, have the orchestrator record that the seam test discharges 'without polling' for this \u00a711 row."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests (private detail)",
+  "location": "Tests/ZTronAssetTransportTests/SessionDelegateDirectTests.swift:156,164,168",
+  "problem": "discardIsSticky asserts TaskMarker precedence by decoding task.taskDescription, which is the internal mechanism, and not by observable outcome. Its first half does assert behaviour (line 159: cancelled(.byClient)). The 'pausing' and 'judged' cases (161-168) assert only internal state. This contradicts adr-drafts/d.md D-1 'no test reads the marker'.",
+  "fix": "Replace the decode assertions at 164 and 168 with delegate.foregroundOutcome(task:job:response:error:) results, as completionHonoursVerdicts already does. pause then discard should give .failed(.cancelled(.byClient)) with no sidecar. oversize then discard should give .failed(.integrity(.oversize(announced: 9, limit:))). Alternatively, reword D-1."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirements traceability (orchestrator)",
+  "location": "docs/ARCHITECTURE.md \u00a712.5 rows TR1-4/T2-07/T2-08; docs/adr-drafts/d.md:94,103",
+  "problem": "No test anywhere carries the \u00a712.5 names 'R-NET-8: a refused or invalid resume discards the partial and restarts from zero in the next attempt' and 'R-NET-8: an invalid resume yields resumeRejected and the engine's next attempt starts fresh'. WP-D covers the transport half under a renamed test, 'R-NET-8: a refused or invalid resume yields resumeRejected and a fresh attempt stages the whole body' (SizeAndResumeTests.swift:199). \u00a711, \u00a79 and \u00a713.5 do not assign either name to D, so this is not a D blocker.",
+  "fix": "At merge, the orchestrator either assigns both names to WP-F in \u00a711 or \u00a713 (the engine discards the partial and sidecar per \u00a77.6), or records the renamed D test as the TR1-4 transport half."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirements coverage (orchestrator)",
+  "location": "SPEC.md:207 (R-NET-3 'falls back to foreground when the hook is not wired'); docs/adr-drafts/d.md:104",
+  "problem": "This SPEC R-NET-3 clause has no test in WP-D and no writer in \u00a711. Detecting the hook needs the Kit relay (WP-G). The SHOULD requirement is otherwise covered by D's coordinator and routing tests.",
+  "fix": "The orchestrator states in \u00a711 whether WP-G writes the 'hook not wired falls back to foreground' test or whether ADR-026's opt-in attestation is enough."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "coverage (informational)",
+  "location": "Sources/ZTronAssetTransport/Session/TaskMarker.swift:101; Sources/ZTronAssetTransport/Session/SessionDelegate+DataTasks.swift:210; Sources/ZTronAssetTransport/Conditions/LiveDeviceConditionsSource.swift:23",
+  "problem": "Three uncovered lines remain. The unknown-verb branch of the TaskMarker decoder returns nil (D-1 says decoding carries no unreachable failure branches, but this one exists and is untested). redirectDecision has a defensive guard for a task without an original or current URL. The third is the @unknown default of the thermal mapping. The target is at 99.10%, well above its 70% floor.",
+  "fix": "Optional. Add one assertion that TaskMarker(decoding: \"ztak-marker bogus\") == nil next to the existing TaskMarker tests, or note the defensive lines in D-1."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "test hygiene (informational)",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchTransport.swift:44,80",
+  "problem": "The P-10 benchmark reads ContinuousClock.now for an elapsed time it only prints. It is not a budget input and not the wall clock, but it is the only clock read in the WP's tests.",
+  "fix": "Optional: drop the elapsed print, or keep it and note in D-13 that it is informational only."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness/security (remote crash, integer overflow)",
+  "location": "Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift:55 (announcedTotal: `offset + length`), reached from SessionDelegate+DataTasks.swift:149 (open) and :73 (receive)",
+  "problem": "For a 206 answering a resumed request, `announcedTotal` adds the resume offset to `expectedContentLength` with trapping arithmetic. `Content-Length` comes from the server. If an allow-listed origin, proxy or CDN sends `Content-Length: 9223372036854775807` (or any value where offset + length > Int64.max), the process crashes inside the URLSession delegate callback. I proved this end to end: a loopback 206 with `Content-Range: bytes 5-9/10`, `Content-Type: application/octet-stream` and `Content-Length: 9223372036854775807`, sent to a resumed job with offset 5, kills the test process with SIGTRAP. The backtrace is `Swift runtime failure: arithmetic overflow` in `HTTPResponseReading.announcedTotal(of:offset:)`, called from `SessionDelegate.open(_:for:task:)`, called from `urlSession(_:dataTask:didReceive:completionHandler:)`, called from CFNetwork. Swift also traps on overflow in -O builds, so release builds crash too.",
+  "fix": "Use saturating arithmetic: `let (total, overflow) = offset.addingReportingOverflow(length); return overflow ? Int64.max : total`. The size guard then aborts as `oversize` before anything is opened. Add a loopback regression test (resumed 206, Content-Type set, Content-Length Int64.max) that expects `.failed(.integrity(.oversize(...)))` and an untouched earlier partial."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness (R-NET-7 on the background join path)",
+  "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:236-238 (join of a live OS task) and :571 (deliver hands .staged to the waiter unchecked)",
+  "problem": "`start(job)` checks a buffered outcome's size against `job.expectedBytes` (lines 228-235, added in round 2 for checksum-less identities). Joining a live OS task has no such check: the task's tag carries the *old* byteSize, and `downloadOutcome` compares the staged size with the tag, not with the joining job. The joiner can therefore receive `.staged` with a size different from its own byteSize. Proven by probe PROBE-R3-2. A relaunch with a live task for `TransportFixtures.legacyID` tagged with 4000 bytes, `reattached()`, then `start` for the same identity with `expected: 5000`, joins without creating a download (`starts=0`). Completing the OS task then yields `terminal=staged(byteCount: 4000)` and `Expectation failed: file.byteCount == new.expectedBytes`. For checksum-less entries the store has no hash to catch this, so a wrong-size file can be published.",
+  "fix": "Store the joining job's `expectedBytes` in `Waiter` (pass it through `attach(_:id:expected:)`). In `deliver`, turn a `.staged(file)` whose `byteCount != waiter.expected` into `.failed(.integrity(byteCount < expected ? .truncated(...) : .sizeMismatch(...)))`; the file is left for discard or GC. Alternatively, join only when `job.id.kind == .content` and always create a new download for checksum-less identities. Keep PROBE-R3-2 (in .build-verify-d-correct/r3/probes/ZZVerifyDR3Probes.swift) as the regression test."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness (integer overflow, reachable through public configuration)",
+  "location": "Sources/ZTronAssetTransport/Policy/PriorityAndSize.swift:43 (SizeGuard.verdict: `limit + limit / 1024 + 64`)",
+  "problem": "The cap slack is computed with trapping arithmetic. `job.maxBytes` comes from `AssetClientConfiguration.limits.maxAssetBytes`, a public `var` with no upper bound; an app may set Int64.max to mean unlimited. With that cap, any response that announces a length traps on the first callback. Proven by probe PROBE-R3-1c: `SizeGuard.verdict(written: 0, announced: 100, expected: nil, limit: .max)` ends the process with SIGTRAP (`exited with unexpected signal code 5`). It is triggered by configuration rather than by the server, so it is lower severity than the first issue, but it is a crash through public API.",
+  "fix": "Saturate: `let (bound, overflow) = limit.addingReportingOverflow(limit / 1024 + 64); if let announced, announced >= 0, announced > (overflow ? .max : bound) { return .abortOversize }`. Also, or instead, clamp `maxBytes` when the job is built. Add the probe's case to the existing size-guard table test."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "concurrency (TOCTOU on the background task cap)",
+  "location": "Sources/ZTronAssetTransport/HTTPRemoteSource.swift:273 (`await coordinator.admits()`) then :200 (`background.start(job)`); BackgroundSupport.swift:313 and :220-256",
+  "problem": "The cap check and the reservation are separate actor calls, and `start` awaits `activate()` and `driver.snapshot()` before `attach` inserts into `live`. K concurrent `transfer()` calls can all see `admits() == true` before any of them attaches, so `live.count` can reach maxTasks + K - 1. D-8 says the cap \"can [be exceeded] by one\", which understates this. Timeline with maxTasks=1: A admits (live 0) and is suspended in snapshot; B admits (live 0) and is suspended in snapshot; C admits (live 0); then A, B and C all attach, giving live 3. Unproven at runtime because the fake driver can hold only one snapshot. Separately, line 217 refuses an unbounded job with `.backgroundSessionUnavailable`, which per ARCHITECTURE \u00a77.6 disables background for the whole process; routing prevents this today.",
+  "fix": "Reserve inside the coordinator: have `admits()` increment a `reserved` counter that `start` consumes. Alternatively, re-check `live.count + reserved` in `start` after the listing and refuse with a cause that sends the transfer to the foreground without disabling background. Correct D-8's wording. Use a non-disabling cause at line 217."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness (R-NET-9 first element, device-only suspicion)",
+  "location": "Sources/ZTronAssetTransport/Conditions/ConditionsObservation.swift:68-77",
+  "problem": "The notification observers are registered before `path.start(queue:)`. A thermal or power notification delivered on the shared queue before NWPathMonitor's first update yields `DeviceConditions(network: path.current, ...)` from a monitor that has not started. Its `currentPath` may report unsatisfied, so the first element can be a spurious offline snapshot rather than \"the current state first\". Not provable in-process (real NWPathMonitor timing).",
+  "fix": "Start the path observer before registering the notification observers. Alternatively, have notification yields wait until the first path update has been seen, by a flag read on the same serial queue."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness (reporting, test-only use)",
+  "location": "Sources/ZTronAssetTransport/Session/ForegroundSession.swift:201",
+  "problem": "`bytesReceived: (job.resume?.offset ?? 0) + task.countOfBytesReceived` adds the resume offset even when the origin answered a resumed request with a 200 (validator changed). The partial was then restarted from zero, so the figure overcounts by the offset. Derived from the code, not run.",
+  "fix": "Add the offset only when `(task.response as? HTTPURLResponse)?.statusCode == 206`."
+ }
+]

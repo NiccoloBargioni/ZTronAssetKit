@@ -1,0 +1,11 @@
+04:52:49 quiet for deferq { 9.82 85.52 315.77 }
+04:52:57 done deferq { 9.51 84.20 313.95 }
+04:52:57 quiet for bench { 9.51 84.20 313.95 }
+05:00:26 done bench { 4.44 22.48 187.12 }
+05:00:26 quiet for superq { 4.44 22.48 187.12 }
+05:00:32 done superq { 4.24 22.14 186.03 }
+05:00:32 quiet for userq { 4.24 22.14 186.03 }
+05:00:37 done userq { 4.30 21.86 184.97 }
+05:00:37 quiet for drainq { 4.30 21.86 184.97 }
+05:00:41 done drainq { 4.12 21.53 183.90 }
+05:00:41 all done

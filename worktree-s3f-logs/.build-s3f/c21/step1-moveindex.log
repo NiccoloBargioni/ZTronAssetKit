@@ -1,0 +1,133 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" started.
+✘ Test "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierMoveIndexTests.swift:66:9: Expectation failed: violations.isEmpty
+↳ H's visit left none of the moved ids on it: ["job c-9761fa3ee1735fb8fb7b4ae6386fab40074e344a425359ef07ea52b44be2dee7 holds zz-o6, which the copy maps elsewhere, and is not in unfollowed"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-9761fa3ee1735fb8fb7b4ae6386fab40074e344a425359ef07ea52b44be2dee7 holds zz-o6, which the copy maps elsewhere, and is not in unfollowed"]
+↳   isEmpty → false
+✘ Test "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierMoveIndexTests.swift:67:9: Expectation failed: after == [w.identifier]
+↳ H holds zz-w alone once its visit moved the six ids, as a move that fits the turn leaves it: [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-w]
+↳ after == [w.identifier] → false
+↳   after → [zz-o6, zz-o4, zz-o5, zz-o3, zz-o1, zz-w, zz-o2]
+↳     some → [zz-o6, zz-o4, zz-o5, zz-o3, zz-o1, zz-w, zz-o2]
+↳   [w.identifier] → [zz-w]
+↳     some → [zz-w]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" started.
+✘ Test "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveIndexTests.swift:66:9: Expectation failed: violations.isEmpty
+↳ H's visit left none of the moved ids on it: ["job c-9761fa3ee1735fb8fb7b4ae6386fab40074e344a425359ef07ea52b44be2dee7 holds zz-o4, which the copy maps elsewhere, and is not in unfollowed"]
+↳ violations.isEmpty → false
+↳   violations → ["job c-9761fa3ee1735fb8fb7b4ae6386fab40074e344a425359ef07ea52b44be2dee7 holds zz-o4, which the copy maps elsewhere, and is not in unfollowed"]
+↳   isEmpty → false
+✘ Test "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveIndexTests.swift:67:9: Expectation failed: after == [w.identifier]
+↳ H holds zz-w alone once its visit moved the six ids, as a move that fits the turn leaves it: [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-w]
+↳ after == [w.identifier] → false
+↳   after → [zz-o4, zz-o1, zz-o2, zz-o5, zz-o3, zz-w, zz-o6]
+↳     some → [zz-o4, zz-o1, zz-o2, zz-o5, zz-o3, zz-w, zz-o6]
+↳   [w.identifier] → [zz-w]
+↳     some → [zz-w]
+✘ Test "R-SYN-6: a bounded move takes the moved ids no interest holds off the holder, as a move that fits the turn does (F-28)" with 2 test cases failed after 0.893 seconds with 4 issues.
+↳ /// W (a prefetch waiter) wants zz-w, and G (a prefetch group) zz-o1 … zz-o6, all on H's 16 bytes: one job,
+↳ /// downloading (held). G is released while H downloads: its interest leaves H, whose ids keep the six (`dropInterest`
+↳ /// leaves `Job.assets` alone). v3 maps the six to O's content; H's visit moves six ids at four a turn
+↳ /// (`followIDsPerTurn`), so it takes the bounded path (`startMove`), whose items are the interests in the moved ids:
+↳ /// none. A move that fits takes every moved id off the holder; the bounded one must too, or H keeps, after its visit,
+↳ /// ids the copy maps elsewhere (the invariant on visited jobs).
+◇ Test "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" started.
+✘ Test "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveIndexTests.swift:309:9: Expectation failed: outcome.hAssets?.isSuperset(of: [a, d]) == true
+↳ H's ids keep A, which T' holds on it, and D (visit-first): [zz-d], 1 interests in A
+↳ outcome.hAssets?.isSuperset(of: [a, d]) == true → false
+↳   outcome.hAssets?.isSuperset(of: [a, d]) → false
+↳     some → false
+↳     some → true
+✘ Test "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveIndexTests.swift:312:9: Expectation failed: outcome.hStarts == 1
+↳ H's content is downloaded once (visit-first): 2 starts
+↳ outcome.hStarts == 1 → false
+↳   outcome.hStarts → 2
+✘ Test "R-SYN-6: an id a rest takes off its holder stays in the holder's ids while an interest that joined meanwhile holds it (F-28)" with 2 test cases failed after 1.416 seconds with 2 issues.
+↳ /// B-T5 (Q1's stage 1): after the rest's last item, H's ids keep A, which T' holds on H, so H's publication binds it
+↳ /// and answers T' from its one download, as visited first.
+◇ Test "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" started.
+✘ Test "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveIndexTests.swift:323:9: Expectation failed: (try? outcome.tPrime.get())?.byteSize == 26
+↳ T' is served Z's bytes, the content C_z maps A to (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? outcome.tPrime.get())?.byteSize == 26 → <not evaluated>
+✘ Test "R-SYN-6: an interest whose id a rest put back is moved by a later apply's visit off its failed holder (F-28)" with 2 test cases failed after 1.706 seconds with 1 issue.
+↳ /// Q1's stage 2, a probe (ruling S3-R26 item 7): H's publication fails and is retried; C_z maps A to Z's content, and
+↳ /// H's retry gets a 404. Visited first, C_z's visit moved A off the failed H (its ids hold A), so T' is served Z's
+↳ /// bytes; a hidden A would stay on H and get its 404.
+◇ Test "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" started.
+✘ Test "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveIndexTests.swift:336:9: Expectation failed: outcome.t1 == .failure(.integrityFailure)
+↳ T1, passed on the publishing H by C_y's visit, gets H's integrity failure (visit-first): Optional(Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-z, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f82628965cdfc3f3cce5b1543214c2cc8d2032e02000cdce848a13a281c3920a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)))
+↳ outcome.t1 == .failure(.integrityFailure) → false
+↳   outcome.t1 → success(ZTronAssetModel.AssetLocation(id: zz-z, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f82628965cdfc3f3cce5b1543214c2cc8d2032e02000cdce848a13a281c3920a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     some → success(ZTronAssetModel.AssetLocation(id: zz-z, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f82628965cdfc3f3cce5b1543214c2cc8d2032e02000cdce848a13a281c3920a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳       success → AssetLocation(id: zz-z, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f82628965cdfc3f3cce5b1543214c2cc8d2032e02000cdce848a13a281c3920a.png, fileExtension: png, byteSize: 22, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳         id → zz-z
+↳           rawValue → "zz-z"
+↳         url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f82628965cdfc3f3cce5b1543214c2cc8d2032e02000cdce848a13a281c3920a.png
+↳           _url → Foundation._SwiftURL
+↳             _parseInfo → Foundation.URLParseInfo
+↳               urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/f8/f82628965cdfc3f3cce5b1543214c2cc8d2032e02000cdce848a13a281c3920a.png"
+↳               schemeRange → 0[utf8] ..< 4[utf8]
+↳                 some → 0[utf8] ..< 4[utf8]
+↳                   lowerBound → 0[utf8]
+↳                     _rawBits → 4
+↳                   upperBound → 4[utf8]
+↳                     _rawBits → 262148
+↳               userRange → nil
+↳               passwordRange → nil
+↳               hostRange → 7[utf8] ..< 7[utf8]
+↳                 some → 7[utf8] ..< 7[utf8]
+↳                   lowerBound → 7[utf8]
+↳                     _rawBits → 458756
+↳                   upperBound → 7[utf8]
+↳                     _rawBits → 458756
+↳               portRange → nil
+↳               pathRange → 7[utf8] ..< 144[utf8]
+↳                 some → 7[utf8] ..< 144[utf8]
+↳                   lowerBound → 7[utf8]
+↳                     _rawBits → 458756
+↳                   upperBound → 144[utf8]
+↳                     _rawBits → 9437188
+↳               queryRange → nil
+↳               fragmentRange → nil
+↳               isIPLiteral → false
+↳               didPercentEncodeHost → false
+↳               pathHasFileID → false
+↳               encodedComponents → EncodedComponentSet(rawValue: 0)
+↳                 rawValue → 0
+↳             _baseURL → nil
+↳             _encoding → Unicode (UTF-8)
+↳               rawValue → 4
+↳             _isCanonicalFileURL → false
+↳             _nsurlLock → ()
+↳         fileExtension → png
+↳           rawValue → "png"
+↳         byteSize → 22
+↳         integrity → .verified
+↳         isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     some → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳       failure → .integrityFailure
+✘ Test "R-SYN-6: an id a rest owes when its holder's publication began and a later apply moved it gets the publication's answer, as visited first (F-28)" with 2 test cases failed after 1.692 seconds with 1 issue.
+↳ /// Q1's stage 3 (variant Y), a probe (ruling S3-R26 item 12, answer 5): T1 is a prefetch waiter that stays; C_y maps
+↳ /// A to Y's content while H publishes, before the rest takes (A, T1), and H's publication fails its integrity
+↳ /// check. Visited first, X's visit at C_w moved T1 onto H, and C_y's visit passed H, publishing, so H's failure
+↳ /// answers T1; the rest's re-route under the copy at its turn would move T1 to Y.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.708 seconds with 8 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 4 tests in 1 suite failed after 5.708 seconds with 8 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

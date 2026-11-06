@@ -1,0 +1,234 @@
+{
+ "result": "Failed",
+ "totalTestCount": 1313,
+ "passedTests": 1268,
+ "failedTests": 45,
+ "skippedTests": 0,
+ "failures": [
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-5: an announced manifest length over the cap is aborted before any byte is staged",
+   "Expectation failed: expected error \".integrity(ZTronAssetModel.TransferIntegrityFailure.oversize(announced: Optional(2097152), limit: 1048576))\" of type TransferError, but \".transient(ZTronAssetModel."
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: an announced size over maxAssetBytes aborts before any progress is reported",
+   "Expectation failed: result.terminal == .failed(.integrity(.oversize(announced: 10 << 20, limit: 1 << 20)))\nresult.terminal \u2192 .failed(ZTronAssetModel.TransferError.transient(ZTronAssetModel.TransientCa"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-SEC-1: the canary key appears in no transport update, error or log line",
+   "Expectation failed: await rig.requests(to: \"/redirect\").first?.header(\"x-zombietron-app-key\") == TransportFixtures.canaryValue: // The key was really sent, so the scan above is not vacuous."
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-2: cancelling by staging name discards the partial unless it keeps it for a pause",
+   "Expectation failed: await awaitProgress(&iterator, reaching: 512 * 1_024)"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a changed validator makes the origin send the whole body, which is staged from zero",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: checksum-less transfers are never resumed",
+   "Expectation failed: await awaitProgress(&iterator, reaching: Int64(stall))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a close-delimited body shorter than byteSize is reported as truncated",
+   "Expectation failed: await run(await rig.source.transfer(request)).terminal == .failed(.integrity(.truncated(expected: 100_000, received: 40_000)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-5: a manifest fetch sends If-None-Match with the stored ETag and maps 304 to notModified",
+   "Caught error: .transient(ZTronAssetModel.TransientCause.timedOut, retryAfter: nil)"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-2: cancelling the consumer cancels the URLSession task and reports cancelled by the client",
+   "Expectation failed: expected error \".cancelled(ZTronAssetModel.CancellationCause.byClient)\" of type TransferError, but \".transient(ZTronAssetModel.TransientCause.timedOut, retryAfter: nil)\" of type Tr"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a 206 whose Content-Range does not start at the resume offset is never appended",
+   "Expectation failed: await run(await rig.source.transfer(resumed)).terminal == .failed(.transient(.resumeRejected, retryAfter: nil))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a resume offset of Int64.min from a corrupt sidecar never traps, and the origin's 200 is staged from zero",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: a cross-host redirect to an allow-listed host is followed without the app key",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a connection dropped mid-download resumes with Range and If-Range and the staged file is complete",
+   "Expectation failed: await awaitProgress(&iterator, reaching: Int64(stall))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: an empty body for an asset without byteSize is reported as truncated",
+   "Expectation failed: await run(await rig.source.transfer(request)).terminal == .failed(.integrity(.truncated(expected: nil, received: 0)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: a remote path is joined by percent-encoded components under the base path",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: writing more than byteSize aborts early as a size mismatch",
+   "Issue recorded: no size mismatch"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a size cap of Int64.max means unlimited and a negative one nothing, both through a whole transfer",
+   "Issue recorded: not staged under a cap of Int64.max"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-6: a 403 after the key was withheld on a cross-origin redirect is reported as keyWithheldOnRedirect",
+   "Expectation failed: await run(handle).terminal == .failed(.rejected(.keyWithheldOnRedirect))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: a redirect to a host outside the allow-list is refused and that host receives no request",
+   "Expectation failed: await run(handle).terminal == .failed(.rejected(.redirectRefused(.hostNotAllowed)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a gzip response is accepted when the decoded size equals byteSize though Content-Length differs",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: cancelling a foreground handle discards its partial, unlike a pause, and a cancel after the outcome changes nothing",
+   "Expectation failed: await awaitProgress(&iterator, reaching: 512 * 1_024)"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: same-origin redirects keep the key and the sixth hop is refused",
+   "Expectation failed: await run(handle).terminal == .failed(.rejected(.redirectRefused(.tooManyRedirects)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a resumed 206 announcing Content-Length Int64.max aborts as oversize and leaves the earlier partial untouched",
+   "Expectation failed: result.terminal == .failed(.integrity(.oversize(announced: .max, limit: 1 << 30)))\nresult.terminal \u2192 .failed(ZTronAssetModel.TransferError.transient(ZTronAssetModel.TransientCause."
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-2: invalidation fails every live transfer and later starts without touching the network",
+   "Test exceeded execution time allowance of 1 minute"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: a backend built without a key sends none and still stages",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: once stripped, the key never returns on a redirect back to the original origin",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a Last-Modified validator is sent as If-Range and a full answer is staged from zero",
+   "Issue recorded: not staged"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a live resumed transfer counts the resume offset only when the origin continued it with a 206",
+   "Expectation failed: await awaitProgress(&iterator, reaching: Int64(quantum))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-6: an error body past the evidence cap stops the transfer and is still classified by its status",
+   "Expectation failed: await run(await rig.source.transfer(request)).terminal == .failed(.transient(.serverError(httpStatus: 503), retryAfter: nil))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-2: every task's bytes reach its own staging file and the transfer interval ends once per transfer",
+   "Issue recorded: a.bin: Optional(ZTronAssetModel.TransferUpdate.failed(ZTronAssetModel.TransferError.transient(ZTronAssetModel.TransientCause.timedOut, retryAfter: nil)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-4: a redirect without a usable Location is delivered as a refused redirect",
+   "Expectation failed: await run(handle).terminal == .failed(.rejected(.redirectRefused(.invalidLocation)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-5: URLSession never answers a manifest fetch from its own cache, even within max-age",
+   "Caught error: .transient(ZTronAssetModel.TransientCause.timedOut, retryAfter: nil)"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar",
+   "Expectation failed: await awaitProgress(&iterator, reaching: 512 * 1_024)"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a refused or invalid resume yields resumeRejected and a fresh attempt stages the whole body",
+   "Expectation failed: await run(await rig.source.transfer(past)).terminal == .failed(.transient(.resumeRejected, retryAfter: nil))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a resumed partial already longer than byteSize is a size mismatch before any byte is appended",
+   "Expectation failed: await run(await rig.source.transfer(resumed)).terminal == .failed(.integrity(.sizeMismatch(expected: 1_000, actual: 2_000)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-8: a resumed request carries the current key, never a stale one",
+   "Expectation failed: await awaitProgress(&iterator, reaching: Int64(stall))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a body shorter than its Content-Length is reported as a lost connection",
+   "Expectation failed: await run(await rig.source.transfer(request)).terminal == .failed(.transient(.connectionLost(resumable: false), retryAfter: nil)): // No validator was sent, so nothing can be resum"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-6: every staging failure kind maps into the taxonomy, a cap as oversize and a source failure as local I/O",
+   "Expectation failed: await run(await rig.source.transfer(capped)).terminal == .failed(.integrity(.oversize(announced: nil, limit: 7)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-6: ENOSPC while staging maps to insufficientSpace and other staging failures to local I/O",
+   "Expectation failed: await run(await rig.source.transfer(full)).terminal == .failed(.insufficientSpace(requiredBytes: 1_000))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-6: status mapping through the real delegate matches the pure table",
+   "Expectation failed: await run(await rig.source.transfer(request)).terminal == .failed(route.expected)"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-5: a manifest over 32 MiB is aborted while streaming",
+   "Expectation failed: expected error \".integrity(ZTronAssetModel.TransferIntegrityFailure.oversize(announced: nil, limit: 33554432))\" of type TransferError, but \".transient(ZTronAssetModel.TransientCaus"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-5: a 304 without a conditional request is rejected",
+   "Expectation failed: expected error \".rejected(ZTronAssetModel.PolicyViolation.unexpectedNotModified)\" of type TransferError, but \".transient(ZTronAssetModel.TransientCause.timedOut, retryAfter: nil)\" "
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-5: a staged manifest that cannot be read back fails as a local error and is discarded",
+   "Expectation failed: expected error \".transient(ZTronAssetModel.TransientCause.localIO(posixCode: 5), retryAfter: nil)\" of type TransferError, but \".transient(ZTronAssetModel.TransientCause.timedOut, r"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-7: a body written past the cap without an announced length is aborted while streaming",
+   "Expectation failed: await run(await rig.source.transfer(request)).terminal == .failed(.integrity(.oversize(announced: nil, limit: cap)))"
+  ],
+  [
+   "ZTronAssetTransportTests",
+   "R-NET-6: an XML 403 on the manifest is reported with its evidence through the delegate",
+   "Expectation failed: expected error \".authentication(ZTronAssetModel.AuthenticationFailure.forbiddenAmbiguous(ZTronAssetModel.ForbiddenEvidence(purpose: ZTronAssetModel.TransferPurpose.manifest, bodyBy"
+  ]
+ ]
+}

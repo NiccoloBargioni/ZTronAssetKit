@@ -1,0 +1,16 @@
+S3-STAB-04 independent confirmation (confirm-stability agent): the hunter's hang probe package (copied to S3-STAB-04-hangprobe/), built in this agent's scratch.
+
+== swift test with a scoped 150 s watchdog (S3-STAB-04-watchdog.sh), started 10:03, load ~35:
+STILL RUNNING after 150s (pid 71482): descendants:
+71734 /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper --test-bundle-path /Users/admin
+/Users/admin/Documents/ZTronAssetKit/.build-s3-confirm-stability/bin/hang-watchdog.sh: line 20: 71482 Terminated: 15          swift test --scratch-path $S/hangprobe-build > $S/hangprobe-run.log 2>&1
+(swift test buffers the helper's output, so the killed run printed nothing past 'Build complete')
+
+== The bundle run directly under a pty (S3-STAB-04-hang-direct.sh), 120 s watchdog, 10:06:06 -> 10:08:06, load ~30:
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Test "a sibling test that ends at once" started.
+◇ Test "join of an unstructured task after a lost resume" started.
+✔ Test "a sibling test that ends at once" passed after 0.001 seconds.
+✘ Test "join of an unstructured task after a lost resume" recorded an issue at HangProbeTests.swift:5:2: Time limit was exceeded: 60.000 seconds
+STILL RUNNING after 120s: no 'Test run with 2 tests ...' line followed the 60 s time-limit issue; the helper was killed by the scoped watchdog.

@@ -1,0 +1,27 @@
+{
+ "base": "s3-base",
+ "bar": "strict",
+ "maxCycle": 30,
+ "simSlots": [
+  {
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E"
+  }
+ ],
+ "wps": [
+  {
+   "wp": "s3f",
+   "name": "Stage 3 WP-F (sync engine)",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c18-issues.json",
+   "fromCycle": 19,
+   "maxCycle": 30,
+   "focus": "Stage 3 hardening, continued under the narrowed bar (S3-R16, S3-R17) and the rulings S3-R18 to S3-R23: read the end of the rulings file named above before anything else. Cycles 1-18 are committed on wp/s3f (HEAD 4b1c3a6; see docs/adr-drafts/s3f.md). Cycle 18 fixed every cycle-17 finding; both verifiers confirmed it. Its verifiers left 5 blocking items, listed in the findings file named above with the non-blocking ones; their probes are under /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c18/. (1) PROBE-C18C-PENDING-LANE: followedLane counts an owed move's ids on the move's target whatever a later copy maps them to. That is false when the target is a failed job whose exit verdict waits and an apply has been followed since (movesAfterVerdict), so a 429 that arrives while the move is owed is decided on the wrong lane (S3-R16 1(a)). (2) C2: a single follow visit or owed move re-routes every id it carries in one turn, 54-56 ms at 10,000 ids sharing one content (S3-R22 item 1). (3)-(5) G4: five drop-mutants of cycle 18's deferral code survive the whole Sync bundle (followedLanePendingHereDrop, followedLanePendingFilterDrop, findInboundPendingDrop, shutdownReleaseInboundWaitsDrop, inboundMadeHolderResumeDrop), several of its branches never run, and the release paths of the publication's wait for owed moves are unpinned (liveness, RE-S48). Kill each with a test in both orders, or remove the code and record the argument. Order of work: first commit the failing tests for the blocking items in both LaneDropVisit orders (CLAUDE.md P3); then the fixes; then G4; then the draft (record S3-R20 to S3-R22 as orchestrator rulings, each removal, each one-to-one assertion change, and the residual risks). S3-R22 item 3 serialises simulator and coverage runs across agents with a lock directory. S3-R12 and S3-R13 apply unchanged; never edit Package.swift. S3-R23: the host is shared with other projects' simulator runs (load 50-1,000 on 8 cores at 14:10 on 1 Nov); record the load with every timing figure, pin each turn bound with a deterministic test, and take the C2 figure at a 1-minute load of 10 or less. The verifiers judge by S3-R16 to S3-R23."
+  }
+ ]
+}

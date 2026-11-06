@@ -1,0 +1,165 @@
+=== rh build 02:32:09 { 70.18 123.65 84.12 }
+rh build exit 0
+rh run 1 exit 1
+◇ Test "PROBE-C12R-FOLLOWED-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C12R-FOLLOWED-LANE" started.
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst before the 429: (owed: false, c: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), y: nil)
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst atArrival=Optional(0.209572016) after drain=(throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.veri
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C12R-FOLLOWED-LANE" started.
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst before the 429: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), y: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst atArrival=Optional(0.838288067) after drain=(throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+✘ Test "PROBE-C12R-FOLLOWED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12ReqsProbes.swift:76:13: Expectation failed: abs(throttle - interactive) < 0.000_001
+↳ PROBE-C12R-FOLLOWED-LANE: right after the 429 the origin is throttled for the backoff of C's user lane (visit-first): 0.838288067 against (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+✘ Test "PROBE-C12R-FOLLOWED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12ReqsProbes.swift:81:13: Expectation failed: abs(throttle - interactive) < 0.000_001
+↳ PROBE-C12R-FOLLOWED-LANE: after the drain the throttle is the user lane's backoff (visit-first): (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verif
+✘ Test "PROBE-C12R-FOLLOWED-LANE" with 2 test cases failed after 2.635 seconds with 2 issues.
+↳ /// PROBE-C12R-FOLLOWED-LANE (residual R-H, S3-R15 item 2): C (1 MB, zz-b) runs for P, a prefetch waiter; Y (1 MB,
+✘ Test run with 1 test in 1 suite failed after 2.635 seconds with 2 issues.
+rh run 2 exit 1
+◇ Test "PROBE-C12R-FOLLOWED-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C12R-FOLLOWED-LANE" started.
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst before the 429: (owed: false, c: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), y: nil)
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst atArrival=Optional(0.209572016) after drain=(throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C12R-FOLLOWED-LANE followVisitedFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.veri
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C12R-FOLLOWED-LANE" started.
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst before the 429: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), lane: Optional(ZTronAssetModel.AssetPriority.prefetch), y: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst atArrival=Optional(0.838288067) after drain=(throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+✘ Test "PROBE-C12R-FOLLOWED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12ReqsProbes.swift:76:13: Expectation failed: abs(throttle - interactive) < 0.000_001
+↳ PROBE-C12R-FOLLOWED-LANE: right after the 429 the origin is throttled for the backoff of C's user lane (visit-first): 0.838288067 against (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+✘ Test "PROBE-C12R-FOLLOWED-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC12ReqsProbes.swift:81:13: Expectation failed: abs(throttle - interactive) < 0.000_001
+↳ PROBE-C12R-FOLLOWED-LANE: after the drain the throttle is the user lane's backoff (visit-first): (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772), lane: Optional(ZTronAssetModel.AssetPriority.userInitiated))
+PROBE-C12R-FOLLOWED-LANE sweepFollowsFirst u=success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d3/d35e95c3a9a7e045960a4a84197664f770d1b9908dff67c80792db60d68fe7e3.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verif
+✘ Test "PROBE-C12R-FOLLOWED-LANE" with 2 test cases failed after 2.686 seconds with 2 issues.
+↳ /// PROBE-C12R-FOLLOWED-LANE (residual R-H, S3-R15 item 2): C (1 MB, zz-b) runs for P, a prefetch waiter; Y (1 MB,
+✘ Test run with 1 test in 1 suite failed after 2.686 seconds with 2 issues.
+=== mutants start 02:32:45 { 83.83 120.41 84.74 }
+MUTANT readmitNow: build exit 0
+MUTANT readmitNow run 1: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 6.477 seconds with 1 issue.
+    ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+MUTANT readmitNow run 2: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 4.905 seconds with 1 issue.
+    ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+MUTANT readmitNow: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT noDispatchOwedFlag: build exit 0
+MUTANT noDispatchOwedFlag run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 1.064 seconds with 1 issue.
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:150:9: Expectation failed: start != nil && start?.waiting == 0
+MUTANT noDispatchOwedFlag run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.938 seconds with 1 issue.
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:150:9: Expectation failed: start != nil && start?.waiting == 0
+MUTANT noDispatchOwedFlag: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT committedNow: build exit 0
+MUTANT committedNow run 1: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 2.443 seconds with 2 issues.
+    ✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:469:9: Expectation failed: nIndex != nil && wIndex != nil && nIndex! < wIndex!
+    ✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:528:9: Expectation failed: after.n == .downloading && after.r == .queued
+MUTANT committedNow run 2: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 2.397 seconds with 2 issues.
+    ✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:469:9: Expectation failed: nIndex != nil && wIndex != nil && nIndex! < wIndex!
+    ✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:528:9: Expectation failed: after.n == .downloading && after.r == .queued
+MUTANT committedNow: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT noPublishedVisit: build exit 0
+MUTANT noPublishedVisit run 1: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 2.211 seconds with 2 issues.
+    ✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:469:9: Expectation failed: nIndex != nil && wIndex != nil && nIndex! < wIndex!
+    ✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:528:9: Expectation failed: after.n == .downloading && after.r == .queued
+MUTANT noPublishedVisit run 2: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 2.422 seconds with 2 issues.
+    ✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:469:9: Expectation failed: nIndex != nil && wIndex != nil && nIndex! < wIndex!
+    ✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:528:9: Expectation failed: after.n == .downloading && after.r == .queued
+MUTANT noPublishedVisit: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT noArrivalThrottle: build exit 0
+MUTANT noArrivalThrottle run 1: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 1.685 seconds with 4 issues.
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:285:25: Issue recorded
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:290:25: Issue recorded
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:56:9: Expectation failed: requestsAfter == requestsBefore
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:59:25: Issue recorded
+MUTANT noArrivalThrottle run 2: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 1.712 seconds with 4 issues.
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:285:25: Issue recorded
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:290:25: Issue recorded
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:56:9: Expectation failed: requestsAfter == requestsBefore
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:59:25: Issue recorded
+MUTANT noArrivalThrottle: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT throttleReadLive: build exit 0
+MUTANT throttleReadLive run 1: exit 1 :: ✘ Test run with 3 tests in 1 suite failed after 2.715 seconds with 2 issues.
+    ✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:213:13: Expectation failed: abs(retryAfter - 60) < 0.5
+    ✘ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:195:13: Expectation failed: abs(retryAfter - 300) < 0.5
+MUTANT throttleReadLive run 2: exit 1 :: ✘ Test run with 3 tests in 1 suite failed after 2.664 seconds with 2 issues.
+    ✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:213:13: Expectation failed: abs(retryAfter - 60) < 0.5
+    ✘ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:195:13: Expectation failed: abs(retryAfter - 300) < 0.5
+MUTANT throttleReadLive: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT visitsLive: build exit 0
+MUTANT visitsLive run 1: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 3.642 seconds with 2 issues.
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:257:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:327:25: Issue recorded
+MUTANT visitsLive run 2: exit 1 :: ✘ Test run with 2 tests in 1 suite failed after 2.392 seconds with 2 issues.
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:257:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:327:25: Issue recorded
+MUTANT visitsLive: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT placeStampsIgnored: build exit 0
+MUTANT placeStampsIgnored run 1: exit 1 :: ✘ Test run with 55 tests in 1 suite failed after 251.564 seconds with 6 issues.
+    ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:106:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:141:27: Expectation failed: backoffEnd
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:257:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:327:25: Issue recorded
+    ✘ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:387:9: Expectation failed: uState == .downloading
+MUTANT placeStampsIgnored run 2: exit 1 :: ✘ Test run with 55 tests in 1 suite failed after 63.846 seconds with 4 issues.
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:257:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:327:25: Issue recorded
+    ✘ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:387:9: Expectation failed: uState == .downloading
+    ✘ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:391:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(uBytes.count)
+MUTANT placeStampsIgnored: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT retryDueNow: build exit 0
+MUTANT retryDueNow run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.655 seconds with 2 issues.
+    ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:169:9: Expectation failed: after.n == .downloading && after.r == .queued
+    ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:170:9: Expectation failed: next.first == n.transferID
+MUTANT retryDueNow run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.654 seconds with 2 issues.
+    ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:169:9: Expectation failed: after.n == .downloading && after.r == .queued
+    ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:170:9: Expectation failed: next.first == n.transferID
+MUTANT retryDueNow: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT requeueReplayDropped: build exit 0
+MUTANT requeueReplayDropped run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 192.010 seconds with 3 issues.
+    ✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:227:9: Expectation failed: after.n == .downloading && after.r == .queued
+    ✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:189:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:233:9: Expectation failed: (try? pResult.get())?.byteSize == 16 && (try? rResult.get())?.byt
+MUTANT requeueReplayDropped run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 192.048 seconds with 3 issues.
+    ✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:227:9: Expectation failed: after.n == .downloading && after.r == .queued
+    ✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:189:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-3: an attempt cancelled by the transport during an owed follow is re-queued behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:233:9: Expectation failed: (try? pResult.get())?.byteSize == 16 && (try? rResult.get())?.byt
+MUTANT requeueReplayDropped: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT pauseParkDropped: build exit 0
+MUTANT pauseParkDropped run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 3.484 seconds with 2 issues.
+    ✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:307:9: Expectation failed: after.x == .downloading && after.y == .queued
+    ✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:308:9: Expectation failed: next.first == bx.transferID
+MUTANT pauseParkDropped run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 2.897 seconds with 2 issues.
+    ✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:307:9: Expectation failed: after.x == .downloading && after.y == .queued
+    ✘ Test "R-SYN-7: a policy pause that ends during an owed follow parks its job with its place on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:308:9: Expectation failed: next.first == bx.transferID
+MUTANT pauseParkDropped: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT stillWantsAlways: build exit 0
+MUTANT stillWantsAlways run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 2.196 seconds with 1 issue.
+    ✘ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:362:9: Expectation failed: left == nil
+MUTANT stillWantsAlways run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 2.787 seconds with 1 issue.
+    ✘ Test "R-SYN-11: a run's join that waits for an owed follow is not made once a purge ended the run (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:362:9: Expectation failed: left == nil
+MUTANT stillWantsAlways: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT unblockNow: build exit 0
+MUTANT unblockNow run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 192.024 seconds with 3 issues.
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:76:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:140:13: Expectation failed: mid.owed && mid.h == .downloading && mid.m == true && mid.run == 
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:150:9: Expectation failed: start != nil && start?.waiting == 0
+MUTANT unblockNow run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 192.018 seconds with 3 issues.
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:76:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:140:13: Expectation failed: mid.owed && mid.h == .downloading && mid.m == true && mid.run == 
+    ✘ Test "R-SYN-5: a pending run on the breaker waits behind the pump the barrier holds for the jobs a cooldown re-admits (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:150:9: Expectation failed: start != nil && start?.waiting == 0
+MUTANT unblockNow: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT timerUnblockDropped: build exit 0
+MUTANT timerUnblockDropped run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 192.009 seconds with 2 issues.
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:274:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:335:9: Expectation failed: nStarted
+MUTANT timerUnblockDropped run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 192.020 seconds with 2 issues.
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:274:6: Time limit was exceeded: 180.000 seconds
+    ✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:335:9: Expectation failed: nStarted
+MUTANT timerUnblockDropped: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+MUTANT arrivalJobLane: build exit 0
+MUTANT arrivalJobLane run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.842 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:283:13: Expectation failed: abs(throttle - background) < 0.000_001
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:288:13: Expectation failed: abs(throttle - background) < 0.000_001
+MUTANT arrivalJobLane run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.964 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:283:13: Expectation failed: abs(throttle - background) < 0.000_001
+    ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:288:13: Expectation failed: abs(throttle - background) < 0.000_001
+MUTANT arrivalJobLane: reverted; Sources md5 worktree=6769d2b7bf8b014e76bd0c47437747bb scratch=6769d2b7bf8b014e76bd0c47437747bb
+=== mutants done 03:01:33 { 48.11 41.59 52.59 }

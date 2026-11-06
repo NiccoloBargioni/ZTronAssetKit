@@ -1,0 +1,181 @@
+{
+ "source": "Level 4 strict close-out wf_0989cd6c-62c, verification of cycle 10 (unfixed)",
+ "issues": [
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "test gap (R-SYN-13 [MUST] 'without polling'; F-30's 'at most once per edge')",
+   "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:687 (job.active?.edgeSerial = self.state.networkEdgeSerial); EngineFailures.swift:84-90",
+   "problem": "In mutant M-EDGESTART that line is deleted, so every attempt records edge serial 0. The whole ZTronAssetSyncTests suite still passes under it: 257 of 257, exit 0.\n\nMy scratch probe PROBE-C10R-1 builds the case: a prefetch member is running, the path goes offline, then back to unrestricted (one satisfied edge), and every later attempt is scripted to fail with .offline(.noConnection).\n- At HEAD, in 3 of 3 runs: 'starts 2 state failed(whenOnline)'. The member is retried at once a single time, then waits for the next edge.\n- Under M-EDGESTART, in 3 of 3 runs: 'starts 21 state downloading'. It is still restarting when the probe stops at epoch + 20.\n\nSo the bound that keeps R-SYN-13 free of polling, which F-30 states, is pinned by no test. Without it, any path whose connections keep failing offline while it reads satisfied would restart in a hot loop with no backoff.",
+   "fix": "Commit PROBE-C10R-1 as an R-SYN-13 regression test. After one edge, a member whose attempts keep failing offline while the path reads satisfied starts exactly twice and then waits in failed(whenOnline). Show that it fails under M-EDGESTART.",
+   "id": "L4-C10-00"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "dispatch order after a set-aside (R-SYN-3; by probe, no MUST violated)",
+   "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:119-137 (addInterest: wasReleasedOnly leads to enqueue(transfer, front: true)); joinMember in EngineCommands.swift:258-277",
+   "problem": "Every queued job that only released groups want, set aside or still in place, is pushed to the front of its lane when an interest joins it.\n\nPROBE-C10R-3 (scratch): a handle of releasesPerTurn + 64 members is released, then three of its still-pending members gain an interest one after the other in the same turn. They were joined in the order a409ae, 5c88c8, 2c725b, and the queue head became 2c725b, 5c88c8, a409ae: reversed. They also move ahead of prefetch work that was queued earlier.\n\nA new handle overlapping a large released one hits this path through joinMember. Its re-joined members then dispatch in reverse id order. Before cycle 10 those entries kept their place in the queue.\n\nThe doc comment's 'at the front of its lane, where it waited' is inaccurate. No requirement fixes the order within a lane.",
+   "fix": "Optional:\n- keep the join order, for example by re-enqueuing at the back with the job's original queuedAt, or by collecting one turn's re-joins and pushing them to the front in reverse;\n- or record the reordering in F-30 and correct the comment.",
+   "id": "L4-C10-01"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "docs hand-off (ARCHITECTURE amendments for F-30)",
+   "location": "docs/adr-drafts/f.md:27 (the 'Orchestrator, at merge' paragraph); docs/ARCHITECTURE.md:202 (downloading \u2192 queued row) and :242 (the \u00a77.6 offline row)",
+   "problem": "F-30 adds two new downloading \u2192 queued triggers:\n- a .paused for a policy pause whose lane is admitted again when the pause arrives;\n- an .offline failure that arrives after a satisfied edge passed while the attempt ran, with the path satisfied now.\n\nARCHITECTURE \u00a77.1 lists the downloading \u2192 queued row as '.paused after preemption, or content superseded (T7, T22)'. The \u00a77.6 offline row reads 'failed(.whenOnline); re-queued on a satisfied-path edge'. The merge paragraph asks the docs level to amend neither; it only folds F-30 into DECISIONS.",
+   "fix": "Add to the merge paragraph:\n- amend the \u00a77.1 downloading \u2192 queued row: a policy pause re-queued at the front when the lane is admitted again, and an offline failure after a passed edge;\n- amend the \u00a77.6 offline row: re-queued at once when a satisfied edge was applied since the attempt started and the path reads satisfied, at most once per edge.",
+   "id": "L4-C10-02"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "time budget (L4-R8): figures for the 10,000-asset R-SYN-12 test this cycle; no overrun",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift:16 (.timeLimit(.minutes(4)))",
+   "problem": "No run recorded 'Time limit was exceeded'. Times for the 10,000-asset test:\n- --quick: 35.775 s (1-minute load about 7.7 to 13.1)\n- Debug Sync runs: 5.418, 5.548 and 5.955 s (load 5.86 to 13.77)\n- In-suite under TSan: 38.997 s, 16.2 % of 240 s (load 10.26 to 33.46, 19 samples)\n- Coverage run: 69.778 s (load up to about 168, beside the other verifier's simulator run)\n- iOS 27 Simulator: 11.981 s (load 41.58 to 143.01)\n\nThe breaker test took 1.013, 0.919 and 1.307 s debug, 13.945 s under TSan and 4.235 s on the simulator. The cycle-10 suite took 14.404 s under TSan and 4.173 s on the simulator.",
+   "fix": "No code change. Record these figures in F-17 at merge.",
+   "id": "L4-C10-03"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "outside-wp (L4-R11)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:189 (P-6) and :249 (P-13), both WP-B's; the ZTronAssetKit coverage target (WP-G)",
+   "problem": "Two of the 27 release benchmarks failed (1-minute load 16.46 at the start, 4.75 at the end):\n- P-6: 'streaming / reference \u2192 0.49881521850798816' against ratioFloor 0.7, at 1425.6 MB/s streaming.\n- P-13: 'unit max 9.150833 ms \u2026 budgets 2.0 s, 5.0 ms per batch'.\n\nEvery WP-F benchmark passed. Coverage: 'COVERAGE target=ZTronAssetKit lines= 37.82% (205/542) min=70.0 FAIL'.",
+   "fix": "No WP-F action. Re-measure P-6 on a quiet host. P-13 awaits ADR-050, and the ZTronAssetKit coverage target belongs to WP-G.",
+   "id": "L4-C10-04"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "rulings and residue (carried, unchanged)",
+   "location": "EngineFailures.swift (spaceFailed); docs/adr-drafts/f.md F-14, F-22, F-23, F-26, F-27, F-28 and L4-R4/L4-R5 notes",
+   "problem": "No cycle-10 commit touches these items, and I reproduced none of them:\n- the L4-R4 counted ENOSPC retry, which has no timed backoff\n- the L4-R5 store guard, which was not added, and its one-await window\n- 'never creates a job' read as 'never downloads'\n- a holder gained before the quarantine\n- the join's copy-change branch\n- the F-28 trade-off\n\nf.md records each of them for cycle 10.",
+   "fix": "At merge, the orchestrator records these in ADR-053, DECISIONS and VERIFICATION 'Not verified', or rules F-27's option (c) or F-21's store-guard question.",
+   "id": "L4-C10-05"
+  },
+  {
+   "lens": "reqs",
+   "blocking": false,
+   "area": "host hygiene",
+   "location": "PIDs 27626, 52290, 53148 (idle swiftpm-testing-helper of earlier verifiers' scratch paths)",
+   "problem": "The three idle helpers from earlier cycles are still alive. They are not mine and not WP-F's, and I left them untouched. No default.profraw is in the worktree root, and git status is clean.",
+   "fix": "The orchestrator may stop the three exact PIDs with a scoped kill.",
+   "id": "L4-C10-06"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "test flake (L4-R8): failed in the required iOS Simulator run",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineRegressionCycle9Tests.swift:42-54 (the 10,000-yield wait for the sleeper's registration) and :59",
+   "problem": "The official iOS Simulator run failed one test.\n- Device: 5B940E6E, iOS 27.0, 1-minute load 44 to 68.\n- xcresult: 1050 passed, 1 failed.\n- The failing test is EngineRegressionCycle9Tests/drivingStopsBeforeReturning(): 'Expectation failed: unseen == 0 / unseen \u2192 1: the sleeper never registered in 1 rounds'.\n\nThe test waits at most 10,000 Task.yield()s for an unstructured Task to call clock.sleep. How many yields that takes depends on scheduling.\n\nPROBE-C10C-7 ran the same rounds as 16 parallel instances of 2,000 rounds each, at load 85 to 91. The most yields needed before registration ranged from 2 to 921 per instance, a heavy tail. Under the simulator's in-process contention it once exceeded 10,000, and the test fails.\n\nA second simulator run of ZTronAssetSyncTests passed (257 of 257), so the failure is intermittent: a flake.",
+   "fix": "Make the wait deterministic:\n- Replace the capped yield loop with `await clock.waitForSleepers(atLeast: 1)` (ManualTimeSource API). A stale driver can advance the clock only to a registered sleeper's deadline, so this returns in both outcomes.\n- Or remove the 10,000 cap and loop until the sleeper registers or the clock moves, bounded by the test's 1-minute time limit.\n- Keep the stale and unseen assertions.\n\nShow that the test still fails against the cycle-8 driver as a mutant. Record the change in F-17 under L4-R8.",
+   "id": "L4-C10-07"
+  },
+  {
+   "lens": "correct",
+   "blocking": true,
+   "area": "test flake (L4-R8; L4-V3-00 only partly fixed): the lower bound still depends on scheduling",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift:85-91 (round loop) and :103 (#expect(progress.count >= 2))",
+   "problem": "The test failed in my stress run: `swift test --filter 'EngineRegressionCycle9Tests|EngineEventsTests' --repeat-until fail --maximum-repetitions 15`. It stopped after about 14 iterations (1-minute load 21 falling to 12, 5-minute load 58 falling to 48) with 'R-SYN-12: transfer progress published to subscribers never exceeds 10 Hz per asset under ManualTimeSource \u2026 Expectation failed: progress.count >= 2'.\n\nCause, as a timeline: each round waits for liveCount == 0, releases a progress update, advances the clock 0.02 s, then waits for running == 1. Nothing waits for the engine's driver to apply the released update before the clock moves. So updates are applied, and rate-limited, at whatever later clock instant the driver happens to reach.\n\nPROBE-C10C-6 runs the same loop and reads active.bytesReceived after each round. Across 20 parallel iterations:\n- in 34 to 50 of the 50 rounds, the clock advanced before the engine had applied that round's update;\n- the progress-event count varied from 3 to 11.\n\nWhen the driver is starved, nearly all updates are applied at one late instant, and the count falls below 2. Run alone, the test passed 400 times, and the events suite passed 40 times at load 5 to 9, so the failure is intermittent.",
+   "fix": "In each round, after `harness.source.release(...)`, wait until the engine has applied that round's update, before `harness.time.advance(by: 0.02)`:\n`await engine.awaitCondition { $0.state.jobs[entry.transferID]?.active?.bytesReceived == Int64(10 + round) }`\n\nEach update is then published, or rate-limited, at its own round's instant. The count becomes deterministic, and the lower bound can assert the exact expected count. Record the change in F-17 under L4-R8.",
+   "id": "L4-C10-08"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "confirmation: cycle-9 blocking 1 (C2, user-initiated release) is fixed",
+   "location": "Sources/ZTronAssetSync/Engine/LaneQueues.swift (scan, setAside); EngineDispatch.swift (popDispatchable, hasQueuedUser, setsAside); EngineJobs.swift addInterest; EngineCommands.swift continueReleases (restoreAside)",
+   "problem": "My own release probes, run one test at a time, give the heartbeat's longest wait (ms):\n\n| Probe | HEAD (load about 9) | b9acb51 (load about 7) |\n|---|---|---|\n| PB-1: 10,000-member user-initiated handle released | 4.42, 4.10, 4.25, 4.07, 4.11 | 21.76, 22.39, 21.75, 21.60, 21.63 (fails) |\n| PB-2: the same, plus a live user-initiated resolve queued behind every released member | 4.15, 4.11, 4.14, 4.29, 4.65 | 21.77, 21.89, 22.14, 21.39, 22.46 (fails) |\n\nThe author's benchmark at HEAD measured 4.22, 4.31 and 4.95 ms. An earlier HEAD run of PB-1 and PB-2 in parallel, at load 94 to 141, measured 8.4 to 17.8 ms; I discarded it as load.",
+   "fix": "None.",
+   "id": "L4-C10-09"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "confirmation: cycle-9 blocking 2 (T17 policy pause) is fixed",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:10-34 (paused: laneWideBlock after the await); f-2 row",
+   "problem": "My own probes:\n- **PROBE-C10C-1b** sends constrained and unrestricted in separate actor turns, over 50 rounds, whatever order the pause arrives in. HEAD: 50 rounds paused, 0 parked. b9acb51: parked blocked(policy(constrainedNetwork)) in round 0.\n- **PROBE-C10C-1a** applies constrained, then offline, before the pause arrives. HEAD parks blocked(offline), the block the lane gives now; the next unrestricted edge restarts it (2 starts, invariants clean). b9acb51 parked it on the stale policy(constrainedNetwork) reason.",
+   "fix": "None.",
+   "id": "L4-C10-10"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "confirmation: cycle-9 blocking 3 (R-SYN-13 offline after the edge) is fixed, with no polling",
+   "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:79-91; EngineConditions.swift:97; EngineDispatch.swift:687; EngineState.swift networkEdgeSerial / ActiveAttempt.edgeSerial",
+   "problem": "My own probes:\n- **PROBE-C10C-2a**: a user-initiated resolve whose transfer reports offline after an interface change (satisfied to satisfied and expensive, which counts as an edge). HEAD: success, 2 starts. b9acb51: failure(.offline), 1 start.\n- **PROBE-C10C-2b**: offline arrives after the edge, then the retry also fails offline. HEAD: exactly 2 starts, then failed(whenOnline) through 48 \u00d7 30 min of the manual clock, so there is no polling. b9acb51: 1 start.",
+   "fix": "None.",
+   "id": "L4-C10-11"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "residue / by design (not a regression): the first conditions element after the watcher starts is never an edge",
+   "location": "Sources/ZTronAssetSync/Engine/EngineConditions.swift:91 (`previous.map {...} ?? false`); EngineDispatch.swift gate (a user lane may start with conditions == nil); EngineFailures.swift:84",
+   "problem": "The gate lets a user-initiated attempt start before the watcher's first element, while conditions == nil. If the first element applied is satisfied, networkEdgeSerial does not move. An .offline failure after it is then failed(whenOnline), and the waiter is answered .offline.\n\nMy first PROBE-C10C-2a variant sent the element before the watcher read its initial one, and got 'failure(.offline) starts 1'. This matches F-16/L4-R3: a path that reads satisfied while connections fail waits for an edge. It is not a liveness defect for a waiter. I did not build a probe for a group member at user-initiated priority in this window.",
+   "fix": "Optional:\n- At attempt start, when conditions == nil, record a sentinel edge serial, so the first satisfied element counts as an edge for that attempt.\n- Otherwise, note the case in F-16/F-30.",
+   "id": "L4-C10-12"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "set-aside: review and stress, no defect found",
+   "location": "LaneQueues.swift scan/restoreAside/compact/storedCount; EngineJobs.swift addInterest (wasReleasedOnly re-enqueue); EngineCommands.swift continueReleases, invariantViolations (strayAside)",
+   "problem": "Every interest addition goes through addInterest. Only continueReleases empties `releasing`, and it restores the set-aside entries when it does. A job only released groups want can lose interests but never gain a non-released one except through addInterest. scan's single rebuild is correct for the take and peek cases.\n\nIn a scratch copy I added the invariant that every queued job has a valid live-queue entry, or is only wanted by released groups and has its entry aside. It held:\n- across the whole Sync suite and my probes;\n- in a randomized model with releasesPerTurn = 1, 40 entries, groups of up to 24 at random lanes, 8 seeds of 10,000 operations: 0 violations, with set-aside reached 0 to 6 times per seed.\n\nPROBE-C10C-5: a resolve for a set-aside member of a released user-initiated handle starts in the same turn and succeeds.\nPROBE-C10C-4b: re-registering the last 40 members of a released 2,000-member handle keeps all 40 jobs; they start and none is stranded.\n\nThe engine's own invariant check has no 'queued job reachable' rule, so a future stranding would go unnoticed.",
+   "fix": "Optional: add the reachability rule to invariantViolations. It is test-only and costs one pass over the queues.",
+   "id": "L4-C10-13"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "time budget (L4-R8): figures for the 10,000-asset R-SYN-12 test; no overrun",
+   "location": "Tests/ZTronAssetSyncTests/Engine/EngineEventsTests.swift:16 (.timeLimit(.minutes(4)))",
+   "problem": "Times in seconds:\n- --quick: 35.775 (all targets in parallel)\n- Sync runs: 6.445, 6.566 and 6.716 (1-minute load 12.7 to 14.6)\n- thread sanitizer: 19.868, which is 8.3 % of 240 s (load about 15)\n- coverage run: 6.383\n- iOS 27 Simulator: 20.921 (load 44 to 68) and 35.891 (load about 75)\n\nNo run recorded 'Time limit was exceeded'. The cycle-10 suite took 2.893 s under the sanitizer and 8.884 s on the simulator.",
+   "fix": "No code change. Record these in F-17.",
+   "id": "L4-C10-14"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "outside-wp (L4-R11)",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 (P-13, WP-B); ZTronAssetKit coverage target (WP-G)",
+   "problem": "- **P-13** failed: 'reclaim of 10000 blobs: 0.612015584 s in 495 units, unit max 9.911 ms \u2026 budgets 2.0 s, 5.0 ms per batch' (load 4.10 at the start, 10.59 at the end). It was the only failure among the 27 benchmark tests.\n- **Coverage**: 'COVERAGE target=ZTronAssetKit lines= 37.82% (205/542) min=70.0 FAIL'.",
+   "fix": "No WP-F action. P-13 awaits ADR-050, and the ZTronAssetKit coverage belongs to WP-G.",
+   "id": "L4-C10-15"
+  },
+  {
+   "lens": "correct",
+   "blocking": false,
+   "area": "host hygiene",
+   "location": "host load during this cycle",
+   "problem": "The 1-minute load average reached 75 to 141 at times (the concurrent verifier, plus my simulator run). I discarded every benchmark figure taken at those times. The reported figures are from loads of 4 to 10.\n\nMy runs left no stray default.profraw (LLVM_PROFILE_FILE pointed into my scratch). Git status is clean, the simulator is shut down, and none of my processes are left.",
+   "fix": "None.",
+   "id": "L4-C10-16"
+  }
+ ],
+ "status": [
+  {
+   "lens": "reqs",
+   "status": "I found nothing blocking for WP-F at 0d071c2 under the requirements, tests and gates lens. Cycle 9 left three blocking findings, and each is fixed. I reproduced each defect as a mutant in a scratch copy, and the new tests or benchmark fail against it:\n- M-PAUSE makes both R-SYN-7 pause tests fail.\n- M-EDGE makes the R-SYN-13 test for an offline failure after the network returned fail.\n- The original C2 defect, M-ASIDE-ORIG (b9acb51's dispatch with no set-aside), measures 24.45 to 27.71 ms and fails the new user-initiated release benchmark. HEAD measured 4.06 to 4.96 ms in the same interleaved runs.\n\nThe previous non-blocking test gap is closed: M-LANEOWED now fails the new lane-park test with \"64 still queued\".\n\nOwnership holds. Every changed path is in WP-F's files, apart from Package.swift (7cf647c, L4-R1), BenchSync.swift and f.md. No contract test and no public signature changed.\n\nEvery gate is green:\n- `VERIFY: PASS`\n- release and iOS builds with warnings as errors\n- `UNSAFE escapes found=0`, docs 100%\n- ZTronAssetSyncTests passed three times in a row and once under TSan with no report\n- ZTronAssetSync coverage 93.03%\n- 1,051 of 1,051 tests passed on my iOS 27 simulator (6BE15CAF)\n- every WP-F benchmark passed\n\nNo test flaked and no time limit was exceeded. f.md records the rulings for cycle 10.\n\nThe non-blocking items:\n- One new mutant survives: M-EDGESTART, which drops `ActiveAttempt.edgeSerial` at start. Without it, a member failing offline while the path reads satisfied restarts at once with no limit. That breaks the \"at most once per edge, no polling\" property R-SYN-13 depends on, and no test pins it. PROBE-C10R-1 below is a ready test.\n- Released members that gain a new interest in the same turn are queued in reverse join order (PROBE-C10R-3).\n- A docs hand-off gap: f.md does not ask the docs level to amend ARCHITECTURE \u00a77.1 and \u00a77.6.\n- Figures to record, outside-wp failures, and carried items.\n\nAt the end, git status is clean, no profraw is left in the worktree and the simulator is shut down."
+  },
+  {
+   "lens": "correct",
+   "status": "FAIL: 2 blocking. Both are flaky WP-F tests; no engine defect is proven.\n\nAll three blocking correctness defects from cycle 9 are fixed. For each one, my own probe fails at the base b9acb51 and passes at HEAD 0d071c2:\n- **User-initiated release, C2:** the release now takes about 4 to 4.6 ms; it took about 22 ms before.\n- **T17 policy pause:** the member no longer stays parked.\n- **R-SYN-13 offline after the edge:** the member is retried, and a repeated failure is retried only once per edge (no polling).\n\nI reviewed all 11 close-out commits for reentrancy, double resumes, races, unbounded growth, overflow, C2 at 10,000, iOS 15 availability and stranded jobs, and proved no new engine bug. In a scratch copy I added an invariant that every queued job must be reachable from a queue, or from the set-aside list when only released groups want it. It held across the full Sync suite, my probes, and a randomized model run with set-aside active (8 seeds of 10,000 operations each).\n\nThe two blocking findings:\n1. `EngineRegressionCycle9Tests.drivingStopsBeforeReturning` failed in the required iOS Simulator run.\n2. `EngineEventsTests.progressIsRateLimited` failed in a macOS stress run. PROBE-C10C-6 shows why: its lower bound still depends on scheduling (L4-V3-00 is only partly fixed).\n\nBoth fail assertions that depend on scheduling, so L4-R8 makes them blocking.\n\nEvery other required run passed: --quick, the release build, the unsafe and docs gates, Sync three times, the thread sanitizer, Sync coverage (92.98 %), the iOS build and the WP-F benchmarks. The only gate failures outside these are outside-wp: P-13 and the ZTronAssetKit coverage target.\n\nGit status is clean, the simulator is shut down, and none of my processes are left. Every probe is under `.build-verify-f-c10-correct` (copies in `pkg`, `pkg2`, `pkg3`; logs in `logs/`)."
+  }
+ ],
+ "fix10": {
+  "summary": "Close-out cycle 10 for WP-F on wp/f (worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/f). All three blocking findings were reproduced at b9acb51, and each had its failing test committed before its fix.\n\n**Blocking fixes**\n1. **Releasing a user-initiated prefetch handle held the actor 22 ms (C2, PROBE-C9C-2).**\n   - At b9acb51 the new release benchmark measured 22.13, 22.16 and 22.00 ms.\n   - Fix (dca73b9, simplified in 51ef016): a scan now takes the queue entry of a job that only released groups want out of its queue, so each entry is stepped over once. The aside list lives in LaneQueues (pop/peek take a setAside predicate).\n   - The pump's pop and hasQueuedUser() set such entries aside. addInterest queues the job again when an interest joins it at its own lane. continueReleases restores any valid aside entry once no release is left. The invariant check flags an aside entry whose job another interest wants.\n   - After: 4.12, 4.18 and 4.21 ms. The prefetch-lane release measured 4.52, 4.09 and 4.19 ms.\n2. **A policy pause whose block cleared before `.paused` arrived left the member parked for good (T17, PROBE-C9C-1a/1b).**\n   - Fix (4e1de3f): after its await, paused() re-reads laneWideBlock under the current conditions. It parks the job with the block the lane gives now, or re-queues it at the front if the lane is admitted.\n   - The f-2 REENTRANCY row is amended.\n3. **An offline failure that arrived after the network returned waited for an edge that had already passed (R-SYN-13 [MUST], PROBE-C9C-3).**\n   - Fix (5613fe6): EngineState.networkEdgeSerial counts satisfied edges, and ActiveAttempt.edgeSerial records the count when an attempt starts.\n   - An `.offline` failure re-queues its job if an edge was applied since the attempt started and the path reads satisfied now. Otherwise it fails whenOnline as before.\n   - This allows at most one immediate retry per edge, so it is not polling. A pin test covers the other order (the path dropped again).\n\n**Non-blocking fixes**\n- **withdraw no longer scans every job.** It now touches only the waiter's own job (a1e0bc1). A new invariant flags a waiter interest held in any other job. Benchmark: 5.28, 6.25 and 5.67 ms with the old body, 0.017 to 0.021 ms after.\n- **Lane-park continuation now has a test.** The new test (b89126c) fails under mutant M-LANEOWED, with 64 members left queued.\n- **New cooldown-end benchmark.** Breaker cooldown end over 10,000 parked members (886a2e4): 5.20, 5.28 and 5.39 ms.\n- **Further tests (48d09d8).** Unit test of the LaneQueues set-aside, a lane park during a release, and an invariant-oracle test for the two new invariants.\n- **Mutants run.** M-LANEOWED, M-ASIDEJOIN and M-ASIDE each fail a cycle-10 test.\n- **docs/adr-drafts/f.md.** Records:\n  - F-30 with a dispositions table covering every finding.\n  - F-14 and F-17 updates.\n  - Cycle-10 notes on rulings L4-R1..R15 under \"Orchestrator ruling (close-out)\". The l4-rulings.md file was re-read and is unchanged.\n  - The L4-R12 cycle-9 note corrected to six tests, naming c75a3b9.\n  - The merge note now reads F-1\u2026F-30.\n\nAll edits are in WP-F files only. No contract signature changed, and Package.swift, Scripts/ and shared docs are untouched. The worktree is clean, the simulator is shut down, and none of my processes are still running.",
+  "quick": "SWIFTPM_SCRATCH=.build-f bash Scripts/verify.sh --quick -> \"VERIFY: PASS\" (at 51ef016; all 1,051 tests; Sync 257 tests in 4.089 s; the 10,000-asset test 4.087 s; 1-minute load 3.60 to 4.48)",
+  "sim": "iOS Simulator 897F9D8D-B10D-4D91-8E22-417A2B9D70AA (iPhone 18 Pro, iOS 27.0): xcresulttool summary reports result Passed, totalTestCount 1051, passedTests 1051, failedTests 0, skippedTests 0. The cycle-10 suite took 3.855 s, the 10,000-asset test 12.858 s and the breaker test 4.077 s. The simulator is shut down.",
+  "declined": [
+   "The space-admitted accounting change was not made (by-reading finding). The sweep's `ahead` already equals what the gate counts in flight for the jobs ahead of it: their ledgerBytes, which is the entry's size. Counting the larger ENOSPC figure there would make the sweep refuse jobs the gate would start. Recorded in F-30.",
+   "The verifier's option (c), coalescing the drains' pumps, was not done. Once entries are set aside, each drain's pump scans nothing, so it is not needed.",
+   "apply(_:) still does not clear policyPause on in-flight jobs (optional). The pause has already gone to the transport, and paused() now decides on the current verdict for both orders.",
+   "The lane park's own set-aside was dropped in 51ef016. The pump's next scan sets the same entries aside, and no test could tell the two apart.",
+   "The L4-R4 timed-backoff question, the carried L4-R5/F-28 residue, the outside-wp P-13/P-2/P-5 failures and ZTronAssetKit coverage, and host hygiene (PIDs 27626, 52290, 53148) were left untouched. They are for the orchestrator, as recorded in f.md."
+  ],
+  "contract": []
+ }
+}

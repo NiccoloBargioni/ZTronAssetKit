@@ -1,0 +1,51 @@
+[08:41:29 load { 7.60 36.48 27.07 }] quick start
+[08:41:36 load { 7.13 35.43 26.81 }] tsan build start
+[08:43:07 load { 21.96 33.09 26.77 }] tsan build exit 0
+[08:43:59 load { 18.54 30.40 26.13 }] build head
+[08:45:35 load { 27.17 29.74 26.32 }] build head exit 0
+[08:45:47 load { 28.62 29.96 26.44 }] test head run1 exit 0
+[08:45:57 load { 29.24 30.06 26.52 }] test head run2 exit 0
+[08:46:27 load { 28.74 29.90 26.58 }] sync bundle head exit 0
+[08:46:27 load { 28.74 29.90 26.58 }] build prefix
+[08:46:43 load { 27.13 29.48 26.49 }] build prefix exit 0
+[08:46:52 load { 24.53 28.85 26.30 }] test prefix run1 exit 1
+[08:47:01 load { 25.92 29.02 26.39 }] test prefix run2 exit 1
+[08:47:01 load { 25.92 29.02 26.39 }] build c7gainNoAhead
+[08:47:05 load { 26.01 28.98 26.39 }] build c7gainNoAhead exit 0
+[08:47:15 load { 27.21 29.18 26.48 }] test c7gainNoAhead run1 exit 1
+[08:47:24 load { 26.47 28.95 26.43 }] test c7gainNoAhead run2 exit 1
+[08:47:24 load { 26.47 28.95 26.43 }] build requeueNoAhead
+[08:47:40 load { 25.45 28.59 26.34 }] build requeueNoAhead exit 0
+[08:47:49 load { 25.45 28.49 26.33 }] test requeueNoAhead run1 exit 1
+[08:47:57 load { 23.53 27.98 26.18 }] test requeueNoAhead run2 exit 1
+[08:47:57 load { 23.53 27.98 26.18 }] build requeueNoRecord
+[08:48:02 load { 22.77 27.75 26.10 }] build requeueNoRecord exit 0
+[08:48:12 load { 23.57 27.75 26.13 }] test requeueNoRecord run1 exit 0
+[08:48:20 load { 24.34 27.79 26.16 }] test requeueNoRecord run2 exit 0
+[08:48:25 load { 24.34 27.79 26.16 }] quick exit 0
+[08:48:40 load { 23.44 27.44 26.06 }] sync bundle requeueNoRecord exit 1
+[08:48:40 load { 23.44 27.44 26.06 }] build noReorder
+[08:48:43 load { 21.89 27.05 25.93 }] build noReorder exit 0
+[08:48:50 load { 22.46 27.08 25.95 }] test noReorder run1 exit 1
+[08:48:56 load { 19.69 26.34 25.70 }] test noReorder run2 exit 1
+[08:48:56 load { 19.69 26.34 25.70 }] build noResort
+[08:48:59 load { 19.69 26.34 25.70 }] build noResort exit 0
+[08:49:06 load { 17.28 25.60 25.45 }] test noResort run1 exit 1
+[08:49:07 load { 17.28 25.60 25.45 }] tsan pairA start (swift test)
+[08:49:11 load { 16.46 25.29 25.34 }] test noResort run2 exit 1
+[08:49:11 load { 16.46 25.29 25.34 }] build boundedJudges
+[08:49:15 load { 16.46 25.29 25.34 }] build boundedJudges exit 0
+[08:49:21 load { 14.53 24.59 25.09 }] test boundedJudges run1 exit 1
+[08:49:27 load { 13.85 24.28 24.97 }] test boundedJudges run2 exit 1
+[08:49:27 load { 13.85 24.28 24.97 }] mut DONE
+[08:49:34 load { 12.90 23.91 24.84 }] tsan pairB start (direct)
+[08:52:02 load { 39.11 31.73 27.88 }] tsan pairB done
+[08:52:15 load { 33.47 30.76 27.58 }] tsan pairA exit 0
+[08:52:57 load { 17.37 26.87 26.31 }] release build start
+[08:52:57 load { 17.37 26.87 26.31 }] probe build
+[08:53:03 load { 16.30 26.49 26.18 }] probe build exit 0
+[08:53:06 load { 16.30 26.49 26.18 }] probe c8 run1 exit 1
+[08:53:08 load { 15.48 26.15 26.06 }] probe c8 run2 exit 1
+[08:53:11 load { 15.48 26.15 26.06 }] probe c8 run3 exit 1
+[08:53:36 load { 12.00 24.46 25.45 }] release build exit 0
+[08:53:37 load { 12.16 24.29 25.39 }] gates exit 0

@@ -1,0 +1,40 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[9 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[19 / 22] ZTronAssetSyncTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (4,38 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine support values" started.
+◇ Test "R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together" started.
+✘ Test "R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together" recorded an issue at EngineBoundaryTests.swift:200:9: Expectation failed: count - left <= SyncEngine.dueDeadlinesPerTurn
+↳ one turn re-queued 600 retries
+↳ count - left <= SyncEngine.dueDeadlinesPerTurn → false
+↳   count - left → 600
+↳   SyncEngine.dueDeadlinesPerTurn → 512
+✘ Test "R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together" recorded an issue at EngineBoundaryTests.swift:201:9: Expectation failed: left >= count - SyncEngine.dueDeadlinesPerTurn && left > 0
+↳ the rest wait for the next turn: 0
+↳ left >= count - SyncEngine.dueDeadlinesPerTurn && left > 0 → false
+↳   left >= count - SyncEngine.dueDeadlinesPerTurn → false
+↳   left > 0 → <not evaluated>
+✘ Test "R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell due together" failed after 0.467 seconds with 2 issues.
+↳ /// The engine's alarm turn takes at most `dueDeadlinesPerTurn` due deadlines (C2; Stage 3, S3-B-077), pinned through
+↳ /// the engine, not only `DeadlineHeap.popDue`: the retries of `dueDeadlinesPerTurn` + 88 prefetch members fall due
+↳ /// together (each failed once transiently while the alarm's turns were held, then the clock passes every backoff),
+↳ /// and one released alarm turn re-queues at most `dueDeadlinesPerTurn` of them; the next turns re-queue the rest.
+✘ Suite "Engine support values" failed after 0.467 seconds with 2 issues.
+↳ /// The pure values the engine is built on: lane admission (R-SYN-7), the circuit breaker (R-SYN-5, ADR-031) and
+↳ /// launch reconciliation (R-NET-3, ADR-028).
+✘ Test run with 1 test in 1 suite failed after 0.467 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,3 @@
+load before: 11:29:21 { 3.20 4.85 10.03 }
+load after: 11:29:29 { 3.58 4.90 10.02 }
+TEST budget probes-budget-p1 exit 1 in 8 s

@@ -1,0 +1,3 @@
+◇ Suite "Engine follow barrier (F-28)" started.
+✔ Suite "Engine follow barrier (F-28)" passed after 162.642 seconds.
+✔ Test run with 448 tests in 53 suites passed after 162.643 seconds.

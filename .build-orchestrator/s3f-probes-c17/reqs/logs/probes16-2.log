@@ -1,0 +1,64 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16Correct" started.
+◇ Suite "VerifyC16ReqsProbes" started.
+◇ Test "PROBE-C16R-RR11-RETRY-AFTER" started.
+◇ Test "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16R-RR11-RETRY-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16R-RR11-RETRY-AFTER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst after the 404: (owed: false, c: nil, reroute: nil, end: nil, n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst after v4: (c: Optional(ZTronAssetSync.JobState.downloading), cAssets: Optional([zz-b]), n: nil, waiterB: [c-cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553])
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+✔ Test "PROBE-C16R-RR11-RETRY-AFTER" with 2 test cases passed after 1.348 seconds.
+✔ Suite "VerifyC16ReqsProbes" passed after 1.349 seconds.
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), reroute: Optional([zz-b]), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-b]))), n: nil)
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.downloading), cAssets: Optional([zz-b]), n: nil, waiterB: [c-cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553])
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✔ Test "PROBE-C16C-VERDICT-MAPPED-BACK" with 2 test cases passed after 2.393 seconds.
+◇ Test "PROBE-C16C-RR11-RETRY-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-RR11-RETRY-LANE" started.
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst after C's 503: (owed: false, c: nil, end: nil, attempts: nil)
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: false, barrier: false)
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst throttle at N's 429: Optional(61000000000ns)
+PROBE-C16C-RR11-RETRY-LANE followVisitedFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/30/30314c47e60d81f8f22b1209d952beb478c2e18add4b54c68cd379203fcf57ac.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-RR11-RETRY-LANE" started.
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst after C's 503: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([]))), attempts: Optional(0))
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: true, barrier: true)
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst throttle at N's 429: Optional(61000000000ns)
+PROBE-C16C-RR11-RETRY-LANE sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/30/30314c47e60d81f8f22b1209d952beb478c2e18add4b54c68cd379203fcf57ac.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C16C-RR11-RETRY-LANE" with 2 test cases passed after 1.415 seconds.
+◇ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst after C's 429: (owed: false, c: nil, interests: nil, throttle: Optional(11000000000ns))
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: false)
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst throttle before=Optional(11000000000ns) after N's 429=Optional(61000000000ns)
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/114984b893db42c936e0a6d7f5dec3bc5564c6e6d73c8688b4c6537cfd9ae06b.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst after C's 429: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), interests: Optional(1), throttle: Optional(11000000000ns))
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: true)
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst throttle before=Optional(11000000000ns) after N's 429=Optional(61000000000ns)
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/114984b893db42c936e0a6d7f5dec3bc5564c6e6d73c8688b4c6537cfd9ae06b.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" with 2 test cases passed after 1.544 seconds.
+◇ Test "PROBE-C16C-INTERMEDIATE-HOP" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-INTERMEDIATE-HOP" started.
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst after v3: (owed: false, c: nil, nInterests: Optional(2))
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst after v4: (c: nil, n: nil, m: nil)
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-INTERMEDIATE-HOP" started.
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst after v3: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), nInterests: Optional(1))
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst after v4: (c: nil, n: nil, m: nil)
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+✔ Test "PROBE-C16C-INTERMEDIATE-HOP" with 2 test cases passed after 1.759 seconds.
+◇ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-INTERMEDIATE-HOP-SERVED" started.
+PROBE-C16C-INTERMEDIATE-HOP-SERVED followVisitedFirst after N's publication: (owed: false, c: nil, n: nil) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C16C-INTERMEDIATE-HOP-SERVED followVisitedFirst b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) mStarts=0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-INTERMEDIATE-HOP-SERVED" started.
+PROBE-C16C-INTERMEDIATE-HOP-SERVED sweepFollowsFirst after N's publication: (owed: true, c: nil, n: nil) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+PROBE-C16C-INTERMEDIATE-HOP-SERVED sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3d/3df8955c2c1396df5a1cc0315ceb08419e47f7dc760b0b073217fca7ba455996.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) mStarts=0
+✔ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" with 2 test cases passed after 1.605 seconds.
+✔ Suite "VerifyC16Correct" passed after 8.718 seconds.
+✔ Test run with 6 tests in 2 suites passed after 8.719 seconds.

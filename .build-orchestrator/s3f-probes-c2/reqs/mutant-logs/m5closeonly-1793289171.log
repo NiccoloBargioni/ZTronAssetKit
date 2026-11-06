@@ -1,0 +1,22 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[15 / 15] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[18 / 18] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[21 / 21] ZTronAssetSyncTests-product
+Build complete! (5,01 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine regressions" started.
+◇ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" started.
+✔ Test "R-SYN-15: shutdown joins every owned task before it begins closing the store" passed after 0.047 seconds.
+✔ Suite "Engine regressions" passed after 0.068 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.068 seconds.

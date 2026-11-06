@@ -1,0 +1,56 @@
+Building for production...
+[Computing dependencies]
+Build complete! (0,41 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "StorageBenchmarks" started.
+◇ Test "P-2: cold index load of 10,000 records off the main thread is under budget" started.
+P-2 index load, 1411449 bytes, 10,000 records: p50 10.619709 ms, p95 10.966167 ms, max 10.998292 ms, budget 25.0 ms
+✔ Test "P-2: cold index load of 10,000 records off the main thread is under budget" passed after 0.370 seconds.
+◇ Test "P-5: index commit of 10,000 records is under budget and a bulk sync commits at most 4 per second" started.
+P-5 commit of 10,000 records, 16 dirty fan-outs: ordered p50 14.938666 ms, p95 19.797167 ms, max 21.54725 ms; durable p50 22.996458 ms, p95 30.907417 ms, max 30.907417 ms; budget 40.0 ms. Bulk sync: 40 commits in 10 s, at most 4 in any second, budget 4.0
+✔ Test "P-5: index commit of 10,000 records is under budget and a bulk sync commits at most 4 per second" passed after 1.270 seconds.
+◇ Test "P-6: streaming SHA-256 of 256 MiB meets the throughput floor, the one-shot ratio and the memory cap" started.
+P-6 streaming SHA-256 of 256 MiB: 2291.5120552058534 MB/s, one-shot 2848.645427811143 MB/s, ratio 0.804421649965267, peak resident delta 0.015625 MiB over 1542 in-read samples; floors 800.0 MB/s, 0.7x, cap 4.0 MiB
+✔ Test "P-6: streaming SHA-256 of 256 MiB meets the throughput floor, the one-shot ratio and the memory cap" passed after 1.571 seconds.
+◇ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" started.
+P-13 reclaim of 10000 blobs: 0.75680625 s in 586 units, unit max 16.2225 ms (p50 0.957917 ms, p95 0.992167 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.0465 ms, p99 0.200917 ms, max 3.645792 ms; unit on-CPU max 1.0045 ms; units over the batch budget: ["7.496875 ms wall, 0.503125 ms on CPU", "16.2225 ms wall, 0.616 ms on CPU", "8.202708 ms wall, 0.887667 ms on CPU", "14.420917 ms wall, 0.995709 ms on CPU", "5.663 ms wall, 0.5445 ms on CPU"]; blob unlinks inside the reclaim: max 15.727792 ms, 8 over 4.0 ms [7.140958, 4.096041, 15.727792, 4.124083, 7.451541, 4.086209, 13.5705, 5.162041]
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+↳ every batch between suspension points: the longest deletion unit took 16.2225 ms
+↳ longest <= batchBudget → false
+↳   longest → 16.2225
+↳   batchBudget → 5.0
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.431 seconds with 1 issue.
+◇ Test "C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch" started.
+C2 longest actor hold at 10,000 assets: first apply 0.852292 ms (max of runs 0.888208 ms), open 0.75675 ms (max of runs 62.752084 ms), unchanged re-apply 0.03525 ms (max of runs 0.061709 ms), prune of all 2.257875 ms (max of runs 2.880125 ms), re-adoption of all 3.272708 ms (max of runs 14.831625 ms); budget 10.0 ms
+✔ Test "C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch" passed after 5.318 seconds.
+✘ Suite "StorageBenchmarks" failed after 10.963 seconds with 1 issue.
+↳ /// P-2, P-5, P-6 and P-13 (WP-B), release configuration, live file system in directories inside this repository
+↳ /// (`.build-tests/`, git-ignored). Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// **Statistics (ADR draft B-9, as ruled by the orchestrator at the L2 close-out).** P-2 judges the p95 of cold
+↳ /// loads. P-5 judges **both** the ordered commit a bulk sync performs and the durable one (flush, close, adoption
+↳ /// report) on their p95 against `index_commit_ms`; the commits-per-second ceiling is a hard maximum over every
+↳ /// sliding second. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
+↳ /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
+↳ /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
+↳ /// duration is asserted against `batch_ms_max` (p50 and p95 printed beside it); the unit's time budget (ADR draft
+↳ /// B-10) makes it fit by design, and an unlink profile of this volume is printed as the justification. Figures
+↳ /// measured while other worktrees build are informative; the orchestrator's quiet-machine run is the reference.
+↳ /// C2 has no budget key: its test reports the longest hold of the store's actor seen by a probe, best of five
+↳ /// runs, against the rule's own 10 ms.
+✘ Suite ZTronAssetKitBenchmarks failed after 10.963 seconds with 1 issue.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 5 tests in 2 suites failed after 10.963 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+exit 1

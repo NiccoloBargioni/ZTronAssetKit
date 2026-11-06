@@ -1,0 +1,28 @@
+LOAD 15:23:46 { 14.55 8.40 11.10 }
+quick exit 0
+::: OK   tests
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+LOAD 15:35:29 { 55.62 160.44 112.10 }
+release exit 0
+[147 / 154] ZTronAssetKit
+Build complete! (34,37 s)
+LOAD 15:36:05 { 32.24 143.01 107.70 }
+gates exit 0
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+LOAD 15:36:05 { 29.74 140.66 107.07 }
+sync1 exit 0
+✔ Test run with 495 tests in 53 suites passed after 62.514 seconds.
+LOAD 15:37:56 { 9.17 99.44 94.96 }
+LOAD 15:37:56 { 9.17 99.44 94.96 }
+sync2 exit 0
+✔ Test run with 495 tests in 53 suites passed after 61.488 seconds.
+LOAD 15:39:00 { 5.00 81.86 88.68 }
+LOAD 15:39:00 { 5.00 81.86 88.68 }
+sync3 exit 0
+✔ Test run with 495 tests in 53 suites passed after 62.265 seconds.
+LOAD 15:40:04 { 3.69 66.46 82.39 }
+JOBA DONE

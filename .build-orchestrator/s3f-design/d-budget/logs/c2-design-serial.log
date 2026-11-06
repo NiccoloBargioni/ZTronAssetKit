@@ -1,0 +1,20 @@
+== round 1 VerifyC8C2Probe 10:04:57 load { 3.37 7.72 9.41 }
+VERIFY-C8-C2-MIXED 10,000 members, 1 handle(s): runs [5.786833, 5.701125, 5.667375] ms, best 5.667375 ms
+VERIFY-C8-C2-MIXED 10,000 members, 2 handle(s): runs [5.827292, 6.130417, 5.794542] ms, best 5.794542 ms
+✔ Test run with 1 test in 1 suite passed after 7.395 seconds.
+== end 10:05:06 load { 3.08 7.52 9.32 }
+== round 1 reclaimDuringFollowTurns 10:05:06 load { 3.08 7.52 9.32 }
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 2.973208 ms (budgets 50.0 ms median, 10.0 ms best); runs [3.290959, 2.973208, 2.934375]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 3.8555 ms (budgets 50.0 ms median, 10.0 ms best); runs [3.8555, 3.940041, 3.804833]
+✔ Test run with 1 test in 2 suites passed after 6.846 seconds.
+== end 10:05:14 load { 2.92 7.34 9.23 }
+== round 2 VerifyC8C2Probe 10:05:14 load { 2.92 7.34 9.23 }
+VERIFY-C8-C2-MIXED 10,000 members, 1 handle(s): runs [5.682, 5.695334, 5.695584] ms, best 5.682 ms
+VERIFY-C8-C2-MIXED 10,000 members, 2 handle(s): runs [5.80475, 6.134333, 7.854084] ms, best 5.80475 ms
+✔ Test run with 1 test in 1 suite passed after 7.305 seconds.
+== end 10:05:23 load { 3.08 7.30 9.21 }
+== round 2 reclaimDuringFollowTurns 10:05:23 load { 3.08 7.30 9.21 }
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 3.072667 ms (budgets 50.0 ms median, 10.0 ms best); runs [3.096167, 3.067167, 3.072667]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 3.971375 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.133167, 3.945459, 3.971375]
+✔ Test run with 1 test in 2 suites passed after 7.022 seconds.
+== end 10:05:32 load { 2.92 7.12 9.12 }

@@ -1,0 +1,301 @@
+[
+ {
+  "blocking": true,
+  "area": "BLOCKING S3D-1",
+  "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:422-441 (setPriority(_:of:token:)); :700-719 (BackgroundTransferHandle.setPriority/pause/cancel)",
+  "problem": "S3-CONC-01: `BackgroundTransferCoordinator.setPriority` checks the attach token, then awaits `driver.snapshot()`, then writes `priorities[name]` and awaits `driver.setPriority`. After the listing, D-9 re-checks the token and whether the task is still live. It never checks that this request is still the newest one for the name. Two overlapping changes from the engine therefore land in whatever order their listings finish. Example: a promotion when a user waiter joins a bulk background job, then a demotion when the waiter withdraws. The OS task and `liveTransfers()` end at 0.75 while the engine's lane is bulk (0.25), and they stay there until another change arrives. On top of that, `BackgroundTransferHandle` sends every control (setPriority, pause, cancel) through its own unstructured `Task`, so even their arrival order at the actor is not guaranteed. The engine-level R-NET-10 test cannot catch either problem: it runs over FakeRemoteSource, whose handle records synchronously. Scope: only when the app turns the background route on (ADR-026; bulk only, off by default).",
+  "fix": "Background priority changes: the newest request wins (a per-name serial taken before the first `await` and checked after it, cleared on `.finished`), and a handle's controls are delivered in FIFO order (one stream per handle drained by one task, not a `Task` per call). Commit both probes (`concurrency/S3-CONC-01.swift` and `confirm-concurrency/S3-CONC-01-reverse.swift`) as regression tests; propose the D-9 ledger row amendment in the draft.",
+  "detail": {
+   "id": "S3-CONC-01",
+   "kind": "hunt",
+   "lens": "concurrency",
+   "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:422-441 (setPriority(_:of:token:)); :700-719 (BackgroundTransferHandle.setPriority/pause/cancel)",
+   "requirements": "R-NET-10 (MUST), H-4, H-5, C3 (REENTRANCY row D-9)",
+   "problem": "`BackgroundTransferCoordinator.setPriority` checks the attach token, then awaits `driver.snapshot()`, then writes `priorities[name]` and awaits `driver.setPriority`. After the listing, D-9 re-checks the token and whether the task is still live. It never checks that this request is still the newest one for the name. Two overlapping changes from the engine therefore land in whatever order their listings finish. Example: a promotion when a user waiter joins a bulk background job, then a demotion when the waiter withdraws. The OS task and `liveTransfers()` end at 0.75 while the engine's lane is bulk (0.25), and they stay there until another change arrives. On top of that, `BackgroundTransferHandle` sends every control (setPriority, pause, cancel) through its own unstructured `Task`, so even their arrival order at the actor is not guaranteed. The engine-level R-NET-10 test cannot catch either problem: it runs over FakeRemoteSource, whose handle records synchronously. Scope: only when the app turns the background route on (ADR-026; bulk only, off by default).",
+   "evidence": ".build-orchestrator/s3-probes/concurrency/S3-CONC-01.swift (test newestPriorityChangeWins), S3-CONC-01.log: `Expectation failed: changes.last == 0.25 \u21b3 the newest request was bulk (0.25), the OS task ends at Optional(0.75); changes [0.25, 0.75]` and `Expectation failed: await coordinator.liveTransfers().map(\\.priority) == [0.25]` (run 09:06, load avg 48.6)",
+   "repro": "git worktree add --detach <wt> s3-base; cp .build-orchestrator/s3-probes/concurrency/S3-CONC-01.swift <wt>/Tests/ZTronAssetTransportTests/S3ConcurrencyProbeTests.swift; cd <wt>; swift test --scratch-path /Users/admin/Documents/ZTronAssetKit/.build-s3-concurrency --skip Benchmarks --filter 'ZTronAssetTransportTests.S3ConcurrencyProbeTests/newestPriorityChangeWins'",
+   "fix": "Make the newest request win inside the actor. Before the first await, bump a per-name request serial (`prioritySerial[name] += 1; let mine = ...`). After the listing, return unless `prioritySerial[name] == mine`, alongside the existing token and processed checks. Clear the serial in `process(.finished)`. Then deliver the handle's controls in order: feed them into one `AsyncStream` continuation per handle, drained by one task in FIFO order, instead of one `Task` per call. Without that, `setPriority(a); setPriority(b)` can still arrive as b then a. Add the probe as a regression test and amend ledger row D-9 to name the newest-request check.",
+   "confirmer": {
+    "id": "S3-CONC-01",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "d",
+    "reason": "Reproduced against s3-base (09:53, load 33.4): `newestPriorityChangeWins` fails because the OS task ends at 0.75 (changes [0.25, 0.75]) and liveTransfers() disagrees with the newest request. I also wrote a confirmation for the direction that matters for H-4 (confirm-concurrency/S3-CONC-01-reverse.swift). An older demotion lands after a newer promotion, so the OS task ends at 0.25 (changes [0.75, 0.75, 0.25]) while a user is waiting.\n\nI checked whether the interleaving can happen outside the fake. The hold seam is the same `holdNextSnapshot(.afterListing)` that the existing BackgroundInterleavingTests use, and in production three points can reorder controls:\n(1) `BackgroundTransferHandle.setPriority/pause/cancel` (BackgroundSupport.swift:700-719) start one nonisolated `Task` per call on the global executor, so they can reach the actor in either order.\n(2) `setPriority` (:422-441) awaits `driver.snapshot()`. The live driver does a holder-actor hop and `session.allTasks` off the actor, so a later request can finish its listing first. D-9 re-checks the token and processed set, but never whether this request is still the newest.\n(3) `LiveBackgroundSessionDriver.setPriority` (BackgroundSessionBackend.swift:79) runs another `allTasks` and then `task.priority =` outside the coordinator, so two writes race there too.\n\nThe engine calls `handle.setPriority(lane)` synchronously on every lane change (EngineJobs.swift:197, EngineDispatch.swift:637-642) and never re-applies it later. A wrong value therefore stays until the next lane change.\n\nRecorded decisions do not cover this. D-10 (adr-drafts/d.md) records the unstructured task per control but only weighs shutdown cancellation, not ordering. ADR-021 chose synchronous controls precisely so that controls stay ordered (S1-06), and this handle defeats that. ARCHITECTURE \u00a77.5 says the priority is a hint, but that concerns what the OS does with the value. Here the library itself leaves the task at the value of an older lane, which breaks R-NET-10's MUST that engine priority maps to the URLSession task priority.\n\nScope: the route is off by default (ADR-026) and only carries key-free bulk work, so today's production configuration does not reach it.\n\nNot refuted: the engine-level R-NET-10 test is not a G4 violation. It verifies the engine's ordering over FakeRemoteSource, as documented, but it does not cover the background coordinator.\n\nThe proposed fix is sound: a per-name request serial checked after the listing, plus one FIFO control stream per handle. Owner is WP-D (Sources/ZTronAssetTransport/**)."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3D-2",
+  "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:733-750 (BackgroundEventsRelay.accept/complete); caller Sources/ZTronAssetKit/Facade/AssetClient.swift handleBackgroundEvents",
+  "problem": "S3-CONC-02: `handlers[identifier] = completionHandler` replaces a handler that has not been completed yet. Sequence: UIKit hands a second handler for the same session while the facade's first `handleBackgroundEvents` task is still waiting. The first task's `relay.complete(identifier)` then calls the second handler, which is early because its own events are not yet staged. The second task finds no handler. The first handler UIKit handed over is never called, although Apple requires every one to be called.",
+  "fix": "`BackgroundEventsRelay.accept` (`BackgroundSupport.swift:733-750`) must never drop an uncompleted handler: every handler it accepts is called exactly once, and none before the events of its own wake are staged. Test both properties.",
+  "detail": {
+   "id": "S3-CONC-02",
+   "kind": "hunt",
+   "lens": "concurrency",
+   "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:733-750 (BackgroundEventsRelay.accept/complete); caller Sources/ZTronAssetKit/Facade/AssetClient.swift handleBackgroundEvents",
+   "requirements": "R-NET-3 (SHOULD), REENTRANCY row RE-S42 ('the relay's completion runs once, after the events that preceded it were staged')",
+   "problem": "`handlers[identifier] = completionHandler` replaces a handler that has not been completed yet. Sequence: UIKit hands a second handler for the same session while the facade's first `handleBackgroundEvents` task is still waiting. The first task's `relay.complete(identifier)` then calls the second handler, which is early because its own events are not yet staged. The second task finds no handler. The first handler UIKit handed over is never called, although Apple requires every one to be called.",
+   "evidence": ".build-orchestrator/s3-probes/concurrency/S3-CONC-02.swift (test secondHandlerKeepsFirst), S3-CONC-02.log: `Expectation failed: calls.sorted() == [\"first\", \"second\"] \u21b3 each handler UIKit handed over runs once: [\"second\"]` (run 09:06, load avg 48.6)",
+   "repro": "cp .build-orchestrator/s3-probes/concurrency/S3-CONC-02.swift <wt>/Tests/ZTronAssetTransportTests/S3ConcurrencyProbeTests.swift; swift test --scratch-path /Users/admin/Documents/ZTronAssetKit/.build-s3-concurrency --skip Benchmarks --filter 'ZTronAssetTransportTests.S3ConcurrencyProbeTests/secondHandlerKeepsFirst'",
+   "fix": "Keep every accepted handler: `handlers: [String: [(ticket: UInt64, handler: () -> Void)]]`. `accept` returns or records a ticket. `complete(identifier:ticket:)` calls and removes the handlers accepted up to that ticket, since their preceding events were staged when the wait that began after them returned. Calling all pending handlers is also acceptable, because the latest wait covers the earlier ones. Never drop one uncalled. Update RE-S42's wording and keep the probe as a test.",
+   "confirmer": {
+    "id": "S3-CONC-02",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "d",
+    "reason": "Reproduced (09:53): calls == [\"second\"], so the first handler is never called. `BackgroundEventsRelay.accept` (BackgroundSupport.swift:733-750) assigns `handlers[identifier] = completionHandler` and overwrites an uncompleted handler. `complete` removes and calls whatever is stored.\n\nThe coordinator side makes the early call real. One `.backgroundEventsFinished` runs `resumeFinishWaiters()` (BackgroundSupport.swift:579-584) and wakes both facade tasks (AssetClient.swift:435-454). The first task's `relay.complete` then calls the second handler, and the second task finds nothing.\n\nNo recorded decision covers this. The existing relay test only checks one handler completed once, and a fix that calls every pending handler keeps that test passing without a public API change.\n\nNon-blocking because I could not prove the trigger. R-NET-3 is a SHOULD, and nothing shows that UIKit hands a second handler for the same session identifier while the first is still pending. That is device-only behaviour and goes under Not verified. It is not a Swift continuation or task leak, and no data is lost.\n\nOwner is WP-D, since the relay lives in Transport. WP-G is only involved if the ticket variant changes `AssetClient.handleBackgroundEvents`."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3D-3",
+  "location": "Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift:63",
+  "problem": "M-N-22: Weak ETag accepted as the resume validator",
+  "fix": "R-NET-8: a weak `ETag` is never the resume validator; with a weak ETag and `Last-Modified` the sidecar keeps `.lastModified`, with only a weak ETag none (`Session/HTTPResponseReading.swift:63`). Kill the mutant.",
+  "detail": {
+   "id": "M-N-22",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift:63",
+   "requirements": "R-NET-8 / RFC 9110 (If-Range needs a strong validator)",
+   "problem": "Weak ETag accepted as the resume validator",
+   "missing_test": "SURVIVED. Missing test: loopback response with headers ETag: W/\"v1\" and Last-Modified (stall after half the body). After pause the sidecar validator must be .lastModified(date) (and with only the weak ETag, no sidecar). File: Tests/ZTronAssetTransportTests/SizeAndResumeTests.swift, beside pauseKeepsThePartial.",
+   "notes": "The !tag.rawValue.hasPrefix(\"W/\") check was removed, so resumeValidator returns .strongETag(W/...) and skips the Last-Modified fallback. A resumed request would then send a weak If-Range, which servers ignore, so the whole file is refetched. No test anywhere uses a weak ETag on the transport side. Survives Transport 151, Sync 351, Kit 85, Compat 71, Apple 104. Candidate: /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-probes/mut-network/M-N-22-candidate-test.swift. It passes on s3-base and fails on this mutant.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/network/M-N-22.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3D-4",
+  "location": "no test carries that name (grep over Tests/ finds none); docs/ARCHITECTURE.md:787",
+  "problem": "S3-B-057: S2-19: 'R-SYN-14: no task outlives a transfer in the live foreground backend' is not written",
+  "fix": "Write S2-19: 'R-SYN-14: no task outlives a transfer in the live foreground backend' (ARCHITECTURE \u00a712.4).",
+  "detail": {
+   "id": "S3-B-057",
+   "kind": "backlog",
+   "location": "no test carries that name (grep over Tests/ finds none); docs/ARCHITECTURE.md:787",
+   "problem": "S2-19: 'R-SYN-14: no task outlives a transfer in the live foreground backend' is not written",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Assignments (\u00a712 names)",
+    "ARCHITECTURE \u00a712.4 S2-19"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3D-5",
+  "location": "tests unchanged; no timeout seam added",
+  "problem": "S3-B-055: OI-10: loopback tests time out under host load (ForegroundBackendTests.swift:162-164 and :200-202 failed once on the simulator at load 468.9); decide whether request timeouts are injected or scale with load, without loosening an assertion",
+  "fix": "OI-10: the loopback tests that time out under host load (`ForegroundBackendTests.swift:162-164`, `:200-202`) get request timeouts that cannot fire spuriously under load (an injected timeout or a deterministic trigger), with no assertion loosened.",
+  "detail": {
+   "id": "S3-B-055",
+   "kind": "backlog",
+   "location": "tests unchanged; no timeout seam added",
+   "problem": "OI-10: loopback tests time out under host load (ForegroundBackendTests.swift:162-164 and :200-202 failed once on the simulator at load 468.9); decide whether request timeouts are injected or scale with load, without loosening an assertion",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-052 Assignments (OI-10)",
+    "ADR-053 Assignments (environment item)",
+    "c.md OI-10"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "no device run exists",
+  "problem": "S3-B-046: D-19.1 / D-20.3: does nsurlsessiond ever finish a fresh background download with a ranged 206 after an internal retry? Today's code then fails the attempt with unexpectedStatus(206) after the whole download; a device check is due before background transfers ship",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-046",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "D-19.1 / D-20.3: does nsurlsessiond ever finish a fresh background download with a ranged 206 after an internal retry? Today's code then fails the attempt with unexpectedStatus(206) after the whole download; a device check is due before background transfers ship",
+   "category": "device-only",
+   "sources": [
+    "ADR-050 (D-19.1; Not verified)",
+    "d.md D-19, D-20.3, Not verified here",
+    "ARCHITECTURE \u00a714"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "no device run exists",
+  "problem": "S3-B-047: D-19.2: the OS keeps taskDescription (the ztak1 tag with its resume flag) across relaunch for a task created by downloadTask(withResumeData:)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-047",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "D-19.2: the OS keeps taskDescription (the ztak1 tag with its resume flag) across relaunch for a task created by downloadTask(withResumeData:)",
+   "category": "device-only",
+   "sources": [
+    "ADR-050 (D-19.2; Not verified)",
+    "d.md Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "orchestrator ruling at the Level 2 close; awaiting owner review",
+  "problem": "S3-B-048: D-19.2 (NEEDS-HUMAN-REVIEW): the 'created from resume data' flag travels in the persisted task tag 'ztak1 <name> <size|-> [resume]' (at most 256 bytes), so every later build must decode it",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-048",
+   "kind": "backlog",
+   "location": "orchestrator ruling at the Level 2 close; awaiting owner review",
+   "problem": "D-19.2 (NEEDS-HUMAN-REVIEW): the 'created from resume data' flag travels in the persisted task tag 'ztak1 <name> <size|-> [resume]' (at most 256 bytes), so every later build must decode it",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-050 (heading, D-19.2)",
+    "d.md D-19.2"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "no device run exists",
+  "problem": "S3-B-049: Background resume data end to end: a 206 with Content-Range moving the whole body, and the errors for stale or unusable resume data (-1002, 416, a 206 without range)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-049",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "Background resume data end to end: a 206 with Content-Range moving the whole body, and the errors for stale or unusable resume data (-1002, 416, a 206 without range)",
+   "category": "device-only",
+   "sources": [
+    "ADR-050 (Not verified)",
+    "d.md ruling 2, Not verified here"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "coverage-excluded device-only file",
+  "problem": "S3-B-050: LiveBackgroundSessionDriver on a device: task creation vs invalidate() ordering, the order of didFinishDownloadingTo / didCompleteWithError / cancelByProducingResumeData, urlSessionDidFinishEvents timing and relaunch re-attachment; its resumeData use (BackgroundSessionBackend.swift:58-60) has no test (mutant ME survives)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-050",
+   "kind": "backlog",
+   "location": "coverage-excluded device-only file",
+   "problem": "LiveBackgroundSessionDriver on a device: task creation vs invalidate() ordering, the order of didFinishDownloadingTo / didCompleteWithError / cancelByProducingResumeData, urlSessionDidFinishEvents timing and relaunch re-attachment; its resumeData use (BackgroundSessionBackend.swift:58-60) has no test (mutant ME survives)",
+   "category": "device-only",
+   "sources": [
+    "d.md Not verified here, D-20.1",
+    "l2-close5-remaining-d.json [1]",
+    "ARCHITECTURE \u00a714"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "no device run exists",
+  "problem": "S3-B-051: Real NWPathMonitor transitions, a notification arriving between NWPathMonitor.start and its first update (D-18.5), and HTTP/2 connection reuse against CloudFront (P-10 is HTTP/1.1 keep-alive on loopback)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-051",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "Real NWPathMonitor transitions, a notification arriving between NWPathMonitor.start and its first update (D-18.5), and HTTP/2 connection reuse against CloudFront (P-10 is HTTP/1.1 keep-alive on loopback)",
+   "category": "device-only",
+   "sources": [
+    "ADR-050 (Not verified)",
+    "d.md Not verified here",
+    "ARCHITECTURE \u00a714"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "awaiting owner review",
+  "problem": "S3-B-052: D-10 (NEEDS-HUMAN-REVIEW): an explicit shutdown() cancels in-flight background downloads (the Model's drop-to-cancel rule; ADR-039 amendment)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-052",
+   "kind": "backlog",
+   "location": "awaiting owner review",
+   "problem": "D-10 (NEEDS-HUMAN-REVIEW): an explicit shutdown() cancels in-flight background downloads (the Model's drop-to-cancel rule; ADR-039 amendment)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-050 (D-10)",
+    "d.md D-10"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "awaiting owner review",
+  "problem": "S3-B-053: Public BackgroundSessionDriver.startDownload(_:name:priority:expectedBytes:resumeData:) gained a resumeData parameter (NEEDS-HUMAN-REVIEW, public API change; no R-CAR-6 shim affected)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-053",
+   "kind": "backlog",
+   "location": "awaiting owner review",
+   "problem": "Public BackgroundSessionDriver.startDownload(_:name:priority:expectedBytes:resumeData:) gained a resumeData parameter (NEEDS-HUMAN-REVIEW, public API change; no R-CAR-6 shim affected)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-050 (Ratified contract changes)",
+    "d.md D-14"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "Tests/ZTronAssetKitTests/CompositionTests.swift:39-44 states the declined detection; goes to the device test plan",
+  "problem": "S3-B-054: R-NET-3's run-time half: an app that attests BackgroundTransferPolicy.enabled without wiring the background-events hook is not detected (CCR-G1 declined, L5-R5); revisit only with a detection that cannot misfire on an early finish (for example a finish that no hook call claims for the whole background wake)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-054",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetKitTests/CompositionTests.swift:39-44 states the declined detection; goes to the device test plan",
+   "problem": "R-NET-3's run-time half: an app that attests BackgroundTransferPolicy.enabled without wiring the background-events hook is not detected (CCR-G1 declined, L5-R5); revisit only with a detection that cannot misfire on an early finish (for example a finish that no hook call claims for the whole background wake)",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-054 (Owner information; Assignments (6))",
+    "g.md Not verified here",
+    "l5-rulings.md L5-R5"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3D-6",
+  "location": "declined at review rounds 2 and 3",
+  "problem": "S3-B-056: WP-D options declined: D-17.5 (apply the joining job's lane priority when start joins a live task), D-17.6 (prove 'without polling' in the conditions test), D-18.3 (change the failure of a direct start of an unbounded job)",
+  "fix": "Record only; the orchestrator moves the device items to DEVICE-TEST-PLAN at Stage 5. NEEDS-HUMAN-REVIEW items stay as ratified.",
+  "detail": {
+   "id": "S3-B-056",
+   "kind": "backlog",
+   "location": "declined at review rounds 2 and 3",
+   "problem": "WP-D options declined: D-17.5 (apply the joining job's lane priority when start joins a live task), D-17.6 (prove 'without polling' in the conditions test), D-18.3 (change the failure of a direct start of an unbounded job)",
+   "category": "accepted-deviation",
+   "sources": [
+    "d.md D-17.5, D-17.6, D-18.3"
+   ],
+   "proposed": "none"
+  }
+ }
+]

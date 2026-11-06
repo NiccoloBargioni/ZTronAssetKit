@@ -1,0 +1,33 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC19ReqsTurnTotal" started.
+◇ Test "PROBE-C19R-TWO-HOLDER-TURN" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C19R-TWO-HOLDER-TURN" started.
+PROBE-C19R-TWO-HOLDER-TURN followVisitedFirst: moves owed at O's end []; members left per turn []; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C19R-TWO-HOLDER-TURN" started.
+PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 8, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+✘ Test "PROBE-C19R-TWO-HOLDER-TURN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC19ReqsTurnTotalProbes.swift:108:13: Expectation failed: turns.allSatisfy { $0 <= Self.bound }
+↳ no follow turn moves more than followIDsPerTurn = 4 ids across the holders: [2, 8, 2]
+↳ turns.allSatisfy { $0 <= Self.bound } → <not evaluated>
+✘ Test "PROBE-C19R-TWO-HOLDER-TURN" with 2 test cases failed after 2.104 seconds with 1 issue.
+◇ Test "PROBE-C19R-THREE-HOLDER-VISITS" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C19R-THREE-HOLDER-VISITS" started.
+PROBE-C19R-THREE-HOLDER-VISITS followVisitedFirst: members left per turn []; O success(24); members not served 24 bytes 0; holder starts 3
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C19R-THREE-HOLDER-VISITS" started.
+PROBE-C19R-THREE-HOLDER-VISITS sweepFollowsFirst: members left per turn [4, 4, 4]; O success(24); members not served 24 bytes 0; holder starts 3
+✔ Test "PROBE-C19R-THREE-HOLDER-VISITS" with 2 test cases passed after 1.551 seconds.
+✘ Suite "VerifyC19ReqsTurnTotal" failed after 3.656 seconds with 1 issue.
+↳ /// Scratch probe (s3f close-out verification, cycle 19, requirements lens). Never committed.
+↳ ///
+↳ /// PROBE-C19R-TWO-HOLDER-TURN: the bound of S3-R22 item 1 is per follow turn ("at most `followIDsPerTurn` ids they
+↳ /// move", `continueFollow`), but `barrierMovesASharedContentsIDsOverBoundedTurns` counts only the members leaving one
+↳ /// holder per turn. Shape: two holders, H1 (zz-a00…05, 16 bytes) and H2 (zz-b00…05, 20 bytes), a prefetch waiter per
+↳ /// member, both downloading (held); O (zz-o, 24 bytes) has a user waiter and downloads (held). The bound is set to 4
+↳ /// (`EngineState.followIDsPerTurn`). v3 maps all twelve members to O's content. Sweep-first, O's 404 arrives before the
+↳ /// follow's first follow-up turn: its attempt's end owes two moves (H1 -> O, H2 -> O, six ids each) and makes
+↳ /// `inboundIDsNow` (2) of them; the follow's turns make the rest, each turn counting the members that left either
+↳ /// holder. Visited first, v3's visit moved every member onto O's job at the apply and the 404 answered them all.
+✘ Test run with 2 tests in 1 suite failed after 3.656 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

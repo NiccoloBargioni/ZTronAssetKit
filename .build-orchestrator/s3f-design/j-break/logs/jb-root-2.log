@@ -1,0 +1,47 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "JBreakProbes" started.
+◇ Test "PROBE-J-SHUTDOWN-DEFERRED" started.
+PROBE-J-SHUTDOWN-DEFERRED between: (owed: true, k: Optional(ZTronAssetSync.JobState.queued), p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), waiters: 3, violations: ["1 queued jobs wait in no queue"])
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" recorded an issue at JBreakProbes.swift:223:9: Expectation failed: between.violations.isEmpty
+↳ the committed invariants hold while the request and the join wait for the follow: ["1 queued jobs wait in no queue"]
+↳ between.violations.isEmpty → false
+↳   between.violations → ["1 queued jobs wait in no queue"]
+↳   isEmpty → false
+PROBE-J-SHUTDOWN-DEFERRED K: failure(ZTronAssetModel.AssetError.shutDown) | P: failure(ZTronAssetModel.AssetError.shutDown) | A: failure(ZTronAssetModel.AssetError.shutDown) | sync: failed(ZTronAssetModel.AssetError.shutDown) | after: (waiters: 0, events: 0)
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" failed after 1.481 seconds with 1 issue.
+◇ Test "PROBE-J-UNRELATED-FREE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-J-UNRELATED-FREE" started.
+PROBE-J-UNRELATED-FREE followVisitedFirst decided: (owed: false, p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), x: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1018013845ns))))
+PROBE-J-UNRELATED-FREE followVisitedFirst A: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5500000, available: 5000000))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-J-UNRELATED-FREE" started.
+PROBE-J-UNRELATED-FREE sweepFollowsFirst decided: (owed: true, p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.insufficientSpace)), x: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1018013845ns))))
+PROBE-J-UNRELATED-FREE sweepFollowsFirst A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ee/ee33e2dc7b415df1a8ef78fd69696fbc010e1249ec5bd8fd2cec33908a93d871.png, fileExtension: png, byteSize: 5500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-J-UNRELATED-FREE" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:283:25: Issue recorded
+↳ A gets the visit-first answer (insufficientSpace, X still in flight at its re-check): success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ee/ee33e2dc7b415df1a8ef78fd69696fbc010e1249ec5bd8fd2cec33908a93d871.png, fileExtension: png, byteSize: 5500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-J-UNRELATED-FREE" with 2 test cases failed after 3.867 seconds with 1 issue.
+↳ /// X (2 MB, not moved) fails transiently while the follow owes the visit that re-routes A onto P (5.5 MB, parked
+↳ /// `insufficientSpace`). Visit-first, A's re-check reads X's bytes in flight (5 MB < 5.5 MB) and A is answered
+↳ /// insufficientSpace; failure-first, X's bytes already left and P fits. No design defers the release of a failed
+↳ /// transfer's bytes, so every design gives the two orders different answers: this marks the criterion's boundary.
+✘ Suite "JBreakProbes" failed after 5.349 seconds with 2 issues.
+↳ /// Judge (break lens) probes for the s3f sweep/follow designs D1 "defer", D2 "budget", D3 "root". Scratch; never committed.
+↳ ///
+↳ /// Each probe runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit that changes what the event's
+↳ /// decision reads. The reference is the visit-first answer.
+↳ ///
+↳ /// - PROBE-J-FAIL-REROUTE: a transient failure of a moved id's holder C arrives while the follow owes the visit that
+↳ ///   abandons another download D. `countFailedAttempt` brings C's visit forward (`followBeforeActing`), out of the follow's
+↳ ///   order: C's waiter is re-routed onto P (parked `insufficientSpace`) and re-checked beside D's doomed bytes.
+↳ /// - PROBE-J-FAIL-TICKET: the same out-of-order visit creates the new content N2 of the failing holder before N1, whose
+↳ ///   holder the follow visits first, so N2 takes the room visit-first gives N1 (FOLLOW-ORDER through a failure).
+↳ /// - PROBE-J-ENOSPC-DROPPED: an ENOSPC of a job whose only id the apply dropped (`holdsMovedID` does not count dropped
+↳ ///   ids, so `followBeforeActing` does nothing): its verdict parks it and fail-fasts the waiter with insufficientSpace
+↳ ///   where visit-first answers `.notFound`.
+↳ /// - PROBE-J-SHUTDOWN-DEFERRED: a user request, a join to a job parked `insufficientSpace` and a free-space read made
+↳ ///   while the follow is owed, then shutdown: every waiter is answered `.shutDown` and shutdown returns.
+✘ Test run with 2 tests in 1 suite failed after 5.349 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

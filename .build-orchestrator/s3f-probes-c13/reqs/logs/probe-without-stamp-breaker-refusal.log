@@ -1,0 +1,16 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C13R-STAMP-BREAKER" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C13R-STAMP-BREAKER" started.
+DBGP followVisitedFirst afterApply=(owed: false, n: Optional(ZTronAssetSync.JobState.queued))
+DBGP followVisitedFirst atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+DBGP followVisitedFirst violations=[]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C13R-STAMP-BREAKER" started.
+DBGP sweepFollowsFirst afterApply=(owed: true, n: nil)
+DBGP sweepFollowsFirst atEnd=(n: Optional(ZTronAssetSync.JobState.downloading), breaker: Optional(ZTronAssetSync.CircuitBreaker.State.closed), breakerAlarm: nil, stamps: 0)
+DBGP sweepFollowsFirst violations=[]
+✔ Test "PROBE-C13R-STAMP-BREAKER" with 2 test cases passed after 0.857 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 0.858 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.858 seconds.

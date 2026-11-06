@@ -1,0 +1,35 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC10CorrectProbes" started.
+◇ Test "PROBE-C10-DOUBLE-PLACE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C10-DOUBLE-PLACE" started.
+PROBE-C10-DOUBLE-PLACE followVisitedFirst before: (owed: false, p: Optional(ZTronAssetSync.JobState.downloading), c: nil, b: nil)
+PROBE-C10-DOUBLE-PLACE followVisitedFirst mid: (p: Optional(ZTronAssetSync.JobState.verifying), places: nil)
+PROBE-C10-DOUBLE-PLACE followVisitedFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) w=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3c/3c734bffa01955b09b7b32d570b798c0d33ad5b4e88cd1648c9a4d0b1a908d0c.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) pIndex=Optional(3) xIndex=Optional(4)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C10-DOUBLE-PLACE" started.
+PROBE-C10-DOUBLE-PLACE sweepFollowsFirst before: (owed: true, p: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.policy(ZTronAssetModel.PolicyBlock.constrainedNetwork))), c: Optional(ZTronAssetSync.JobState.downloading), b: Optional(ZTronAssetSync.JobState.queued))
+PROBE-C10-DOUBLE-PLACE sweepFollowsFirst mid: (p: Optional(ZTronAssetSync.JobState.queued), places: Optional(1))
+PROBE-C10-DOUBLE-PLACE sweepFollowsFirst results: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) w=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/3c/3c734bffa01955b09b7b32d570b798c0d33ad5b4e88cd1648c9a4d0b1a908d0c.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/59/59427652de5891de25742baf7cb6f850f8c849a68e162185be04e7bc9d81b75d.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) pIndex=Optional(4) xIndex=Optional(3)
+✘ Test "PROBE-C10-DOUBLE-PLACE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC10CorrectProbes.swift:329:9: Expectation failed: pIndex != nil && xIndex != nil && pIndex! < xIndex!
+↳ P, queued by the visit of C before X, starts first (visit-first): p=Optional(4) x=Optional(3)
+↳ pIndex != nil && xIndex != nil && pIndex! < xIndex! → false
+↳   pIndex != nil && xIndex != nil → true
+↳   pIndex! < xIndex! → false
+✘ Test "PROBE-C10-DOUBLE-PLACE" with 2 test cases failed after 1.187 seconds with 1 issue.
+↳ /// PROBE-C10-DOUBLE-PLACE (the draft's residual "a follow visit that re-lanes a queued job whose place still waits
+↳ /// gives it a place in the visit and again at the drain"): two transfer slots; H (zz-h, user, held) runs; under Low
+↳ /// Data Mode P (zz-p) is parked by policy for a prefetch waiter; C (zz-a) runs for user waiter A; B (zz-b) is queued
+↳ /// for user waiter W. v3 moves zz-a onto P's content and zz-b onto a new content X. Visited first, the visit of C
+↳ /// re-lanes P to user work and queues it, then the visit of B creates X behind it: P starts before X. With the network
+↳ /// turning unrestricted while the visits are owed, `readmit` re-queues P behind the barrier (its place waits); the
+↳ /// visit then places P, then X, and the drain places P again, behind X.
+✘ Suite "VerifyC10CorrectProbes" failed after 1.188 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 10, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`): `.followVisitedFirst` lets the held follow end before the event under
+↳ /// test; `.sweepFollowsFirst` delivers the event while the follow still owes the visit of the job the event concerns.
+↳ /// Every expectation is the visit-first outcome (S3-R11 item 3).
+✘ Test run with 1 test in 1 suite failed after 1.188 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

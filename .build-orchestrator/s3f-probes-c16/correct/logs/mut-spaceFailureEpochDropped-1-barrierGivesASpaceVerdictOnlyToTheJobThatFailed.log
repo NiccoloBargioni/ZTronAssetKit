@@ -1,0 +1,26 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" started.
+✘ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSpaceEpochTests.swift:71:9: Expectation failed: (try? xResult.get())?.byteSize == Int64(cBytes.count)
+↳ zz-x's caller is served C's content by a new job (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 5000000))
+↳ (try? xResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: an ENOSPC's waiting verdict skips a new job the drain created for its content (F-28)" with 2 test cases failed after 3.102 seconds with 1 issue.
+↳ /// An ENOSPC whose job the owed visit superseded gives no verdict to the job a waiting join then creates for the same
+↳ /// content: C (1 MB) is zz-a's content; v3 moves zz-a to N (16 bytes) and maps zz-x onto C's content. While v3's
+↳ /// follow is owed (300 prefetch members before zz-a keep C's visit owed past the ENOSPC read's own follow turn, and
+↳ /// the space sweep's follow-up turns are held), a user asks for zz-x (the join waits), then C's attempt fails ENOSPC
+↳ /// reporting 20 MB with 5 MB of room (the verdict waits). The follow's visit supersedes C, the drain's join creates a
+↳ /// new job C' for C's content, and the `.spaceFailure` replay skips it. Visited first, C was superseded at the apply,
+↳ /// and C' started for zz-x and served it.
+✘ Suite "Engine follow barrier (F-28)" failed after 3.103 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 3.103 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

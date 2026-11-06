@@ -1,0 +1,24 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15R-RETRY-RACE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-RETRY-RACE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-RETRY-RACE" started.
+PROBE-C15R-RETRY-RACE held before=[9] n=Optional(10)
+PROBE-C15R-RETRY-RACE after N's read: (n: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1017071680ns))), attempts: Optional(1))
+✘ Test "PROBE-C15R-RETRY-RACE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:293:6: Time limit was exceeded: 60.000 seconds
+✘ Test "PROBE-C15R-RETRY-RACE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC15ReqsProbes.swift:370:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+↳ B is served N, the content v3 maps zz-b to (visit-first): failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? bResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C15R-RETRY-RACE" with 2 test cases failed after 63.994 seconds with 2 issues.
+↳ /// PROBE-C15R-RETRY-RACE: `barrierAnswersAPassedJobsRetryAsVisitedFirst` with N's publication made to run after the
+↳ /// test adds its `.verifying` read fault (N held until then), the order the TSan run's time-out suggests.
+✘ Suite "Engine follow barrier (F-28)" failed after 63.995 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 63.995 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

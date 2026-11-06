@@ -1,0 +1,229 @@
+03:56:34 baseline: build exit 0 load { 46.78 44.77 46.77 }
+03:56:53 baseline: run1 exit 0 load { 36.15 42.45 45.89 }
+03:56:53     ✔ Test run with 10 tests in 2 suites passed after 13.662 seconds.
+03:57:13 baseline: run2 exit 0 load { 37.91 42.30 45.75 }
+03:57:13     ✔ Test run with 10 tests in 2 suites passed after 17.885 seconds.
+03:59:38 inboundSpentDrop: build exit 0 load { 13.66 31.35 40.80 }
+03:59:44 inboundSpentDrop: run1 exit 1 load { 13.77 31.07 40.65 }
+03:59:44     ✘ Test "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:106:13: Expectation failed: tu
+03:59:44     ✘ Test run with 2 tests in 1 suite failed after 2.541 seconds with 1 issue.
+03:59:49 inboundSpentDrop: run2 exit 1 load { 14.51 30.94 40.55 }
+03:59:49     ✘ Test "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:106:13: Expectation failed: tu
+03:59:49     ✘ Test run with 2 tests in 1 suite failed after 2.637 seconds with 1 issue.
+03:59:49 inboundSpentDrop: reverted; sources diff: none
+03:59:54 restSpentDrop: build exit 0 load { 15.11 30.79 40.44 }
+04:00:00 restSpentDrop: run1 exit 1 load { 15.34 30.58 40.31 }
+04:00:00     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:199:13: Expectati
+04:00:00     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:200:13: Expectati
+04:00:00     ✘ Test run with 2 tests in 1 suite failed after 2.679 seconds with 2 issues.
+04:00:05 restSpentDrop: run2 exit 1 load { 15.31 30.32 40.16 }
+04:00:05     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:199:13: Expectati
+04:00:05     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:200:13: Expectati
+04:00:05     ✘ Test run with 2 tests in 1 suite failed after 2.900 seconds with 2 issues.
+04:00:05 restSpentDrop: reverted; sources diff: none
+04:00:12 visitSpentDrop: build exit 0 load { 15.37 30.08 40.02 }
+04:00:19 visitSpentDrop: run1 exit 1 load { 25.37 31.74 40.49 }
+04:00:19     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:199:13: Expectati
+04:00:19     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:200:13: Expectati
+04:00:19     ✘ Test run with 2 tests in 1 suite failed after 4.286 seconds with 2 issues.
+04:00:25 visitSpentDrop: run2 exit 1 load { 25.98 31.76 40.44 }
+04:00:25     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:199:13: Expectati
+04:00:25     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:200:13: Expectati
+04:00:25     ✘ Test run with 2 tests in 1 suite failed after 2.834 seconds with 2 issues.
+04:00:25 visitSpentDrop: reverted; sources diff: none
+04:00:30 continueMoveBudgetDrop: build exit 0 load { 25.74 31.62 40.34 }
+04:00:37 continueMoveBudgetDrop: run1 exit 1 load { 25.68 31.51 40.25 }
+04:00:37     ✘ Test "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:104:13: Expectation failed: mo
+04:00:37     ✘ Test "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:106:13: Expectation failed: tu
+04:00:37     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:199:13: Expectati
+04:00:37     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:200:13: Expectati
+04:00:37     ✘ Test run with 2 tests in 1 suite failed after 3.484 seconds with 4 issues.
+04:00:43 continueMoveBudgetDrop: run2 exit 1 load { 24.51 31.17 40.08 }
+04:00:43     ✘ Test "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:104:13: Expectation failed: mo
+04:00:43     ✘ Test "R-SYN-6: the follow's turns that make owed moves off two holders each move at most followIDsPerTurn ids across both, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:106:13: Expectation failed: tu
+04:00:43     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:199:13: Expectati
+04:00:43     ✘ Test "R-SYN-6: the follow's turns that end a visit's rest and visit further holders each move at most followIDsPerTurn ids across them, with the visit-first answers (C2, F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTurnTotalTests.swift:200:13: Expectati
+04:00:43     ✘ Test run with 2 tests in 1 suite failed after 3.440 seconds with 4 issues.
+04:00:43 continueMoveBudgetDrop: reverted; sources diff: none
+04:00:50 byIdentifierTargetDrop: build exit 0 load { 23.73 30.78 39.84 }
+04:01:00 byIdentifierTargetDrop: run1 exit 1 load { 22.78 30.34 39.58 }
+04:01:00     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:00     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:00     ✘ Test run with 1 test in 1 suite failed after 6.869 seconds with 2 issues.
+04:01:09 byIdentifierTargetDrop: run2 exit 1 load { 22.04 29.94 39.32 }
+04:01:09     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:09     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:09     ✘ Test run with 1 test in 1 suite failed after 6.767 seconds with 2 issues.
+04:01:09 byIdentifierTargetDrop: reverted; sources diff: none
+04:01:16 byIdentifierLookupDrop: build exit 0 load { 22.28 29.85 39.24 }
+04:01:24 byIdentifierLookupDrop: run1 exit 1 load { 20.87 29.30 38.93 }
+04:01:24     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:24     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:24     ✘ Test run with 1 test in 1 suite failed after 4.633 seconds with 2 issues.
+04:01:31 byIdentifierLookupDrop: run2 exit 1 load { 19.76 28.93 38.75 }
+04:01:31     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → false at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:31     ✘ Test "R-SYN-6: an apply's walk moves an id onto a publishing checksum-less content's job, with the visit-first answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, followUpsFirst → true at EngineFollowBarrierLegacyTargetTests.swift:70:13: Expectation failed: atWalk
+04:01:31     ✘ Test run with 1 test in 1 suite failed after 4.832 seconds with 2 issues.
+04:01:31 byIdentifierLookupDrop: reverted; sources diff: none
+04:01:39 drainOriginalDefect: build exit 0 load { 22.92 29.27 38.75 }
+04:01:46 drainOriginalDefect: run1 exit 1 load { 21.64 28.90 38.56 }
+04:01:46     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectati
+04:01:46     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9:
+04:01:46     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:01:46     ✘ Test run with 1 test in 1 suite failed after 3.410 seconds with 3 issues.
+04:01:52 drainOriginalDefect: run2 exit 1 load { 20.39 28.52 38.37 }
+04:01:52     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectati
+04:01:52     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9:
+04:01:52     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:01:52     ✘ Test run with 1 test in 1 suite failed after 3.376 seconds with 3 issues.
+04:01:52 drainOriginalDefect: reverted; sources diff: none
+04:01:58 drainSpentDrop: build exit 0 load { 19.40 28.18 38.19 }
+04:02:04 drainSpentDrop: run1 exit 1 load { 17.94 27.58 37.86 }
+04:02:04     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectati
+04:02:04     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9:
+04:02:04     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:02:04     ✘ Test run with 1 test in 1 suite failed after 3.274 seconds with 3 issues.
+04:02:10 drainSpentDrop: run2 exit 1 load { 18.74 27.58 37.81 }
+04:02:10     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectati
+04:02:10     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9:
+04:02:10     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:02:10     ✘ Test run with 1 test in 1 suite failed after 3.444 seconds with 3 issues.
+04:02:10 drainSpentDrop: reverted; sources diff: none
+04:02:16 drainSeedFull: build exit 0 load { 17.88 27.26 37.63 }
+04:02:23 drainSeedFull: run1 exit 1 load { 17.17 26.96 37.46 }
+04:02:23     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectati
+04:02:23     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9:
+04:02:23     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:02:23     ✘ Test run with 1 test in 1 suite failed after 3.664 seconds with 3 issues.
+04:02:29 drainSeedFull: run2 exit 1 load { 16.48 26.48 37.17 }
+04:02:29     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectati
+04:02:29     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9:
+04:02:29     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:02:29     ✘ Test run with 1 test in 1 suite failed after 3.248 seconds with 3 issues.
+04:02:29 drainSeedFull: reverted; sources diff: none
+04:02:36 drainSpentBreakDrop: build exit 0 load { 17.00 26.42 37.09 }
+04:02:49 drainSpentBreakDrop: run1 exit 1 load { 34.40 29.67 38.05 }
+04:02:49     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:02:49     ✘ Test run with 1 test in 1 suite failed after 8.353 seconds with 1 issue.
+04:02:56 drainSpentBreakDrop: run2 exit 1 load { 41.82 31.29 38.57 }
+04:02:56     ✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13
+04:02:56     ✘ Test run with 1 test in 1 suite failed after 4.640 seconds with 1 issue.
+04:02:56 drainSpentBreakDrop: reverted; sources diff: none
+04:03:03 moveIDGoneDrop: build exit 0 load { 49.68 33.09 39.17 }
+04:03:12 moveIDGoneDrop: run1 exit 1 load { 59.42 35.73 40.03 }
+04:03:12     ✘ Test "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .memberPurged at EngineFollowBarrierMoveRevalidationTests.swift:212:13: Expectation f
+04:03:12     ✘ Test run with 1 test in 1 suite failed after 5.218 seconds with 1 issue.
+04:03:20 moveIDGoneDrop: run2 exit 1 load { 59.47 36.53 40.27 }
+04:03:20     ✘ Test "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .memberPurged at EngineFollowBarrierMoveRevalidationTests.swift:212:13: Expectation f
+04:03:20     ✘ Test run with 1 test in 1 suite failed after 5.762 seconds with 1 issue.
+04:03:20 moveIDGoneDrop: reverted; sources diff: none
+04:03:26 supersedeRelaneDrop: build exit 0 load { 60.80 37.19 40.48 }
+04:03:35 supersedeRelaneDrop: run1 exit 1 load { 62.45 38.30 40.83 }
+04:03:35     ✘ Test "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .mappedBack at EngineFollowBarrierMoveRevalidationTests.swift:223:13: Expectation fai
+04:03:35     ✘ Test run with 1 test in 1 suite failed after 6.551 seconds with 1 issue.
+04:03:44 supersedeRelaneDrop: run2 exit 1 load { 63.90 39.41 41.20 }
+04:03:44     ✘ Test "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .mappedBack at EngineFollowBarrierMoveRevalidationTests.swift:223:13: Expectation fai
+04:03:44     ✘ Test run with 1 test in 1 suite failed after 5.926 seconds with 1 issue.
+04:03:44 supersedeRelaneDrop: reverted; sources diff: none
+04:03:49 moveInterestGoneDrop: build exit 0 load { 67.11 40.48 41.56 }
+04:03:59 moveInterestGoneDrop: run1 exit 0 load { 66.78 40.86 41.69 }
+04:03:59     ✔ Test run with 1 test in 1 suite passed after 6.240 seconds.
+04:04:08 moveInterestGoneDrop: run2 exit 0 load { 67.07 41.77 42.00 }
+04:04:08     ✔ Test run with 1 test in 1 suite passed after 6.604 seconds.
+04:04:08 moveInterestGoneDrop: reverted; sources diff: none
+04:04:16 moveInterestGoneReroute: build exit 0 load { 66.40 42.45 42.24 }
+04:04:25 moveInterestGoneReroute: run1 exit 1 load { 63.95 42.70 42.33 }
+04:04:25     ✘ Test "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .memberPurged at EngineFollowBarrierMoveRevalidationTests.swift:212:13: Expectation f
+04:04:25     ✘ Test run with 1 test in 1 suite failed after 6.198 seconds with 1 issue.
+04:04:34 moveInterestGoneReroute: run2 exit 1 load { 62.91 42.84 42.38 }
+04:04:34     ✘ Test "R-SYN-6: what a release, a purge or an apply changes between a bounded move's turns is read again, with the visit-first outcome (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .memberPurged at EngineFollowBarrierMoveRevalidationTests.swift:212:13: Expectation f
+04:04:34     ✘ Test run with 1 test in 1 suite failed after 5.862 seconds with 1 issue.
+04:04:34 moveInterestGoneReroute: reverted; sources diff: none
+04:04:40 admissionGuardDrop: build exit 0 load { 58.84 42.64 42.32 }
+04:04:43 admissionGuardDrop: run1 exit 1 load { 58.84 42.64 42.32 }
+04:04:43     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:55:9: Expectation failed: announced.isEmpty
+04:04:43     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:56:9: Expectation failed: after.applies == before.applies && after.follows == before.follows
+04:04:43     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:57:9: Expectation failed: after.digest == before.digest
+04:04:43     ✘ Test run with 1 test in 1 suite failed after 0.011 seconds with 3 issues.
+04:04:45 admissionGuardDrop: run2 exit 1 load { 55.41 42.20 42.16 }
+04:04:45     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:55:9: Expectation failed: announced.isEmpty
+04:04:45     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:56:9: Expectation failed: after.applies == before.applies && after.follows == before.follows
+04:04:45     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:57:9: Expectation failed: after.digest == before.digest
+04:04:45     ✘ Test run with 1 test in 1 suite failed after 0.008 seconds with 3 issues.
+04:04:45 admissionGuardDrop: reverted; sources diff: none
+04:04:52 followOwedClauseDrop: build exit 0 load { 51.61 41.63 41.96 }
+04:05:00 followOwedClauseDrop: run1 exit 1 load { 54.38 42.54 42.28 }
+04:05:00     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:64:9: Expectation failed: forced == ["a follow is owed while the engine is shutDown"]
+04:05:00     ✘ Test run with 1 test in 1 suite failed after 0.011 seconds with 1 issue.
+04:05:10 followOwedClauseDrop: run2 exit 1 load { 70.05 46.26 43.60 }
+04:05:10     ✘ Test "R-SYN-15: an unknown-id admission whose store calls straddle shutdown's start follows no store view and starts no follow (F-28)" recorded an issue at EngineFollowShutdownTests.swift:64:9: Expectation failed: forced == ["a follow is owed while the engine is shutDown"]
+04:05:10     ✘ Test run with 1 test in 1 suite failed after 0.011 seconds with 1 issue.
+04:05:10 followOwedClauseDrop: reverted; sources diff: none
+04:05:31 admissionRecordDrop: build exit 0 load { 134.15 62.33 49.42 }
+04:05:40 admissionRecordDrop: run1 exit 1 load { 180.39 74.57 53.92 }
+04:05:40     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:97:9: Expectation failed: admitted.first?.transfer == n.transferID
+04:05:40     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:98:9: Expectation failed: Set(admitted.map(\.transfer)) == others.union([
+04:05:40     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:97:9: Expectation failed: admitted.first?.transfer == n.transferID
+04:05:40     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:98:9: Expectation failed: Set(admitted.map(\.transfer)) == others.union([n
+04:05:40     ✘ Test run with 1 test in 1 suite failed after 3.960 seconds with 4 issues.
+04:05:48 admissionRecordDrop: run2 exit 1 load { 199.10 80.21 56.03 }
+04:05:48     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:97:9: Expectation failed: admitted.first?.transfer == n.transferID
+04:05:48     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReplayTests.swift:98:9: Expectation failed: Set(admitted.map(\.transfer)) == others.union([
+04:05:48     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:97:9: Expectation failed: admitted.first?.transfer == n.transferID
+04:05:48     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:98:9: Expectation failed: Set(admitted.map(\.transfer)) == others.union([n
+04:05:48     ✘ Test run with 1 test in 1 suite failed after 3.958 seconds with 4 issues.
+04:05:48 admissionRecordDrop: reverted; sources diff: none
+04:05:58 countInsertDrop: build exit 0 load { 230.51 90.84 60.08 }
+04:06:05 countInsertDrop: run1 exit 1 load { 250.67 99.75 63.60 }
+04:06:05     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:05     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:05     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:05     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:05     ... 29 issue lines
+04:06:05     ✘ Test run with 3 tests in 1 suite failed after 0.003 seconds with 29 issues.
+04:06:09 countInsertDrop: run2 exit 1 load { 257.98 103.77 65.23 }
+04:06:09     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:09     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:09     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:09     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:09     ... 29 issue lines
+04:06:09     ✘ Test run with 3 tests in 1 suite failed after 0.007 seconds with 29 issues.
+04:06:09 countInsertDrop: reverted; sources diff: none
+04:06:16 countRemovalDrop: build exit 0 load { 256.54 106.04 66.26 }
+04:06:19 countRemovalDrop: run1 exit 1 load { 243.12 105.75 66.39 }
+04:06:19     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:19     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:19     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:19     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:19     ... 22 issue lines
+04:06:19     ✘ Test run with 3 tests in 1 suite failed after 0.006 seconds with 22 issues.
+04:06:22 countRemovalDrop: run2 exit 1 load { 243.12 105.75 66.39 }
+04:06:22     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:22     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:22     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:22     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:22     ... 22 issue lines
+04:06:22     ✘ Test run with 3 tests in 1 suite failed after 0.004 seconds with 22 issues.
+04:06:22 countRemovalDrop: reverted; sources diff: none
+04:06:51 countLaneChangeDrop: build exit 0 load { 285.63 127.74 75.64 }
+04:06:59 countLaneChangeDrop: run1 exit 1 load { 302.15 133.79 78.08 }
+04:06:59     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:06:59     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:06:59     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:92:9: Expectation failed: steps.map(\.lane) == [.bulk, .bulk, .prefetch, .userInitiated, .userInitiated, .userInitiated, .pref
+04:06:59     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:93:9: Expectation failed: steps.map(\.singleUser) == [false, false, false, false, true, false, false, true, false, false, fals
+04:06:59     ✘ Test run with 3 tests in 1 suite failed after 0.002 seconds with 4 issues.
+04:07:08 countLaneChangeDrop: run2 exit 1 load { 341.13 147.68 83.65 }
+04:07:08     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:51:13: Expectation failed: job.interestCounts == InterestCounts(job.interests.values)
+04:07:08     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:52:13: Expectation failed: job.lane == Self.walked(job).lane && job.isSingleUser == Self.walked(job).singleUser
+04:07:08     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:92:9: Expectation failed: steps.map(\.lane) == [.bulk, .bulk, .prefetch, .userInitiated, .userInitiated, .userInitiated, .pref
+04:07:08     ✘ Test "R-SYN-3: a job's lane and single-user rank, read from its interest counts, follow every change to its interests" recorded an issue at EngineInterestCountsTests.swift:93:9: Expectation failed: steps.map(\.singleUser) == [false, false, false, false, true, false, false, true, false, false, fals
+04:07:08     ✘ Test run with 3 tests in 1 suite failed after 0.007 seconds with 4 issues.
+04:07:10 countLaneChangeDrop: reverted; sources diff: none
+04:15:16 readmitDeferDrop: build exit 0 load { 421.68 358.89 232.60 }
+04:15:25 readmitDeferDrop: run1 exit 1 load { 431.07 362.96 235.52 }
+04:15:25     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:97:9: Expectation failed: admitted.first?.transfer == n.transferID
+04:15:25     ✘ Test run with 1 test in 1 suite failed after 5.454 seconds with 1 issue.
+04:15:35 readmitDeferDrop: run2 exit 1 load { 430.45 365.11 237.77 }
+04:15:35     ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:97:9: Expectation failed: admitted.first?.transfer == n.transferID
+04:15:35     ✘ Test run with 1 test in 1 suite failed after 5.963 seconds with 1 issue.
+04:15:36 readmitDeferDrop: reverted; sources diff: none

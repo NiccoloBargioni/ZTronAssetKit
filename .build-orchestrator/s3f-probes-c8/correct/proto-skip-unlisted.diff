@@ -1,0 +1,64 @@
+--- Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 08:10:47
++++ .build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 08:55:06
+@@ -793,6 +793,13 @@
+             }
+             let transfer = candidate.transfer
+             guard let job = self.state.jobs[transfer], case .blocked(let reason) = job.state else {
++                continue
++            }
++            // PROTOTYPE (verifier, cycle 8): after the pre-phase, a job that still waits for the follow holds an id the
++            // copy no longer lists; its place and lane are the follow's to decide, and it cannot start before the follow
++            // ends: it is not judged now, and a sweep is owed once the follow ends.
++            if self.holdsUnlistedID(job) {
++                self.state.spaceSweepAfterFollow = sweep.merged(with: self.state.spaceSweepAfterFollow)
+                 continue
+             }
+             guard let block = self.spaceBlock(job, ahead: ahead) else {
+@@ -921,9 +928,26 @@
+         }
+         if spawned == nil {
+             self.state.spaceSweepFollowUp = nil
++        }
++    }
++
++    /// PROTOTYPE: whether `job` holds an id the copy does not list while a follow is owed (one lookup per id).
++    func holdsUnlistedID(_ job: Job) -> Bool {
++        guard self.followOwed else {
++            return false
+         }
++        return job.assets.contains { self.state.applied.entry(for: $0) == nil }
+     }
+ 
++    /// PROTOTYPE: the sweep owed to the jobs a sweep left to the follow, once it ends.
++    func scheduleSpaceSweepAfterFollow() {
++        guard let owed = self.state.spaceSweepAfterFollow else {
++            return
++        }
++        self.state.spaceSweepAfterFollow = nil
++        self.scheduleSpaceSweepFollowUp(owed)
++    }
++
+     /// Test seam: the next space sweep follow-ups keep their sweep owed until `releaseSpaceSweepFollowUps()`.
+     func holdSpaceSweepFollowUps() {
+         self.state.spaceSweepFollowUpsHeld = true
+--- Sources/ZTronAssetSync/Engine/EngineFollow.swift	2026-10-30 08:01:31
++++ .build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineFollow.swift	2026-10-30 08:55:06
+@@ -83,6 +83,7 @@
+             self.state.heldForManifest.removeAll()
+             moved = true
+         }
++        self.scheduleSpaceSweepAfterFollow()
+         self.checkRunSettled()
+         if moved || self.state.pumpWaitsForFollow {
+             self.pump()
+--- Sources/ZTronAssetSync/Engine/EngineState.swift	2026-10-29 18:23:55
++++ .build-verify-s3f-c8-correct/probe-src/Sources/ZTronAssetSync/Engine/EngineState.swift	2026-10-30 08:55:06
+@@ -291,6 +291,8 @@
+     /// A space sweep stopped after `SyncEngine.parksPerPump` parks or re-admissions and owes a later turn the rest, in
+     /// this mode (C2).
+     var spaceSweepFollowUp: SpaceSweep?
++    /// PROTOTYPE: a sweep owed once the follow ends.
++    var spaceSweepAfterFollow: SpaceSweep?
+     /// Test seam (close-out cycle 17): while set, the scheduled space sweep follow-up keeps its sweep owed
+     /// (`spaceSweepFollowUp`) instead of running (`holdSpaceSweepFollowUps()`, `releaseSpaceSweepFollowUps()`), so a
+     /// test decides what the engine does while a sweep is owed, an order no production path fixes. No production path

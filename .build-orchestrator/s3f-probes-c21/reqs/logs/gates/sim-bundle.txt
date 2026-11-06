@@ -1,0 +1,1 @@
+.build-verify-s3f-c21-reqs/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.11.05_18-46-08-+0100.xcresult

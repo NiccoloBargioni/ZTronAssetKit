@@ -1,0 +1,42 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "contract / ADR (ruling 1)",
+  "location": "Sources/ZTronAssetTransport/HTTPRemoteSource.swift:85-95 (makeBackgroundBackend); docs/adr-drafts/d.md 'Orchestrator ruling (L2 close-out)' items 1 and 3",
+  "problem": "Ruling 1 authorised three defaulted parameters (appKey, requestTimeout, log). The function also has a fourth defaulted package parameter, `makeDriver: (BackgroundSessionIdentifier, SessionDelegate, Bool) -> any BackgroundSessionDriver`, which defaults to LiveBackgroundSessionDriver. It is package-only, so no public signature changed. The ruling's own requirement to test the key rule 'through the package function with a fake driver' cannot be met without this seam unless the deleted internal overload comes back. d.md discloses it under ruling 1 and lists it for acknowledgement under ruling 3. Strictly, it is a signature element the ruling did not name.",
+  "fix": "No code change. At merge, the orchestrator records `makeDriver` in DECISIONS.md as part of ruling 1, together with `startIfAdmitted(_:)` and `livePathObserver`, both new package members listed in d.md ruling 3. If the orchestrator rejects the seam, the only other route is to restore an internal overload, which ruling 1 forbids, so acknowledging the seam is the recommended path."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests (ruling 2, R-NET-8 background resume)",
+  "location": "Tests/ZTronAssetTransportTests/BackgroundResumeTests.swift:57-96 (staleDataFallsBackToFresh); behaviour in Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:601-607 (deliver)",
+  "problem": "No test covers the most likely real outcome of a changed validator. A continued background download sends If-Range, and when the validator has changed the origin answers 200 with the whole body. The stale-data test covers only -1002, 416 and a 206 without Content-Range. I added a scratch mutant (z200) to deliver() that turns a continued start's staged 200 into transient(.resumeRejected). It survives all 140 ZTronAssetTransportTests ('Test run with 140 tests in 16 suites passed'). A scratch probe test kills it, and the probe passes against the unmutated code, so today's behaviour is correct but unpinned. If it regressed, every validator change would cost a second, useless full download.",
+  "fix": "Add a case to BackgroundResumeTests (for example `StaleSignal.validatorChanged`, or its own test). Pause rig.job(1) returning data, start rig.job(2), and call `rig.driver.complete(restart.partialName, status: 200, body: TransportFixtures.payload(4_000))`. Expect `.staged(StagedFile(name: restart.partialName, byteCount: 4_000, resumed: false, httpStatus: 200, etag: nil))`, `driver.starts.map(\\.resumeData) == [nil, data]` and `keptResumeData(for: paused.partialName) == nil`. The scratch probe ZZVerifyProbe.continued200 under .build-verify-d-close-reqs1/mut can serve as the template."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness (D-4 / TR1-3 on the background path, introduced by ca8d31b)",
+  "location": "Sources/ZTronAssetTransport/Session/SessionDelegate+Downloads.swift:67 (`let continued = response.status == 206 && response.contentRangeStart != nil`), staged at :87",
+  "problem": "The background delegate now stages any 206 that carries a Content-Range as `resumed: true`, for every task. That includes checksum-less identities, which never keep resume data, and fresh tasks the coordinator never gave resume data. D-4 says a 206 to a request that did not resume is `rejected(.unexpectedStatus)`. ARCHITECTURE \u00a76.3 / TR1-3 say checksum-less transfers are never resumed. d.md ruling 2(a) says this 206 means 'the OS continuing resume data the coordinator handed it (checksummed content only)', but the code does not check that. Probe VDC-H1 shows it: a fresh legacy (checksum-less) job with expected 4000 has no resume data (handedResumeData=no). The OS answers 206 with Content-Range starting at 1000 and a 4000-byte body. The terminal is `staged(StagedFile(name: l-\u20261-1.part, byteCount: 4000, resumed: true, httpStatus: 206))`; before round 3 it was `rejected(.unexpectedStatus(206))`. This is non-blocking because the harm is small. The size must still equal byteSize. A hostile origin could already send wrong bytes of the right size with a 200 for a checksum-less entry. A full-range 206 is harmless. The OS may also resume internally, which can only be checked on a device.",
+  "fix": "Gate the continuation on the identity: `let continued = response.status == 206 && response.contentRangeStart != nil && tag.name.transfer.kind == .content`. Only checksummed content can hold resume data, so ruling 2 loses nothing. A checksum-less 206 then falls through to `classify`, which gives `unexpectedStatus(206)` as before. Add VDC-H1 (in .build-verify-d-close-correct1/logs/ZZVerifyDCloseProbes.swift.txt) as a regression test. If the owner prefers to accept OS auto-resume for checksum-less entries, record that instead as a deviation from D-4/TR1-3 in d.md."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness (stale-resume classification across a relaunch)",
+  "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:173 (`resumedStarts` is in-memory), :278 (set), :603-607 (`asResumed` applied only when the name is in `resumedStarts`)",
+  "problem": "The record of which OS tasks continue resume data lives only in the coordinator's memory, so it does not survive a process death. Probe VDC-H3 shows the timeline. Attempt 1 is paused and keeps data. Attempt 2 is created from that data (usedData=true). The process dies while the discretionary continuation is still pending. After the relaunch, `reattached()` reports it (reattached=1). The engine's attempt 3 joins it (starts=2, no new task). The OS then answers 416. The joiner receives `failed(rejected(.unexpectedStatus(416)))`, not `transient(.resumeRejected)`. Per ARCHITECTURE \u00a77.6 the engine then waits for the next run (`failed(.nextRun)`) instead of making an immediate fresh attempt. The data was already used, so nothing loops. A changed validator is answered 200 and is staged correctly (VDC-H4 passes). This is non-blocking: it is proven against the fake, but whether the OS answers this way on a device was not verified, and recovery is only slower.",
+  "fix": "Carry the 'continued' fact with the OS task so it survives a relaunch. For example, the driver labels a task created from resume data with a tag variant (BackgroundTaskTag gains a flag that it encodes and decodes; the driver passes `resumeData != nil`, which needs no decision). The background delegate or the coordinator then applies `TransferClassifier.asResumed` for such tags. Alternatively, record this as a known limitation in d.md ruling 2 and in 'Not verified'. Keep VDC-H3 as the test."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "robustness (defensive; not reachable from the engine)",
+  "location": "Sources/ZTronAssetTransport/Background/BackgroundSupport.swift:232 and :349 (`expected <= job.maxBytes`), Sources/ZTronAssetTransport/HTTPRemoteSource.swift:261, Sources/ZTronAssetTransport/Background/BackgroundTaskTag.swift:44",
+  "problem": "A negative `expectedBytes` passes the background bound check. The tag is then encoded as `ztak1 <name> -1`, which `BackgroundTaskTag(decoding:)` rejects. The OS task can no longer be tracked. Probe VDC-H2: handle returned, starts=1, decodableLive=0. On a device, `didFinishDownloadingTo` and `didCompleteWithError` ignore the task, so the handle never terminates and the `live` slot leaks for the process lifetime. At the next launch the task is cancelled as foreign. The manifest validates `byteSize >= 0` (ZTronAssetModel ManifestRules.swift:325), so the engine cannot produce this today. `TransferRequest` is public, though.",
+  "fix": "Require `expected >= 0` in `routesToBackground`, `startIfAdmitted` and `start` (for example `guard let expected = job.expectedBytes, (0...job.maxBytes).contains(expected)`), so such a job runs in the foreground."
+ }
+]

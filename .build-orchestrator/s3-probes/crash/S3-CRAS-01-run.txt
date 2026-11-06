@@ -1,0 +1,9 @@
+# S3-CRAS-01 probe run (S3UpdateCrashProbe)
+◇ Suite "S3 probe: crash at every boundary during an update, a directory change and a removal" started.
+S3 probe processKill: 29 crash points
+S3 probe processKillTornWrite: 29 crash points
+S3 probe powerLossDropUnsynced: 29 crash points
+S3 probe powerLossKeepMetadata: 29 crash points
+✔ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5" with 4 test cases passed after 1.854 seconds.
+✔ Suite "S3 probe: crash at every boundary during an update, a directory change and a removal" passed after 1.854 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.854 seconds.

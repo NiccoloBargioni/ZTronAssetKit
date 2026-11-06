@@ -1,0 +1,47 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20Correct" started.
+◇ Test "PROBE-C20C-DEFER-BEHIND" started.
+◇ Test case passing 1 argument waits → true to "PROBE-C20C-DEFER-BEHIND" started.
+PROBE-C20C-DEFER-BEHIND waits=true count=2000 run 0: apply window 242.29 ms; longest follow turn 1058.93 ms; peak joins waiting for T 1536; t0 failure(ZTronAssetModel.AssetError.shutDown); violations []; turns [follow 477.39ms E513->1025 H976, follow 1058.93ms E1025->1537 H464, follow 971.57ms E1537->1489 H0, drain 84.81ms E1489->977 H0, drain 91.70ms E977->465 H0, drain 137.45ms E465->0 H0]
+PROBE-C20C-DEFER-BEHIND waits=true count=2000: longest follow turn per run [1058.933625] ms, best 1058.933625 ms; load ?
+✘ Test "PROBE-C20C-DEFER-BEHIND" recorded an issue with 1 argument waits → true at VerifyC20CorrectProbes.swift:200:9: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ PROBE-C20C-DEFER-BEHIND: every follow turn at most C2's 10 ms: [1058.933625]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 1058.933625
+◇ Test case passing 1 argument waits → false to "PROBE-C20C-DEFER-BEHIND" started.
+PROBE-C20C-DEFER-BEHIND waits=false count=2000 run 0: apply window 127.02 ms; longest follow turn 158.39 ms; peak joins waiting for T 0; t0 failure(ZTronAssetModel.AssetError.shutDown); violations []; turns [follow 158.39ms E0->0 H976, follow 139.56ms E0->0 H464, follow 119.61ms E0->0 H0]
+PROBE-C20C-DEFER-BEHIND waits=false count=2000: longest follow turn per run [158.392792] ms, best 158.392792 ms; load ?
+✘ Test "PROBE-C20C-DEFER-BEHIND" recorded an issue with 1 argument waits → false at VerifyC20CorrectProbes.swift:200:9: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ PROBE-C20C-DEFER-BEHIND: every follow turn at most C2's 10 ms: [158.392792]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 158.392792
+✘ Test "PROBE-C20C-DEFER-BEHIND" with 2 test cases failed after 10.277 seconds with 2 issues.
+◇ Test "PROBE-C20C-DRAIN-BOUND-ALL" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, jobsCount → 3 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL followVisitedFirst jobs 3 bound 4 atV4 9 turns [9] kinds ["apply"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+◇ Test case passing 2 arguments visit → .followVisitedFirst, jobsCount → 4 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL followVisitedFirst jobs 4 bound 4 atV4 12 turns [12] kinds ["apply"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 4
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, jobsCount → 3 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL sweepFollowsFirst jobs 3 bound 4 atV4 9 turns [0, 0, 4, 4, 1] kinds ["apply", "follow", "follow", "follow", "follow"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, jobsCount → 4 to "PROBE-C20C-DRAIN-BOUND-ALL" started.
+PROBE-C20C-DRAIN-BOUND-ALL sweepFollowsFirst jobs 4 bound 4 atV4 12 turns [0, 0, 4, 4, 4] kinds ["apply", "follow", "follow", "follow", "follow"] answers [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 4
+✔ Test "PROBE-C20C-DRAIN-BOUND-ALL" with 4 test cases passed after 4.720 seconds.
+✘ Suite "VerifyC20Correct" failed after 14.998 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 20, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C20C-DEFER-BEHIND: a follow's visit that moves ids onto a job whose exit verdict waits defers each join behind
+↳ /// that verdict (`deferBehindVerdict`), which scans the waiting events back to the verdict (`lastIndex`) and inserts the
+↳ /// join right after it (an O(E) shift), once per id: a turn of `followIDsPerTurn` ids costs O(ids x E), and E grows by
+↳ /// one per join deferred. Shape: T (zz-t0, zz-t1, 16 B, a user waiter each) downloads; H, `count` prefetch members of one
+↳ /// group sharing 16 B, downloads. v3 moves zz-t1 to a content of its own (T holds a moved id); T's attempt times out, so
+↳ /// its verdict waits (`waits`). v4 maps every H member to T's content: H's visit, over the follow's held turns, moves
+↳ /// 512 ids a turn onto T, each behind T's waiting verdict. Each held follow or drain turn is timed inside the actor.
+↳ /// The control (`waits == false`) leaves T downloading, so the same joins land on T in place.
+↳ ///
+↳ /// PROBE-C20C-DRAIN-BOUND-ALL: the cycle-19 PROBE-C19C-DRAIN-BOUND shape, with the drain's follow-up turns held and
+↳ /// counted as well as the follow's (the cycle-19 probe counted the follow's turns and the drain turn only).
+✘ Test run with 2 tests in 1 suite failed after 14.998 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

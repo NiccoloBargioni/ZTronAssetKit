@@ -1,0 +1,94 @@
+load before: 13:40  up 4 days,  2:04, 2 users, load averages: 29.42 143.21 162.07
+Building for production...
+[Computing dependencies]
+[1 / 4]
+[2 / 7] ZTronAssetSync
+[3 / 8] ZTronAssetSync
+[7 / 10] ZTronAssetKit
+[8 / 11] ZTronAssetKit
+[18 / 28] ZTronAssetKitBenchmarks-product
+[21 / 31] ZTronAssetSyncTests-product
+[22 / 32] ZTronAssetCompatibilityTests-product
+[24 / 32] ZTronAssetCompatibilityTests-product
+[24 / 32] ZTronAssetKitBenchmarks-product
+[26 / 32] ZTronAssetKitBenchmarks-product
+[26 / 32] ZTronAssetKitTests-product
+[28 / 32] ZTronAssetKitTests-product
+[28 / 32] ZTronAssetSyncTests-product
+[34 / 35] ZTronAssetSyncTests-product
+[37 / 37] ZTronAssetSyncTests-product
+[40 / 40] ZTronAssetKitTests-product
+[43 / 43] ZTronAssetKitBenchmarks-product
+[46 / 46] ZTronAssetCompatibilityTests-product
+Build complete! (114,45 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" started.
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 16.349334 ms (budgets 50.0 ms median, 10.0 ms best); runs [30.542709, 11.565917, 16.349334]; at 1,000: 1.426708 ms; the group without waiters: [3.3605, 0.750708, 3.441958]
+✘ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" recorded an issue at BenchSync.swift:250:13: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+↳ [30.542709, 11.565917, 16.349334]
+↳ (runs.min() ?? .infinity) <= Self.c2Budget → false
+↳   (runs.min() ?? .infinity) → 11.565917
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" failed after 9.489 seconds with 1 issue.
+↳ /// C2 at SPEC §6's reference scale when the engine shuts down (Stage 3, S3-PERF-01): under a 10,000-member
+↳ /// prefetch group (three run, the others wait in the queue) and 10,000 user-initiated `resolve` callers waiting on
+↳ /// its members, the shutdown's first turn sorted the job table twice to cancel handles, answered every waiter and
+↳ /// group and freed the job table in one actor turn (17 to 22 ms). The same path retires the engine of a store
+↳ /// whose root vanished while the app runs. Production's dispatch executors (the store's units off the actors).
+↳ /// Medians of three against P-9, the best of the three against C2, after a warm-up; the 1,000 figure gives the
+↳ /// ratio, and the group alone (no waiters) is measured too.
+◇ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 13.643959 ms (budgets 50.0 ms median, 10.0 ms best); runs [13.643959, 13.688208, 13.598958]
+✘ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:272:13: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+↳ [13.643959, 13.688208, 13.598958]
+↳ (runs.min() ?? .infinity) <= Self.c2Budget → false
+↳   (runs.min() ?? .infinity) → 13.598958
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" failed after 2.408 seconds with 1 issue.
+↳ /// C2 at SPEC §6's reference scale when a sync applies a manifest (one entry added) while a 10,000-member
+↳ /// prefetch group waits in the queue (Stage 3, S3-PERF-02): `followApplied` sorted and walked the whole job table
+↳ /// after every apply, and the run's release of launch re-attachments and its end each walked it again, sorted
+↳ /// (17 to 19 ms). Production's dispatch executors. Medians of three against P-9, the best of the three against
+↳ /// C2, after a warm-up.
+◇ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 60.547083 ms (budgets 50.0 ms median, 10.0 ms best); runs [60.547083, 73.782792, 52.156167]
+✘ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:310:13: Expectation failed: median <= gapMax
+↳ median <= gapMax → false
+↳   median → 60.547083
+↳   gapMax → 50.0
+✘ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:311:13: Expectation failed: (runs.min() ?? .infinity) <= Self.c2Budget
+↳ [60.547083, 73.782792, 52.156167]
+↳ (runs.min() ?? .infinity) <= Self.c2Budget → false
+↳   (runs.min() ?? .infinity) → 52.156167
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" failed after 17.749 seconds with 2 issues.
+↳ /// C2 at SPEC §6's reference scale when the retries of 10,000 prefetch members that failed transiently fall due
+↳ /// together, so one alarm turn (`fireDue`) finds every deadline due (Stage 3, S3-B-077). Medians of three against
+↳ /// P-9, the best against C2, after a warm-up.
+✘ Suite "SyncBenchmarks" failed after 29.648 seconds with 4 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+✘ Suite ZTronAssetKitBenchmarks failed after 29.648 seconds with 4 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 3 tests in 2 suites failed after 29.648 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+load after: 13:43  up 4 days,  2:06, 2 users, load averages: 14.44 93.06 138.67

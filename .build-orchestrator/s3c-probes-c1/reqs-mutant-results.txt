@@ -1,0 +1,90 @@
+=== BASE (ZTronAssetStorageTests.(PollReleaseTests|LargeBlobTests|LeaseTests|GarbageCollectionTests|IntegrityTests|OracleTests|CleanupFlowCrashTests)|CrashPairTests/osPurgeAfterCrash) 17:44:47 load averages: 26.44 25.11 39.63
+exit 0
+✔ Test run with 54 tests in 8 suites passed after 6.629 seconds.
+=== P1 (ZTronAssetStorageTests.PollReleaseTests) 17:44:59 load averages: 23.62 24.55 39.18
+exit 1
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → everyUnit at PollReleaseTests.swift:58:9: Expectation failed: held == [2]
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → oldest at PollReleaseTests.swift:58:9: Expectation failed: held == [2]
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → everyUnit at PollReleaseTests.swift:59:9: Expectation failed: completed == [1]
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → oldest at PollReleaseTests.swift:59:9: Expectation failed: completed == [1]
+✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 4 issues.
+=== M7 (ZTronAssetStorageTests.LeaseTests) 17:45:01 load averages: 23.62 24.55 39.18
+exit 1
+✘ Test "R-CLN-5: apply skips a planned victim leased after the plan, even when no access since the plan protects it" recorded an issue at LeaseTests.swift:387:9: Expectation failed: report.evicted.isEmpty
+✘ Test "R-CLN-5: apply skips a planned victim leased after the plan, even when no access since the plan protects it" recorded an issue at LeaseTests.swift:388:9: Expectation failed: await harness.isPresent(asset.id, at: asset.key) && harness.hasBlob(asset.key)
+✘ Test run with 9 tests in 1 suite failed after 0.021 seconds with 2 issues.
+=== M8 (ZTronAssetStorageTests.LeaseTests) 17:45:04 load averages: 23.25 24.46 39.06
+exit 1
+✘ Test "R-CLN-5: the eviction dry run neither names a leased asset nor counts its bytes" recorded an issue at LeaseTests.swift:409:9: Expectation failed: beyond == nil
+✘ Test run with 9 tests in 1 suite failed after 0.027 seconds with 1 issue.
+=== M20 (ZTronAssetStorageTests.GarbageCollectionTests) 17:45:06 load averages: 23.25 24.46 39.06
+exit 1
+✘ Test "R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed" recorded an issue at GarbageCollectionTests.swift:622:9: Expectation failed: inside == CleanupResult() && insideDoom == nil
+✘ Test "R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed" recorded an issue at GarbageCollectionTests.swift:623:9: Expectation failed: atGrace == CleanupResult() && atGraceDoom == nil
+✘ Test "R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed" recorded an issue at GarbageCollectionTests.swift:624:9: Expectation failed: past == CleanupResult(bytesFreed: 60, filesRemoved: 1, bytesDeferred: 0)
+✘ Test run with 13 tests in 1 suite failed after 0.020 seconds with 3 issues.
+=== R9 (ZTronAssetStorageTests.IntegrityTests) 17:45:09 load averages: 21.55 24.09 38.84
+exit 1
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:164:9: Expectation failed: after == before
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:165:9: Expectation failed: written == 0
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:170:9: Expectation failed: live
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:171:9: Expectation failed: await harness.store.location(for: present.id, extensions: [], recordingAccess: false) != nil
+✘ Test run with 14 tests in 1 suite failed after 0.144 seconds with 4 issues.
+=== K8 (CrashPairTests/osPurgeAfterCrash) 17:45:11 load averages: 21.55 24.09 38.84
+exit 1
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → half at CrashPairTests.swift:197:17: Expectation failed: report.stamp == nil && report.syncDue
+=== Z (ZTronAssetStorageTests.OracleTests) 17:45:18 load averages: 20.06 23.74 38.63
+exit 1
+ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran
+=== X (ZTronAssetStorageTests.CleanupFlowCrashTests) 17:45:20 load averages: 18.86 23.42 38.44
+exit 1
+ZTronAssetStorage/AssetStore+Publish.swift:358: Fatal error: S3MUT X: copyBlob ran
+=== G (ZTronAssetStorageTests.(OracleTests|CleanupFlowCrashTests)) 17:45:23 load averages: 18.79 23.33 38.31
+exit 1
+✘ Test "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+✘ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: violations.isEmpty
+=== E1 (ZTronAssetStorageTests.LargeBlobTests) 17:45:27 load averages: 18.79 23.33 38.31
+exit 1
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → leased at LargeBlobTests.swift:106:6: Caught error: .notPresent(w3)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:133:13: Expectation failed: await harness.store.location(for: changed, extensions: [], recordingAccess: true) != nil
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:148:9: Expectation failed: first == 2
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:149:9: Expectation failed: result == CleanupResult()
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:150:9: Expectation failed: await LargeBlobTests.count(harness, shared, .absent(.evicted)) == 2
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:152:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:152:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:152:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:154:9: Expectation failed: await LargeBlobTests.references(harness, key) == 3
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → pinned at LargeBlobTests.swift:106:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → bound at LargeBlobTests.swift:278:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" recorded an issue with 1 argument change → left at LargeBlobTests.swift:278:6: Time limit was exceeded: 60.000 seconds
+=== U1 (ZTronAssetStorageTests.LargeBlobTests) 17:46:35 load averages: 53.88 32.18 40.42
+exit 1
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a lease taken between its chunks" recorded an issue at LargeBlobTests.swift:357:6: Caught error: .notPresent(w4)
+✘ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" recorded an issue at LargeBlobTests.swift:180:9: Expectation failed: first == (2, 3)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:189:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" recorded an issue at LargeBlobTests.swift:323:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" recorded an issue at CleanupHarness.swift:237:52: Issue recorded
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" recorded an issue at CleanupHarness.swift:237:52: Issue recorded
+✘ Test run with 8 tests in 1 suite failed after 64.000 seconds with 6 issues.
+DONE

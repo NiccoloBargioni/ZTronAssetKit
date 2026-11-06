@@ -1,0 +1,9 @@
+# S3-CONF-06 mutant; --filter 'ZTronAssetStorageTests|ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests'
+✔ Test run with 356 tests in 53 suites passed after 13.393 seconds.
+✘ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" recorded an issue at S3ConformanceUpdateCrashTests.swift:184:9: Expectation failed: !harness.exists(oldBlob)
+✘ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" recorded an issue at S3ConformanceUpdateCrashTests.swift:186:9: Expectation failed: oldState == nil
+✘ Test "R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace" failed after 0.953 seconds with 2 issues.
+✘ Suite "S3 conformance probe: content change onto a live blob" failed after 0.995 seconds with 2 issues.
+✘ Test run with 461 tests in 62 suites failed after 69.496 seconds with 2 issues.
+✔ Test run with 85 tests in 11 suites passed after 2.262 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.386 seconds.

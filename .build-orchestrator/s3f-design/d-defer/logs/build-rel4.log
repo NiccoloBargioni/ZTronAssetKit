@@ -1,0 +1,20 @@
+Building for production...
+[Computing dependencies]
+[1 / 4]
+[2 / 7] ZTronAssetSync
+[3 / 8] ZTronAssetSync
+[9 / 12] ZTronAssetKit
+[19 / 29] ZTronAssetKitBenchmarks-product
+[23 / 33] ZTronAssetCompatibilityTests-product
+[25 / 33] ZTronAssetCompatibilityTests-product
+[25 / 33] ZTronAssetKitBenchmarks-product
+[27 / 33] ZTronAssetKitBenchmarks-product
+[27 / 33] ZTronAssetKitTests-product
+[29 / 33] ZTronAssetKitTests-product
+[29 / 33] ZTronAssetSyncTests-product
+[35 / 36] ZTronAssetSyncTests-product
+[38 / 38] ZTronAssetSyncTests-product
+[41 / 41] ZTronAssetKitTests-product
+[44 / 44] ZTronAssetKitBenchmarks-product
+[47 / 47] ZTronAssetCompatibilityTests-product
+Build complete! (80,15 s)

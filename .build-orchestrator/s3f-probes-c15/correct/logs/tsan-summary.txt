@@ -1,0 +1,2 @@
+✔ Test run with 511 tests in 53 suites passed after 395.665 seconds.
+exit=0

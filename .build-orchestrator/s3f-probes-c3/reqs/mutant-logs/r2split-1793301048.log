@@ -1,0 +1,38 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (8,53 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine failure paths" started.
+◇ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test case passing 1 argument reason → .unreadable to "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+◇ Test case passing 1 argument reason → .notFound to "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" started.
+✘ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" recorded an issue with 1 argument reason → .unreadable at EnginePublicationRefusalTests.swift:91:9: Expectation failed: answer == .failure(expected)
+↳ failure(ZTronAssetModel.AssetError.notFound)
+↳ answer == .failure(expected) → false
+↳   answer → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+↳   .failure(expected) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-NET-6: a publication the store refuses because the asset's record failed meanwhile answers the waiter from that record" with 2 test cases failed after 0.011 seconds with 1 issue.
+↳ /// A publication whose every id the store has recorded as failed meanwhile (the origin's 404 for that content, or
+↳ /// a copy repeatedly unreadable, recorded behind the engine) is refused (`assetFailed`): the job fails until the
+↳ /// entry changes and the waiter gets the record's answer, `notFound` for the 404 and `integrityFailure` for the
+↳ /// unreadable copy (the second reason tells the refusal's own mapping apart from an unknown asset's `notFound`: the
+↳ /// close-out cycle-2 requirements lens).
+✘ Suite "Engine failure paths" failed after 0.012 seconds with 1 issue.
+↳ /// Failure paths of ARCHITECTURE §7.6 and §7.7, reconcile-time job changes (T21, T22), the manifest deadline,
+↳ /// launch reconciliation and a store that cannot open.
+✘ Test run with 1 test in 1 suite failed after 0.012 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

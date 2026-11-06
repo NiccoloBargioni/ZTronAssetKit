@@ -1,0 +1,54 @@
+  858|     26|            switch item.kind {
+  859|     26|            case .waiter:
+  860|     20|                guard let waiter = self.state.waiters[item.token], !waiter.fromStore, waiter.asset == item.asset, waiter.transfer == batch.from else {
+  861|      0|                    return false
+  862|      0|                }
+  863|     26|            case .prefetch, .ensure:
+  864|      6|                guard self.state.groups[item.token]?.pending[item.asset] == batch.from else {
+  865|      6|                    return false
+  866|      6|                }
+  867|     26|            case .run:
+  868|      0|                guard self.state.run?.token == item.token else {
+  869|      0|                    return false
+  870|      0|                }
+  871|     26|            case .system:
+  872|      0|                break
+  174|  5.37k|        for answer in owed {
+  175|     32|            answer.resume()
+  176|     32|            steps += 1
+  177|     32|            if steps == SyncEngine.shutdownStepsPerTurn {
+  178|      0|                self.state.shutdownSlices.append(steps)
+  179|      0|                steps = 0
+  180|      0|                // REENTRANCY: RE-S43 (proposed) — nothing: the drained answers belong to this call, and while the
+  181|      0|                // lifecycle is `shuttingDown` no resolution owes a new one a follow-up would resume.
+  182|      0|                await Task.yield()
+  183|      0|            }
+  184|  5.37k|        }
+  798|    214|            let layer = layers[index]
+  799|    214|            // A layer no job was at an attempt's end at (most) is passed without formatting the entry's transfer.
+  800|    214|            if !layer.ends.isEmpty, let epoch = layer.ends[entry.transferID] {
+  801|    138|                if self.waitingTarget(entry.transferID, epoch: epoch) != nil {
+  802|     69|                    return layer.outgoing
+  803|     69|                }
+  804|     69|                // The layers hold one per copy adopted from `serial` to the commit: the copy in force then is the next
+  805|     69|                // layer's outgoing one, or the engine's.
+  806|     69|                guard let committed = self.state.reroutePinCommits[VerdictKey(transfer: entry.transferID, epoch: epoch)] else {
+  807|      6|                    return nil
+  808|     63|                }
+  809|     63|                index = Int(committed &- serial)
+  810|     76|            } else {
+  811|     76|                index += 1
+  812|    139|            }
+  878|    194|        guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
+  879|     10|            return nil
+  880|    184|        }
+  881|    184|        self.state.verdictsAfterFollow[transfer] = nil
+  882|    184|        guard self.state.jobs[transfer]?.epoch == epoch, case .failed? = self.state.jobs[transfer]?.state else {
+  883|      0|            return nil
+  884|    184|        }
+ 1562|  3.74k|    func waitingTarget(_ move: InboundMove) -> Job? {
+ 1563|  3.74k|        if let job = self.state.jobs[move.target], job.epoch == move.epoch, job.state == .queued {
+ 1564|      4|            return job
+ 1565|  3.74k|        }
+ 1566|  3.74k|        return self.waitingTarget(move.target, epoch: move.epoch)
+ 1567|  3.74k|    }

@@ -1,0 +1,182 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[Starting]
+[37 / 304] ZTronAssetModel
+[127 / 304]
+[128 / 305] ZTronAssetModel
+[136 / 351]
+[138 / 351]
+[140 / 351]
+[146 / 351]
+[147 / 351]
+[148 / 351]
+[151 / 351]
+[153 / 351]
+[155 / 351]
+[158 / 351]
+[161 / 351]
+[162 / 351]
+[163 / 351]
+[164 / 351]
+[165 / 351]
+[174 / 351] ZTronAssetModel
+[175 / 351] ZTronAssetModel
+[182 / 353]
+[183 / 354] ZTronAssetModel
+[183 / 354] ZTronAssetTransport
+[190 / 374]
+[190 / 387] ZTronAssetModel
+[191 / 387]
+[192 / 387]
+[195 / 387]
+[196 / 387]
+[199 / 387] ZTronAssetTransport
+[205 / 387] ZTronAssetTransport
+[206 / 387] ZTronAssetStorage
+[219 / 387] ZTronAssetTransport
+[220 / 387] ZTronAssetTransport
+[222 / 387] ZTronAssetTransport
+[223 / 387] ZTronAssetTransport
+[226 / 387] ZTronAssetTransport
+[228 / 387] ZTronAssetStorage
+[231 / 387] ZTronAssetAppleHosted
+[233 / 387] ZTronAssetStorage
+[235 / 387] ZTronAssetAppleHosted
+[237 / 387] ZTronAssetAppleHosted
+[239 / 389] ZTronAssetSync
+[241 / 398] ZTronAssetTestSupport
+[244 / 398] ZTronAssetTestSupport
+[245 / 407] ZTronAssetSync
+[246 / 407] ZTronAssetTestSupport
+[247 / 407] ZTronAssetTestSupport
+[250 / 407] ZTronAssetTestSupport
+[256 / 407] ZTronAssetTestSupport
+[257 / 407] ZTronAssetSync
+[258 / 407] ZTronAssetStorage
+[261 / 407] ZTronAssetSync
+[266 / 407] ZTronAssetSync
+[268 / 407] ZTronAssetTestSupport
+[281 / 407]
+[282 / 408] ZTronAssetSync
+[285 / 408] ZTronAssetTransport
+[288 / 417] ZTronAssetSync
+[290 / 417] ZTronAssetKit
+[293 / 417] ZTronAssetKit
+[300 / 417] ZTronAssetKit
+[315 / 419] ZTronAssetStorageTests-product
+[316 / 419] ZTronAssetStorageTests-product
+[319 / 421] ZTronAssetTransportTests-product
+[321 / 432]
+[321 / 459]
+[323 / 459]
+[329 / 459] ZTronAssetTransportTests-product
+[329 / 459] ZTronAssetSync
+[330 / 459] ZTronAssetSync
+[331 / 459] ZTronAssetAppleHostedTests-product
+[336 / 459] ZTronAssetModelTests-product
+[344 / 459] ZTronAssetTransportTests-product
+[347 / 459] ZTronAssetTransportTests-product
+[353 / 459] ZTronAssetTransportTests-product
+[356 / 459] ZTronAssetStorageTests-product
+[357 / 459] ZTronAssetTransportTests-product
+[359 / 459] ZTronAssetTransportTests-product
+[364 / 459] ZTronAssetStorageTests-product
+[366 / 459] ZTronAssetTransportTests-product
+[368 / 459] ZTronAssetTransportTests-product
+[369 / 459] ZTronAssetModelTests-product
+[369 / 459] ZTronAssetStorageTests-product
+[371 / 459] ZTronAssetModelTests-product
+[373 / 459] ZTronAssetModelTests-product
+[374 / 459] ZTronAssetModelTests-product
+[375 / 459] ZTronAssetModelTests-product
+[376 / 459] ZTronAssetAppleHostedTests-product
+[377 / 459] ZTronAssetAppleHostedTests-product
+[377 / 459] ZTronAssetModelTests-product
+[378 / 459] ZTronAssetModelTests-product
+[379 / 459] ZTronAssetStorageTests-product
+[381 / 459] ZTronAssetAppleHostedTests-product
+[382 / 459] ZTronAssetAppleHostedTests-product
+[383 / 459]
+[385 / 459]
+[391 / 460]
+[393 / 460] ZTronAssetKit
+[398 / 469] ZTronAssetSyncTests-product
+[398 / 469] ZTronAssetAppleHostedTests-product
+[400 / 469] ZTronAssetAppleHostedTests-product
+[401 / 469] ZTronAssetAppleHostedTests-product
+[403 / 469] ZTronAssetSyncTests-product
+[404 / 469] ZTronAssetSyncTests-product
+[405 / 469] ZTronAssetSyncTests-product
+[406 / 469] ZTronAssetSyncTests-product
+[416 / 469] ZTronAssetStorageTests-product
+[417 / 469] ZTronAssetSyncTests-product
+[422 / 470] ZTronAssetKitTests-product
+[424 / 479] ZTronAssetKitTests-product
+[426 / 479] ZTronAssetKitTests-product
+[427 / 479] ZTronAssetKitTests-product
+[432 / 479] ZTronAssetSyncTests-product
+[434 / 479] ZTronAssetKitTests-product
+[435 / 479] ZTronAssetKitTests-product
+[437 / 479] ZTronAssetKitTests-product
+[437 / 479]
+[438 / 481] ZTronAssetKitBenchmarks-product
+[440 / 490] ZTronAssetKitBenchmarks-product
+[440 / 490] ZTronAssetCompatibilityTests-product
+[442 / 495] ZTronAssetCompatibilityTests-product
+[445 / 495] ZTronAssetKitBenchmarks-product
+[457 / 495] ZTronAssetKitBenchmarks-product
+[459 / 495] ZTronAssetKitBenchmarks-product
+[461 / 495] ZTronAssetCompatibilityTests-product
+[461 / 495] ZTronAssetKitBenchmarks-product
+[463 / 495] ZTronAssetCompatibilityTests-product
+[464 / 495] ZTronAssetCompatibilityTests-product
+[465 / 495] AllIncludingTests
+[471 / 495] ZTronAssetStorageTests-product
+[473 / 495] ZTronAssetKitTests-product
+[477 / 495] ZTronAssetKitBenchmarks-product
+[477 / 495] ZTronAssetCompatibilityTests-product
+[479 / 495] ZTronAssetCompatibilityTests-product
+[483 / 495] ZTronAssetCompatibilityTests-product
+[483 / 495] ZTronAssetKitBenchmarks-product
+[483 / 495] ZTronAssetSyncTests-product
+[485 / 495] ZTronAssetKitBenchmarks-product
+[485 / 495] ZTronAssetSyncTests-product
+[488 / 495] ZTronAssetSyncTests-product
+[489 / 495] ZTronAssetKitBenchmarks-product
+[491 / 495] ZTronAssetKitBenchmarks-product
+[495 / 495] ZTronAssetKitBenchmarks-product
+Build complete! (99,16 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Verifier probes r3" started.
+◇ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" started.
+◇ Test "PROBE-1 control: register after start, then shutdown, leaves nothing" started.
+PROBE-1 before: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=1 observer=true liveObservations=1
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" recorded an issue at VerifierProbesR3.swift:31:9: Expectation failed: after.ownedTasks == 0
+↳ owned tasks after shutdown: 1
+↳ after.ownedTasks == 0 → false
+↳   after.ownedTasks → 1
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" recorded an issue at VerifierProbesR3.swift:32:9: Expectation failed: after.memoryPressureObserverActive == false
+↳ the observer is still active after shutdown
+↳ after.memoryPressureObserverActive == false → false
+↳   after.memoryPressureObserverActive → true
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" recorded an issue at VerifierProbesR3.swift:33:9: Expectation failed: observations == 0
+↳ live pressure observations after shutdown: 1
+↳ observations == 0 → false
+↳   observations → 1
+PROBE-1 after one more event: liveObservations=0 purges=0
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" failed after 0.013 seconds with 3 issues.
+↳ /// PROBE-1: a purgeable cache registered before the client was started starts the engine's memory-pressure observer
+↳ /// on an engine still in `created`; `shutdown()` then takes the engine's `created` branch, which neither cancels nor
+↳ /// joins owned tasks, so the observer task and its pressure subscription outlive the shutdown (R-SYN-15).
+PROBE-1 control after: lifecycle=shutDown ownedTasks=0 observer=false
+✔ Test "PROBE-1 control: register after start, then shutdown, leaves nothing" passed after 0.022 seconds.
+✘ Suite "Verifier probes r3" failed after 0.022 seconds with 3 issues.
+↳ /// Verifier probes (round 3, correctness lens). Scratch only: never committed.
+✘ Test run with 2 tests in 1 suite failed after 0.023 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitTests (Swift Testing)
+exit=1

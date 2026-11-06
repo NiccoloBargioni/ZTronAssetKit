@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" started.
+✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDrainLaneTests.swift:115:9: Expectation failed: throttle != nil
+↳ J's 429 throttles the origin on J's own (prefetch) lane: B's interest is on C until the next follow (visit-first): nil
+↳ throttle != nil → false
+↳   throttle → nil
+✘ Test "R-SYN-5: a 429 between two drain turns reads no interest a passed job keeps until the next follow (F-28)" with 2 test cases failed after 0.974 seconds with 1 issue.
+↳ /// A 429 that arrives between two drain turns, with another job's verdict still waiting, is decided on the lane of
+↳ /// the interests its job holds, not on an interest a passed job keeps until the next follow (PROBE-C15R-LANE-WALK):
+↳ /// C (100 kB: zz-a and zz-b, user waiters A and B) publishes when v3 moves zz-b to N (16 B), the content of zz-p,
+↳ /// whose prefetch waiter P's job J downloads; Z (zz-z, a user waiter) downloads too. v3's visit passes C (its
+↳ /// publication began before the apply), so zz-b stays on C until the next follow. C's verification read fails (EIO):
+↳ /// transient, retried. Behind the barrier a conditions element then waits and ends the drain's first batch, and Z's
+↳ /// 404 waits after it, so the drain's second turn (held) still owes Z's verdict. J then gets a 429 with `Retry-After`
+↳ /// 60 s (above the user lane's 30 s cap, below the prefetch lane's 3,600 s). Visited first, J's lane was its own (B's
+↳ /// interest was on C), and the 429 throttled the origin for 60 s.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.974 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.974 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

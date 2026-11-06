@@ -1,0 +1,6 @@
+✘ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" recorded an issue with 1 argument swept → .waiterRequeued at EngineFollowTests.swift:575:9: Expectation failed: !afterSweep.holds
+✘ Test "R-SYN-11: a space sweep during an owed follow moves a listed id's interest to its new content before it answers or re-queues the replaced content's job (R-CAR-2)" with 3 test cases failed after 2.771 seconds with 1 issue.
+✘ Suite "Engine runs" failed after 2.772 seconds with 1 issue.
+PROBE-C3-SPACE answer: success(ZTronAssetModel.AssetLocation(id: zz-target, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/31/3130125a834142a80d30ea3aa1b77b3a4d96910f3efbabca664ba89317b5e9f9.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); room above reserve now 1000336
+✔ Test "PROBE-C3-SPACE: a space sweep during the follow does not answer a moved id with its replaced content's figures" passed after 3.075 seconds.
+✘ Test run with 2 tests in 2 suites failed after 3.075 seconds with 1 issue.

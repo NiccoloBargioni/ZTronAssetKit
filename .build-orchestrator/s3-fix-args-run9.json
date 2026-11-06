@@ -1,0 +1,31 @@
+{
+  "bar": "strict",
+  "base": "s3-base",
+  "maxCycle": 30,
+  "simSlots": [
+    {
+      "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E",
+      "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+      "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B"
+    }
+  ],
+  "wps": [
+    {
+      "coverageMin": 90,
+      "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c21-issues.json",
+      "focus": "Stage 3 hardening, continued under the narrowed bar (S3-R16, S3-R17) and the rulings S3-R18 to S3-R27: read the end of the rulings file named above before anything else; S3-R27 is this cycle's ruling. S3-R26 and the earlier rulings apply wherever S3-R27 does not change them, and S3-R27 decides wherever any other file differs from it. Cycles 1-21 are committed on wp/s3f (HEAD d5b2ab9; see docs/adr-drafts/s3f.md). Cycle 21 implemented S3-R26 (8e1fb24..d5b2ab9, 73 commits) and closed with six blocking items and three put-backs, which S3-R27 routes. Its verifiers' findings, blocking and non-blocking, are in the findings file named above (cited as 'reqs #n' and 'correct #n'); their probes are under /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c21/. S3-R27 adopts parts of the read-only analyses in /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c21-analysis/ (d1 to d5 with the reviews of d1, d2 and d4; e1-pin-requeue.md and e2-purge.md with their reviews), as its items say; S3-R27's header and item 12 say which parts bind. S3-R27 item 12 records the owner's ruling of 5 Nov (the 10 ms bar covers only 10,000 ids, however grouped, with at most 4 interests on one id and one subscriber) and routes the correctness verifier's two new findings (correct #1, the pin after an ENOENT re-queue; correct #2, the purge's first turn); its sub-item 12.5 settles points that 12.1 to 12.4 leave open. Follow S3-R27 item 10's order of work, with the amendments of items 11 and 12, and its red-first rule (red against d5b2ab9), and commit each step on its own. S3-R22 item 3 serialises simulator and coverage runs across agents with a lock directory (mkdir .build-orchestrator/sim.lock, removed afterwards). S3-R12 and S3-R13 apply unchanged; never edit Package.swift. S3-R23: the host is shared with other projects' simulator runs; record the load with every timing figure, pin each turn bound with a deterministic test, and take the C2 figure at a 1-minute load of 10 or less (S3-R27's 'How a C2 figure is read in cycle 22' says how a figure is read, and S3-R26 item 11 what to do when a deciding figure cannot be taken at a quiet load). The verifiers judge by S3-R16 to S3-R27. Keep docs/adr-drafts/s3f.md's cycle-22 section current step by step (which step is committed, which is in progress, its next action, and the mapping of the verifiers' findings to S3-R27's items), so that a fixer resumed after an interruption continues from the worktree HEAD without redoing work. The weekly usage limit may cut this cycle off: commit every finished step as you go, so that a cut-off loses no finished work. Do not delete .build-s3f/c21/ (cycle 21's probes and mutation tools, which S3-R27 cites).",
+      "fromCycle": 22,
+      "maxCycle": 30,
+      "name": "Stage 3 WP-F (sync engine)",
+      "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+      "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+      "target": "ZTronAssetSync",
+      "testTarget": "ZTronAssetSyncTests",
+      "wp": "s3f",
+      "models": {
+        "fix": "opus",
+        "verify": "opus"
+      }
+    }
+  ]
+}

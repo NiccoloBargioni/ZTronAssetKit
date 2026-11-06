@@ -1,0 +1,12 @@
+PROBE-C21C-PURGE-PARTS shared=false 10,000 run 0: dropBindings 0.00 ms, settleRun 0.00 ms, withdrawPurged 54.83 ms; jobs after 0; load { 5.01 39.04 121.54 } -> { 5.01 39.04 121.54 }
+PROBE-C21C-PURGE-PARTS shared=false 10,000 run 1: dropBindings 0.00 ms, settleRun 0.00 ms, withdrawPurged 53.86 ms; jobs after 0; load { 5.01 39.04 121.54 } -> { 5.01 39.04 121.54 }
+PROBE-C21C-PURGE-PARTS shared=false 10,000 run 2: dropBindings 0.00 ms, settleRun 0.00 ms, withdrawPurged 67.57 ms; jobs after 0; load { 5.01 39.04 121.54 } -> { 5.01 39.04 121.54 }
+PROBE-C21C-PURGE-PARTS shared=false: withdrawPurged [54.826416, 53.855959, 67.57375] ms, best 53.855959 ms
+✘ Test "PROBE-C21C-PURGE-PARTS" recorded an issue with 1 argument shared → false at VerifyC21CorrectPurgeProbes.swift:151:9: Expectation failed: (withdraws.min() ?? .infinity) <= 10.0
+PROBE-C21C-PURGE-PARTS shared=true 10,000 run 0: dropBindings 0.00 ms, settleRun 0.00 ms, withdrawPurged 13.11 ms; jobs after 0; load { 5.01 39.04 121.54 } -> { 5.01 39.04 121.54 }
+PROBE-C21C-PURGE-PARTS shared=true 10,000 run 1: dropBindings 0.00 ms, settleRun 0.00 ms, withdrawPurged 13.16 ms; jobs after 0; load { 5.01 39.04 121.54 } -> { 5.01 39.04 121.54 }
+PROBE-C21C-PURGE-PARTS shared=true 10,000 run 2: dropBindings 0.00 ms, settleRun 0.00 ms, withdrawPurged 12.36 ms; jobs after 0; load { 5.01 39.04 121.54 } -> { 4.85 38.44 120.84 }
+PROBE-C21C-PURGE-PARTS shared=true: withdrawPurged [13.11025, 13.161833, 12.358542] ms, best 12.358542 ms
+✘ Test "PROBE-C21C-PURGE-PARTS" recorded an issue with 1 argument shared → true at VerifyC21CorrectPurgeProbes.swift:151:9: Expectation failed: (withdraws.min() ?? .infinity) <= 10.0
+✘ Test "PROBE-C21C-PURGE-PARTS" with 2 test cases failed after 1.656 seconds with 2 issues.
+✘ Test run with 1 test in 1 suite failed after 1.656 seconds with 2 issues.

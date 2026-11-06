@@ -1,0 +1,87 @@
+{
+ "base": "s3-base",
+ "usageStop": 100,
+ "bar": "strict",
+ "maxCycle": 6,
+ "simSlots": [
+  {
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E"
+  },
+  {
+   "fix": "02CE21B4-F307-4CB7-B80A-1F2EF72F115C",
+   "reqs": "7E25727F-BD73-47F4-B6C8-BB38A9F5D822",
+   "correct": "0E21D9E5-AD38-4065-A393-E8E5A6865FC9"
+  }
+ ],
+ "wps": [
+  {
+   "wp": "s3f",
+   "name": "Stage 3 WP-F (sync engine)",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-findings-s3f.json",
+   "focus": "Stage 3 hardening. Your items and their levels are in the rulings file; the findings file holds each item's full evidence (the hunter's finding with the independent confirmer's verdict, a surviving mutant, or a backlog entry). Work the BLOCKING items first. WP-F's Stage 2 record is docs/adr-drafts/f.md (read by section).",
+   "maxCycle": 8
+  },
+  {
+   "wp": "s3b",
+   "name": "Stage 3 WP-B (storage core)",
+   "target": "ZTronAssetStorage",
+   "testTarget": "ZTronAssetStorageTests",
+   "sections": "sections 1.1, 1.2, 3, 4.1-4.6a, 5, 10.1, 12.1, 12.2, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3b.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-findings-s3b.json",
+   "focus": "Stage 3 hardening. Your items and their levels are in the rulings file; the findings file holds each item's full evidence (the hunter's finding with the independent confirmer's verdict, a surviving mutant, or a backlog entry). Work the BLOCKING items first. WP-B's Stage 2 record is docs/adr-drafts/b.md (read by section)."
+  },
+  {
+   "wp": "s3c",
+   "name": "Stage 3 WP-C (integrity, cleanup, eviction, migration)",
+   "target": "ZTronAssetStorage",
+   "testTarget": "ZTronAssetStorageTests",
+   "sections": "sections 1.1, 1.2, 4.4-4.7, 10.1, 14",
+   "coverageMin": 90,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3c.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-findings-s3c.json",
+   "focus": "Stage 3 hardening. Your items and their levels are in the rulings file; the findings file holds each item's full evidence (the hunter's finding with the independent confirmer's verdict, a surviving mutant, or a backlog entry). Work the BLOCKING items first. WP-C's Stage 2 record is docs/adr-drafts/c.md (read by section)."
+  },
+  {
+   "wp": "s3ah",
+   "name": "Stage 3 WP-A and WP-H (model and test support)",
+   "target": "ZTronAssetModel",
+   "testTarget": "ZTronAssetModelTests",
+   "sections": "sections 1.2, 2, 3, 10.3, 14",
+   "coverageMin": 70,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3ah.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-findings-s3ah.json",
+   "focus": "Stage 3 hardening. Your items and their levels are in the rulings file; the findings file holds each item's full evidence (the hunter's finding with the independent confirmer's verdict, a surviving mutant, or a backlog entry). WP-A's Stage 2 record is docs/adr-drafts/a.md and WP-H's is docs/adr-drafts/h.md (read by section). WP-H's tests live in Tests/ZTronAssetStorageTests/TestSupport/."
+  },
+  {
+   "wp": "s3d",
+   "name": "Stage 3 WP-D (transport)",
+   "target": "ZTronAssetTransport",
+   "testTarget": "ZTronAssetTransportTests",
+   "sections": "sections 1.2, 6.1-6.5, 7.5, 10.4, 14",
+   "coverageMin": 70,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3d.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-findings-s3d.json",
+   "focus": "Stage 3 hardening. Your items and their levels are in the rulings file; the findings file holds each item's full evidence (the hunter's finding with the independent confirmer's verdict, a surviving mutant, or a backlog entry). Work the BLOCKING item first. WP-D's Stage 2 record is docs/adr-drafts/d.md (read by section)."
+  },
+  {
+   "wp": "s3g",
+   "name": "Stage 3 WP-G (facade)",
+   "target": "ZTronAssetKit",
+   "testTarget": "ZTronAssetKitTests",
+   "sections": "sections 1.2, 8, 10.6, 11, 14",
+   "coverageMin": 70,
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3g.md",
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-findings-s3g.json",
+   "focus": "Stage 3 hardening. Your items and their levels are in the rulings file; the findings file holds each item's full evidence (a hunter finding, or a backlog entry). WP-G's Stage 2 record is docs/adr-drafts/g.md (read by section)."
+  }
+ ]
+}

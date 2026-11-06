@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine regressions" started.
+◇ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" started.
+✘ Test "R-SYN-2: a transfer stream that ends without a terminal element fails the job instead of stranding it" recorded an issue at EngineSync1RegressionTests.swift:96:6: Time limit was exceeded: 60.000 seconds
+
+[ptyrun] still running after 200 s: killing process group
+
+[ptyrun] exit=-15 elapsed=200.5s

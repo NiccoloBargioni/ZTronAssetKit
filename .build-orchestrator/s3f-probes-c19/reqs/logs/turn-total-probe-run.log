@@ -1,0 +1,18 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC19ReqsTurnTotal" started.
+◇ Test "PROBE-C19R-TWO-HOLDER-TURN" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C19R-TWO-HOLDER-TURN" started.
+PROBE-C19R-TWO-HOLDER-TURN followVisitedFirst: moves owed at O's end []; members left per turn []; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C19R-TWO-HOLDER-TURN" started.
+PROBE-C19R-TWO-HOLDER-TURN sweepFollowsFirst: moves owed at O's end [6, 6]; members left per turn [2, 4, 4, 2]; O failure(ZTronAssetModel.AssetError.notFound); members not 404 0; starts 3
+✔ Test "PROBE-C19R-TWO-HOLDER-TURN" with 2 test cases passed after 1.323 seconds.
+◇ Test "PROBE-C19R-THREE-HOLDER-VISITS" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C19R-THREE-HOLDER-VISITS" started.
+PROBE-C19R-THREE-HOLDER-VISITS followVisitedFirst: members left per turn []; O success(24); members not served 24 bytes 0; holder starts 3
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C19R-THREE-HOLDER-VISITS" started.
+PROBE-C19R-THREE-HOLDER-VISITS sweepFollowsFirst: members left per turn [4, 4, 4]; O success(24); members not served 24 bytes 0; holder starts 3
+✔ Test "PROBE-C19R-THREE-HOLDER-VISITS" with 2 test cases passed after 1.129 seconds.
+✔ Suite "VerifyC19ReqsTurnTotal" passed after 2.453 seconds.
+✔ Test run with 2 tests in 1 suite passed after 2.453 seconds.

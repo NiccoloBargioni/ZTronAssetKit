@@ -1,0 +1,36 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .verdicts to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .verdictsAfterARest to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .verdicts to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdicts at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectation failed: outcome.turns.allSatisfy { $0 <= bound }
+↳ no follow or drain turn moves more than followIDsPerTurn = 4 ids: [0, 0, 9] [ZTronAssetSyncTests.EngineFollowBarrierTests.HeldTurn.follow, ZTronAssetSyncTests.EngineFollowBarrierTests.HeldTurn.follow]
+↳ outcome.turns.allSatisfy { $0 <= bound } → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest to "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" started.
+✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:191:9: Expectation failed: outcome.turns.allSatisfy { $0 <= bound }
+↳ no follow or drain turn moves more than followIDsPerTurn = 4 ids: [0, 4, 11] [ZTronAssetSyncTests.EngineFollowBarrierTests.HeldTurn.follow, ZTronAssetSyncTests.EngineFollowBarrierTests.HeldTurn.follow]
+↳ outcome.turns.allSatisfy { $0 <= bound } → <not evaluated>
+✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .verdictsAfterARest at EngineFollowBarrierDrainBoundTests.swift:196:13: Expectation failed: outcome.turns.suffix(3) == [4, 4, 3] && outcome.kinds.suffix(2) == [.follow, .drain]
+↳ // The follow's last turn moves the two members B's visit left and the first two of J0's, and the next follow
+↳ // turn J0's last and J1's three; J2's verdict then waits for a drain turn of its own, with a fresh turn's ids,
+↳ // instead of a visit that the spent turn could not move.
+↳ the drain's batch stops once the turn's ids are spent and its rest waits for the next drain turn: [0, 4, 11] [ZTronAssetSyncTests.EngineFollowBarrierTests.HeldTurn.follow, ZTronAssetSyncTests.EngineFollowBarrierTests.HeldTurn.follow]
+↳ outcome.turns.suffix(3) == [4, 4, 3] && outcome.kinds.suffix(2) == [.follow, .drain] → false
+↳   outcome.turns.suffix(3) == [4, 4, 3] → false
+↳   outcome.kinds.suffix(2) == [.follow, .drain] → <not evaluated>
+✘ Test "R-SYN-6: the drain's visits after the verdicts that waited move at most followIDsPerTurn ids a turn together, with the visit-first answers (C2, F-28)" with 4 test cases failed after 2.151 seconds with 3 issues.
+↳ /// The drain's visits after verdicts move at most one turn's ids together: their visits share what the turn has
+↳ /// left (the follow's last turn's, after its own visits), and once those are spent the batch's rest waits for the
+↳ /// next drain turn (`drainEventsAfterFollow`, `followAfterVerdict`). Every member gets its own content's bytes, as a
+↳ /// visit-first engine's v4 visits moved them at the apply.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.152 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.152 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

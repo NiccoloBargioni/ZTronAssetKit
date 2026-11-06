@@ -1,0 +1,59 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" started.
+✘ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:554:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ K's user waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:563:29: Issue recorded
+↳ B's prefetch waiter is answered insufficientSpace: C's 5 MB do not fit beside K: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e8/e8816bfee3ba0ee1b0814a7112095be7e17ed9afee04415d66eeebe0ac02c903.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:555:9: Expectation failed: aResult == .failure(.notFound)
+↳ A's dropped id is answered notFound: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+↳ aResult == .failure(.notFound) → false
+↳   aResult → failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+↳     failure → .insufficientSpace(required: 5000000, available: 4000078)
+↳       insufficientSpace → (required: 5000000, available: 4000078)
+↳         required → 5000000
+↳         available → 4000078
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:559:17: Expectation failed: (try? bResult.get())?.byteSize == Int64(cBytes.count)
+↳ B's prefetch waiter is answered from C's 5 MB on the opportunistic room: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+↳ (try? bResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineSweepOrderTests.swift:554:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ K's user waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id at its prefetch place (F-28)" with 2 test cases failed after 0.607 seconds with 2 issues.
+↳ /// A space sweep judges a job whose user lane came only from a dropped id at its prefetch place: C (5 MB) is wanted by
+↳ /// A (user) and B (prefetch); v3 drops A's id and keeps B's while the follow owes C's visit. Visited first, C is
+↳ /// prefetch work judged after K (3 MB, user): K fits, and C's 5 MB do not fit the room K leaves, so B is answered with
+↳ /// that shortage. Judged at its pre-follow user place, C was admitted ahead of K and K's waiter got the shortage (the
+↳ /// close-out cycle-8 correctness lens, PROBE-C8-DROPPED-KEEP).
+✘ Test "R-SYN-11: a space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it (F-28)" with 2 test cases failed after 0.642 seconds with 1 issue.
+↳ /// A space sweep does not admit a job whose only id the copy dropped ahead of the user work behind it: C (5 MB) is
+↳ /// wanted only by A's user waiter and ranked before K (3 MB, a user waiter) with the earlier ticket; both wait
+↳ /// `awaitingSpace` for 4 MB of a pruned blob. v3 drops A's id while the bounded follow owes C's visit. Visited first,
+↳ /// C's job ends (A is answered `.notFound`) and the reclaim's sweep serves K. A sweep that followed only the jobs
+↳ /// holding a moved id (`holdsMovedID` ignores a dropped id) judged C at its user place and admitted it ahead of K, whose
+↳ /// waiter was answered with a shortage (the close-out cycle-8 correctness lens, PROBE-C8-DROPPED).
+✘ Test "R-SYN-11: a space sweep judges a job whose user lane came only from a dropped id on its own lane's volume (F-28)" with 2 test cases failed after 0.647 seconds with 2 issues.
+↳ /// A space sweep judges a job whose user lane came only from a dropped id on its own lane's volume: the setup of
+↳ /// `spaceSweepJudgesADroppedUserLaneAtItsPrefetchPlace` with 4 MB of important room and 12 MB of opportunistic room
+↳ /// after the reclaim. Visited first, C is prefetch work judged after K: K fits the important room, and C fits the
+↳ /// opportunistic room, so B is served. Judged at its pre-follow user place, C did not fit the important room and was
+↳ /// parked: B's prefetch waiter was answered `insufficientSpace` although C's own lane had room (the close-out cycle-8
+↳ /// correctness lens, PROBE-C8-DROPPED-LANE).
+✘ Suite "Engine runs" failed after 0.647 seconds with 5 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 3 tests in 1 suite failed after 0.647 seconds with 5 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

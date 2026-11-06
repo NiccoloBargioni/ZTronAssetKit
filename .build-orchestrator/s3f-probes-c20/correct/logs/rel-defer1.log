@@ -1,0 +1,37 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20Correct" started.
+◇ Test "PROBE-C20C-DEFER-BEHIND" started.
+◇ Test case passing 1 argument waits → true to "PROBE-C20C-DEFER-BEHIND" started.
+PROBE-C20C-DEFER-BEHIND waits=true count=10000 run 0: apply window 19.86 ms; longest follow turn 66.27 ms (thread CPU 63.31 ms); peak joins waiting for T 9728; t0 failure(ZTronAssetModel.AssetError.shutDown); violations []; turns [follow 11.44ms cpu 11.40ms E513->1025 H8976, follow 16.80ms cpu 13.37ms E1025->1537 H8464, follow 18.95ms cpu 17.57ms E1537->2049 H7952, follow 21.31ms cpu 17.36ms E2049->2561 H7440, follow 23.07ms cpu 20.14ms E2561->3073 H6928, follow 23.55ms cpu 23.35ms E3073->3585 H6416, follow 32.72ms cpu 28.92ms E3585->4097 H5904, follow 38.76ms cpu 33.14ms E4097->4609 H5392, follow 33.97ms cpu 31.80ms E4609->5121 H4880, follow 49.68ms cpu 42.75ms E5121->5633 H4368, follow 37.61ms cpu 37.29ms E5633->6145 H3856, follow 47.63ms cpu 43.54ms E6145->6657 H3344, follow 47.88ms cpu 44.87ms E6657->7169 H2832, follow 61.03ms cpu 53.73ms E7169->7681 H2320, follow 59.33ms cpu 52.07ms E7681->8193 H1808, follow 64.36ms cpu 54.21ms E8193->8705 H1296, follow 64.53ms cpu 58.22ms E8705->9217 H784, follow 66.27ms cpu 63.31ms E9217->9729 H272, follow 47.77ms cpu 40.95ms E9729->9489 H0, drain 4.34ms cpu 4.21ms E9489->8977 H0, drain 5.97ms cpu 5.04ms E8977->8465 H0, drain 6.30ms cpu 4.81ms E8465->7953 H0, drain 7.24ms cpu 6.23ms E7953->7441 H0, drain 5.19ms cpu 4.66ms E7441->6929 H0, drain 5.29ms cpu 4.62ms E6929->6417 H0, drain 5.44ms cpu 4.41ms E6417->5905 H0, drain 4.74ms cpu 4.60ms E5905->5393 H0, drain 6.62ms cpu 5.12ms E5393->4881 H0, drain 5.67ms cpu 5.43ms E4881->4369 H0, drain 3.99ms cpu 3.99ms E4369->3857 H0, drain 5.30ms cpu 5.30ms E3857->3345 H0, drain 4.07ms cpu 4.05ms E3345->2833 H0, drain 6.58ms cpu 4.94ms E2833->2321 H0, drain 7.06ms cpu 5.71ms E2321->1809 H0, drain 5.25ms cpu 4.73ms E1809->1297 H0, drain 5.98ms cpu 5.79ms E1297->785 H0, drain 8.33ms cpu 4.43ms E785->273 H0, drain 3.32ms cpu 2.92ms E273->0 H0]
+PROBE-C20C-DEFER-BEHIND waits=true count=10000: longest follow turn per run [66.267875] ms, best 66.267875 ms; thread CPU per run [63.312084] ms; stride 168 B; load { 1013.42 59.65 611.50 }
+✘ Test "PROBE-C20C-DEFER-BEHIND" recorded an issue with 1 argument waits → true at VerifyC20CorrectProbes.swift:208:9: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ PROBE-C20C-DEFER-BEHIND: every follow turn at most C2's 10 ms: [66.267875]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 66.267875
+◇ Test case passing 1 argument waits → false to "PROBE-C20C-DEFER-BEHIND" started.
+✘ Test "PROBE-C20C-DEFER-BEHIND" recorded an issue with 1 argument waits → false at VerifyC20CorrectProbes.swift:208:9: Expectation failed: (longest.min() ?? .infinity) <= 10.0
+↳ PROBE-C20C-DEFER-BEHIND: every follow turn at most C2's 10 ms: [14.372334]
+↳ (longest.min() ?? .infinity) <= 10.0 → false
+↳   (longest.min() ?? .infinity) → 14.372334
+PROBE-C20C-DEFER-BEHIND waits=false count=10000 run 0: apply window 17.37 ms; longest follow turn 14.37 ms (thread CPU 13.84 ms); peak joins waiting for T 0; t0 failure(ZTronAssetModel.AssetError.shutDown); violations []; turns [follow 10.73ms cpu 7.52ms E0->0 H8976, follow 6.05ms cpu 5.82ms E0->0 H8464, follow 7.05ms cpu 6.53ms E0->0 H7952, follow 5.44ms cpu 5.44ms E0->0 H7440, follow 7.36ms cpu 6.75ms E0->0 H6928, follow 5.89ms cpu 5.88ms E0->0 H6416, follow 6.68ms cpu 6.35ms E0->0 H5904, follow 8.14ms cpu 7.96ms E0->0 H5392, follow 8.57ms cpu 8.38ms E0->0 H4880, follow 8.73ms cpu 8.45ms E0->0 H4368, follow 3.97ms cpu 3.97ms E0->0 H3856, follow 5.74ms cpu 4.44ms E0->0 H3344, follow 4.61ms cpu 3.83ms E0->0 H2832, follow 5.45ms cpu 4.03ms E0->0 H2320, follow 7.00ms cpu 5.51ms E0->0 H1808, follow 4.90ms cpu 4.40ms E0->0 H1296, follow 4.98ms cpu 4.83ms E0->0 H784, follow 5.30ms cpu 3.85ms E0->0 H272, follow 14.37ms cpu 13.84ms E0->0 H0]
+PROBE-C20C-DEFER-BEHIND waits=false count=10000: longest follow turn per run [14.372334] ms, best 14.372334 ms; thread CPU per run [13.844125] ms; stride 168 B; load { 1013.42 59.65 611.50 }
+✘ Test "PROBE-C20C-DEFER-BEHIND" with 2 test cases failed after 2.320 seconds with 2 issues.
+✘ Suite "VerifyC20Correct" failed after 2.320 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 20, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C20C-DEFER-BEHIND: a follow's visit that moves ids onto a job whose exit verdict waits defers each join behind
+↳ /// that verdict (`deferBehindVerdict`), which scans the waiting events back to the verdict (`lastIndex`) and inserts the
+↳ /// join right after it (an O(E) shift), once per id: a turn of `followIDsPerTurn` ids costs O(ids x E), and E grows by
+↳ /// one per join deferred. Shape: T (zz-t0, zz-t1, 16 B, a user waiter each) downloads; H, `count` prefetch members of one
+↳ /// group sharing 16 B, downloads. v3 moves zz-t1 to a content of its own (T holds a moved id); T's attempt times out, so
+↳ /// its verdict waits (`waits`). v4 maps every H member to T's content: H's visit, over the follow's held turns, moves
+↳ /// 512 ids a turn onto T, each behind T's waiting verdict. Each held follow or drain turn is timed inside the actor.
+↳ /// The control (`waits == false`) leaves T downloading, so the same joins land on T in place.
+↳ ///
+↳ /// PROBE-C20C-DRAIN-BOUND-ALL: the cycle-19 PROBE-C19C-DRAIN-BOUND shape, with the drain's follow-up turns held and
+↳ /// counted as well as the follow's (the cycle-19 probe counted the follow's turns and the drain turn only).
+✘ Test run with 1 test in 1 suite failed after 2.321 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

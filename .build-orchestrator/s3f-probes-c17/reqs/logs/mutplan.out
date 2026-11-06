@@ -1,0 +1,170 @@
+PLAN START 03:59:17
+retryAfterDrop: build rc=0 (4 s) load=3.8
+  run1 rc=1 load=13.5 ✘ Test run with 4 tests in 3 suites failed after 19.717 seconds with 10 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "PROBE-C16R-RR11-RETRY-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16ReqsProbes.swift:186:9: Expectation failed: after429.throttled
+    ✘ Test "PROBE-C16R-RR11-RETRY-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16ReqsProbes.swift:187:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(jBytes.count)
+    ✘ Test "PROBE-C16C-RR11-RETRY-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:694:9: Expectation failed: throttle != nil
+    ✘ Test "PROBE-C16C-RR11-RETRY-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:695:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ =
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get()
+  run2 rc=1 load=23.6 ✘ Test run with 4 tests in 3 suites failed after 23.942 seconds with 10 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "PROBE-C16R-RR11-RETRY-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16ReqsProbes.swift:186:9: Expectation failed: after429.throttled
+    ✘ Test "PROBE-C16R-RR11-RETRY-AFTER" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16ReqsProbes.swift:187:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(jBytes.count)
+    ✘ Test "PROBE-C16C-RR11-RETRY-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:694:9: Expectation failed: throttle != nil
+    ✘ Test "PROBE-C16C-RR11-RETRY-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:695:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ =
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get()
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+throttleFailFastDrop: build rc=0 (9 s) load=27.5
+  run1 rc=1 load=41.4 ✘ Test run with 3 tests in 2 suites failed after 29.130 seconds with 5 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:764:9: Expectation failed: after != before
+    ✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:765:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.
+  run2 rc=1 load=45.0 ✘ Test run with 3 tests in 2 suites failed after 22.556 seconds with 5 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:764:9: Expectation failed: after != before
+    ✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:765:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+offlineFailFastDrop: build rc=0 (5 s) load=44.7
+  run1 rc=1 load=42.1 ✘ Test run with 2 tests in 1 suite failed after 18.075 seconds with 5 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.ke
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize 
+  run2 rc=1 load=39.6 ✘ Test run with 2 tests in 1 suite failed after 13.971 seconds with 5 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.ke
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize 
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+spaceOriginal: build rc=0 (5 s) load=38.6
+  run1 rc=1 load=34.6 ✘ Test run with 2 tests in 1 suite failed after 13.918 seconds with 7 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == 
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?
+  run2 rc=1 load=31.2 ✘ Test run with 2 tests in 1 suite failed after 14.557 seconds with 7 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == 
+    ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+takeOffDrop: build rc=0 (6 s) load=32.1
+  run1 rc=1 load=32.7 ✘ Test run with 3 tests in 2 suites failed after 6.792 seconds with 3 issues.
+    ✘ Test "PROBE-C16C-VERDICT-MAPPED-BACK" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:620:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(cBytes.count)
+    ✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict at EngineFollowBarrierHopTests.swift:149:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_00
+    ✘ Test "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierHopTests.swift:161:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_000
+  run2 rc=1 load=33.0 ✘ Test run with 3 tests in 2 suites failed after 7.599 seconds with 3 issues.
+    ✘ Test "PROBE-C16C-VERDICT-MAPPED-BACK" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:620:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(cBytes.count)
+    ✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict at EngineFollowBarrierHopTests.swift:149:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_00
+    ✘ Test "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierHopTests.swift:161:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_000
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD; copy Sources vs worktree diff rc=0
+rule3Drop: build rc=0 (8 s) load=32.5
+  run1 rc=1 load=31.2 ✘ Test run with 3 tests in 2 suites failed after 5.045 seconds with 1 issue.
+    ✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict at EngineFollowBarrierHopTests.swift:149:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_0
+  run2 rc=1 load=27.8 ✘ Test run with 3 tests in 2 suites failed after 4.828 seconds with 1 issue.
+    ✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict at EngineFollowBarrierHopTests.swift:149:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_0
+  reverted: Sources/ZTronAssetSync/Engine/EngineJobs.swift == HEAD; copy Sources vs worktree diff rc=0
+bringInboundDrop: build rc=0 (4 s) load=26.2
+  run1 rc=1 load=24.7 ✘ Test run with 3 tests in 2 suites failed after 4.870 seconds with 5 issues.
+    ✘ Test "PROBE-C16C-INTERMEDIATE-HOP" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:838:9: Expectation failed: bResult == .failure(.notFound)
+    ✘ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:897:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierHopTests.swift:298:13: Expectation failed: outc
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .published at EngineFollowBarrierHopTests.swift:301:13: Expectation failed: (tr
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+  run2 rc=1 load=21.9 ✘ Test run with 3 tests in 2 suites failed after 4.861 seconds with 5 issues.
+    ✘ Test "PROBE-C16C-INTERMEDIATE-HOP" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:838:9: Expectation failed: bResult == .failure(.notFound)
+    ✘ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:897:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierHopTests.swift:298:13: Expectation failed: outc
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .published at EngineFollowBarrierHopTests.swift:301:13: Expectation failed: (tr
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD; copy Sources vs worktree diff rc=0
+startEndResetDrop: build rc=0 (4 s) load=21.5
+  run1 rc=1 load=21.5 ✘ Test run with 1 test in 1 suite failed after 0.401 seconds with 1 issue.
+    ✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:228:9: Expectation failed: violations.isEmpty
+  run2 rc=1 load=20.2 ✘ Test run with 1 test in 1 suite failed after 0.402 seconds with 1 issue.
+    ✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:228:9: Expectation failed: violations.isEmpty
+  reverted: Sources/ZTronAssetSync/Engine/EngineDispatch.swift == HEAD; copy Sources vs worktree diff rc=0
+startRerouteResetDrop: build rc=0 (6 s) load=21.3
+  run1 rc=1 load=24.6 ✘ Test run with 1 test in 1 suite failed after 0.518 seconds with 1 issue.
+    ✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:228:9: Expectation failed: violations.isEmpty
+  run2 rc=1 load=24.6 ✘ Test run with 1 test in 1 suite failed after 0.437 seconds with 1 issue.
+    ✘ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" recorded an issue at EngineFollowBarrierWindowTests.swift:228:9: Expectation failed: violations.isEmpty
+  reverted: Sources/ZTronAssetSync/Engine/EngineDispatch.swift == HEAD; copy Sources vs worktree diff rc=0
+vaKeptLane: build rc=0 (5 s) load=27.0
+  run1 rc=1 load=23.4 ✘ Test run with 2 tests in 1 suite failed after 11.490 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+  run2 rc=1 load=25.0 ✘ Test run with 2 tests in 1 suite failed after 12.720 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+    ✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+flMovedBeforeDrop: build rc=0 (5 s) load=23.5
+  run1 rc=1 load=21.0 ✘ Test run with 2 tests in 1 suite failed after 16.222 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a 429 counts the interest the drain takes off a waiting verdict's job and re-routes onto it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMovedBeforeTests.swift:230:9: Expectation failed: outcome.after == nil
+    ✘ Test "R-SYN-5: a 429 counts the interest the drain takes off a waiting verdict's job and re-routes onto it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+  run2 rc=1 load=28.3 ✘ Test run with 2 tests in 1 suite failed after 21.885 seconds with 2 issues.
+    ✘ Test "R-SYN-5: a 429 counts the interest the drain takes off a waiting verdict's job and re-routes onto it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMovedBeforeTests.swift:230:9: Expectation failed: outcome.after == nil
+    ✘ Test "R-SYN-5: a 429 counts the interest the drain takes off a waiting verdict's job and re-routes onto it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+relaneGuardRevert: build rc=0 (6 s) load=28.9
+  run1 rc=1 load=32.2 ✘ Test run with 1 test in 1 suite failed after 5.519 seconds with 1 issue.
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+  run2 rc=1 load=31.3 ✘ Test run with 1 test in 1 suite failed after 6.374 seconds with 1 issue.
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+  reverted: Sources/ZTronAssetSync/Engine/EngineJobs.swift == HEAD; copy Sources vs worktree diff rc=0
+deferralFollowOwedDrop: build rc=0 (6 s) load=32.8
+  run1 rc=1 load=34.8 ✘ Test run with 1 test in 1 suite failed after 0.939 seconds with 2 issues.
+    ✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:104:9: Expectation failed: afterVerdict.xHoldsU && afterVerdict.uWaits
+    ✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:110:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(xBytes.c
+  run2 rc=1 load=38.6 ✘ Test run with 1 test in 1 suite failed after 1.396 seconds with 2 issues.
+    ✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:104:9: Expectation failed: afterVerdict.xHoldsU && afterVerdict.uWaits
+    ✘ Test "R-CAR-2: an id admitted from a newer manifest stays on its job through a verdict that waits for the drain (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:110:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(xBytes.c
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD; copy Sources vs worktree diff rc=0
+publishBringInboundDrop: build rc=0 (6 s) load=40.4
+  run1 rc=1 load=45.3 ✘ Test run with 2 tests in 2 suites failed after 7.497 seconds with 2 issues.
+    ✘ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:897:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .published at EngineFollowBarrierHopTests.swift:301:13: Expectation failed: (tr
+  run2 rc=1 load=54.6 ✘ Test run with 2 tests in 2 suites failed after 11.538 seconds with 2 issues.
+    ✘ Test "PROBE-C16C-INTERMEDIATE-HOP-SERVED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:897:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .published at EngineFollowBarrierHopTests.swift:301:13: Expectation failed: (tr
+  reverted: Sources/ZTronAssetSync/Engine/EngineDispatch.swift == HEAD; copy Sources vs worktree diff rc=0
+spaceBringInboundDrop: build rc=0 (6 s) load=57.5
+  run1 rc=1 load=56.3 ✘ Test run with 1 test in 1 suite failed after 4.982 seconds with 1 issue.
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+  run2 rc=1 load=52.6 ✘ Test run with 1 test in 1 suite failed after 4.790 seconds with 1 issue.
+    ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierHopTests.swift:30:25: Issue recorded
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+vaStampDrop: build rc=0 (4 s) load=49.3
+  run1 rc=0 load=22.0 ✔ Test run with 116 tests in 1 suite passed after 157.445 seconds.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFailures.swift == HEAD; copy Sources vs worktree diff rc=0
+bringInboundStampDrop: build rc=0 (6 s) load=22.2
+  run1 rc=0 load=29.9 ✔ Test run with 116 tests in 1 suite passed after 180.811 seconds.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD; copy Sources vs worktree diff rc=0
+takeOffAssetsKeep: build rc=0 (6 s) load=30.4
+  run1 rc=0 load=15.8 ✔ Test run with 116 tests in 1 suite passed after 134.120 seconds.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD; copy Sources vs worktree diff rc=0
+rerouteOnPassKeepWhole: build rc=0 (4 s) load=15.0
+  run1 rc=0 load=6.2 ✔ Test run with 116 tests in 1 suite passed after 103.562 seconds.
+  reverted: Sources/ZTronAssetSync/Engine/EngineFollow.swift == HEAD; copy Sources vs worktree diff rc=0
+PLAN DONE 04:17:15

@@ -1,0 +1,38 @@
+[07:11:01 load { 28.73 66.38 80.86 }] build head
+[07:14:02 load { 54.01 59.10 74.75 }] build head exit 0
+[07:14:11 load { 54.65 59.15 74.68 }] test head run1 exit 0
+[07:14:19 load { 56.26 59.33 74.56 }] test head run2 exit 0
+[07:14:27 load { 56.40 59.31 74.46 }] test head run3 exit 0
+[07:14:34 load { 58.33 59.63 74.40 }] test head run4 exit 0
+[07:14:41 load { 57.98 59.53 74.28 }] test head run5 exit 0
+[07:14:41 load { 57.98 59.53 74.28 }] build prefixC6
+[07:15:13 load { 52.96 58.18 73.19 }] build prefixC6 exit 0
+[07:15:18 load { 51.44 57.77 72.96 }] test prefixC6 run1 exit 1
+[07:15:22 load { 50.92 57.56 72.80 }] test prefixC6 run2 exit 1
+[07:15:22 load { 50.92 57.56 72.80 }] build skipNotFit
+[07:15:35 load { 45.77 56.23 72.15 }] build skipNotFit exit 0
+[07:15:38 load { 43.55 55.59 71.83 }] test skipNotFit run1 exit 1
+[07:15:41 load { 43.55 55.59 71.83 }] test skipNotFit run2 exit 1
+[07:15:44 load { 40.46 54.75 71.44 }] test skipNotFit run3 exit 1
+[07:15:47 load { 37.70 53.94 71.05 }] test skipNotFit run4 exit 1
+[07:15:47 load { 37.70 53.94 71.05 }] build requeueNoAhead
+[07:15:51 load { 37.70 53.94 71.05 }] build requeueNoAhead exit 0
+[07:15:54 load { 35.08 53.13 70.67 }] test requeueNoAhead run1 exit 1
+[07:15:58 load { 34.19 52.65 70.39 }] test requeueNoAhead run2 exit 1
+[07:16:01 load { 34.19 52.65 70.39 }] test requeueNoAhead run3 exit 1
+[07:16:04 load { 32.10 51.91 70.03 }] test requeueNoAhead run4 exit 1
+[07:16:04 load { 32.10 51.91 70.03 }] build noLaneRejudge
+[07:16:08 load { 29.93 51.13 69.64 }] build noLaneRejudge exit 0
+[07:16:12 load { 29.93 51.13 69.64 }] test noLaneRejudge run1 exit 1
+[07:16:15 load { 27.85 50.34 69.26 }] test noLaneRejudge run2 exit 1
+[07:16:15 load { 27.85 50.34 69.26 }] build gainNoAhead
+[07:16:18 load { 26.10 49.61 68.89 }] build gainNoAhead exit 0
+[07:16:22 load { 26.10 49.61 68.89 }] test gainNoAhead run1 exit 0
+[07:16:24 load { 24.49 48.88 68.52 }] test gainNoAhead run2 exit 0
+[07:16:43 load { 26.54 47.77 67.66 }] sync bundle gainNoAhead exit 0
+[07:16:43 load { 26.54 47.77 67.66 }] build gainNoBound
+[07:16:48 load { 25.94 47.29 67.38 }] build gainNoBound exit 0
+[07:16:52 load { 25.94 47.29 67.38 }] test gainNoBound run1 exit 0
+[07:16:55 load { 24.26 46.59 67.01 }] test gainNoBound run2 exit 0
+[07:17:13 load { 23.10 44.88 65.93 }] sync bundle gainNoBound exit 0
+[07:17:13 load { 23.10 44.88 65.93 }] DONE

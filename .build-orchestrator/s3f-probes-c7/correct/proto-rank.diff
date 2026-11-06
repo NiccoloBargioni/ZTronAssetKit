@@ -1,0 +1,113 @@
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -725,7 +725,24 @@
+         var parks = 0
+         var follows = 0
+         var waiting = false
+-        for candidate in candidates {
++        // PROTOTYPE (verifier, cycle 7): jobs whose follow in this turn lowered their rank wait for their new place in the
++        // pump's order (at most `followsPerTurn` of them).
++        var demoted: [(rank: Int, ticket: UInt64, transfer: TransferID)] = []
++        var rePlaced: Set<TransferID> = []
++        var next = 0
++        while true {
++            let candidate: (rank: Int, ticket: UInt64, transfer: TransferID)
++            if let first = demoted.first, next >= candidates.count || (first.rank, first.ticket) < (candidates[next].rank, candidates[next].ticket) {
++                candidate = demoted.removeFirst()
++            } else if next < candidates.count {
++                candidate = candidates[next]
++                next += 1
++                if rePlaced.contains(candidate.transfer) {
++                    continue
++                }
++            } else {
++                break
++            }
+             if let room, smallest > room.subtractingClamped(ahead) {
+                 break
+             }
+@@ -739,11 +756,14 @@
+                     self.scheduleSpaceSweepFollowUp(sweep)
+                     break
+                 }
++                let targets = self.movedTargets(of: job)
+                 if self.followBeforeActing(transfer) {
+                     // Superseded: the ids went to their new content's jobs, which the gate admits on their own.
++                    self.rePlaceTargets(targets, sweep: sweep, into: &demoted, rePlaced: &rePlaced)
+                     requeues += 1
+                     continue
+                 }
++                self.rePlaceTargets(targets, sweep: sweep, into: &demoted, rePlaced: &rePlaced)
+                 // A follow that kept some ids may have lowered the job's lane (the moved interests may have set it),
+                 // and with it the volume the verdict read: the job is judged again before it is re-queued and its bytes
+                 // counted ahead of the jobs behind it (PROBE-C5-LANEDROP). Without a follow it is the same job.
+@@ -751,6 +771,9 @@
+                     continue
+                 }
+                 job = followed
++                if self.demoteSwept(job, below: candidate.rank, into: &demoted) {
++                    continue
++                }
+                 verdict = self.spaceBlock(job, ahead: ahead)
+             }
+             guard let block = verdict else {
+@@ -775,10 +798,16 @@
+             }
+             // The ids that left this content leave before its fail-fast answers the rest; a job that keeps some is read
+             // again, since the moved interests may have set its lane (and so the volume its verdict and figures read).
++            let targets = self.movedTargets(of: job)
+             guard !self.followBeforeActing(transfer), let parked = self.state.jobs[transfer] else {
++                self.rePlaceTargets(targets, sweep: sweep, into: &demoted, rePlaced: &rePlaced)
+                 parks += 1
+                 continue
+             }
++            self.rePlaceTargets(targets, sweep: sweep, into: &demoted, rePlaced: &rePlaced)
++            if self.demoteSwept(parked, below: candidate.rank, into: &demoted) {
++                continue
++            }
+             if self.spaceBlock(parked, ahead: ahead) == nil {
+                 // The lane the follow left reads the other volume, and the two readings are not ordered: a lowered lane
+                 // may read the larger room. A job that fits there is re-queued as an admitted one is, never parked with
+@@ -817,9 +846,42 @@
+         }
+         if requeues > 0 {
+             self.pump()
++        }
++    }
++
++    /// PROTOTYPE (verifier, cycle 7): the transfers the copy lists a job's moved ids at (the jobs its follow joins).
++    private func movedTargets(of job: Job) -> [TransferID] {
++        guard self.holdsMovedID(job) else {
++            return []
+         }
++        return job.assets.compactMap { self.state.applied.entry(for: $0)?.transferID }.filter { $0 != job.transfer }
+     }
+ 
++    /// PROTOTYPE (verifier, cycle 7): a parked job a follow joined (its rank may have fallen: its lane rose) is judged at
++    /// its place after the follow; its earlier place in the sorted candidates is skipped.
++    private func rePlaceTargets(_ targets: [TransferID], sweep: SpaceSweep, into demoted: inout [(rank: Int, ticket: UInt64, transfer: TransferID)], rePlaced: inout Set<TransferID>) {
++        for target in targets {
++            guard let job = self.state.jobs[target], case .blocked(let reason) = job.state, reason == .insufficientSpace || (reason == .awaitingSpace && sweep != .read) else {
++                continue
++            }
++            let rank = self.queueRank(job)
++            let index = demoted.firstIndex { ($0.rank, $0.ticket) > (rank, job.ticket) } ?? demoted.count
++            demoted.insert((rank: rank, ticket: job.ticket, transfer: target), at: index)
++            rePlaced.insert(target)
++        }
++    }
++
++    /// PROTOTYPE (verifier, cycle 7): a followed job whose rank rose (its lane fell) is judged at its new place.
++    private func demoteSwept(_ job: Job, below rank: Int, into demoted: inout [(rank: Int, ticket: UInt64, transfer: TransferID)]) -> Bool {
++        let newRank = self.queueRank(job)
++        guard newRank > rank else {
++            return false
++        }
++        let index = demoted.firstIndex { ($0.rank, $0.ticket) > (newRank, job.ticket) } ?? demoted.count
++        demoted.insert((rank: newRank, ticket: job.ticket, transfer: job.transfer), at: index)
++        return true
++    }
++
+     /// Re-queues a parked job the space sweep admitted, counts its bytes `ahead` of the jobs the sweep judges after it
+     /// (the gate counts them in flight once it starts), and records it in `spaceAdmitted` so later sweeps count it too
+     /// while it waits in the queue. `false` when the job could not leave its park (no transition to `.queued`).

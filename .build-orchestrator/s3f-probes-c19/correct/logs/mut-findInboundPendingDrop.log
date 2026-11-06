@@ -1,0 +1,6 @@
+mutant findInboundPendingDrop start 22:03:28 load { 42.23 32.28 40.61 }
+occurrences 1
+build exit 0 Build complete! (4,16 s) 22:03:34 load { 43.17 32.64 40.69 }
+run 1 exit 1 ✘ Test run with 1 test in 1 suite failed after 11.493 seconds with 1 issue. 22:03:49 load { 39.58 32.36 40.45 }
+run 2 exit 1 ✘ Test run with 1 test in 1 suite failed after 11.578 seconds with 1 issue. 22:04:03 load { 37.40 32.23 40.26 }
+restored identical

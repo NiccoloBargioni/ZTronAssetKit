@@ -1,0 +1,26 @@
+PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2 warm-up 1,000: applyWait 4.43 turnsWait 3.51 turns 3 max 3.52 top ["#0=3.52 ms (E 1)", "#1=3.39 ms (E 489)", "#2=2.50 ms (E 0)"] maxE 489 joinsAtFollowEnd 489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 5.78 50.37 133.82
+PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2 10,000 run 0: applyWait 7.63 turnsWait 9.08 turns 38 max 6.44 top ["#18=6.44 ms (E 9489)", "#1=4.12 ms (E 1)", "#6=3.87 ms (E 1)"] maxE 9489 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 5.78 50.37 133.82 -> 5.78 50.37 133.82
+PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2 10,000 run 1: applyWait 8.18 turnsWait 9.98 turns 38 max 6.61 top ["#18=6.61 ms (E 9489)", "#2=4.35 ms (E 1)", "#5=4.13 ms (E 1)"] maxE 9489 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 5.78 50.37 133.82 -> 5.78 50.37 133.82
+PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2 10,000 run 2: applyWait 7.72 turnsWait 9.57 turns 38 max 6.63 top ["#18=6.63 ms (E 9489)", "#1=4.36 ms (E 1)", "#3=4.31 ms (E 1)"] maxE 9489 joinsAtFollowEnd 9489 verdictWaited true answer failure(ZTronAssetModel.AssetError.notFound) load 5.78 50.37 133.82 -> 5.78 50.37 133.82
+PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2 best heartbeat 9.082958 ms, best longest held turn 6.437 ms (c2Budget 10.0)
+✘ Test "PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2" recorded an issue at VerifyC21CorrectReqsC20Shapes.swift:363:13: Expectation failed: runs.allSatisfy { $0.verdictWaited && $0.joinsAtFollowEnd >= 10_000 }
+✘ Test "PROBE-C21C-C20RSHAPE-DEFER-BEHIND-C2" failed after 1.760 seconds with 1 issue.
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users false 10,000 moved 500 run 0: (wait: 6.871334, before: 10000, interests: 1, onO: 501, onH: 9500) load 5.78 50.37 133.82 -> 5.78 50.37 133.82
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users false 10,000 moved 500 run 1: (wait: 6.536625, before: 10000, interests: 1, onO: 501, onH: 9500) load 5.78 50.37 133.82 -> 5.78 50.37 133.82
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users false 10,000 moved 500 run 2: (wait: 8.161084, before: 10000, interests: 1, onO: 501, onH: 9500) load 5.78 50.37 133.82 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users false: waits [6.871334, 6.536625, 8.161084] best 6.536625 ms (c2Budget 10.0)
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users true 10,000 moved 500 run 0: (wait: 7.712875, before: 10000, interests: 10000, onO: 501, onH: 9500) load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users true 10,000 moved 500 run 1: (wait: 7.463542, before: 10000, interests: 10000, onO: 501, onH: 9500) load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users true 10,000 moved 500 run 2: (wait: 7.442875, before: 10000, interests: 10000, onO: 501, onH: 9500) load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2 users true: waits [7.712875, 7.463542, 7.442875] best 7.442875 ms (c2Budget 10.0)
+✔ Test "PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-C2" with 2 test cases passed after 2.068 seconds.
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users false 10,000 moved 500 run 0: applyWait 6.60 ms, 0 held turns, top [], onO 501 onH 9500 load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users false 10,000 moved 500 run 1: applyWait 6.51 ms, 0 held turns, top [], onO 501 onH 9500 load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users false 10,000 moved 500 run 2: applyWait 7.35 ms, 0 held turns, top [], onO 501 onH 9500 load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users false: longest [6.604583, 6.50825, 7.346417] best 6.50825 ms (c2Budget 10.0)
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users true 10,000 moved 500 run 0: applyWait 7.90 ms, 0 held turns, top [], onO 501 onH 9500 load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users true 10,000 moved 500 run 1: applyWait 7.25 ms, 0 held turns, top [], onO 501 onH 9500 load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users true 10,000 moved 500 run 2: applyWait 7.19 ms, 0 held turns, top [], onO 501 onH 9500 load 6.28 49.73 133.11 -> 6.28 49.73 133.11
+PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS users true: longest [7.902916, 7.248667, 7.188459] best 7.188459 ms (c2Budget 10.0)
+✔ Test "PROBE-C21C-C20RSHAPE-PARTIAL-MOVE-TURNS" with 2 test cases passed after 1.765 seconds.
+✘ Test run with 3 tests in 2 suites failed after 5.594 seconds with 1 issue.

@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift b/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift
+index c7f0bd6..7e0bdf0 100644
+--- a/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift
++++ b/Sources/ZTronAssetTransport/Policy/TransportSecurity.swift
+@@ -123,7 +123,7 @@ public enum RedirectPolicy {
+         keyStillPresent: Bool,
+         policy: TransportSecurityPolicy
+     ) -> Decision {
+-        guard hop <= policy.maxRedirects else {
++        guard hop < policy.maxRedirects else {
+             return .refuse(.tooManyRedirects)
+         }
+         guard let proposed else {

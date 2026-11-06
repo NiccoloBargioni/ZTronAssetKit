@@ -1,0 +1,5 @@
+✔ Test run with 104 tests in 14 suites passed after 0.925 seconds.
+::: OK   tests
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+exit 0

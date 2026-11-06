@@ -1,0 +1,453 @@
+ZTronAssetKit/Facade/AssetClient.swift:119-119 | throw .shutDown
+ZTronAssetKit/Facade/AssetClient.swift:142-142 | core = await lifecycle.current()
+ZTronAssetKit/Facade/AssetClient.swift:148-149 | // The root vanished again after every reopen allowed: the failure is reported, never a lease under it. / throw .storageUnavailable(.rootVanished)
+ZTronAssetKit/Facade/AssetClient.swift:396-396 | return .failure(.shutDown)
+ZTronAssetKit/Facade/ClientLifecycle.swift:177-177 | return nil
+ZTronAssetKit/Facade/ClientLifecycle.swift:185-185 | return self.core
+ZTronAssetKit/Facade/ClientLifecycle.swift:216-216 | return self.endReopen(nil)
+ZTronAssetKit/Facade/ClientLifecycle.swift:246-248 | self.followers[key] = nil / self.followerObserver?(self.followers.count, self.lastFollower) / continue
+ZTronAssetKit/Facade/ClientLifecycle.swift:253-253 | continue
+ZTronAssetKit/Facade/ClientLifecycle.swift:344-345 | self.unfollow(key) / return .failure(error)
+ZTronAssetKit/Facade/ClientLifecycle.swift:417-417 | return .failure(.shutDown)
+ZTronAssetKit/Facade/ClientLifecycle.swift:425-425 | return result
+ZTronAssetKit/Facade/ClientLifecycle.swift:432-432 | }
+ZTronAssetKit/Facade/ClientLifecycle.swift:508-509 | self.groups.removeValue(forKey: token) / return .failure(.shutDown)
+ZTronAssetKit/Facade/ClientLifecycle.swift:512-512 | return .success(token)
+ZTronAssetKit/Facade/ClientLifecycle.swift:515-515 | return .success(token)
+ZTronAssetKit/Facade/ClientLifecycle.swift:543-543 | continue
+ZTronAssetKit/Facade/ClientLifecycle.swift:549-549 | }
+ZTronAssetKit/Facade/EventForwarder.swift:240-240 | return
+ZTronAssetKit/Fallback/FallbackChain.swift:63-64 | let key = BundleResourceKey(name: url.deletingPathExtension().lastPathComponent, fileExtension: fileExtension) / result[key] = url
+ZTronAssetKit/Observability/DiagnosticReportBuilder.swift:100-100 | return "<unparseable>"
+ZTronAssetStorage/Blobs/BlobUnits.swift:121-121 | try fileSystem.rename(from: source, to: destination, mode: .replacing)
+ZTronAssetStorage/Blobs/BlobUnits.swift:132-132 | return false
+ZTronAssetStorage/Cleanup/CleanupUnits.swift:23-23 | return .success([])
+ZTronAssetStorage/Cleanup/CleanupUnits.swift:39-39 | break
+ZTronAssetStorage/Cleanup/CleanupUnits.swift:97-97 | throw .cancelled
+ZTronAssetStorage/Cleanup/OrphanCollection.swift:59-59 | return CleanupResult()
+ZTronAssetStorage/Cleanup/OrphanCollection.swift:73-73 | break
+ZTronAssetStorage/Cleanup/OrphanCollection.swift:146-146 | return nil
+ZTronAssetStorage/Cleanup/OrphanCollection.swift:158-158 | return nil
+ZTronAssetStorage/Cleanup/StagingCollection.swift:12-12 | throw .notOpen
+ZTronAssetStorage/Cleanup/StagingCollection.swift:64-64 | return false
+ZTronAssetStorage/Cleanup/StorageReporting.swift:41-41 | break
+ZTronAssetStorage/Cleanup/StorageReporting.swift:67-67 | return 0
+ZTronAssetStorage/Cleanup/StorageReporting.swift:76-76 | return 0
+ZTronAssetStorage/Cleanup/StorageReporting.swift:114-114 | continue
+ZTronAssetStorage/Cleanup/StorePurge.swift:124-124 | continue
+ZTronAssetStorage/Eviction/EvictionOrder.swift:375-375 | return 0
+ZTronAssetStorage/Eviction/EvictionOrder.swift:386-386 | return other > 0 ? .max : .min
+ZTronAssetStorage/Eviction/QuotaEviction.swift:228-228 | return []
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:23-29 | public func standardDirectory(_ directory: StandardDirectory) throws(FileSystemError) -> URL { / do { / return try FileManager.default.url(for: LiveFileSystem.searchPath(directory), in: .userDomainMask, appropriateFor: n
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:159-159 | throw FileSystemErrorMapping.cocoa(error)
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:203-203 | return
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:244-246 | let code = errno / _ = close(descriptor) / throw FileSystemErrorMapping.posix(code)
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:252-253 | _ = close(descriptor) / throw error
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:302-303 | throw FileSystemErrorMapping.cocoa(error) / }
+ZTronAssetStorage/FileSystem/LiveFileSystem.swift:317-318 | let fallback = fsync(descriptor) / return (fallback, fallback == 0 ? 0 : errno)
+ZTronAssetStorage/Index/IndexBytes.swift:172-172 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:72-73 | return nil / }
+ZTronAssetStorage/Index/IndexCodec.swift:122-122 | return nil
+ZTronAssetStorage/Index/IndexCodec.swift:441-441 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:479-479 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:512-512 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:544-544 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:597-597 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:634-634 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:648-648 | break
+ZTronAssetStorage/Index/IndexCodec.swift:654-654 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:657-657 | throw .malformed
+ZTronAssetStorage/Index/IndexCodec.swift:857-857 | return index
+ZTronAssetStorage/Index/IndexCommitUnit.swift:160-160 | return outcome
+ZTronAssetStorage/Integrity/DeepVerification.swift:113-114 | return .unknown / }
+ZTronAssetStorage/Integrity/DeepVerification.swift:151-151 | continue
+ZTronAssetStorage/Integrity/IntegrityBookkeeping.swift:49-49 | continue
+ZTronAssetStorage/Migration/LegacyPhases.swift:18-18 | return false
+ZTronAssetStorage/Migration/LegacyPhases.swift:126-128 | throw .closed / } catch .notOpen { / throw .notOpen
+ZTronAssetStorage/Migration/LegacyPhases.swift:205-205 | return false
+ZTronAssetStorage/Migration/LegacyPhases.swift:209-209 | return false
+ZTronAssetStorage/Migration/LegacyPhases.swift:226-226 | return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
+ZTronAssetStorage/Migration/LegacyPhases.swift:267-267 | return self.legacyAdopted(file) ? .alreadyAdopted : .dropped
+ZTronAssetStorage/Migration/LegacyPhases.swift:283-284 | continuation.resume() / }
+ZTronAssetStorage/Migration/LegacyPhases.swift:294-294 | return
+ZTronAssetStorage/Migration/LegacyPhases.swift:358-358 | return nothing
+ZTronAssetStorage/Migration/LegacyPhases.swift:611-611 | return location
+ZTronAssetStorage/Migration/LegacyPhases.swift:623-623 | return nil
+ZTronAssetStorage/Migration/LegacyPhases.swift:656-656 | }
+ZTronAssetStorage/Migration/LegacyPhases.swift:703-704 | continuation.resume() / }
+ZTronAssetStorage/Migration/LegacyPhases.swift:712-712 | return
+ZTronAssetStorage/Migration/LegacyPhases.swift:850-850 | return false
+ZTronAssetStorage/Migration/LegacyPlacement.swift:29-31 | continue / _ = components.popLast()
+ZTronAssetStorage/Migration/LegacyPlacement.swift:71-71 | return true
+ZTronAssetStorage/Migration/LegacyPlacement.swift:85-85 | return true
+ZTronAssetStorage/Migration/LegacyPlacement.swift:119-119 | continue
+ZTronAssetStorage/Migration/LegacyUnits.swift:262-262 | throw .cancelled
+ZTronAssetStorage/Migration/LegacyUnits.swift:273-273 | throw .cancelled
+ZTronAssetStorage/Migration/LegacyUnits.swift:293-293 | return true
+ZTronAssetStorage/Migration/LiveLegacyDefaults.swift:19-21 | public func string(forKey key: String) -> String? { / self.defaults.string(forKey: key) / }
+ZTronAssetStorage/Migration/LiveLegacyDefaults.swift:24-30 | public func removeValue(forKey key: String) { / self.defaults.removeObject(forKey: key) / } / private var defaults: UserDefaults { / self.suiteName.flatMap { UserDefaults(suiteName: $0) } ?? .standard / }
+ZTronAssetStorage/Staging/StoreStagingSink.swift:72-72 | return
+ZTronAssetStorage/Staging/StoreStagingSink.swift:123-124 | throw FileSystemErrorMapping.stagingError(error) / }
+ZTronAssetStorage/Staging/StoreStagingSink.swift:127-127 | break
+ZTronAssetStorage/Staging/StoreStagingSink.swift:131-131 | throw .tooLarge(limit: maxBytes)
+ZTronAssetStorage/Staging/StoreStagingSink.swift:176-176 | throw FileSystemErrorMapping.stagingError(error)
+ZTronAssetStorage/Staging/StoreStagingSink.swift:206-206 | }
+ZTronAssetStorage/Staging/StoreStagingSink.swift:232-232 | throw .notFound
+ZTronAssetStorage/Store/ApplyPlan.swift:35-35 | continue
+ZTronAssetStorage/Store/AssetRecord+Derived.swift:29-29 | return false
+ZTronAssetStorage/Store/AssetStore+Apply.swift:184-185 | } / }
+ZTronAssetStorage/Store/AssetStore+Apply.swift:206-210 | if let blob = previous.referencedBlob { / self.releaseReference(blob, dooming: .unreferenced) / } / self.refreshPresentEntry(id) / }
+ZTronAssetStorage/Store/AssetStore+Apply.swift:213-215 | self.insertRecord(for: entry, now: now) / report.added.append(id) / }
+ZTronAssetStorage/Store/AssetStore+Apply.swift:263-264 | self.releaseReference(previous, dooming: .unreferenced) / }
+ZTronAssetStorage/Store/AssetStore+Apply.swift:278-279 | self.insertRecord(for: entry, now: now) / return
+ZTronAssetStorage/Store/AssetStore+Apply.swift:310-310 | return false
+ZTronAssetStorage/Store/AssetStore+Apply.swift:315-315 | return false
+ZTronAssetStorage/Store/AssetStore+Apply.swift:331-331 | return false
+ZTronAssetStorage/Store/AssetStore+Apply.swift:345-346 | self.releaseReference(previous, dooming: .unreferenced) / }
+ZTronAssetStorage/Store/AssetStore+Commit.swift:89-89 | throw .notOpen
+ZTronAssetStorage/Store/AssetStore+Commit.swift:210-210 | return "storeError"
+ZTronAssetStorage/Store/AssetStore+Lifecycle.swift:22-22 | throw .notOpen
+ZTronAssetStorage/Store/AssetStore+Lifecycle.swift:51-51 | }
+ZTronAssetStorage/Store/AssetStore+Lifecycle.swift:190-190 | }
+ZTronAssetStorage/Store/AssetStore+Lifecycle.swift:196-196 | self.resumeKeyWaiters(key)
+ZTronAssetStorage/Store/AssetStore+Lifecycle.swift:238-238 | self.resumeKeyWaiters(key)
+ZTronAssetStorage/Store/AssetStore+Open.swift:209-210 | return .failure(.fileSystem(error)) / }
+ZTronAssetStorage/Store/AssetStore+Publish.swift:108-108 | throw error
+ZTronAssetStorage/Store/AssetStore+Publish.swift:358-358 | throw .notOpen
+ZTronAssetStorage/Store/AssetStore+Publish.swift:410-410 | failure = .integrity(.sizeMismatch(expected: byteCount, actual: offset))
+ZTronAssetStorage/Store/AssetStore+Reads.swift:69-71 | report.missing += 1 / report.bytesMissing += entry.byteSize ?? 0 / continue
+ZTronAssetStorage/Store/AssetStore+Reads.swift:99-99 | throw .notOpen
+ZTronAssetStorage/Store/AssetStore+Reads.swift:150-150 | throw .notOpen
+ZTronAssetStorage/Store/AssetStore+Reaper.swift:127-127 | return report
+ZTronAssetStorage/Store/AssetStore+Reaper.swift:156-156 | return result
+ZTronAssetStorage/Store/AssetStore+Reaper.swift:169-169 | continue
+ZTronAssetStorage/Store/AssetStore+Reaper.swift:176-176 | break
+ZTronAssetStorage/Store/AssetStore+References.swift:17-17 | return false
+ZTronAssetStorage/Store/AssetStore+References.swift:49-49 | return
+ZTronAssetStorage/Store/AssetStore+References.swift:186-187 | self.abandonAcquisition(key, acquisition) / throw .notOpen
+ZTronAssetStorage/Store/AssetStore+Snapshot.swift:17-18 | self.state.core.presentTable[id] = nil / return
+ZTronAssetStorage/Store/AssetStore+Snapshot.swift:61-61 | return
+ZTronAssetStorage/Store/AssetStore.swift:75-75 | throw .notOpen
+ZTronAssetSync/Engine/EngineCatchUp.swift:23-24 | self.manifestCaughtUp() / return .failure(.closed)
+ZTronAssetSync/Engine/EngineCatchUp.swift:77-77 | return false
+ZTronAssetSync/Engine/EngineCatchUp.swift:81-81 | return false
+ZTronAssetSync/Engine/EngineCatchUp.swift:106-106 | waiting[ticket]?.resume()
+ZTronAssetSync/Engine/EngineCatchUp.swift:161-162 | self.manifestCaughtUp() / }
+ZTronAssetSync/Engine/EngineCatchUp.swift:179-179 | view = nil
+ZTronAssetSync/Engine/EngineCommands.swift:47-47 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:59-66 | } catch .cancelled { / return .failure(.cancelled) / } catch { / // A legacy file that cannot be adopted is downloaded instead. / } / guard self.isRunning else { / return .failure(.shutDown) / }
+ZTronAssetSync/Engine/EngineCommands.swift:74-74 | return .failure(error.assetError)
+ZTronAssetSync/Engine/EngineCommands.swift:78-78 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:99-100 | continuation.resume(returning: .failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineCommands.swift:162-162 | return .integrityFailure
+ZTronAssetSync/Engine/EngineCommands.swift:177-178 | waiter.continuation.resume(returning: .failure(.cancelled)) / }
+ZTronAssetSync/Engine/EngineCommands.swift:268-269 | self.endClaims(of: token) / return
+ZTronAssetSync/Engine/EngineCommands.swift:285-286 | self.endClaims(of: token) / return
+ZTronAssetSync/Engine/EngineCommands.swift:317-318 | // Committed since the view was read (L4-R5). / return
+ZTronAssetSync/Engine/EngineCommands.swift:375-375 | continue
+ZTronAssetSync/Engine/EngineCommands.swift:408-409 | self.state.releaseFollowUpScheduled = false / }
+ZTronAssetSync/Engine/EngineCommands.swift:432-432 | return
+ZTronAssetSync/Engine/EngineCommands.swift:509-509 | continue
+ZTronAssetSync/Engine/EngineCommands.swift:542-542 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:565-565 | return .failure(.cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:586-586 | return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:603-603 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:610-612 | return .failure(.cancelled) / return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:636-636 | return .failure(error.assetError)
+ZTronAssetSync/Engine/EngineCommands.swift:639-639 | return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:659-659 | return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:671-671 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:676-676 | return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:692-692 | continuation.resume(returning: self.state.groups[token] != nil)
+ZTronAssetSync/Engine/EngineCommands.swift:707-707 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:728-728 | return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
+ZTronAssetSync/Engine/EngineCommands.swift:732-732 | return .serverUnavailable(retryAfter: nil)
+ZTronAssetSync/Engine/EngineCommands.swift:748-748 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:759-760 | return .failure(error.assetError) / }
+ZTronAssetSync/Engine/EngineCommands.swift:773-773 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:777-778 | return .failure(error.assetError) / }
+ZTronAssetSync/Engine/EngineCommands.swift:804-804 | return .failure(.cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:830-831 | return .done(.failure(error.assetError)) / }
+ZTronAssetSync/Engine/EngineCommands.swift:836-836 | return .failure(.cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:851-853 | // REENTRANCY: RE-S30 — terminal. / _ = await self.store.releaseLease(lease) / return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:862-862 | return .failure(error)
+ZTronAssetSync/Engine/EngineCommands.swift:873-876 | return .failure(self.isShuttingDown ? .shutDown : error.assetError) / } / return .failure(.notFound)
+ZTronAssetSync/Engine/EngineCommands.swift:898-898 | return
+ZTronAssetSync/Engine/EngineCommands.swift:920-920 | continue
+ZTronAssetSync/Engine/EngineCommands.swift:924-924 | return true
+ZTronAssetSync/Engine/EngineCommands.swift:958-959 | self.state.jobs[transfer]?.interests[token]?.assets.subtract(withdrawn) / }
+ZTronAssetSync/Engine/EngineCommands.swift:970-973 | if case .done(.failure(let error)) = result { / return .failure(error) / } / return .failure(.cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:982-982 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:1023-1026 | if case .done(.failure(let error)) = result { / return .failure(error) / } / return .failure(.cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:1054-1056 | report.budgetExhausted = true / // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle. / return await self.finishMaintenance(report)
+ZTronAssetSync/Engine/EngineCommands.swift:1063-1065 | report.budgetExhausted = true / // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle. / return await self.finishMaintenance(report)
+ZTronAssetSync/Engine/EngineCommands.swift:1081-1092 | // The step that threw may have evicted or quarantined in memory first (ADR-050): no binding learned during / // maintenance is trusted (L4-R5). / self.storeMutationFailed() / report.budgetExhausted = true / } catch { / 
+ZTronAssetSync/Engine/EngineCommands.swift:1102-1102 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:1141-1141 | return .failure(.cancelled)
+ZTronAssetSync/Engine/EngineCommands.swift:1176-1176 | return []
+ZTronAssetSync/Engine/EngineCommands.swift:1199-1199 | return
+ZTronAssetSync/Engine/EngineCommands.swift:1202-1202 | return
+ZTronAssetSync/Engine/EngineCommands.swift:1211-1211 | continue
+ZTronAssetSync/Engine/EngineCommands.swift:1218-1218 | continue
+ZTronAssetSync/Engine/EngineCommands.swift:1235-1235 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:1242-1242 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:1256-1256 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:1287-1287 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineCommands.swift:1348-1348 | return
+ZTronAssetSync/Engine/EngineCommands.swift:1355-1355 | return
+ZTronAssetSync/Engine/EngineCommands.swift:1374-1374 | return .failure(error)
+ZTronAssetSync/Engine/EngineCommands.swift:1394-1395 | continuation.resume(returning: .done(.failure(.cancelled))) / return
+ZTronAssetSync/Engine/EngineCommands.swift:1404-1405 | self.state.entryJoins.removeValue(forKey: token)?.resume(returning: .done(.failure(.shutDown))) / return
+ZTronAssetSync/Engine/EngineCommands.swift:1425-1425 | return
+ZTronAssetSync/Engine/EngineCommands.swift:1435-1435 | self.dropClaim(claim)
+ZTronAssetSync/Engine/EngineCommands.swift:1463-1463 | preempting += 1
+ZTronAssetSync/Engine/EngineCommands.swift:1600-1601 | violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1611-1612 | violations.append("job \(transfer) is kept by a claim that would not retire it") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1624-1625 | violations.append("waiter interest \(token.rawValue) without a waiter") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1629-1630 | violations.append("\(self.runningCount) running > \(self.tuning.maxConcurrentTransfers)") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1638-1639 | violations.append("lane queues hold \(self.state.queues.storedCount) entries for \(self.state.jobs.count) jobs") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1644-1644 | violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
+ZTronAssetSync/Engine/EngineCommands.swift:1656-1656 | violations.append("\(transfer) drains an attempt whose driver ended")
+ZTronAssetSync/Engine/EngineCommands.swift:1660-1660 | violations.append("the run claims \(transfer), whose job does not hold its interest")
+ZTronAssetSync/Engine/EngineCommands.swift:1664-1665 | violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1668-1672 | // A probe held for a manifest fetch is that fetch's, in flight, or the starting run's, whose first turn begins / // it; every fetch records its outcome on the breaker before it ends, and one that asks for nothing lets t
+ZTronAssetSync/Engine/EngineCommands.swift:1686-1687 | violations.append("the ledger's \(self.state.spaceParked.count) jobs parked for space differ from the table's \(parkedForSpace.count)") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1690-1691 | violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1718-1719 | violations.append("group \(token.rawValue) claims \(group.claimed.count) contents for \(group.members.count) members") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1723-1724 | violations.append("group \(token.rawValue) counts \(group.unlistedClaims) unlisted claims for \(groupUnlisted)") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1732-1732 | tally[key, default: 0] += 1
+ZTronAssetSync/Engine/EngineCommands.swift:1736-1740 | violations.append("the claim table's \(self.state.claims.count) contents differ from the groups' \(tally.count)") / } / violations.append("\(self.state.unlistedClaims) unlisted claims counted for \(unlisted)") / }
+ZTronAssetSync/Engine/EngineCommands.swift:1767-1777 | violations.append("the index's \(self.state.laneParked.count) jobs parked by a lane-wide gate differ from the table's \(laneParked.count)") / } / violations.append("the index's \(self.state.circuitParked.count) and \(sel
+ZTronAssetSync/Engine/EngineCommands.swift:1780-1789 | violations.append("\(self.state.originOwed.subtracting(originParked).count) jobs owed a re-queue by their origin are not parked by it") / } / violations.append("re-queues are owed but no turn is scheduled for them") / } 
+ZTronAssetSync/Engine/EngineCommands.swift:1884-1884 | return false
+ZTronAssetSync/Engine/EngineCommands.swift:1888-1889 | // Its gate reads armed while its debounce is in the heap (`pendingRunGate`). / return false
+ZTronAssetSync/Engine/EngineConditions.swift:37-37 | return
+ZTronAssetSync/Engine/EngineConditions.swift:100-100 | continue
+ZTronAssetSync/Engine/EngineDispatch.swift:51-51 | continue
+ZTronAssetSync/Engine/EngineDispatch.swift:70-70 | break
+ZTronAssetSync/Engine/EngineDispatch.swift:79-79 | return max(1, self.configuration.power.interactiveConcurrencyAtCritical)
+ZTronAssetSync/Engine/EngineDispatch.swift:111-112 | self.schedulePumpFollowUp() / break rounds
+ZTronAssetSync/Engine/EngineDispatch.swift:186-187 | self.state.pumpFollowUpScheduled = false / }
+ZTronAssetSync/Engine/EngineDispatch.swift:258-259 | self.state.ensureRefillScheduled = false / }
+ZTronAssetSync/Engine/EngineDispatch.swift:350-351 | self.enqueue(transfer, front: true) / return .parked(1)
+ZTronAssetSync/Engine/EngineDispatch.swift:358-358 | return .parked(1)
+ZTronAssetSync/Engine/EngineDispatch.swift:407-407 | continue
+ZTronAssetSync/Engine/EngineDispatch.swift:410-411 | self.state.laneParksOwed[lane] = nil / continue
+ZTronAssetSync/Engine/EngineDispatch.swift:414-414 | break
+ZTronAssetSync/Engine/EngineDispatch.swift:440-440 | return reason
+ZTronAssetSync/Engine/EngineDispatch.swift:448-448 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:541-541 | return .policy(.expensiveNetwork)
+ZTronAssetSync/Engine/EngineDispatch.swift:621-621 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:628-628 | handle.cancel()
+ZTronAssetSync/Engine/EngineDispatch.swift:639-639 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:653-653 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:665-665 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:698-698 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:741-741 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:783-783 | handle.cancel()
+ZTronAssetSync/Engine/EngineDispatch.swift:786-787 | handle.setPriority(lane) / }
+ZTronAssetSync/Engine/EngineDispatch.swift:792-792 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:841-845 | if case .staged(let file) = update { / // REENTRANCY: f-3 (proposed) — nothing: the copy belongs to an attempt nobody wants any more. / await self.state.staging?.discard(file.name) / } / return
+ZTronAssetSync/Engine/EngineDispatch.swift:870-870 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:877-877 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:922-929 | // The job was retired (or replaced) before this publication began: nobody else will publish the file. The / // transfer ended without a verdict (a half-open probe's exit, §7.7) unless a new job of it runs. / if self.sta
+ZTronAssetSync/Engine/EngineDispatch.swift:932-932 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:962-966 | // The job ended while its content was published (its asset pruned, its content superseded): the publication's / // trailing install is scheduled whatever became of the job (L5K-R16). / // REENTRANCY: RE-S40 — the lifecy
+ZTronAssetSync/Engine/EngineDispatch.swift:984-984 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:1039-1041 | self.state.heals[asset] = nil / break
+ZTronAssetSync/Engine/EngineDispatch.swift:1052-1052 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:1057-1060 | guard self.state.groups[token] != nil else { / return / } / self.state.groups[token]?.pending[asset] = entry.transferID
+ZTronAssetSync/Engine/EngineDispatch.swift:1063-1063 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:1067-1067 | break
+ZTronAssetSync/Engine/EngineDispatch.swift:1075-1078 | if self.isRunning, self.state.jobs[transfer] == nil { / self.recordBreaker(.abandoned(transfer)) / } / return
+ZTronAssetSync/Engine/EngineDispatch.swift:1109-1120 | self.transition(transfer, to: .failed(.untilEntryChanges)) / self.resolveAll(transfer, with: .failed(.notFound)) / self.transition(transfer, to: .failed(.untilEntryChanges)) / self.resolveAll(transfer, with: .failed(erro
+ZTronAssetSync/Engine/EngineDispatch.swift:1131-1131 | return
+ZTronAssetSync/Engine/EngineDispatch.swift:1140-1140 | continue
+ZTronAssetSync/Engine/EngineEvents.swift:16-16 | continue
+ZTronAssetSync/Engine/EngineEvents.swift:60-60 | return
+ZTronAssetSync/Engine/EngineEvents.swift:128-129 | replay(progress) / }
+ZTronAssetSync/Engine/EngineEvents.swift:157-160 | self.state.subscribers[key] = nil / self.notifyObservers() / continuation.resume(returning: nil) / return
+ZTronAssetSync/Engine/EngineEvents.swift:213-213 | return nil
+ZTronAssetSync/Engine/EngineEvents.swift:223-225 | // REENTRANCY: f-6 (proposed) — nothing: terminal. / await self.engine.unsubscribe(registered) / return nil
+ZTronAssetSync/Engine/EngineFailures.swift:16-16 | return
+ZTronAssetSync/Engine/EngineFailures.swift:24-24 | return
+ZTronAssetSync/Engine/EngineFailures.swift:45-45 | return nil
+ZTronAssetSync/Engine/EngineFailures.swift:65-65 | return
+ZTronAssetSync/Engine/EngineFailures.swift:75-76 | // Not a failure (T7/T13): a cancel the engine did not ask for re-queues the job. / self.requeue(transfer, discarding: request)
+ZTronAssetSync/Engine/EngineFailures.swift:102-102 | return
+ZTronAssetSync/Engine/EngineFailures.swift:140-143 | // After shutdown began the store refuses, or the commit is cancelled: nothing is left to report to. / if self.isRunning { / self.record(ids.first, .storage, "recording a 404 failed: \(error)") / }
+ZTronAssetSync/Engine/EngineFailures.swift:155-159 | // `recordFailure` dooms a failed stale record's blob and publishes at bulk urgency: its trailing / // install runs on the alarm whatever became of the job (orchestrator ruling L5K-R16). / // REENTRANCY: RE-S40 — the lif
+ZTronAssetSync/Engine/EngineFailures.swift:187-187 | return
+ZTronAssetSync/Engine/EngineFailures.swift:266-266 | return nil
+ZTronAssetSync/Engine/EngineFailures.swift:279-279 | continue
+ZTronAssetSync/Engine/EngineFailures.swift:303-303 | return
+ZTronAssetSync/Engine/EngineFailures.swift:347-347 | return
+ZTronAssetSync/Engine/EngineFailures.swift:356-357 | self.state.throttleAnswersScheduled = false / }
+ZTronAssetSync/Engine/EngineFailures.swift:369-369 | return
+ZTronAssetSync/Engine/EngineFailures.swift:372-373 | // Every user-initiated interest still waits within its bound. / return
+ZTronAssetSync/Engine/EngineFailures.swift:380-380 | continue
+ZTronAssetSync/Engine/EngineFailures.swift:397-397 | continue
+ZTronAssetSync/Engine/EngineFailures.swift:425-427 | if self.isRunning { / self.record(absent.first, .storage, "recording an integrity failure failed: \(error)") / }
+ZTronAssetSync/Engine/EngineFailures.swift:437-441 | // `recordIntegrityFailure` dooms a blob at the cap and publishes at bulk urgency: its trailing install / // runs on the alarm whatever became of the job (orchestrator ruling L5K-R16). / // REENTRANCY: RE-S40 — the lifec
+ZTronAssetSync/Engine/EngineFailures.swift:467-467 | return absent
+ZTronAssetSync/Engine/EngineFailures.swift:491-491 | return
+ZTronAssetSync/Engine/EngineFailures.swift:499-500 | // A user request re-queued it meanwhile (T20): the gate's ledger decides with the figures just read. / return
+ZTronAssetSync/Engine/EngineFailures.swift:516-516 | return
+ZTronAssetSync/Engine/EngineFailures.swift:528-528 | return
+ZTronAssetSync/Engine/EngineFailures.swift:554-554 | return
+ZTronAssetSync/Engine/EngineFailures.swift:595-595 | return
+ZTronAssetSync/Engine/EngineFailures.swift:617-617 | return
+ZTronAssetSync/Engine/EngineJobs.swift:21-21 | return false
+ZTronAssetSync/Engine/EngineJobs.swift:116-116 | return
+ZTronAssetSync/Engine/EngineJobs.swift:157-158 | self.readmitOpenedOriginGates(gate) / return
+ZTronAssetSync/Engine/EngineJobs.swift:181-181 | return
+ZTronAssetSync/Engine/EngineJobs.swift:222-222 | return false
+ZTronAssetSync/Engine/EngineJobs.swift:266-266 | return
+ZTronAssetSync/Engine/EngineJobs.swift:270-270 | return
+ZTronAssetSync/Engine/EngineJobs.swift:305-305 | return
+ZTronAssetSync/Engine/EngineJobs.swift:320-322 | // A drained copy nobody will publish now. / self.discardLater(adopt.name) / }
+ZTronAssetSync/Engine/EngineJobs.swift:348-348 | return
+ZTronAssetSync/Engine/EngineJobs.swift:369-369 | return
+ZTronAssetSync/Engine/EngineJobs.swift:409-409 | return
+ZTronAssetSync/Engine/EngineJobs.swift:420-420 | return
+ZTronAssetSync/Engine/EngineJobs.swift:427-428 | waiter.continuation.resume(returning: .failure(.notFound)) / }
+ZTronAssetSync/Engine/EngineJobs.swift:434-434 | return
+ZTronAssetSync/Engine/EngineJobs.swift:466-466 | return
+ZTronAssetSync/Engine/EngineJobs.swift:480-480 | return
+ZTronAssetSync/Engine/EngineJobs.swift:515-515 | return
+ZTronAssetSync/Engine/EngineJobs.swift:555-555 | return until
+ZTronAssetSync/Engine/EngineJobs.swift:588-588 | return false
+ZTronAssetSync/Engine/EngineJobs.swift:636-636 | continue
+ZTronAssetSync/Engine/EngineJobs.swift:744-744 | return
+ZTronAssetSync/Engine/EngineJobs.swift:751-752 | self.state.spaceSweepFollowUp = nil / }
+ZTronAssetSync/Engine/EngineJobs.swift:764-764 | return
+ZTronAssetSync/Engine/EngineJobs.swift:782-782 | return
+ZTronAssetSync/Engine/EngineJobs.swift:786-786 | return
+ZTronAssetSync/Engine/EngineLifecycle.swift:55-55 | return nil
+ZTronAssetSync/Engine/EngineLifecycle.swift:80-80 | return
+ZTronAssetSync/Engine/EngineLifecycle.swift:149-149 | return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineLifecycle.swift:171-173 | continuation.resume(returning: .failure(.cancelled)) / } else if let settled = self.startSettlement() { / continuation.resume(returning: settled)
+ZTronAssetSync/Engine/EngineLifecycle.swift:191-195 | return self.state.launch.map { .success($0.report) } ?? .failure(.shutDown) / return .failure(.storageUnavailable(reason)) / return .failure(.shutDown)
+ZTronAssetSync/Engine/EngineLifecycle.swift:224-225 | self.settleStart(.failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineLifecycle.swift:248-249 | self.settleStart(.failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineLifecycle.swift:257-264 | if !self.isShuttingDown { / // No start task is left to settle later callers: the engine degrades, as for a failed open. / let reason = SyncEngine.unavailableReason(error) / self.state.lifecycle = .degraded(reason) / sel
+ZTronAssetSync/Engine/EngineLifecycle.swift:286-287 | self.settleStart(.failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineLifecycle.swift:292-293 | self.settleStart(.failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineLifecycle.swift:298-299 | self.settleStart(.failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineLifecycle.swift:309-310 | self.settleStart(.failure(.shutDown)) / return
+ZTronAssetSync/Engine/EngineLifecycle.swift:371-371 | return .ioFailure
+ZTronAssetSync/Engine/EngineLifecycle.swift:384-384 | return false
+ZTronAssetSync/Engine/EngineLifecycle.swift:394-394 | return false
+ZTronAssetSync/Engine/EngineLifecycle.swift:397-397 | return false
+ZTronAssetSync/Engine/EngineLifecycle.swift:404-404 | return false
+ZTronAssetSync/Engine/EngineLifecycle.swift:429-429 | continue
+ZTronAssetSync/Engine/EngineLifecycle.swift:444-444 | return published
+ZTronAssetSync/Engine/EngineLifecycle.swift:479-479 | continuation.resume()
+ZTronAssetSync/Engine/EngineLifecycle.swift:525-525 | unknown[token]?.continuation.resume(returning: .failure(error))
+ZTronAssetSync/Engine/EngineLifecycle.swift:559-559 | entries[token]?.resume(returning: .done(.failure(error)))
+ZTronAssetSync/Engine/EngineLifecycle.swift:572-572 | conditionWaiters[token]?.resume()
+ZTronAssetSync/Engine/EngineLifecycle.swift:624-624 | observers[id]?.continuation.resume()
+ZTronAssetSync/Engine/EngineLifecycle.swift:629-629 | conditions[id]?.continuation.resume()
+ZTronAssetSync/Engine/EngineManifest.swift:23-25 | continuation.resume(returning: .shutDown) / continuation.resume(returning: .cancelled)
+ZTronAssetSync/Engine/EngineManifest.swift:40-41 | continuation.resume(returning: .cancelled) / return
+ZTronAssetSync/Engine/EngineManifest.swift:45-48 | if let continuation = self.state.heldManifestDeliveries[index].waiters.removeValue(forKey: token) { / continuation.resume(returning: .cancelled) / return / }
+ZTronAssetSync/Engine/EngineManifest.swift:106-106 | return
+ZTronAssetSync/Engine/EngineManifest.swift:129-129 | return .failed(.offline(.noConnection))
+ZTronAssetSync/Engine/EngineManifest.swift:137-137 | return .shutDown
+ZTronAssetSync/Engine/EngineManifest.swift:301-301 | return .abandoned(.manifest)
+ZTronAssetSync/Engine/EngineManifest.swift:310-310 | return
+ZTronAssetSync/Engine/EngineManifest.swift:317-317 | continuation.resume()
+ZTronAssetSync/Engine/EngineManifest.swift:394-397 | if let pending = self.state.unknownWaiters.removeValue(forKey: token) { / pending.continuation.resume(returning: .failure(error.assetError)) / } / continue
+ZTronAssetSync/Engine/EngineManifest.swift:400-400 | return
+ZTronAssetSync/Engine/EngineManifest.swift:424-425 | self.answerWaiterFromStore(token, asset: waiter.asset, lane: waiter.lane, transfer: entry.transferID) / return
+ZTronAssetSync/Engine/EngineOriginGate.swift:64-64 | return OriginGate(now: now, throttledUntil: nil, throttleEnded: false, breaker: nil)
+ZTronAssetSync/Engine/EngineOriginGate.swift:90-90 | return false
+ZTronAssetSync/Engine/EngineOriginGate.swift:97-99 | self.unblockOrigin(.throttled) / readmitted = true / }
+ZTronAssetSync/Engine/EnginePresence.swift:31-31 | self.state.boundContent[id] = transfer
+ZTronAssetSync/Engine/EnginePresence.swift:110-110 | self.state.heals[asset] = nil
+ZTronAssetSync/Engine/EnginePresence.swift:118-118 | return
+ZTronAssetSync/Engine/EnginePresence.swift:128-128 | return
+ZTronAssetSync/Engine/EnginePresence.swift:138-139 | self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(self.isShuttingDown ? .shutDown : .cancelled)) / }
+ZTronAssetSync/Engine/EnginePresence.swift:148-148 | return
+ZTronAssetSync/Engine/EnginePresence.swift:158-160 | self.state.waiters.removeValue(forKey: token)?.continuation.resume(returning: .failure(.notFound)) / self.reconcileIdle() / return
+ZTronAssetSync/Engine/EnginePresence.swift:262-265 | } catch { / // The store refused or is closing: the caller's lifecycle check discards the answers. / break / }
+ZTronAssetSync/Engine/EnginePresence.swift:332-333 | return (nil, urgency) / }
+ZTronAssetSync/Engine/EnginePresence.swift:345-345 | continue
+ZTronAssetSync/Engine/EngineReadmission.swift:62-62 | return false
+ZTronAssetSync/Engine/EngineReadmission.swift:128-129 | stale.append(transfer) / continue
+ZTronAssetSync/Engine/EngineReadmission.swift:134-134 | self.state.edgeOwed.remove(transfer)
+ZTronAssetSync/Engine/EngineReadmission.swift:141-142 | stale.append(transfer) / continue
+ZTronAssetSync/Engine/EngineReadmission.swift:147-147 | self.state.originOwed.remove(transfer)
+ZTronAssetSync/Engine/EngineReadmission.swift:155-155 | continue
+ZTronAssetSync/Engine/EngineReadmission.swift:188-189 | self.state.originOwed.formUnion(parked) / }
+ZTronAssetSync/Engine/EngineReadmission.swift:200-200 | return false
+ZTronAssetSync/Engine/EngineReadmission.swift:209-209 | return
+ZTronAssetSync/Engine/EngineReadmission.swift:217-219 | self.state.readmissionFollowUpScheduled = false / self.state.readmissionsOwed = [] / }
+ZTronAssetSync/Engine/EngineReadmission.swift:231-231 | return
+ZTronAssetSync/Engine/EngineReadmission.swift:250-250 | return
+ZTronAssetSync/Engine/EngineRuns.swift:21-21 | return .failed(error.assetError)
+ZTronAssetSync/Engine/EngineRuns.swift:24-24 | return .failed(.shutDown)
+ZTronAssetSync/Engine/EngineRuns.swift:42-42 | return .failed(.shutDown)
+ZTronAssetSync/Engine/EngineRuns.swift:50-52 | continuation.resume(returning: .failed(.cancelled)) / continuation.resume(returning: .failed(self.isShuttingDown ? .shutDown : .cancelled))
+ZTronAssetSync/Engine/EngineRuns.swift:73-73 | return
+ZTronAssetSync/Engine/EngineRuns.swift:93-97 | self.state.run = nil / if held != nil { / self.releaseManifestProbe() / } / return
+ZTronAssetSync/Engine/EngineRuns.swift:166-168 | return .failed(.cancelled) / return .failed(.shutDown)
+ZTronAssetSync/Engine/EngineRuns.swift:188-188 | return .failed(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineRuns.swift:206-206 | return .failed(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineRuns.swift:214-214 | return .failed(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineRuns.swift:252-252 | return .failed(self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineRuns.swift:262-262 | return .failed(.shutDown)
+ZTronAssetSync/Engine/EngineRuns.swift:287-287 | return .failed(.cancelled)
+ZTronAssetSync/Engine/EngineRuns.swift:345-345 | continuation.resume(returning: self.isShuttingDown ? .shutDown : .cancelled)
+ZTronAssetSync/Engine/EngineRuns.swift:422-422 | continue
+ZTronAssetSync/Engine/EngineRuns.swift:471-473 | error = .integrityFailure / failureClass = .integrity / }
+ZTronAssetSync/Engine/EngineRuns.swift:491-491 | continue
+ZTronAssetSync/Engine/EngineRuns.swift:496-497 | self.removeInterest(token, from: transfer) / }
+ZTronAssetSync/Engine/EngineRuns.swift:544-544 | return
+ZTronAssetSync/Engine/EngineRuns.swift:551-552 | run.failures[asset] = AssetFailure(id: asset, error: .notFound, failureClass: .notFound) / }
+ZTronAssetSync/Engine/EngineRuns.swift:607-607 | return
+ZTronAssetSync/Engine/EngineRuns.swift:693-693 | return
+ZTronAssetSync/Engine/EngineRuns.swift:700-700 | return
+ZTronAssetSync/Engine/EngineRuns.swift:704-704 | return
+ZTronAssetSync/Engine/EngineRuns.swift:710-710 | continue
+ZTronAssetSync/Engine/EngineRuns.swift:714-714 | return
+ZTronAssetSync/Engine/EngineRuns.swift:722-722 | return
+ZTronAssetSync/Engine/EngineRuns.swift:726-726 | return
+ZTronAssetSync/Engine/EngineRuns.swift:818-819 | completion.resume(returning: .cancelled) / }
+ZTronAssetSync/Engine/EngineRuns.swift:824-824 | self.removeInterest(run.token, from: transfer)
+ZTronAssetSync/Engine/EngineRuns.swift:848-848 | return
+ZTronAssetSync/Engine/EngineRuns.swift:873-873 | return
+ZTronAssetSync/Engine/EngineRuns.swift:939-939 | return .open
+ZTronAssetSync/Engine/EngineRuns.swift:960-960 | return .unarmed
+ZTronAssetSync/Engine/EngineRuns.swift:992-1004 | switch pending.gate { / case .conditions: / self.considerPendingRun() / self.ensureWatcher() / case .breaker: / self.scheduleBreakerDeadline() / case .throttle: / if let origin = self.state.remote?.originID, let until = 
+ZTronAssetSync/Engine/EngineRuns.swift:1011-1011 | return
+ZTronAssetSync/Engine/EngineRuns.swift:1034-1037 | self.record(nil, .transient, "\(reclaim.failed.count) source copies could not be released") / } / self.record(nil, .storage, "adoption report failed: \(error)")
+ZTronAssetSync/Engine/EngineRuns.swift:1046-1046 | return
+ZTronAssetSync/Engine/EngineRuns.swift:1084-1086 | // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline. / await self.refreshStoreDeadlineAfterPublish() / }
+ZTronAssetSync/Engine/EngineRuns.swift:1090-1090 | return
+ZTronAssetSync/Engine/EngineRuns.swift:1096-1096 | return
+ZTronAssetSync/Engine/EngineRuns.swift:1107-1107 | }
+ZTronAssetSync/Engine/EngineState.swift:437-437 | var probe = false
+ZTronAssetSync/Engine/EngineState.swift:580-580 | var claims: ArraySlice<ClaimKey?> = []
+ZTronAssetSync/Engine/EngineState.swift:597-598 | self = .legacy(entry.transferID) / }
+ZTronAssetSync/Engine/EngineSupport.swift:399-399 | return verdict
+ZTronAssetSync/Engine/EngineTimers.swift:32-32 | return
+ZTronAssetSync/Engine/EngineTimers.swift:70-71 | continuation.resume() / }
+ZTronAssetSync/Engine/EngineTimers.swift:107-107 | continue
+ZTronAssetSync/Engine/EngineTimers.swift:114-114 | continue
+ZTronAssetSync/Engine/EngineTimers.swift:125-125 | continue
+ZTronAssetSync/Engine/EngineTimers.swift:169-169 | return
+ZTronAssetSync/Engine/EngineTimers.swift:192-193 | self.state.pendingRun?.scheduled = false / return
+ZTronAssetSync/Engine/EngineTimers.swift:314-315 | self.state.spaceDeadlineReread = false / }
+ZTronAssetSync/Engine/EngineTimers.swift:348-349 | self.state.spaceSettleRead = false / }
+ZTronAssetSync/Engine/EngineTimers.swift:365-365 | return
+ZTronAssetSync/Engine/EngineTimers.swift:382-382 | return
+ZTronAssetSync/Engine/EngineTimers.swift:391-391 | return
+ZTronAssetSync/Engine/EngineTimers.swift:413-415 | // Gone from the manifest, or present again (a resolve downloaded it meanwhile, L4-R5): nothing to heal. / self.state.heals[asset] = nil / return
+ZTronAssetSync/Engine/InFlightBytes.swift:19-20 | self.high &+= 1 / }
+ZTronAssetSync/Engine/InFlightBytes.swift:28-29 | self.high &-= 1 / }
+ZTronAssetSync/Engine/InFlightBytes.swift:42-42 | return Int64.max
+ZTronAssetSync/Engine/InFlightBytes.swift:65-65 | return .settle
+ZTronAssetSync/Planning/PlanBuilder.swift:162-162 | return .added
+ZTronAssetSync/Planning/PlanBuilder.swift:185-185 | return nil
+ZTronAssetSync/Planning/PlanBuilder.swift:194-194 | return .integrityQuarantined

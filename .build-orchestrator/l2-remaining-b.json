@@ -1,0 +1,90 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "tests (G4) / R-INT-2",
+  "location": "Tests/ZTronAssetStorageTests/Core/StorePublishTests.swift:165-179 (production path Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift:76-78)",
+  "problem": "The test 'R-INT-2: a size mismatch is rejected before hashing and the staged bytes are deleted' only checks the thrown error and that the .verifying file was never read. Nothing checks that the staged bytes are deleted, even though the name says so. SPEC R-INT-2 says a mismatch deletes the staged bytes, and no other test covers this for a size mismatch (the oversize and checksum tests use other paths). Mutation evidence: in a scratch copy I replaced line 78's `rejectIntegrity(.sizeMismatch\u2026)` with a bare `throw` that only counts the metric, so the claimed .verifying file and its sidecar stay in staging. All 256 ZTronAssetStorageTests still passed ('\u2714 Test run with 256 tests in 34 suites passed after 4.408 seconds').",
+  "fix": "In that test, stage with `sidecar: true`. After the `#expect(throws:)`, add `for kind in [StagingFileName.Kind.partial, .verifying, .sidecar] { #expect(!harness.exists(harness.layout.stagingURL(staged.name.with(kind: kind)))) }`, `#expect(await harness.store.metrics().integrityFailures == 1)`, `#expect(!harness.exists(harness.layout.blobURL(CoreFixture.key(bytes))))` and `#expect(await harness.store.location(for: entry.identifier, extensions: [], recordingAccess: false) == nil)`. These assertions mirror the checksum-mismatch test at lines 137-143. Then confirm the test fails on the bare-throw mutant."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "coverage (per file)",
+  "location": "Sources/ZTronAssetStorage/FileSystem/LiveFileSystem.swift:23-29,102,159,203,231,244-246,252-253,302-303,317-318",
+  "problem": "LiveFileSystem.swift is at 89.81% (282/314), below the 90% per-file bar by one line. Lines 23-29 are `standardDirectory`, which cannot be tested without creating directories under ~/Library, outside the repository (owner directive). Without those 7 lines the file is 91.9% (282/307). The rest are defensive catch paths: the capacity resourceValues failure (102), the write-after-open failure (159), the rmdir ENOENT race (203), the attribute-set catch (231), lseek and identity failures after the lock is acquired (244-246, 252-253, 302-303), and the fsync fallback closure (317-318; the pure finishSync is tested). Rounds 1-2 left this for the orchestrator, and ARCHITECTURE \u00a714 still lists only LiveLegacyDefaults as deliberately untested.",
+  "fix": "Orchestrator: add `LiveFileSystem.standardDirectory` (7 lines) to ARCHITECTURE \u00a714 'known deliberately untested lines', next to LiveLegacyDefaults. Or WP-B: add a live test, in a .build-tests directory, asserting that `LiveFileSystem().capacity(at:)` on a missing item throws `FileSystemError.notFound` (line 102). That checks real behaviour: freeSpace on a vanished root surfaces a typed error. It brings the file to 283/314 = 90.1%."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "coverage (per file, contract value types)",
+  "location": "Sources/ZTronAssetStorage/Store/AssetRecord.swift:121-126; Sources/ZTronAssetStorage/Store/StoreTypes.swift:212-217,230-233,314-318",
+  "problem": "AssetRecord.swift is at 72.73% (16/22) and StoreTypes.swift at 85.29% (87/102). Neither file was changed in l1-merged...HEAD. The uncovered lines are the package initialisers of AssetLease, EvictionVictim, EvictionPlan and VerificationReport, which only WP-C's APIs construct, and those APIs are still stubs at L2. A WP-B test that constructed them would be coverage-only (G4). The Storage target is 95.01% and WP-B's 34 files are 96.63% (4677/4840), so neither target gate is at risk.",
+  "fix": "No WP-B change. Orchestrator: expect WP-C's L3 tests (acquireLease, evictionPlan, verifyIntegrity) to cover these lines, and re-check both files after the L3 merge."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "benchmarks (P-13 statistic)",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:228-232; docs/adr-drafts/b.md B-9",
+  "problem": "P-13 passes on the statistic the WP chose (p95 of deletion-unit durations: 2.06 / 2.27 / 2.13 ms against batch_ms_max 5). The slowest single unit was 7.55 / 7.47 / 7.89 ms in all three runs. If batch_ms_max is read as a hard maximum between suspension points, P-13 misses its budget. The statistic choice (B-9), together with judging P-5's durable commit on its median and P-6 on its best of five, is still waiting for an orchestrator ruling. P-5's durable p95 (29.97-34.97 ms) is under 40 anyway, so only P-13 is affected.",
+  "fix": "Orchestrator: rule on B-9 before merge. If the budget is a maximum, run `bash Scripts/verify.sh --perf` as the reference on a quiet machine, and have WP-B assert the maximum or tighten the unit time budget (B-10) until the maximum fits."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "orchestration hygiene (shared scratch paths)",
+  "location": "task commands: .build-b, .build-b-perf, .build-b/xcode",
+  "problem": "Another agent working in this same worktree ran `swift test --scratch-path .build-b --enable-code-coverage` while I was working, and it deleted .build-b/out/Products/Debug/codecov/default.profdata. My first benchmark run in .build-b-perf printed 'error: unable to attach DB \u2026 build.db: database is locked Possibly there are two concurrent builds'. Giving both verifiers of one WP the same scratch path breaks CLAUDE.md P2 (one SwiftPM scratch path per agent) and can make results stale or mixed. I reran the benchmarks and the iOS build in my own scratch paths (.build-verify-b-reqs/perf, .build-verify-b-reqs/xcode); those reruns are the evidence I quote.",
+  "fix": "Give each verifier its own scratch paths in the task text, for example .build-verify-<wp>-<lens>, -perf and /xcode."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "crash-consistency (index commit protocol, ENOSPC fallback)",
+  "location": "Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:109-118 (writeTemporary removes index.prev on ENOSPC), :92-96 (step 4 then step 5, no rollback when step 5 fails); interacts with Store/LaunchState.swift:47 (committedGeneration = survivingGeneration assumes index.prev survives)",
+  "problem": "The ENOSPC fallback deletes index.tmp and then index.prev without checking that index.bin exists. When index.bin is missing, every valid generation can end up deleted. index.bin goes missing after a crash between commit steps 4 and 5, after an EIO on the tmp->bin rename, or when the load rule fell back to index.prev. Probe probe1 (scratch package .build-verify-b-correct/r3/pkg, ProbeR3Tests.swift), timeline: (1) open, apply [a], publish a; a's blob rots and setResidency(.quarantined, dooming: .corrupt) runs; flush(.durable). (2) The tmp->bin rename hits EIO on the next commit, so the disk holds index.prev=G-1, index.tmp=G and no index.bin. (3) The process is killed and the next launch finds the volume full: the load rule picks index.tmp, the launch commit truncates it, hits ENOSPC, removes tmp and prev, and the retry also hits ENOSPC. Even a clean close() leaves no index file. Observed: 'PROBE1: no index generation is left on disk after the launch (and a clean close)'. The third launch is degraded and the record is lost (I-5 also regresses: generations and the launch epoch restart at 1). After apply, the corrupt-doomed name is re-adopted as an orphan and served with integrity Optional(.verified). This violates ARCHITECTURE \u00a74.4: corrupt and purged names are never re-adopted. probe1-control (same steps, no ENOSPC) passes: the doom survives and nothing is served. On a full device every commit hits this path, so the store runs with no index on disk until space returns, and any kill loses the index.",
+  "fix": "(a) In writeTemporary, remove index.prev on ENOSPC only when index.bin exists and holds the committed generation (stat index.bin in the unit, or pass the committed file in IndexCommitInput); never remove the newest valid generation. (b) When step 5 fails after step 4 succeeded, roll back in the unit (rename index.prev -> index.bin), so index.bin is never missing after a failed commit. (c) When the launch load chose index.tmp (or index.bin is missing), have the launch commit first promote the already-synced index.tmp to index.bin (rename plus root sync) before it truncates index.tmp, and keep survivingGeneration consistent with it. Add a test: 'R-STO-4: ENOSPC at a launch after a crash between commit steps 4 and 5 keeps a valid generation on disk and never re-adopts a corrupt doom'."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "crash-consistency (blob placement / fan-out durability)",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+References.swift:216-219 (failure branch drops the fact that the fan-out was created); Sources/ZTronAssetStorage/Blobs/BlobUnits.swift:68-70 (createdFanOut computed and directory created before a rename that can still fail)",
+  "problem": "The placement unit creates blobs/<aa>/ before the rename. If the rename (or the EEXIST replace) then fails, placeAndBind takes the .failure branch and never sets commits.blobsDirectoryDirty. The next successful placement into that fan-out sees it already exists (createdFanOut: false). The commit that references that blob then barrier-syncs the fan-out but never blobs/. So the fan-out's own entry in blobs/ is never made durable, against ARCHITECTURE \u00a73 ('barrier-synced before the commit that references a blob in it') and \u00a74.1 step 1. Probe probe4 (CoreHarness mode .powerLossDropUnsynced): payloads a and b share a fan-out; publishing a fails with EIO on the .verifying rename; b is published and flush(.ordered) commits it; then power loss. Observed: 'PROBE4: 1 committed blob(s) lost by the power loss' and 'PROBE4: [\"I-2: b needs healing although no blob was removed externally\"]'. The reopen also flags OS-purge detection: the stamp is reset and a sync becomes due. probe4-control (no failed placement) passes.",
+  "fix": "Make BlobPlacementUnit.run report whether it created the fan-out on failure too (for example, return (Result, createdFanOut) or create the fan-out in a separate step whose outcome is kept), and set commits.blobsDirectoryDirty = true in placeAndBind's failure branch when it did. The simplest safe alternative is to set blobsDirectoryDirty = true whenever a placement unit fails after reaching createDirectory. Add the probe as a test under StoreRecoveryTests: 'R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it'."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "lifecycle / close() contract",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Lifecycle.swift:156-157 (performClose returns at once when phase is .closing)",
+  "problem": "A second close() that arrives while the first is draining or flushing returns at once, before the durable commit and the lock release. AssetStore.close() documents 'Drains in-flight units, flushes durably, releases the lock', so a caller of the second close then reopening the root (facade shutdown and re-create, or two shutdown paths) gets .locked. Probe probe2 (metadata SteppedBlockingExecutor holding close #1's durable commit unit; close #2 awaited; a new store on the same fake then opened). Observed: 'PROBE2: close() returned, yet reopening the root failed with Optional(ZTronAssetStorage.StoreError.locked)'.",
+  "fix": "Add closeWaiters to StoreCoreState. In performClose, case .closing: suspend on a continuation appended to closeWaiters (REENTRANCY comment: re-read the phase), and resume them all when closeOpenStore sets phase = .closed. Return immediately only for .closed. Add a test where a second close returns only after the lock was released."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "scheduling / idle cost under persistent commit failure",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift:84-86 and :115-125; Sources/ZTronAssetStorage/Store/AssetStore+Commit.swift:88, 113-123",
+  "problem": "A commit that keeps failing (ENOSPC on a full device, EROFS, EIO) has no backoff. nextDeadline() reports the coalescing window every 250 ms forever, and each runDueWork() re-encodes the whole index, retries the write (deleting index.prev again on ENOSPC, see the first issue) and logs an error. Probe probe6 (ENOSPC on every index.tmp write; 200 windows): 'PROBE6: 200 of 200 windows kept a deadline; 201 failed commits; 607 log records'. Not a broken invariant (the state stays authoritative, as \u00a74.1 says), but on a full device the engine's alarm never quiesces (R-SYN-14 spirit) and the log fills up. This one is a design gap, not a proven contract violation, so it is non-blocking.",
+  "fix": "Back off failed commit attempts exponentially: after n consecutive failures the next commit deadline is lastAttemptAt + min(cap, interval * 2^n), reset on success. Explicit flush or requireCommitted callers can still try at once. Log one error per failure streak plus a counter."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "applied-manifest metadata after admit",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift:367-383 (performAdmit rebuilds ValidatedManifest with applied.digest)",
+  "problem": "admit() changes the applied manifest's entries but keeps the old digest (ValidatedManifest documents the digest as 'equal digests mean nothing to reconcile'). After an admit, the persisted digest no longer describes the persisted entries. If WP-F skips apply when the fetched digest equals planningView().appliedManifest.digest, an admitted entry absent from the server manifest is never pruned, and an admitted change is never reverted. Unproven: it depends on WP-F's use of the digest.",
+  "fix": "Have admit mark the applied digest as not matching any server payload (for example, a zero or derived digest, recorded in an ADR draft), or document for WP-F that digest equality must not short-circuit apply after an admit."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "publish cancellation hand-back",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Publish.swift:90-92",
+  "problem": "The cancelled-hash hand-back renames .verifying back to .part with .exclusive inside try?. If a .part of the same attempt name exists again (the producer reopened it with O_CREAT), the rename fails silently and the claimed full-size file stays in staging as .verifying until staging GC. Minor hygiene; not probed.",
+  "fix": "On failure of the hand-back rename, discard the claimed file (discardClaimed), as B-26 does for other failures, or report it in the thrown error."
+ }
+]

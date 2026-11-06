@@ -1,0 +1,11 @@
+◇ Test run started.
+◇ Test "PROBE-W2: an apply landing while a 10,000-job follow is owed holds the actor at most 10 ms" started.
+◇ Test "PROBE-W3: the breaker's parked order rebuilds itself at 10,000 parked jobs within C2" started.
+◇ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" started.
+PROBE-W3 parked-order rebuild at 10,000: ["parked 9994: longest noteCircuitParked 6.175166 ms over 10059 calls, entries after 9994", "parked 9994: longest noteCircuitParked 5.075 ms over 10059 calls, entries after 9994", "parked 9994: longest noteCircuitParked 6.295667 ms over 10059 calls, entries after 9994"]
+✔ Test "PROBE-W3: the breaker's parked order rebuilds itself at 10,000 parked jobs within C2" passed after 0.895 seconds.
+PROBE-W2 follow turns at 10,000: ["round 0: first 5.430125 ms (unfollowed 1792, owed 1792); pass steps 4 max 5.440208 ms; restart 8.007042 ms (unfollowed 9744, owed 9744, scans 1); rest 39 turns max 4.846334 ms; violations []", "round 1: first 4.7895 ms (unfollowed 1792, owed 1792); pass steps 4 max 6.311709 ms; restart 10.28575 ms (unfollowed 9744, owed 9744, scans 1); rest 39 turns max 6.049375 ms; violations []", "round 2: first 4.213375 ms (unfollowed 1792, owed 1792); pass steps 4 max 5.489625 ms; restart 10.210875 ms (unfollowed 9744, owed 9744, scans 1); rest 39 turns max 3.722125 ms; violations []"]
+✔ Test "PROBE-W2: an apply landing while a 10,000-job follow is owed holds the actor at most 10 ms" passed after 1.353 seconds.
+PROBE-V9 longest actor wait at 10,000 members: ["1% changed: runs [4.286458, 3.1925, 3.1305] ms", "10% changed: runs [6.093584, 4.5265, 4.436125] ms", "100% changed: runs [4.851625, 4.598792, 5.441167] ms"]
+✔ Test "PROBE-V9: a refresh that changes 1 %, 10 % or 100 % of a waiting 10,000-member prefetch group's content holds the engine's actor at most 10 ms" passed after 4.100 seconds.
+✔ Test run with 3 tests in 2 suites passed after 4.100 seconds.

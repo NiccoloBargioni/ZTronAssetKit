@@ -1,0 +1,53 @@
+# S3-CRAS-04 probe run (S3LegacyPairsProbe, 24 slices x 2 power-loss modes)
+S3 legacy pairs powerLossDropUnsynced slice 0: 279
+S3 legacy pairs powerLossDropUnsynced slice 1: 275
+S3 legacy pairs powerLossDropUnsynced slice 2: 274
+S3 legacy pairs powerLossDropUnsynced slice 3: 267
+S3 legacy pairs powerLossDropUnsynced slice 4: 264
+S3 legacy pairs powerLossDropUnsynced slice 5: 264
+S3 legacy pairs powerLossDropUnsynced slice 6: 260
+S3 legacy pairs powerLossDropUnsynced slice 7: 255
+S3 legacy pairs powerLossDropUnsynced slice 8: 254
+S3 legacy pairs powerLossDropUnsynced slice 9: 248
+S3 legacy pairs powerLossDropUnsynced slice 10: 244
+S3 legacy pairs powerLossDropUnsynced slice 11: 243
+S3 legacy pairs powerLossDropUnsynced slice 12: 238
+S3 legacy pairs powerLossDropUnsynced slice 13: 237
+S3 legacy pairs powerLossDropUnsynced slice 14: 233
+S3 legacy pairs powerLossDropUnsynced slice 15: 229
+S3 legacy pairs powerLossDropUnsynced slice 16: 227
+S3 legacy pairs powerLossDropUnsynced slice 17: 230
+S3 legacy pairs powerLossDropUnsynced slice 18: 229
+S3 legacy pairs powerLossDropUnsynced slice 19: 224
+S3 legacy pairs powerLossDropUnsynced slice 20: 220
+S3 legacy pairs powerLossDropUnsynced slice 21: 219
+S3 legacy pairs powerLossDropUnsynced slice 22: 195
+S3 legacy pairs powerLossDropUnsynced slice 23: 195
+S3 legacy pairs powerLossKeepMetadata slice 0: 279
+S3 legacy pairs powerLossKeepMetadata slice 1: 275
+S3 legacy pairs powerLossKeepMetadata slice 2: 274
+S3 legacy pairs powerLossKeepMetadata slice 3: 267
+S3 legacy pairs powerLossKeepMetadata slice 4: 264
+S3 legacy pairs powerLossKeepMetadata slice 5: 264
+S3 legacy pairs powerLossKeepMetadata slice 6: 260
+S3 legacy pairs powerLossKeepMetadata slice 7: 255
+S3 legacy pairs powerLossKeepMetadata slice 8: 254
+S3 legacy pairs powerLossKeepMetadata slice 9: 248
+S3 legacy pairs powerLossKeepMetadata slice 10: 244
+S3 legacy pairs powerLossKeepMetadata slice 11: 243
+S3 legacy pairs powerLossKeepMetadata slice 12: 238
+S3 legacy pairs powerLossKeepMetadata slice 13: 237
+S3 legacy pairs powerLossKeepMetadata slice 14: 233
+S3 legacy pairs powerLossKeepMetadata slice 15: 229
+S3 legacy pairs powerLossKeepMetadata slice 16: 227
+S3 legacy pairs powerLossKeepMetadata slice 17: 230
+S3 legacy pairs powerLossKeepMetadata slice 18: 229
+S3 legacy pairs powerLossKeepMetadata slice 19: 224
+S3 legacy pairs powerLossKeepMetadata slice 20: 220
+S3 legacy pairs powerLossKeepMetadata slice 21: 219
+S3 legacy pairs powerLossKeepMetadata slice 22: 195
+S3 legacy pairs powerLossKeepMetadata slice 23: 195
+✔ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" with 48 test cases passed after 304.382 seconds.
+✔ Suite "S3 probe: legacy migration kill then power loss" passed after 304.382 seconds.
+✔ Test run with 1 test in 1 suite passed after 304.382 seconds.
+total pairs 11606

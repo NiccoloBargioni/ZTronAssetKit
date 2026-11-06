@@ -1,0 +1,93 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16Correct" started.
+◇ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" recorded an issue at EngineFollowBarrierVerdictAnswersTests.swift:126:13: Expectation failed: item.answers == item.expected
+↳ 429 for 10 s: U: verdictAnswers false, the replay true
+↳ item.answers == item.expected → false
+↳   item.answers → false
+↳   item.expected → true
+✘ Test "R-SYN-5: a waiting verdict answers in the 429's lane exactly the interests its replay answers (F-28)" failed after 0.004 seconds with 1 issue.
+↳ /// `verdictAnswers` answers, for every verdict a drain gives, exactly the interests that verdict's replay answers,
+↳ /// a non-user interest included (`verdictAnswerCases`; Stage 3 close-out cycle 17: the user-interest endings are
+↳ /// `verdictLane`'s, these are the answers no ending of it decides).
+◇ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst after C's 429: (owed: false, c: nil, interests: nil, throttle: Optional(11000000000ns))
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.prefetch), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: false)
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst throttle before=Optional(11000000000ns) after N's 429=Optional(61000000000ns)
+PROBE-C16C-THROTTLE-FAILFAST-LANE followVisitedFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/11/114984b893db42c936e0a6d7f5dec3bc5564c6e6d73c8688b4c6537cfd9ae06b.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-THROTTLE-FAILFAST-LANE" started.
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst after C's 429: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun)), interests: Optional(1), throttle: Optional(11000000000ns))
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst N's lane before its 429: (followed: Optional(ZTronAssetModel.AssetPriority.userInitiated), own: Optional(ZTronAssetModel.AssetPriority.prefetch), owed: true)
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst throttle before=Optional(11000000000ns) after N's 429=Optional(11000000000ns)
+PROBE-C16C-THROTTLE-FAILFAST-LANE sweepFollowsFirst b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(10.0))) p=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:764:9: Expectation failed: after != before
+↳ PROBE-C16C-THROTTLE-FAILFAST-LANE: N's 429 extends the origin's throttle on N's own lane (visit-first)
+↳ after != before → false
+↳   after → 11000000000ns
+↳     some → 11000000000ns
+↳       nanoseconds → 11000000000
+↳   before → 11000000000ns
+↳     some → 11000000000ns
+↳       nanoseconds → 11000000000
+✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:765:9: Expectation failed: (try? pResult.get())?.byteSize == 16
+↳ PROBE-C16C-THROTTLE-FAILFAST-LANE: P is served by N's retry (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C16C-THROTTLE-FAILFAST-LANE" with 2 test cases failed after 5.517 seconds with 2 issues.
+↳ /// PROBE-C16C-THROTTLE-FAILFAST-LANE (a fourth partial answer `verdictAnswers` counts as none: a 429 park's fail-fast,
+↳ /// not in the draft's RR-11). As above, but C gets a 429 with Retry-After 10 s (within the user lane's 30 s cap, beyond
+↳ /// `interactiveMaxWait`).
+↳ /// Visit-first: C's 429 throttled the origin 10 s and parked C; the park answered B `serverUnavailable` (10 s > 2 s);
+↳ /// v4 moved nobody; N's 429 was decided on N's own (prefetch) lane: throttled 60 s, N parked, retried, P served.
+↳ /// Sweep-first: `verdictAnswers(.throttle(.until))` is false, so B counts as moving onto N after C's verdict: N's 429
+↳ /// is decided on the user lane, `.exhausted`, and P is answered `serverUnavailable(60)`.
+✘ Suite "VerifyC16Correct" failed after 5.517 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs, adapted to cycle 16's names only, every scenario the cycle-15 verifiers reported blocking; every
+↳ /// expectation is the visit-first outcome. Part 2 hunts the classes cycle 16's mechanism (`appliesFollowed`,
+↳ /// `Job.attemptEnd`, `rerouteOnVisit`, `followAfterVerdict`, `verdictAnswers`) may still miss. Each runs in both orders.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+↳ J's 429 throttles the origin until its own end only on J's prefetch lane, O's .throttleFailFast having answered B (visit-first): before Optional(11000000000ns), after Optional(11000000000ns)
+↳ outcome.throttledByJ == !ending.keepsB → false
+↳   outcome.throttledByJ → false
+↳   !ending.keepsB → true
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ P is served J's retry after the throttle: O's .throttleFailFast answered B (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" with 16 test cases failed after 29.125 seconds with 2 issues.
+↳ /// A 429 that arrives while another job's verdict waits with a later apply's moved id reads that id's interest on
+↳ /// its lane when the verdict leaves the job alive, and not when the verdict answers it (`verdictLane`; ruling S3-R19
+↳ /// item 1): visited first, v4's visit moved B onto J from O backing off (a user lane, the 429 throttles nothing and
+↳ /// fails J, answering P), or found B answered by O's 404, 429 beyond the caps, timeout at the cap, `Retry-After`
+↳ /// beyond the cap, throttle's fail-fast, offline fail-fast or ENOSPC fail-fast (a prefetch lane, the 429 throttles
+↳ /// the origin until its own end and J's retry serves P). Cycle 17 adds the last four endings and the assertions on
+↳ /// J's own throttle end and on the answers of B and P.
+✘ Suite "Engine follow barrier (F-28)" failed after 29.130 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 3 tests in 2 suites failed after 29.130 seconds with 5 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

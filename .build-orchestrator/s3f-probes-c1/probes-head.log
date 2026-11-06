@@ -1,0 +1,21 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC1Correct probes" started.
+◇ Test "PROBE-V7: retries falling due together beyond one alarm turn are all retried once without another clock advance" started.
+◇ Test "PROBE-V1b: a first satisfied reading with nothing failed starts nothing extra" started.
+◇ Test "PROBE-V6: a lagging subscriber across three runs gets every run's end before the next run's start and its start before its progress" started.
+◇ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" started.
+◇ Test "PROBE-V3: a run over a healthy asset and one failed at the integrity cap reports exactly the capped one and writes no stamp" started.
+◇ Test "PROBE-V4: cancellations and new calls racing a multi-turn shutdown settle resume every caller once" started.
+◇ Test "PROBE-V1: a user-lane group's job that failed offline before the first reading is retried by that reading" started.
+✔ Test "PROBE-V6: a lagging subscriber across three runs gets every run's end before the next run's start and its start before its progress" passed after 0.001 seconds.
+✔ Test "PROBE-V3: a run over a healthy asset and one failed at the integrity cap reports exactly the capped one and writes no stamp" passed after 0.013 seconds.
+✔ Test "PROBE-V1b: a first satisfied reading with nothing failed starts nothing extra" passed after 0.017 seconds.
+✔ Test "PROBE-V1: a user-lane group's job that failed offline before the first reading is retried by that reading" passed after 0.020 seconds.
+✔ Test "PROBE-V5: an apply under a waiting group leaves every job following the copy" passed after 0.022 seconds.
+✔ Test "PROBE-V4: cancellations and new calls racing a multi-turn shutdown settle resume every caller once" passed after 0.902 seconds.
+PROBE-V7: 1541 retries wait for the clock
+✔ Test "PROBE-V7: retries falling due together beyond one alarm turn are all retried once without another clock advance" passed after 32.702 seconds.
+✔ Suite "VerifyC1Correct probes" passed after 32.702 seconds.
+✔ Test run with 7 tests in 1 suite passed after 32.703 seconds.

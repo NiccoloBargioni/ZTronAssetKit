@@ -1,0 +1,55 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Cleanup: a blob more records share than a chunk holds (C2, R-CLN-4, R-CLN-6)" started.
+◇ Suite "Verifier s3c c1 correctness probes" started.
+◇ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" started.
+◇ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" started.
+◇ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" started.
+◇ Test "probe P1: evictable purge, holders swapped before the first turn" started.
+◇ Test "R-CLN-4: quota eviction takes a blob that more records share than a chunk holds one chunk of its records per actor turn" started.
+◇ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" started.
+◇ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" started.
+◇ Test case passing 1 argument change → accessed to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test "R-CLN-4: quota eviction skips whole a blob more records share than a chunk holds when a later record was accessed before its first turn" started.
+◇ Test case passing 1 argument change → leased to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test case passing 1 argument change → pinned to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test case passing 1 argument change → bound to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" started.
+◇ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a lease taken between its chunks" started.
+◇ Test case passing 1 argument chunk → 1000 to "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" started.
+◇ Test case passing 1 argument change → left to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" started.
+◇ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" started.
+◇ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" started.
+◇ Test case passing 1 argument chunk → 2 to "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" started.
+◇ Test case passing 1 argument point → beforeFirstTurn to "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" started.
+◇ Test case passing 1 argument chunk → 1000 to "probe P1: evictable purge, holders swapped before the first turn" started.
+◇ Test case passing 1 argument point → betweenChunks to "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" started.
+✔ Test "R-CLN-4: quota eviction skips whole a blob more records share than a chunk holds when a later record was accessed before its first turn" passed after 0.010 seconds.
+✔ Test "R-CLN-4: quota eviction takes a blob that more records share than a chunk holds one chunk of its records per actor turn" passed after 0.011 seconds.
+✔ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" with 3 test cases passed after 0.011 seconds.
+✔ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops when a later holder is swapped for an essential id between its chunks, the rest keeping the blob" passed after 0.011 seconds.
+◇ Test case passing 1 argument chunk → 2 to "probe P1: evictable purge, holders swapped before the first turn" started.
+✔ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when an id is bound to it or a later record leaves it between its chunks" with 2 test cases passed after 0.011 seconds.
+✔ Test "R-CLN-6: an evictable purge keeps whole a blob whose later holder was swapped for an essential id after the selection, before its first turn" with 2 test cases passed after 0.012 seconds.
+✔ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" passed after 0.012 seconds.
+✔ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" passed after 0.012 seconds.
+✔ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a lease taken between its chunks" passed after 0.012 seconds.
+✔ Test "R-CLN-4: quota eviction of a blob more records share than a chunk holds evicts no record after a later record is swapped for an essential id, before its first turn or between its chunks" with 2 test cases passed after 0.012 seconds.
+✔ Test "probe P1: evictable purge, holders swapped before the first turn" with 2 test cases passed after 0.014 seconds.
+◇ Test "probe P2: evictable purge, holders swapped between turns" started.
+✔ Test "probe P2: evictable purge, holders swapped between turns" passed after 0.002 seconds.
+◇ Test "probe P3: quota eviction, holders swapped between turns" started.
+✔ Test "probe P3: quota eviction, holders swapped between turns" passed after 0.003 seconds.
+✔ Suite "Verifier s3c c1 correctness probes" passed after 0.020 seconds.
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" recorded an issue at LargeBlobTests.swift:323:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" failed after 63.998 seconds with 1 issue.
+↳ /// An evictable purge takes every current holder (`purgeChunk`'s rule): an id bound between two chunks is read with the
+↳ /// holders and purged too; a lease taken between them stops the blob, which a purge never takes while leased.
+✘ Suite "Cleanup: a blob more records share than a chunk holds (C2, R-CLN-4, R-CLN-6)" failed after 63.998 seconds with 1 issue.
+↳ /// A blob that more records share than a chunk holds (C2 at the reference scale; Stage 3 ruling S3C-2, S3-B-025): quota
+↳ /// eviction and purge take its records a chunk per actor turn instead of all in one, re-validating each chunk in its turn.
+↳ /// One blob that 10,000 ids share held the actor 15.4–16.6 ms in one turn (`BenchCleanup`'s shared-blob benchmark).
+✘ Test run with 14 tests in 2 suites failed after 63.998 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetStorageTests (Swift Testing)

@@ -1,0 +1,41 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Suite "VerifyC16Correct" started.
+◇ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, when → .afterVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst after the 404: (owed: false, c: nil, reroute: nil, end: nil, n: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst after v4: (c: nil, cAssets: nil, n: nil, waiterB: [])
+PROBE-C16C-VERDICT-MAPPED-BACK followVisitedFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-VERDICT-MAPPED-BACK" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, when → .beforeVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst after the 404: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), reroute: Optional([zz-b]), end: Optional(ZTronAssetSync.AttemptEnd(failedAfter: 3, deferredAfter: Optional(3), movedBefore: Set([zz-b]))), n: nil)
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst after v4: (c: Optional(ZTronAssetSync.JobState.downloading), cAssets: Optional([zz-b]), n: nil, waiterB: [c-cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553])
+PROBE-C16C-VERDICT-MAPPED-BACK sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.notFound) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/cd/cd1816d7a273df8b1ed5443823d66cc34f2f039e78f2786fa61fbb0f51928553.png, fileExtension: png, byteSize: 100000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) cStarts=2
+✔ Test "PROBE-C16C-VERDICT-MAPPED-BACK" with 2 test cases passed after 1.760 seconds.
+✔ Suite "VerifyC16Correct" passed after 1.760 seconds.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict at EngineFollowBarrierHopTests.swift:149:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_000
+↳ B was on N at C's 404, and v4 moved it back to a fresh job of C's content, which serves it (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? outcome.b.get())?.byteSize == 100_000 → <not evaluated>
+✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" with 4 test cases failed after 3.053 seconds with 1 issue.
+↳ /// An id a later apply maps back to the content whose verdict waits joins that content after the verdict, not before
+↳ /// it (`mappedBack`; PROBE-C16C-VERDICT-MAPPED-BACK, `takeOffMovedBefore`, and the join a visit makes onto a job whose
+↳ /// verdict waits, `addInterest`): visited first, the 404 answered A alone, and B, moved back by v4 after it, was
+↳ /// served by a fresh job of C's content.
+◇ Test "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" started.
+✔ Test "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" with 2 test cases passed after 1.991 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.045 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 3 tests in 2 suites failed after 5.045 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

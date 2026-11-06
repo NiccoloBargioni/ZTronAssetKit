@@ -1,0 +1,24 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" started.
+✘ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:199:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(kBytes.count)
+↳ the user request for K is served from the room the follow frees: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 1000000))
+↳ (try? uResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:203:13: Expectation failed: second == .failure(.cancelled) || (try? second.get())?.byteSize == Int64(kBytes.count)
+↳ the cancelled joiner: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 1000000))
+↳ second == .failure(.cancelled) || (try? second.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a user waiter joining a job parked for space while the follow owes the visit that frees the room is re-checked on the followed state (F-28)" with 2 test cases failed after 0.949 seconds with 2 issues.
+↳ /// A user waiter that joins a job parked `insufficientSpace` while the follow owes the visit that abandons the
+↳ /// download holding the room is re-checked on the room that visit frees: K (3 MB) is a prefetch group's member, parked
+↳ /// beside D's 4 MB in 5 MB of room. Visited first, D's bytes left and the join re-queues K; re-checked beside D's doomed
+↳ /// bytes, the joiner was answered `insufficientSpace` (PROBE-D-JOIN-FREED; the same scenario as PROBE-D3-JOIN-ABANDON,
+↳ /// merged here). A second joiner cancels while its answer waits for the follow: it gets `.cancelled` or K's content.
+✘ Suite "Engine runs" failed after 0.949 seconds with 2 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 0.949 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

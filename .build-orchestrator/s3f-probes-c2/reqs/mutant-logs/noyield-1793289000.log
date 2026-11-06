@@ -1,0 +1,22 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 1] ZTronAssetCompatibilityTests-product
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetCompatibilityTests-product
+[12 / 12] ZTronAssetCompatibilityTests-product
+[13 / 14] ZTronAssetKitBenchmarks-product
+[15 / 15] ZTronAssetKitBenchmarks-product
+[16 / 17] ZTronAssetKitTests-product
+[19 / 20] ZTronAssetSyncTests-product
+[21 / 21] ZTronAssetSyncTests-product
+Build complete! (5,03 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine idle and shutdown" started.
+◇ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" started.
+✔ Test "R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDown and leaves the engine owning nothing" passed after 0.210 seconds.
+✔ Suite "Engine idle and shutdown" passed after 0.210 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.210 seconds.

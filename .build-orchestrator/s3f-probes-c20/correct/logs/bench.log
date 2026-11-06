@@ -1,0 +1,345 @@
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 6]
+[2 / 7] ZTronAssetModel
+[3 / 8] ZTronAssetModel
+[7 / 12] ZTronAssetStorage
+[11 / 16] ZTronAssetTransport
+[14 / 19] ZTronAssetAppleHosted
+[15 / 20] ZTronAssetAppleHosted
+[19 / 24] ZTronAssetSync
+[22 / 25] ZTronAssetKit
+[23 / 26] ZTronAssetKit
+[34 / 37] ZTronAssetTestSupport
+[44 / 63] ZTronAssetKitTests-product
+[50 / 68] ZTronAssetCompatibilityTests-product
+[53 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetKitTests-product
+[59 / 71] ZTronAssetKitTests-product
+[59 / 71] ZTronAssetTransportTests-product
+[62 / 72] ZTronAssetTransportTests-product
+[65 / 74] ZTronAssetKitBenchmarks-product
+[68 / 76] ZTronAssetKitBenchmarks-product
+[68 / 76] ZTronAssetModelTests-product
+[70 / 76] ZTronAssetModelTests-product
+[70 / 76] ZTronAssetStorageTests-product
+[72 / 76] ZTronAssetStorageTests-product
+[72 / 76] ZTronAssetSyncTests-product
+[81 / 82] ZTronAssetSyncTests-product
+[84 / 84] ZTronAssetSyncTests-product
+[88 / 88] ZTronAssetStorageTests-product
+[92 / 92] ZTronAssetModelTests-product
+[96 / 96] ZTronAssetKitTests-product
+[100 / 100] ZTronAssetKitBenchmarks-product
+[104 / 104] ZTronAssetCompatibilityTests-product
+[108 / 108] ZTronAssetAppleHostedTests-product
+Build complete! (173,95 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "CleanupBenchmarks" started.
+◇ Test "C2: WP-C's report, verification, orphan GC, quarantine, eviction and purges never hold the store's actor for more than 10 ms at 10,000 assets" started.
+C2 longest actor hold at 10,000 assets (WP-C): storage report 0.56675 ms (max of runs 0.865 ms), deep verification of every blob 0.262125 ms (max of runs 0.547583 ms), orphan GC of 100 orphans 0.20875 ms (max of runs 0.618625 ms), orphan GC of 10,000 orphans 1.332542 ms (max of runs 2.3145 ms), quarantine of one blob 0.260208 ms (max of runs 0.590291 ms), quota eviction of half 1.76425 ms (max of runs 2.817208 ms), purge(.evictable) of all 1.972208 ms (max of runs 3.020458 ms), purge(.all) of all 1.952709 ms (max of runs 2.07525 ms); budget 10.0 ms
+✔ Test "C2: WP-C's report, verification, orphan GC, quarantine, eviction and purges never hold the store's actor for more than 10 ms at 10,000 assets" passed after 13.733 seconds.
+◇ Test "C2: WP-C's actor stretches at 10,000 and at 100,000 assets (maxEntries), thread CPU per stretch" started.
+C2 thread CPU of WP-C's stretches at 10000 assets: first records copy under a live snapshot 0.669792 ms (worst 0.695167 ms), recorded, first blob-table copy under a live snapshot 0.048958 ms (worst 0.071291 ms), recorded, WP-B: first present-table copy after a publication 0.224917 ms (worst 0.304417 ms), recorded, WP-B: the reaper's deletable filter 0.47 ms (worst 0.472708 ms), recorded, WP-B: freeSpace() (probe, wall clock) 0.472542 ms (worst 0.569292 ms), recorded, snapshot capture 0.000959 ms (worst 0.003083 ms), holders of 1000 blobs 0.440209 ms (worst 0.526541 ms), holders of 1000 blobs by one scan of the records 0.91075 ms (worst 1.059167 ms), recorded, eviction candidates (off the actor since round 2) 3.085917 ms (worst 3.085917 ms), recorded, eviction dry run of the whole store 2.585584 ms (worst 2.675667 ms), eviction dry run protecting every other id 2.343917 ms (worst 2.384833 ms), eviction chunk of 1000 1.445416 ms (worst 1.634458 ms), purge selection (off the actor) 3.232792 ms (worst 3.232792 ms), recorded, purge chunk of 1000 1.01325 ms (worst 1.091375 ms), orphan GC doom chunk of 1000 0.2435 ms (worst 0.292833 ms), verification due list (off the actor) 0.772833 ms (worst 0.772833 ms), recorded, holders(of:known:) fallback scan 0.083708 ms (worst 0.326208 ms), recorded, purge(.evictable) chunk of 1000 1.501417 ms (worst 1.797875 ms), WP-B: grace start over every doomed key (probe, wall clock) 1.847375 ms (worst 1.847375 ms), recorded, WP-B: the reaper's queue over every deletable key (filter and sort) 1.953583 ms (worst 1.998666 ms), recorded, purge's reclaim pass, chunk of 1000 0.068333 ms (worst 0.073 ms), apply's eviction hook over a plan of 5000 blobs, each of its 5 chunks of 1000 records 1.444542 ms (worst 1.768875 ms), apply's eviction hook over a plan of 10000 blobs, each of its 10 chunks of 1000 records 1.485584 ms (worst 1.759125 ms), WP-B: setResidency of each chunk's 1000 victims alone (10 chunks) 0.895709 ms (worst 1.27225 ms), recorded
+C2 thread CPU of WP-C's stretches at 100000 assets: first records copy under a live snapshot 12.086709 ms (worst 12.898458 ms), recorded, first blob-table copy under a live snapshot 1.5755 ms (worst 1.743625 ms), recorded, WP-B: first present-table copy after a publication 6.751542 ms (worst 14.942291 ms), recorded, WP-B: the reaper's deletable filter 4.17725 ms (worst 4.342084 ms), recorded, WP-B: freeSpace() (probe, wall clock) 12.358833 ms (worst 16.845667 ms), recorded, snapshot capture 0.000833 ms (worst 0.007625 ms), holders of 1000 blobs 0.68325 ms (worst 0.759292 ms), holders of 1000 blobs by one scan of the records 6.124292 ms (worst 6.40575 ms), recorded, eviction candidates (off the actor since round 2) 61.013625 ms (worst 61.013625 ms), recorded, eviction dry run of the whole store 41.596333 ms (worst 45.916041 ms), recorded, eviction dry run protecting every other id 32.693208 ms (worst 34.542667 ms), recorded, eviction chunk of 1000 1.873166 ms (worst 2.0545 ms), purge selection (off the actor) 84.539959 ms (worst 84.539959 ms), recorded, purge chunk of 1000 1.512458 ms (worst 1.696 ms), orphan GC doom chunk of 1000 0.303708 ms (worst 0.341042 ms), verification due list (off the actor) 130.545042 ms (worst 130.545042 ms), recorded, holders(of:known:) fallback scan 2.488458 ms (worst 3.83125 ms), recorded, purge(.evictable) chunk of 1000 1.882708 ms (worst 7.377209 ms), WP-B: grace start over every doomed key (probe, wall clock) 36.918208 ms (worst 36.918208 ms), recorded, WP-B: the reaper's queue over every deletable key (filter and sort) 23.20775 ms (worst 23.961916 ms), recorded, purge's reclaim pass, chunk of 1000 0.138875 ms (worst 0.15975 ms), apply's eviction hook over a plan of 50000 blobs, each of its 50 chunks of 1000 records 1.843584 ms (worst 7.453083 ms), apply's eviction hook over a plan of 100000 blobs, each of its 100 chunks of 1000 records 1.7855 ms (worst 7.215083 ms), WP-B: setResidency of each chunk's 1000 victims alone (100 chunks) 1.340333 ms (worst 7.116 ms), recorded
+C2 longest actor hold at 100000 assets (WP-C operations, one run, WP-B's stretches inside them included): storage report 8.562208 ms, verification slice of 1,000 blobs 2.444125 ms, orphan GC of 100 orphans 3.171583 ms, quarantine of one blob 5.359958 ms, quota eviction of half 22.768917 ms, purge(.all) of the rest 24.343708 ms, purge(.evictable) of a full store 38.40775 ms, purge(.all) of a full store 39.907583 ms, orphan GC of 100000 orphans 19.250667 ms
+✔ Test "C2: WP-C's actor stretches at 10,000 and at 100,000 assets (maxEntries), thread CPU per stretch" passed after 54.596 seconds.
+◇ Test "C2: legacy migration's actor holds at 10,000 and at 100,000 legacy files" started.
+C2 legacy migration over 10000 files with access stamps: 3 last calls, finished: false, 29535 stamps
+C2 legacy migration over 10000 files with access stamps: 3 last calls, finished: false, 33634 stamps
+C2 legacy migration over 10000 files with access stamps: 3 last calls, finished: false, 17686 stamps
+C2 longest actor hold of legacy migration over 10000 files (best of 3): open() with phase 1 0.167541 ms (max of runs 0.264833 ms), longest batch of 500 0.69875 ms (max of runs 0.750334 ms), last call with phases 3 and 4 2.055459 ms (max of runs 2.356459 ms), last calls while access stamps arrive 3.245833 ms (max of runs 4.899625 ms)
+C2 legacy migration over 100000 files with access stamps: 3 last calls, finished: false, 31632 stamps
+C2 longest actor hold of legacy migration over 100000 files (best of 1): open() with phase 1 1.774875 ms (max of runs 1.774875 ms), longest batch of 500 15.708708 ms (max of runs 15.708708 ms), last call with phases 3 and 4 8.015125 ms (max of runs 8.015125 ms), last calls while access stamps arrive 9.692916 ms (max of runs 9.692916 ms)
+✔ Test "C2: legacy migration's actor holds at 10,000 and at 100,000 legacy files" passed after 32.465 seconds.
+◇ Test "C2: quota eviction holds the actor at most 10 ms at 10,000 records when five or ten ids share each blob" started.
+C2 with shared blobs at 10,000 records (best of 3): quota eviction of every blob with 5 ids per blob 2.167166 ms (max of runs 2.501 ms), quota eviction of every blob with 10 ids per blob 2.072833 ms (max of runs 2.124917 ms), eviction of one blob 10,000 ids share (thread CPU) 16.39675 ms (max of runs 16.435666 ms)
+✔ Test "C2: quota eviction holds the actor at most 10 ms at 10,000 records when five or ten ids share each blob" passed after 3.590 seconds.
+◇ Test "C2: quota eviction, apply's eviction plan and an evictable purge hold the actor at most 10 ms at 10,000 assets when ids were bound to their blobs after the selection" started.
+C2 after ids were bound to the selected blobs at 10,000 assets (best of 3): quota eviction after an alias was bound to every candidate 3.224375 ms (max of runs 3.431875 ms), apply renaming every id with an eviction plan of half 3.0775 ms (max of runs 3.285916 ms), purge(.evictable) after an alias was bound to every selected blob 6.512709 ms (max of runs 6.684375 ms), apply's eviction hook over a plan of half, longest chunk (thread CPU) 1.782542 ms (max of runs 2.105625 ms), apply's eviction hook over a plan of half after a rename, longest chunk (thread CPU) 0.193833 ms (max of runs 0.236083 ms), purge(.evictable) chunk of 1,000 blobs after an alias was bound to each (thread CPU) 5.838916 ms (max of runs 6.783334 ms), apply's eviction hook over a plan of half after an alias was bound to half its blobs, longest chunk (thread CPU) 2.862 ms (max of runs 3.972583 ms)
+✔ Test "C2: quota eviction, apply's eviction plan and an evictable purge hold the actor at most 10 ms at 10,000 assets when ids were bound to their blobs after the selection" passed after 10.187 seconds.
+◇ Test "C2: apply holds the actor at most 10 ms at 10,000 records with an eviction plan of the whole store, of one or two ids per blob, and while it binds aliases" started.
+C2 of apply with an eviction plan at 10,000 records (best of 3): apply with an eviction plan of every blob, one id per blob 1.881 ms (max of runs 2.181833 ms), apply with an eviction plan of every blob, two ids per blob 2.335958 ms (max of runs 2.480375 ms), apply with an eviction plan of half the blobs, two ids per blob 2.388417 ms (max of runs 3.1565 ms), apply binding an alias to half the planned blobs, with an eviction plan of every blob 3.060542 ms (max of runs 3.269875 ms)
+✔ Test "C2: apply holds the actor at most 10 ms at 10,000 records with an eviction plan of the whole store, of one or two ids per blob, and while it binds aliases" passed after 5.554 seconds.
+✔ Suite "CleanupBenchmarks" passed after 120.129 seconds.
+◇ Suite "KitBenchmarks" started.
+◇ Test "P-1: lookup on the main actor stays under lookup_p99_us at 10,000 assets and scales within scale_ratio_max" started.
+P-1 lookup p99 0.458 µs at 10,000 (median 0.292), 0.334 µs at 100; ratio 1.3712574850299402 (max 3.0); budget 25.0 µs
+✔ Test "P-1: lookup on the main actor stays under lookup_p99_us at 10,000 assets and scales within scale_ratio_max" passed after 0.031 seconds.
+◇ Test "P-8: UI-facing calls make zero main-thread file-system calls and each stays within ui_call_ms_max" started.
+P-8 main-thread file-system calls 0 (max 0)
+P-8 events: p99 0.0037080000000000004 ms, max 0.032209 ms (budget 1.0 ms)
+P-8 locate: p99 0.000833 ms, max 0.012666 ms (budget 1.0 ms)
+P-8 lookup: p99 0.000584 ms, max 0.003542 ms (budget 1.0 ms)
+P-8 prefetch: p99 0.004333 ms, max 0.012875 ms (budget 1.0 ms)
+P-8 register: p99 0.002417 ms, max 0.008417 ms (budget 1.0 ms)
+P-8 resolve entry: p99 0.002875 ms, max 0.010459 ms (budget 1.0 ms)
+P-8 unregister: p99 0.002458 ms, max 0.003375 ms (budget 1.0 ms)
+P-8 window update: p99 0.010583 ms, max 0.015167 ms (budget 1.0 ms)
+✔ Test "P-8: UI-facing calls make zero main-thread file-system calls and each stays within ui_call_ms_max" passed after 0.568 seconds.
+◇ Test "P-8: the fallback chain's bundle step does no work on the main thread" started.
+P-8 bundle enumerations [false] (on main: 0); locate 0.000128417 ms per call (budget 1.0 ms)
+✔ Test "P-8: the fallback chain's bundle step does no work on the main thread" passed after 0.001 seconds.
+◇ Test "P-9: 64 concurrent resolves plus hashing keep the heartbeat gap p99 within budget" started.
+P-9 64 resolves of 2 MiB in 0.656411583 seconds; heartbeat gaps 48, p99 15.056 ms, max 15.056 ms (budget 50.0 ms, tick 10.0 ms)
+✔ Test "P-9: 64 concurrent resolves plus hashing keep the heartbeat gap p99 within budget" passed after 0.820 seconds.
+◇ Test "P-12: AssetClient.init completes within init_ms_max and performs no file-system call" started.
+P-12 init p99 0.003333 ms over fakes, 0.004791999999999999 ms over .live() (budget 1.0 ms); file-system calls 0
+✔ Test "P-12: AssetClient.init completes within init_ms_max and performs no file-system call" passed after 0.002 seconds.
+✔ Suite "KitBenchmarks" passed after 1.423 seconds.
+◇ Suite "ModelBenchmarks" started.
+◇ Test "P-3: decoding and validating the 3.3 MB reference manifest stays under manifest_decode_validate_ms" started.
+P-3 reference 3283455 bytes: p50 18.391166 ms, max 18.576875 ms, budget 80.0 ms
+✔ Test "P-3: decoding and validating the 3.3 MB reference manifest stays under manifest_decode_validate_ms" passed after 0.365 seconds.
+◇ Test "P-3: the reference decode rate holds for fuzzed manifests at the 32 MiB payload limit, keeping R-MAN-3 within 1 s" started.
+P-3 at the limit, dense manifest: 33064934 bytes, worst 206.390792 ms, threshold 817.5396221358295 ms
+P-3 at the limit, dense manifest truncated: 24798700 bytes, worst 68.692667 ms, threshold 817.5396221358295 ms
+P-3 at the limit, dense manifest with edits: 33064934 bytes, worst 37.748208 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge unknown string: 33554172 bytes, worst 17.530959 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge multi-byte string: 33554170 bytes, worst 105.187459 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge escaped file name: 33554173 bytes, worst 104.822708 ms, threshold 817.5396221358295 ms
+P-3 at the limit, deep nesting: 33554432 bytes, worst 0.001167 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings: 14600001 bytes, worst 43.727541 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings, keepFirst: 14600001 bytes, worst 43.061958 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings, at the estimate's limit: 16199954 bytes, worst 94.038125 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 entries with one 16-byte path component and one 16-byte tag, at the estimate's limit: 17053287 bytes, worst 98.79875 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 entries with three 16-byte path components, at the estimate's limit: 18333287 bytes, worst 93.472083 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 60,000 entries with three 16-byte strings and three 16-byte path components, at the estimate's limit: 13732933 bytes, worst 74.360708 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 minimal entries, at the estimate's limit: 11079954 bytes, worst 63.58675 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 empty objects, quarantined: 300001 bytes, worst 9.187292 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 25-byte path components: 33553806 bytes, worst 120.434875 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 61 one-byte tags per entry: 33554361 bytes, worst 297.0755 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge identifier: 33554169 bytes, worst 17.831125 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge tag: 33554174 bytes, worst 18.047959 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge checksum: 33554176 bytes, worst 20.222125 ms, threshold 817.5396221358295 ms
+P-3 at the limit, entries sharing one identifier, keepFirst: 8100001 bytes, worst 56.535334 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 32 empty path components and 31 one-byte tags per entry, at the estimate's limit: 23627640 bytes, worst 183.709583 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 31 one-byte tags per entry, at the estimate's limit: 28146620 bytes, worst 212.216125 ms, threshold 817.5396221358295 ms
+P-3 at the limit, shortest escaped 8-byte unknown keys, assets before schemaVersion: 33554429 bytes, worst 328.32725 ms, threshold 817.5396221358295 ms
+P-3 at the limit, shortest escaped 8-byte unknown keys in one entry: 33554428 bytes, worst 199.563958 ms, threshold 817.5396221358295 ms
+P-3 at the limit, escaped 13-byte unknown keys in the envelope: 33554415 bytes, worst 108.252875 ms, threshold 817.5396221358295 ms
+✔ Test "P-3: the reference decode rate holds for fuzzed manifests at the 32 MiB payload limit, keeping R-MAN-3 within 1 s" passed after 13.899 seconds.
+✔ Suite "ModelBenchmarks" passed after 14.265 seconds.
+◇ Suite "StorageBenchmarks" started.
+◇ Test "P-2: cold index load of 10,000 records off the main thread is under budget" started.
+P-2 index load, 1411449 bytes, 10,000 records: p50 9.945208 ms, p95 10.176 ms, max 10.200583 ms, budget 25.0 ms
+✔ Test "P-2: cold index load of 10,000 records off the main thread is under budget" passed after 0.344 seconds.
+◇ Test "P-5: index commit of 10,000 records is under budget and a bulk sync commits at most 4 per second" started.
+P-5 commit of 10,000 records, 16 dirty fan-outs: ordered p50 13.940292 ms, p95 14.387291 ms, max 14.398667 ms; durable p50 20.715791 ms, p95 27.910208 ms, max 27.910208 ms; budget 40.0 ms. Bulk sync: 40 commits in 10 s, at most 4 in any second, budget 4.0
+✔ Test "P-5: index commit of 10,000 records is under budget and a bulk sync commits at most 4 per second" passed after 1.162 seconds.
+◇ Test "P-6: streaming SHA-256 of 256 MiB meets the throughput floor, the one-shot ratio and the memory cap" started.
+P-6 streaming SHA-256 of 256 MiB: 2331.0364512834094 MB/s, one-shot 2861.182810655539 MB/s, ratio 0.814710770175966, peak resident delta 0.0 MiB over 1542 in-read samples; floors 800.0 MB/s, 0.7x, cap 4.0 MiB
+✔ Test "P-6: streaming SHA-256 of 256 MiB meets the throughput floor, the one-shot ratio and the memory cap" passed after 1.813 seconds.
+◇ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" started.
+P-13 reclaim of 10000 blobs: 0.63135775 s in 504 units, unit max 10.160917 ms (p50 0.963834 ms, p95 0.993 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.044417 ms, p99 0.066542 ms, max 0.160334 ms; unit on-CPU max 1.0215 ms; units over the batch budget: ["7.848958 ms wall, 0.165583 ms on CPU", "6.670125 ms wall, 0.321375 ms on CPU", "7.277958 ms wall, 0.377958 ms on CPU", "6.105375 ms wall, 0.629917 ms on CPU", "10.160917 ms wall, 0.496125 ms on CPU", "8.172959 ms wall, 0.9325 ms on CPU"]; blob unlinks inside the reclaim: max 9.827708 ms, 6 over 4.0 ms [7.785541, 6.451667, 7.027833, 5.548583, 9.827708, 7.383208]
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+↳ every batch between suspension points: the longest deletion unit took 10.160917 ms
+↳ longest <= batchBudget → false
+↳   longest → 10.160917
+↳   batchBudget → 5.0
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.205 seconds with 1 issue.
+◇ Test "C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch" started.
+C2 longest actor hold at 10,000 assets: first apply 0.746459 ms (max of runs 0.787375 ms), open 0.72025 ms (max of runs 1.318833 ms), unchanged re-apply 0.036416 ms (max of runs 0.060334 ms), prune of all 2.550959 ms (max of runs 2.899792 ms), re-adoption of all 3.119 ms (max of runs 3.650375 ms); budget 10.0 ms
+✔ Test "C2: open and apply of 10,000 assets never hold the store's actor for more than 10 ms at a stretch" passed after 4.235 seconds.
+✘ Suite "StorageBenchmarks" failed after 9.762 seconds with 1 issue.
+↳ /// P-2, P-5, P-6 and P-13 (WP-B), release configuration, live file system in directories inside this repository
+↳ /// (`.build-tests/`, git-ignored). Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// **Statistics (ADR draft B-9, as ruled by the orchestrator at the L2 close-out).** P-2 judges the p95 of cold
+↳ /// loads. P-5 judges **both** the ordered commit a bulk sync performs and the durable one (flush, close, adoption
+↳ /// report) on their p95 against `index_commit_ms`; the commits-per-second ceiling is a hard maximum over every
+↳ /// sliding second. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
+↳ /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
+↳ /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
+↳ /// duration is asserted against `batch_ms_max` (p50 and p95 printed beside it); the unit's time budget (ADR draft
+↳ /// B-10) makes it fit by design, and an unlink profile of this volume is printed as the justification. Figures
+↳ /// measured while other worktrees build are informative; the orchestrator's quiet-machine run is the reference.
+↳ /// C2 has no budget key: its test reports the longest hold of the store's actor seen by a probe, best of five
+↳ /// runs, against the rule's own 10 ms.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "P-4: planning 10,000 vs 10,000 entries with 10% churn stays within plan_ms and scales by at most doubling_ratio_max" started.
+P-4 plan 10,000: 15.833917 ms (budget 20.0); 20,000: 27.121958 ms; ratio 1.7129026254211135 (max 2.5)
+✔ Test "P-4: planning 10,000 vs 10,000 entries with 10% churn stays within plan_ms and scales by at most doubling_ratio_max" passed after 1.105 seconds.
+◇ Test "P-14: after quiescence the engine owns at most idle_timers_max timers and idle_tasks_max tasks" started.
+P-14 armed timers 0 (max 0), owned tasks 0 (max 0), sleepers 0
+✔ Test "P-14: after quiescence the engine owns at most idle_timers_max timers and idle_tasks_max tasks" passed after 0.016 seconds.
+◇ Test "P-7: a 1 GiB synthetic bulk sync adds at most sync_memory_delta_mib_max MiB and does not grow with catalog size" started.
+P-7 resident delta: 0.875 MiB for 256 MiB, 0.171875 MiB for 1024 MiB (max 48.0)
+✔ Test "P-7: a 1 GiB synthetic bulk sync adds at most sync_memory_delta_mib_max MiB and does not grow with catalog size" passed after 5.412 seconds.
+◇ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" started.
+P-11 200 assets at 10.0 ms: concurrency 1 3.308115917 s, 5 1.026475333 s, speedup 3.222791440425193 (min 3.0)
+✔ Test "P-11: assets with server latency sync at least speedup_min times faster at the configured concurrency than at 1" passed after 4.344 seconds.
+◇ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber costs at most twice the same sync with nobody subscribed" started.
+R-SYN-12 prune of 10,000 ids: nobody subscribed 0.009682917 s, one stalled subscriber 0.013150958 s, ratio 1.3581607691153401 (max 2, plus 5 ms)
+✔ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber costs at most twice the same sync with nobody subscribed" passed after 0.584 seconds.
+◇ Test "R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, hold the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" started.
+R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking 5.011459 ms, during an ENOSPC's free-space read 3.359875 ms (budgets 50.0 ms median, 10.0 ms best); runs [8.3755, 4.139917, 5.011459] and [3.105375, 3.359875, 3.788667]
+✔ Test "R-SYN-11: parking a 10,000-member prefetch group for lack of space, and an ENOSPC's free-space read over it, hold the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" passed after 5.098 seconds.
+◇ Test "R-SYN-11: re-admitting 10,000 prefetch members parked for lack of space when the volume gains room holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait 5.259083 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.939833, 5.259083, 5.055417]
+✔ Test "R-SYN-11: re-admitting 10,000 prefetch members parked for lack of space when the volume gains room holds the engine's actor at most C2's 10 ms per turn" passed after 0.938 seconds.
+◇ Test "R-SYN-13: losing and regaining the network under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" started.
+R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline 1.38925 ms, coming back 4.3235 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.38925, 1.373542, 1.389458] and [4.3235, 4.063709, 5.039541]
+✔ Test "R-SYN-13: losing and regaining the network under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn and never longer than P-9's heartbeat_gap_ms_p99_max" passed after 0.943 seconds.
+◇ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" started.
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 5.501958 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.008, 5.459709, 5.501958]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 0.663 seconds.
+◇ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" started.
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 1.769875 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.59325, 1.769875, 1.906791]; at 1,000: 0.552 ms; the group without waiters: [0.668375, 0.667667, 0.623583]
+✔ Test "R-SYN-15: shutting down under a 10,000-member prefetch group and 10,000 waiting resolves holds the engine's actor at most C2's 10 ms per turn and answers every waiter shutDown" passed after 8.966 seconds.
+◇ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 1.237625 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.237625, 1.23975, 1.228334]
+✔ Test "R-SYN-6: a sync that applies a new manifest under a 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" passed after 0.796 seconds.
+◇ Test "R-SYN-6: a sync whose manifest changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait 4.286 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.335542, 4.256542, 4.286]
+✔ Test "R-SYN-6: a sync whose manifest changes the content of every member of a waiting 10,000-member prefetch group holds the engine's actor at most C2's 10 ms per turn" passed after 1.425 seconds.
+◇ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait 5.777 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.047166, 5.777, 4.995792]
+✔ Test "R-SYN-12: announcing a 10,000-id prune to a stalled subscriber holds the engine's actor at most C2's 10 ms per turn" passed after 0.372 seconds.
+◇ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 1.251 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.251, 1.231166, 1.251583]
+✔ Test "R-SYN-5: retries of 10,000 prefetch members falling due together hold the engine's actor at most C2's 10 ms per turn" passed after 3.397 seconds.
+◇ Test "R-SYN-4: releasing a 10,000-member prefetch handle of user-initiated priority holds the engine's actor at most C2's 10 ms per turn and leaves no job" started.
+R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait 5.400292 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.679667, 5.400292, 5.355208]
+✔ Test "R-SYN-4: releasing a 10,000-member prefetch handle of user-initiated priority holds the engine's actor at most C2's 10 ms per turn and leaves no job" passed after 0.688 seconds.
+◇ Test "R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-3 re-join of a released 10,000-member prefetch handle: longest actor wait 5.685875 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.873875, 5.660541, 5.685875]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-3 re-join of a released 10,000-member bulk handle: longest actor wait 5.877333 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.199084, 5.6795, 5.877333]; members re-joined while the release was pending [432, 432, 432]
+✔ Test "R-SYN-3: re-registering the members of a released 10,000-member handle holds the engine's actor at most C2's 10 ms per turn" passed after 5.738 seconds.
+◇ Test "R-SYN-4: cancelling a resolve while 10,000 prefetch members wait holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait 0.022333 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.028417, 0.021708, 0.022333]
+✔ Test "R-SYN-4: cancelling a resolve while 10,000 prefetch members wait holds the engine's actor at most C2's 10 ms per turn" passed after 0.471 seconds.
+◇ Test "R-SYN-5: a breaker cooldown's end over 10,000 prefetch members parked by it holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait 0.077 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.07025, 0.103792, 0.077]
+✔ Test "R-SYN-5: a breaker cooldown's end over 10,000 prefetch members parked by it holds the engine's actor at most C2's 10 ms per turn" passed after 0.979 seconds.
+◇ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" started.
+R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait 0.80325 ms (budgets 50.0 ms median, 10.0 ms best); totals [1.176257666, 1.170363458, 1.160916333] s; runs [3.086792, 0.80325, 0.441667]
+✔ Test "R-SYN-5: a chain of half-open probes ending without a verdict over 10,000 prefetch members parked by the breaker holds the engine's actor at most C2's 10 ms per turn, and reports the chain's total time" passed after 4.177 seconds.
+◇ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait 9.216375 ms (budgets 50.0 ms median, 10.0 ms best); runs [9.830458, 9.216375, 8.130333]
+✔ Test "R-SYN-5: a 429 that extends the throttle under 10,000 user-initiated waiters holds the engine's actor at most C2's 10 ms per turn" passed after 13.068 seconds.
+◇ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 4.105834 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.105834, 3.936542, 4.222125]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 5.10625 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.10625, 5.082084, 5.875625]
+✔ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" passed after 7.341 seconds.
+◇ Test "R-SYN-11: a reclaim of space during an owed follow that changed one member in 20 of a 10,000-member prefetch group, its sweeps following the owed visits and then judging every member, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 1 handle(s): longest actor wait 6.841583 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.609792, 6.841583, 8.674541]
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 2 handle(s): longest actor wait 7.861584 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.861584, 10.553292, 7.587417]
+✔ Test "R-SYN-11: a reclaim of space during an owed follow that changed one member in 20 of a 10,000-member prefetch group, its sweeps following the owed visits and then judging every member, holds the engine's actor at most C2's 10 ms per turn" passed after 7.461 seconds.
+◇ Test "R-SYN-11: the end of an owed follow that changed every member of a 10,000-member prefetch group, and the drain of 10,000 places in a queue that waited for it, hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 follow end and drain of 10,000 places under 10,000 changed prefetch members: longest actor wait 5.150542 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.122541, 5.226208, 5.150542]; follow ended [192.188166, 193.673625, 194.18425] ms and drain ended [192.191458, 193.892833, 194.269833] ms after the release
+✔ Test "R-SYN-11: the end of an owed follow that changed every member of a 10,000-member prefetch group, and the drain of 10,000 places in a queue that waited for it, hold the engine's actor at most C2's 10 ms per turn" passed after 2.459 seconds.
+◇ Test "R-SYN-11: an owed follow's last turn, a full turn of visits under a 10,000-member prefetch group plus the first batch of 10,000 places that waited for it, holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 follow's last turn plus the drain's first batch under 10,000 prefetch members and 10,000 waiting places: the turn [4.891166, 4.90975, 4.888708] ms; longest actor wait 5.189333 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.121333, 5.189333, 5.299083]
+✔ Test "R-SYN-11: an owed follow's last turn, a full turn of visits under a 10,000-member prefetch group plus the first batch of 10,000 places that waited for it, holds the engine's actor at most C2's 10 ms" passed after 2.126 seconds.
+◇ Test "R-SYN-5: an attempt's end and a 429 while an owed follow covers 10,000 jobs hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-5 attempt end and 429 while an owed follow covers 10,000 jobs: longest actor wait at the 404 3.739125 ms; followedLane [2.811166, 2.800292, 2.99] ms (budgets 50.0 ms median, 10.0 ms best); runs [3.679375, 3.739125, 4.112292]
+✔ Test "R-SYN-5: an attempt's end and a 429 while an owed follow covers 10,000 jobs hold the engine's actor at most C2's 10 ms per turn" passed after 3.308 seconds.
+◇ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose attempt ends in a 404 hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, a 404 whose verdict waits: longest actor wait [6.560083, 6.753459, 7.687875] ms, best 6.560083 ms; the commit window [0.0, 0.0, 0.0] ms; longest held turn [6.55675, 6.749458, 7.668042] ms; followedLane with the moves owed [3.967417, 3.660167, 6.809166] ms (budget 10.0 ms best); runs [wait 6.560083 ms, ending 5.85925 ms, commit 0.0 ms (committed false, served false, re-routed 0); 9745 jobs, follow owed true, O ids 0, 0 jobs left, verdict waits true, followedLane Optional(3.967417) ms; 40 held turns, longest 6.55675 ms, median 1.699875 ms, wait 6.753459 ms, ending 6.177917 ms, commit 0.0 ms (committed false, served false, re-routed 0); 9745 jobs, follow owed true, O ids 0, 0 jobs left, verdict waits true, followedLane Optional(3.660167) ms; 40 held turns, longest 6.749458 ms, median 1.673792 ms, wait 7.687875 ms, ending 7.389292 ms, commit 0.0 ms (committed false, served false, re-routed 0); 9745 jobs, follow owed true, O ids 0, 0 jobs left, verdict waits true, followedLane Optional(6.809166) ms; 40 held turns, longest 7.668042 ms, median 1.934875 ms]
+✔ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose attempt ends in a 404 hold the engine's actor at most C2's 10 ms per turn" passed after 4.412 seconds.
+◇ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose publication begins and commits hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, a publication through its commit: longest actor wait [14.647708, 10.206833, 10.454666] ms, best 10.206833 ms; the commit window [14.647708, 10.206833, 10.454666] ms; longest held turn [5.364625, 3.857791, 3.872] ms; followedLane with the moves owed [] ms (budget 10.0 ms best); runs [wait 14.647708 ms, ending 9.560583 ms, commit 14.647708 ms (committed true, served true, re-routed 0); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 38 held turns, longest 5.364625 ms, median 2.291333 ms, wait 10.206833 ms, ending 5.569542 ms, commit 10.206833 ms (committed true, served true, re-routed 0); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 38 held turns, longest 3.857791 ms, median 1.8265 ms, wait 10.454666 ms, ending 6.349417 ms, commit 10.454666 ms (committed true, served true, re-routed 0); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 38 held turns, longest 3.872 ms, median 1.88475 ms]
+✘ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose publication begins and commits hold the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:722:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ a publication through its commit: [14.647708, 10.206833, 10.454666]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 10.206833
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose publication begins and commits hold the engine's actor at most C2's 10 ms per turn" failed after 5.304 seconds with 1 issue.
+↳ /// As `concentrationNotFoundTurns`, when the content's download completes and its publication begins (held at
+↳ /// its first store unit): the heartbeat's longest wait runs from the release until the publication reaches the
+↳ /// store, so it covers the publication's own turns and the moves its binding waits for; then, once the follow's
+↳ /// remaining turns ran, through the commit, which binds and answers all 10,001 ids (`committed`; Stage 3
+↳ /// close-out cycle 20, rulings S3-R24 item 2 and S3-R25 item 11, RR-21: the cycle-19 requirements verifier
+↳ /// measured that window at 9.64 ms best, at a load of 3.84).
+◇ Test "R-SYN-11: the commit of a publication whose 10,000 converged ids an apply moved away re-routes them holding the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, a commit that re-routes the ids moved away: longest actor wait [49.346125, 49.873084, 49.936542] ms, best 49.346125 ms; the commit window [49.346125, 49.873084, 49.936542] ms; longest held turn [3.891542, 5.161083, 3.881333] ms; followedLane with the moves owed [] ms (budget 10.0 ms best); runs [wait 49.346125 ms, ending 5.5815 ms, commit 49.346125 ms (committed true, served true, re-routed 10000); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 38 held turns, longest 3.891542 ms, median 1.791041 ms, wait 49.873084 ms, ending 5.9715 ms, commit 49.873084 ms (committed true, served true, re-routed 10000); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 38 held turns, longest 5.161083 ms, median 1.9825 ms, wait 49.936542 ms, ending 6.18 ms, commit 49.936542 ms (committed true, served true, re-routed 10000); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 38 held turns, longest 3.881333 ms, median 1.868167 ms]
+✘ Test "R-SYN-11: the commit of a publication whose 10,000 converged ids an apply moved away re-routes them holding the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:722:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ a commit that re-routes the ids moved away: [49.346125, 49.873084, 49.936542]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 49.346125
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: the commit of a publication whose 10,000 converged ids an apply moved away re-routes them holding the engine's actor at most C2's 10 ms per turn" failed after 4.116 seconds with 1 issue.
+↳ /// As `concentrationPublicationTurns`, when v4 maps the 10,000 members to another content while the publication
+↳ /// waits at the store (Stage 3 close-out cycle 20, rulings S3-R24 item 2 and S3-R25 item 11, RR-21): the store
+↳ /// binds only O's own id, and the commit re-routes the other 10,000 interests to the content v4 names (one job).
+↳ /// The heartbeat's longest wait over the commit, the best of three against C2.
+◇ Test "R-SYN-11: an owed follow's own turns moving 10,000 ids onto one content hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, no ending: longest actor wait [3.766084, 3.832375, 3.804125] ms, best 3.766084 ms; the commit window [0.0, 0.0, 0.0] ms; longest held turn [3.760541, 3.82725, 3.798958] ms; followedLane with the moves owed [] ms (budget 10.0 ms best); runs [wait 3.766084 ms, ending 0.0 ms, commit 0.0 ms (committed false, served false, re-routed 0); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 39 held turns, longest 3.760541 ms, median 1.708375 ms, wait 3.832375 ms, ending 0.0 ms, commit 0.0 ms (committed false, served false, re-routed 0); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 39 held turns, longest 3.82725 ms, median 1.713084 ms, wait 3.804125 ms, ending 0.0 ms, commit 0.0 ms (committed false, served false, re-routed 0); 9745 jobs, follow owed true, O ids 10001, 1 jobs left, verdict waits false, followedLane nil ms; 39 held turns, longest 3.798958 ms, median 1.68775 ms]
+✔ Test "R-SYN-11: an owed follow's own turns moving 10,000 ids onto one content hold the engine's actor at most C2's 10 ms per turn" passed after 3.606 seconds.
+◇ Test "R-SYN-11: the drain's verdict on a job holding 10,000 ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 the drain's verdict on a job holding 10,000 ids moved off before it and back: longest actor wait [49.077417, 52.474458, 52.247166] ms, best 49.077417 ms; longest held turn [49.0695, 52.4675, 52.2395] ms (budget 10.0 ms best); runs [wait 49.077417 ms; moved before 10000, held 10000, verdict given true, re-routed 10000; 4 held turns, longest 49.0695 ms, wait 52.474458 ms; moved before 10000, held 10000, verdict given true, re-routed 10000; 4 held turns, longest 52.4675 ms, wait 52.247166 ms; moved before 10000, held 10000, verdict given true, re-routed 10000; 4 held turns, longest 52.2395 ms]
+✘ Test "R-SYN-11: the drain's verdict on a job holding 10,000 ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:689:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [49.077417, 52.474458, 52.247166]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 49.077417
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: the drain's verdict on a job holding 10,000 ids moved off it before the verdict and back holds the engine's actor at most C2's 10 ms per turn" failed after 1.285 seconds with 1 issue.
+↳ /// C2 of the drain's verdict on a job whose 10,000 ids a visit-first engine's visits had moved off it before the
+↳ /// verdict arrived, and a later apply moved back (Stage 3 close-out cycle 20, rulings S3-R24 item 2 and S3-R25
+↳ /// item 11, RR-21; `SyncBench.movedBeforeDrain`): the drain takes them off the job before the verdict
+↳ /// (`takeOffMovedBefore`) and re-routes them after it (`rerouteMovedBefore`). The heartbeat's longest wait from the
+↳ /// follow's held turns' release until the verdict is given, the best of three against C2, after a warm-up.
+◇ Test "R-SYN-11: the walk an apply makes for the publications in flight while an owed follow covers 10,000 jobs holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 the walk an apply makes for the publications in flight while an owed follow covers 10,000 jobs: median of 21 calls [3.40925, 2.74825, 2.339708] ms, best 2.339708 ms; the apply's longest actor wait [7.768167, 4.50225, 5.175292] ms, best 4.50225 ms; with a move found for nearly every member [6.695375, 6.310916, 6.241708] ms, best 6.241708 ms (budget 10.0 ms best); runs [walk 3.40925 ms, apply 7.768167 ms; 10001 jobs, follow owed true, publishing true, 0 moves found, walk 2.74825 ms, apply 4.50225 ms; 10001 jobs, follow owed true, publishing true, 0 moves found, walk 2.339708 ms, apply 5.175292 ms; 10001 jobs, follow owed true, publishing true, 0 moves found] [walk 0.0 ms, apply 6.695375 ms; 9745 jobs, follow owed true, publishing true, 9744 moves found, walk 0.0 ms, apply 6.310916 ms; 9745 jobs, follow owed true, publishing true, 9744 moves found, walk 0.0 ms, apply 6.241708 ms; 9745 jobs, follow owed true, publishing true, 9744 moves found]
+✔ Test "R-SYN-11: the walk an apply makes for the publications in flight while an owed follow covers 10,000 jobs holds the engine's actor at most C2's 10 ms" passed after 7.784 seconds.
+◇ Test "R-SYN-6: an apply that moves 10,000 members sharing one content, onto one other content or each onto a content of its own, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 an apply moving 10,000 members that share one content: onto one other content, longest actor wait [7.075708, 6.99325, 6.9815] ms, best 6.9815 ms; each onto a content of its own [7.396333, 7.520791, 8.201917] ms, best 7.396333 ms (budget 10.0 ms best); runs [wait 7.075708 ms; 10000 ids before, O's job 10001 after; 1 jobs after, follow owed false, wait 6.99325 ms; 10000 ids before, O's job 10001 after; 1 jobs after, follow owed false, wait 6.9815 ms; 10000 ids before, O's job 10001 after; 1 jobs after, follow owed false] [wait 7.396333 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 7.520791 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 8.201917 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false]
+✔ Test "R-SYN-6: an apply that moves 10,000 members sharing one content, onto one other content or each onto a content of its own, holds the engine's actor at most C2's 10 ms per turn" passed after 2.158 seconds.
+◇ Test "R-SYN-6: an apply that maps 10,000 ids converged on one content away again holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 an apply mapping 10,000 ids converged on one content away again: back to their own contents, longest actor wait [7.71425, 7.221166, 7.99025] ms, best 7.221166 ms; on to fresh contents [7.390167, 7.554042, 8.068292] ms, best 7.390167 ms (budget 10.0 ms best); runs [wait 7.71425 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 7.221166 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 7.99025 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false] [wait 7.390167 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 7.554042 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 8.068292 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false]
+✔ Test "R-SYN-6: an apply that maps 10,000 ids converged on one content away again holds the engine's actor at most C2's 10 ms per turn" passed after 8.066 seconds.
+◇ Test "R-SYN-11: an attempt's end that brings 10,000 ids one job holds onto its content while a follow is owed holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 an attempt's end bringing 10,000 ids one job holds onto its content during an owed follow: longest actor wait [7.367791, 7.369084, 7.362083] ms, best 7.362083 ms; longest held turn [7.363708, 7.365125, 7.357917] ms (budget 10.0 ms best); runs [wait 7.367791 ms; H held 10000 ids, owed its visit true, verdict waits true, answered true; 20 held turns, longest 7.363708 ms, wait 7.369084 ms; H held 10000 ids, owed its visit true, verdict waits true, answered true; 20 held turns, longest 7.365125 ms, wait 7.362083 ms; H held 10000 ids, owed its visit true, verdict waits true, answered true; 20 held turns, longest 7.357917 ms]
+✔ Test "R-SYN-11: an attempt's end that brings 10,000 ids one job holds onto its content while a follow is owed holds the engine's actor at most C2's 10 ms per turn" passed after 1.315 seconds.
+◇ Test "R-SYN-6: the drain's visits after 16 waiting verdicts that move their members off their jobs hold the engine's actor at most C2's 10 ms per turn" started.
+◇ Test case passing 1 argument perJob → 500 to "R-SYN-6: the drain's visits after 16 waiting verdicts that move their members off their jobs hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 the drain's visits after 16 waiting verdicts moving 8000 members off their jobs: longest held turn [4.625041, 4.2995, 4.418] ms, best 4.2995 ms; longest actor wait [4.631458, 4.304291, 4.423375] ms, best 4.304291 ms (budget 10.0 ms best); runs [24 turns, longest 4.625041 ms; heartbeat 4.631458 ms; verdicts waiting 16, ids held 8000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 320], 24 turns, longest 4.2995 ms; heartbeat 4.304291 ms; verdicts waiting 16, ids held 8000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 320], 24 turns, longest 4.418 ms; heartbeat 4.423375 ms; verdicts waiting 16, ids held 8000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 320]]
+◇ Test case passing 1 argument perJob → 625 to "R-SYN-6: the drain's visits after 16 waiting verdicts that move their members off their jobs hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 the drain's visits after 16 waiting verdicts moving 10000 members off their jobs: longest held turn [4.835375, 4.197792, 4.148083] ms, best 4.148083 ms; longest actor wait [4.852417, 4.202958, 4.153042] ms, best 4.153042 ms (budget 10.0 ms best); runs [30 turns, longest 4.835375 ms; heartbeat 4.852417 ms; verdicts waiting 16, ids held 10000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272], 30 turns, longest 4.197792 ms; heartbeat 4.202958 ms; verdicts waiting 16, ids held 10000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272], 30 turns, longest 4.148083 ms; heartbeat 4.153042 ms; verdicts waiting 16, ids held 10000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272]]
+✔ Test "R-SYN-6: the drain's visits after 16 waiting verdicts that move their members off their jobs hold the engine's actor at most C2's 10 ms per turn" with 2 test cases passed after 3.121 seconds.
+◇ Test "R-SYN-6: an apply that moves 10,000 ids sharing one content, each with a user-initiated waiter, holds the engine's actor at most C2's 10 ms per turn" started.
+◇ Test case passing 1 argument shape → .supersede to "R-SYN-6: an apply that moves 10,000 ids sharing one content, each with a user-initiated waiter, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 an apply moving 10,000 ids that share one content, a user-initiated waiter each, supersede: longest actor wait [9.164875, 7.644792, 7.450542] ms, best 7.450542 ms (budget 10.0 ms best); runs [wait 9.164875 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false, wait 7.644792 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false, wait 7.450542 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false]
+◇ Test case passing 1 argument shape → .keep to "R-SYN-6: an apply that moves 10,000 ids sharing one content, each with a user-initiated waiter, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-6 an apply moving 10,000 ids that share one content, a user-initiated waiter each, keep: longest actor wait [8.703458, 9.73625, 8.181375] ms, best 8.181375 ms (budget 10.0 ms best); runs [wait 8.703458 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false, wait 9.73625 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false, wait 8.181375 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false]
+✔ Test "R-SYN-6: an apply that moves 10,000 ids sharing one content, each with a user-initiated waiter, holds the engine's actor at most C2's 10 ms per turn" with 2 test cases passed after 2.412 seconds.
+✘ Suite "SyncBenchmarks" failed after 125.475 seconds with 3 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+◇ Suite "TransportBenchmarks" started.
+◇ Test "P-10: 500 small assets over a loopback server use at most connections_max TCP connections" started.
+P-10 500 assets: 8 TCP connections (max 8), 500 requests, 0.04369575 seconds
+✔ Test "P-10: 500 small assets over a loopback server use at most connections_max TCP connections" passed after 0.044 seconds.
+✔ Suite "TransportBenchmarks" passed after 0.044 seconds.
+◇ Suite "BudgetsBenchmarks" started.
+◇ Test "every budget in quality-gates.json is present with numeric thresholds the benchmarks can read" started.
+✔ Test "every budget in quality-gates.json is present with numeric thresholds the benchmarks can read" passed after 0.001 seconds.
+✔ Suite "BudgetsBenchmarks" passed after 0.001 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 271.101 seconds with 4 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 56 tests in 8 suites failed after 271.102 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

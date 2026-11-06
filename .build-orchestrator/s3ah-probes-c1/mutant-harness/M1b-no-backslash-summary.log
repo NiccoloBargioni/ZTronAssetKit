@@ -1,0 +1,5 @@
+✘ Test "R-MAN-2: a remote path with an empty or dot segment (also %2E), a backslash or a trailing slash is quarantined, the rest applied" with 14 test cases failed after 0.003 seconds with 12 issues.
+✘ Test "R-MAN-2: over seeded remote paths the decoder accepts only paths the transport can fetch, exactly so without schemes, queries or encoded separators" failed after 0.156 seconds with 323 issues.
+✘ Test run with 34 tests in 4 suites failed after 0.469 seconds with 335 issues.
+✔ Test run with 8 tests in 1 suite passed after 0.012 seconds.
+exit 1

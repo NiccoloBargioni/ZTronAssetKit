@@ -1,0 +1,62 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "5B940E6E-490F-4E9E-A917-A6456A18225E",
+        "deviceName" : "iPhone Air",
+        "modelName" : "iPhone Air",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 2790,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "ZTronAssetKit · Built with macOS 27.0",
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "finishTime" : 1793411395.48,
+  "passedTests" : 1428,
+  "result" : "Passed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1793410993.809,
+  "statistics" : [
+    {
+      "subtitle" : "1543 test runs",
+      "title" : "181 tests ran with dynamic parameters"
+    }
+  ],
+  "testFailures" : [
+
+  ],
+  "title" : "Test - ZTronAssetKit",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "7% of duration",
+      "text" : "12 longest test runs with outlier durations exceeding 13.25s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "85% of duration",
+      "text" : "1 longest test run with outlier durations exceeding 33.54s (three standard deviations)"
+    },
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "20% of duration",
+      "text" : "18 longest test runs with outlier durations exceeding 5.16s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 1428
+}

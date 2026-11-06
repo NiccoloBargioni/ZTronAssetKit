@@ -1,0 +1,42 @@
+ok enospcNoDefer apply
+enospcNoDefer build exit 0 17:39:33 { 86.75 75.92 66.24 }
+enospcNoDefer test 1 exit 1 17:42:48
+enospcNoDefer test 2 exit 1 17:46:05
+ok enospcNoDefer revert
+ok reinstateSkip apply
+reinstateSkip build exit 0 17:46:22 { 26.97 38.51 50.69 }
+reinstateSkip test 1 exit 1 17:47:24
+reinstateSkip test 2 exit 1 17:47:44
+ok reinstateSkip revert
+ok enqueueNoEpoch apply
+enqueueNoEpoch build exit 0 17:48:06 { 24.62 34.83 47.87 }
+enqueueNoEpoch test 1 exit 1 17:48:16
+enqueueNoEpoch test 2 exit 1 17:48:23
+ok enqueueNoEpoch revert
+ok joinNoVerdictDefer apply
+joinNoVerdictDefer build exit 0 17:48:31 { 24.15 33.89 47.15 }
+joinNoVerdictDefer test 1 exit 1 17:48:38
+joinNoVerdictDefer test 2 exit 1 17:48:42
+ok joinNoVerdictDefer revert
+ok visitRelaneEvent apply
+visitRelaneEvent build exit 0 17:48:50 { 22.53 33.02 46.61 }
+visitRelaneEvent test 1 exit 1 17:48:56
+visitRelaneEvent test 2 exit 1 17:49:02
+ok visitRelaneEvent revert
+ok offlineNoDefer apply
+offlineNoDefer build exit 0 17:49:12 { 29.01 33.70 46.45 }
+offlineNoDefer test 1 exit 1 17:49:18
+offlineNoDefer test 2 exit 1 17:49:23
+ok offlineNoDefer revert
+ok throttleNoDefer apply
+throttleNoDefer build exit 0 17:49:28 { 29.37 33.60 46.20 }
+throttleNoDefer test 1 exit 1 17:49:32
+throttleNoDefer test 2 exit 1 17:49:37
+ok throttleNoDefer revert
+ok edgeNoNote apply
+edgeNoNote build exit 0 17:49:42 { 24.84 32.38 45.54 }
+edgeNoNote test 1 exit 1 17:49:46
+edgeNoNote test 2 exit 1 17:49:49
+ok edgeNoNote revert
+copy-head sources restored
+mutants done 17:49:49

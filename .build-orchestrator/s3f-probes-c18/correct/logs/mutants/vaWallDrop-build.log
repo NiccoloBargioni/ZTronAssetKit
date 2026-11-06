@@ -1,0 +1,21 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c18-correct/probesrc/Sources/ZTronAssetSync/Engine/EngineFailures.swift:855:48: [1;33mwarning: [1;39mimmutable value 'wall' was never used; consider replacing with '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+[0;36m853 |[0;0m         case .attempt(.resolve):
+[0;36m854 |[0;0m             return true
+[0;36m855 |[0;0m         case .attempt(.retry(let error, _, let wall)):
+    [0;36m|[0;0m                                                `- [1;33mwarning: [1;39mimmutable value 'wall' was never used; consider replacing with '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+[0;36m856 |[0;0m             if self.reachesCap(interest.lane, attempts: attempts) {
+[0;36m857 |[0;0m                 return true
+
+[#NoUsage]: <https://docs.swift.org/compiler/documentation/diagnostics/no-usage>
+[8 / 11] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (5,03 s)

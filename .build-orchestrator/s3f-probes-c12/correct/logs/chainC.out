@@ -1,0 +1,28 @@
+=== coverage2 03:06:23 { 9.55 28.96 44.27 }
+cov2 exit 0
+✔ Test run with 151 tests in 16 suites passed after 0.555 seconds.
+✔ Test run with 474 tests in 53 suites passed after 53.886 seconds.
+✔ Test run with 459 tests in 60 suites passed after 107.674 seconds.
+✔ Test run with 84 tests in 18 suites passed after 78.755 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.842 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.359 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.414 seconds.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainC.sh: line 14: 85295 Terminated: 15          sample > $L/load-cov2.txt
+export exit 0
+cov gate exit 0
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.83% (1444/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.38% (8118/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 93.25% (10061/10789) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.28% (26571/27597) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.64% max=3.0% OK
+COVERAGE: PASS
+=== perf 03:11:28 { 22.61 31.64 41.21 }
+perf exit 1
+✘ Test run with 44 tests in 8 suites failed after 210.706 seconds with 1 issue.
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-correct/scripts/chainC.sh: line 26: 87675 Terminated: 15          sample > $L/load-perf.txt
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.320 seconds with 1 issue.
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+=== doneC 03:18:24 { 4.64 16.02 30.32 }

@@ -1,0 +1,7 @@
+exit=1
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" recorded an issue at JBreakProbes.swift:185:6: Time limit was exceeded: 180.000 seconds
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" recorded an issue at JBreakProbes.swift:232:9: Expectation failed: pResult == .failure(.shutDown) || pResult == .failure(.insufficientSpace(required: Int64(pBytes.count), available: 2_000_000))
+✘ Test "PROBE-J-SHUTDOWN-DEFERRED" failed after 192.019 seconds with 2 issues.
+✘ Test "PROBE-J-UNRELATED-FREE" recorded an issue with 1 argument visit → .sweepFollowsFirst at JBreakProbes.swift:283:25: Issue recorded
+✘ Test "PROBE-J-UNRELATED-FREE" with 2 test cases failed after 0.643 seconds with 1 issue.
+✘ Test run with 2 tests in 1 suite failed after 192.663 seconds with 3 issues.

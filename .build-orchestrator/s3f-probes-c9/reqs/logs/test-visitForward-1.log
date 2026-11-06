@@ -1,0 +1,36 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" started.
+✘ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:1077:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(pBytes.count)
+↳ B's user waiter, moved onto P, is answered from P's 3.5 MB (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 3000000))
+↳ (try? bResult.get())?.byteSize == Int64(pBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a transient failure of a moved id's holder during an owed follow re-routes the moved interest in the follow's order (F-28)" with 2 test cases failed after 1.015 seconds with 1 issue.
+↳ /// A transient failure of a moved id's holder while the follow owes an earlier visit brings no visit forward: D
+↳ /// (4 MB, zz-a) and C (2 MB, zz-b) download with 7 MB of room; P (3.5 MB) is a prefetch group's member parked
+↳ /// `insufficientSpace` beside them. v3 moves A to a 16-byte content (D's visit abandons D) and B onto P's content, in
+↳ /// that order. C's attempt then fails (transient). Visited first, D's bytes left before B's interest joined P, so P
+↳ /// fits and B is served. With the failure first, `countFailedAttempt` followed C out of the follow's order: B's
+↳ /// interest joined P beside D's doomed bytes and was answered with a shortage (PROBE-J-FAIL-REROUTE).
+✘ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:1128:9: Expectation failed: (try? a1Result.get())?.byteSize == Int64(n1Bytes.count)
+↳ A1 is served from N1, created first by the follow (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 6000000, available: 5000000))
+↳ (try? a1Result.get())?.byteSize == Int64(n1Bytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierTests.swift:1131:25: Issue recorded
+↳ A2 gets insufficientSpace: N2 does not fit beside N1 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-a2, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ac/ace6f359aa489cff9f23d77ffe262d52c8e9af0ff2a0e7937c3cc475e1cb33d9.png, fileExtension: png, byteSize: 6000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: a failure during an owed follow brings no visit forward: the new contents of two moved holders are created in the follow's order (F-28)" with 2 test cases failed after 1.119 seconds with 2 issues.
+↳ /// A failure brings no visit forward, so the new contents of two moved holders are created in the follow's order: C1
+↳ /// (zz-a1) and C2 (zz-a2), 5 MB each, download for one user waiter each in 11 MB of room; v3 moves both to new 6 MB
+↳ /// contents, of which one fits once both left. C2's attempt then fails (transient). Visited first, the follow visits
+↳ /// C1 first, N1 is created and served first and A2 gets a shortage. With the failure first, C2's visit was brought
+↳ /// forward and N2 took the room (PROBE-J-FAIL-TICKET).
+✘ Suite "Engine runs" failed after 1.120 seconds with 3 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 2 tests in 1 suite failed after 1.120 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

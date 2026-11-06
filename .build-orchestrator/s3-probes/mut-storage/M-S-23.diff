@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Integrity/DeepVerification.swift b/Sources/ZTronAssetStorage/Integrity/DeepVerification.swift
+index 6ec3b2c..df96e43 100644
+--- a/Sources/ZTronAssetStorage/Integrity/DeepVerification.swift
++++ b/Sources/ZTronAssetStorage/Integrity/DeepVerification.swift
+@@ -79,7 +79,7 @@ extension AssetStore {
+             }
+             self.state.integrity.cursor = first
+             report.bytesVerified = report.bytesVerified.addingSaturating(outcome?.byteCount ?? item.size)
+-            if let outcome, outcome.digest == key.hash, outcome.byteCount == item.size {
++            if let outcome, outcome.byteCount == item.size {
+                 let now = self.environment.time.now()
+                 for id in holders {
+                     self.state.core.records[id]?.verifiedAt = now

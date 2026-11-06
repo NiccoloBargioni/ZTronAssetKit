@@ -1,0 +1,38 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C9R-THROTTLE-FAILFAST" started.
+◇ Test "PROBE-C9R-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9R-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9R-THROTTLE-FAILFAST" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9R-JOIN-RESOLVE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9R-THROTTLE-FAILFAST" started.
+PROBE-C9R-THROTTLE-FAILFAST followVisitedFirst: a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d1/d1cfd9872bf8459d5d9ae01b9fb1ce7b9002d63e7abba724b76772006dce97b8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+PROBE-C9R-JOIN-RESOLVE sweepFollowsFirst: b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/50/50b1b20c829cc50778e4a485c3faf07dbcbadbb8dd1be300cf6b2dbc9a9924ce.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+✘ Test "PROBE-C9R-JOIN-RESOLVE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC9ReqsProbes.swift:67:9: Expectation failed: (try? bResult.get())?.byteSize == Int64(xBytes.count)
+↳ B, asking after the refusal, gets a new job for X and is served (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil))
+↳ (try? bResult.get())?.byteSize == Int64(xBytes.count) → <not evaluated>
+PROBE-C9R-THROTTLE-FAILFAST sweepFollowsFirst: a=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0))) b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+✘ Test "PROBE-C9R-THROTTLE-FAILFAST" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC9ReqsProbes.swift:160:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A, moved to Y by the owed visit, is served from Y (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(600.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C9R-THROTTLE-FAILFAST" with 2 test cases failed after 1.102 seconds with 1 issue.
+↳ /// PROBE-C9R-THROTTLE-FAILFAST: the draft's open residual "the offline and throttle exits". C (1 MB, content X)
+↳ /// downloads for A (zz-a, user) and B0 (zz-b, user). v3 moves zz-a to a 16-byte content Y. C's attempt then fails
+↳ /// offline while the path reads satisfied (no edge since it started): `.failed(.whenOnline)` with its fail-fast.
+↳ /// Visit-first, A's interest left C for Y's job before the failure, Y stages: A is served. Behind the barrier the
+↳ /// fail-fast answers A `.offline` before the owed visit moves it.
+PROBE-C9R-JOIN-RESOLVE followVisitedFirst: b0=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: nil)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/50/50b1b20c829cc50778e4a485c3faf07dbcbadbb8dd1be300cf6b2dbc9a9924ce.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/b3/b3571a587998c0ab98d6071c9f75cb81baa0fad2c4c8dbb4f23d9d9eb644cebe.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C9R-JOIN-RESOLVE" with 2 test cases failed after 1.163 seconds with 1 issue.
+↳ /// PROBE-C9R-JOIN-RESOLVE: the draft's open residual "A join while a `.resolve` verdict waits". C (1 MB, content X)
+↳ /// downloads for A (zz-a, user) and B0 (zz-b, user); zz-a and zz-b share X. v3 moves zz-a to a 16-byte content Y and
+↳ /// keeps zz-b on X. C's attempt is then refused by policy (`.rejected`, final for the run: `resolveAll`). A new user
+↳ /// waiter B then asks for zz-b. Visit-first, the failure answered B0 and removed C, so B's request creates a new job
+↳ /// for X, whose next attempt stages X: B is served. Behind the barrier, C's verdict waits, B joins C (left failed),
+↳ /// and the drain's `resolveAll` answers B with the failure.
+✘ Suite "Engine runs" failed after 1.163 seconds with 2 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 2 tests in 1 suite failed after 1.163 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

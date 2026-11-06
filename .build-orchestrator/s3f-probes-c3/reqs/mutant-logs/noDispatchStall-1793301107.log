@@ -1,0 +1,114 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[16 / 16] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[19 / 21] ZTronAssetSyncTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (14,47 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" started.
+◇ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" started.
+◇ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" started.
+◇ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" started.
+◇ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" started.
+◇ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" started.
+◇ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" started.
+◇ Test case passing 1 argument failure → .noSpace to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .notFound to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test case passing 1 argument failure → .serverErrorAtCap to "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" started.
+◇ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" started.
+✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:433:9: Expectation failed: !startedBetween.contains(dropped.transferID)
+↳ the dropped id's transfer was requested after the apply
+↳ !startedBetween.contains(dropped.transferID) → true
+↳   startedBetween.contains(dropped.transferID) → false
+↳     startedBetween → [c-c600d7bd22f40c5b9811c70d399be509c2e4a173a94d44fdce4aa44eca7731e6]
+↳     dropped.transferID → c-c600d7bd22f40c5b9811c70d399be509c2e4a173a94d44fdce4aa44eca7731e6
+↳       rawValue → "c-c600d7bd22f40c5b9811c70d399be509c2e4a173a94d44fdce4aa44eca7731e6"
+✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:434:9: Expectation failed: between.queued == .queued
+↳ it waits in its queue for the follow: (queued: Optional(ZTronAssetSync.JobState.downloading), steady: Optional(ZTronAssetSync.JobState.queued), preemptions: 0, violations: [])
+↳ between.queued == .queued → false
+↳   between.queued → .downloading
+↳     some → .downloading
+↳     some → .queued
+✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:435:9: Expectation failed: between.steady == .downloading
+↳ the freed slot went to the unchanged prefetch member: (queued: Optional(ZTronAssetSync.JobState.downloading), steady: Optional(ZTronAssetSync.JobState.queued), preemptions: 0, violations: [])
+↳ between.steady == .downloading → false
+↳   between.steady → .queued
+↳     some → .queued
+↳     some → .downloading
+PROBE-W4 before the 404: copy lists the id at its new content true, old job Optional(ZTronAssetSync.JobState.downloading), owed visits 344
+✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" recorded an issue at EngineFollowTests.swift:368:9: Expectation failed: startedBetween.isEmpty
+↳ 2 transfers of replaced content started after the apply: [c-5952bf67ac15960a4d3ffd7b7af1fb46555be7ba78a6383c35f60bb343514cce, c-89566edb393b4596fd7fa127c8a224841e34a865e23ebe0b639095561f8b5be8]
+↳ startedBetween.isEmpty → false
+↳   startedBetween → [c-5952bf67ac15960a4d3ffd7b7af1fb46555be7ba78a6383c35f60bb343514cce, c-89566edb393b4596fd7fa127c8a224841e34a865e23ebe0b639095561f8b5be8]
+↳   isEmpty → false
+✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" recorded an issue at EngineFollowTests.swift:369:9: Expectation failed: between.downloading.allSatisfy { !old.contains($0) }
+↳ no replaced content downloads between the follow's turns
+↳ between.downloading.allSatisfy { !old.contains($0) } → <not evaluated>
+PROBE-W4 waiter's answer: success(ZTronAssetModel.AssetLocation(id: y0599, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6a/6a67f1a0dcc6531f31f3f0fa9f2af6a9566482f29a88c50d10658b03532f0756.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-W4: a 404 for an id's replaced content before its follow visit does not answer its waiter notFound" passed after 1.868 seconds.
+✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" recorded an issue at EngineFollowTests.swift:443:9: Expectation failed: !(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID)
+↳ never requested after the apply
+↳ !(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID) → <not evaluated>
+✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" recorded an issue at EngineFollowTests.swift:376:9: Expectation failed: !started.isEmpty && started.allSatisfy { !old.contains($0) }
+↳ every start since the apply is of new content: [c-5952bf67ac15960a4d3ffd7b7af1fb46555be7ba78a6383c35f60bb343514cce, c-89566edb393b4596fd7fa127c8a224841e34a865e23ebe0b639095561f8b5be8, c-be1be3eeaf865a9bc02c9b41c7a09c86d57036cc0ca3759fb998ba369c9491da, c-1a9214d577005791f9bd30d803cf313b12a5a4149a789ff5c758516fd7c51550]
+↳ !started.isEmpty && started.allSatisfy { !old.contains($0) } → false
+↳   !started.isEmpty → true
+↳   started.allSatisfy { !old.contains($0) } → false
+✘ Test "R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owes its visit" failed after 1.954 seconds with 4 issues.
+↳ /// The user-queue form of `noReplacedContentStartsDuringTheFollow`, for an id the apply dropped: the job of a user
+↳ /// waiter whose id left the manifest waits in the user queue (both slots run other user transfers) when the apply
+↳ /// lands, and the follow owes it a visit. A slot freed between two follow turns does not start it: a transfer of
+↳ /// content no id wants is never requested after the apply. That user job takes no slot from other work either: the
+↳ /// freed slot goes to the first member of an unchanged prefetch group, and no running transfer is preempted for it.
+↳ /// The follow's visit then ends the waiter's interest with `.notFound` (T21), as the cycle-1 one-turn follow did in
+↳ /// the apply's turn.
+✔ Test "R-CAR-2: a failure of an id's replaced content before its follow visit answers the id's waiter from its new content" with 3 test cases passed after 2.044 seconds.
+✘ Test "R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still owes its job" failed after 2.049 seconds with 3 issues.
+↳ /// Between two turns of a bounded follow, the jobs of replaced content the follow still owes a visit (or its pass has
+↳ /// not reached) stay queued with their old tickets, ahead of the new content's jobs. No pump starts them: a transfer
+↳ /// of content no id of the applied copy wants is never requested after the apply (the cycle-1 one-turn follow
+↳ /// abandoned them in the apply's turn). 700 members whose content all changed, two slots; the follow-up is held so
+↳ /// the drains' and freed slots' pumps run between the follow's turns. Without the check each pump started replaced
+↳ /// content (the close-out cycle-2 correctness lens, PROBE-W1: two of two starts, PROBE-W1b: 44 of 48 at 3,000).
+PROBE-W1 between follow turns: owed visits 444, downloading ["OLD", "OLD"], starts since the apply 2, of replaced content 2: [c-5952bf67ac15960a4d3ffd7b7af1fb46555be7ba78a6383c35f60bb343514cce, c-89566edb393b4596fd7fa127c8a224841e34a865e23ebe0b639095561f8b5be8]
+✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" recorded an issue at VerifyC2CorrectProbes.swift:43:9: Expectation failed: staleBetween.isEmpty
+↳ PROBE-W1 FAIL: 2 transfers of replaced content started after the apply: [c-5952bf67ac15960a4d3ffd7b7af1fb46555be7ba78a6383c35f60bb343514cce, c-89566edb393b4596fd7fa127c8a224841e34a865e23ebe0b639095561f8b5be8]
+↳ staleBetween.isEmpty → false
+↳   staleBetween → [c-5952bf67ac15960a4d3ffd7b7af1fb46555be7ba78a6383c35f60bb343514cce, c-89566edb393b4596fd7fa127c8a224841e34a865e23ebe0b639095561f8b5be8]
+↳   isEmpty → false
+PROBE-W1 after the follow: outcome complete true, starts since the apply 6, of replaced content 4
+✘ Test "PROBE-W1: between two follow turns no transfer of a replaced content starts" failed after 2.579 seconds with 1 issue.
+↳ /// PROBE-W1: the bounded follow (958348e) leaves the jobs of replaced content queued between follow turns; a pump in
+↳ /// between (a drain's, a slot freed) dispatches them, starting transfers of content no id of the applied copy wants.
+↳ /// The hold seam orders the follow-up after the drains, an interleaving production allows (independent tasks).
+✔ Test "R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it moves the member to its new content" passed after 4.596 seconds.
+✘ Suite "Engine runs" failed after 4.596 seconds with 7 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+PROBE-W4b: owed visits when the 404 was released 1792, sync complete true, waiter's answer success(ZTronAssetModel.AssetLocation(id: z2999, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/7a/7a96ee08888ec5374ceeddae08f3ccc9578d9a29eb14d47632ca899543a9a541.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✔ Test "PROBE-W4b: without seams, a 404 for an id's replaced content during the follow does not answer its waiter notFound" passed after 5.753 seconds.
+PROBE-W1b: complete true, starts since the apply 48, of replaced content 44
+✘ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" recorded an issue at VerifyC2CorrectProbes.swift:78:9: Expectation failed: stale.isEmpty
+↳ PROBE-W1b FAIL: 44 transfers of replaced content started after the apply
+↳ stale.isEmpty → false
+↳   stale → [c-1444677c8905d6c08c132640a1c62246e1aec6b85eaa0d0f1109c3f9823ac8a3, c-be3fa5caf02e93ad39e63380417a5c36ca5eb9a81e48575f367baef4688a7e18, c-172cb40b8e134e5c24c3d403ecf9b8d8dc90ffa5222589bffc25a84e7a85a4ac, c-022580752bf9bfb6d78ca2cec40e9d23a7f53fdf9f59c2e40f47f4da09f5e569, c-b5d3318db5a7b4ee36d974e47034d3bdb2294df8383eaffaeb37d8a8b1ad0f9b, c-cd9e6ebb4d7e16586cf958f341b754e29f0086ebc42adec7b41774ae36854660, c-d02caa5231c454e23abdf2c8a5baf3ff9f5ef85ae563ba2e770fce01b7494a54, c-0794693b9adca68f6ca5c90f9425143b54bd423ffa6af0f578da03247d9d8689, c-8c228269d3a46caa622087726e997f06716f73b7f0fc29135c1b4e20355444a6, c-af6690755bd090fa9073234c5c1f9de6f8816a000ef76ad8fddfc7847492b4d5, c-a4fd7fb38ed21fa8bb70ff5652c568a321d64028db3fb425d114b2db566f15cf, c-5365c841cffb5477a15deac15d5e6dab3f1a77ca2382af4ecd3548127dd540c6, c-3f48b3754573d242201f3b6910aabf6b7a1a837632aaafd0966ebfe0de9f0b25, c-02c0013cde92163cc258b21847e90e1ede5a132423f8f1e97facc138d35c2c73, c-8888e41e2efe46d478a006e5c58e593534bca51b9ab0e89a76f6d920d8cb2b8f, c-3bcecbef0a280da4037157326bad6acefcd4e07d7ada9a38c3c8e51bb71fc3f6, c-398981f716b0f3a976fac2254167f742e22dabc8a1e90b1430ca5007d2c14412, c-844cd201e5bd4ce010f2c4d7fd84f5bb9cd8cd39e271a4a7e240812194a8da03, c-c839a57519de9134f67902b902faf802187f6b79dbea98fab069d4e50e02da60, c-0d02250d5d31a8d6f3b1df76ec058869f677063d98b1e6a8eb6022da34aa5022, c-a326621548722d534b64b99eea9fbc59802f097640f23a3f5750dc83aa0461f3, c-0b90be83b18e35b233449059d44829a82367967813dd6203cfd3360206a9b0cc, c-f064065cbb124cc9f3e968f0c380eaeb71e665c892c4ac146656bdb5ae205009, c-ad48f2a8941ea56fa4949f68b011ab2f3eedf76d75643b06f1b56bf30feb24a5, c-44b6da94fc14ee9ed7403cbd09075fa935d31f50b6408b60af76deb44dc2c8b3, c-3481a0ddd1b8c6376043faab2289a2e14b3041c1ad0ee63ae1142e429af96a0b, c-65b5abc889afcba10c281a37df7ffd880a87a62c0a61fab30f0ad7f777a821db, c-dee8d58f91c618118ad7dadbcbe0b354a5900b6708f45363c9f8fb61de02ed9f, c-115ddc79908ed7974236ba7bebbeb585b3ff988138401dc41385d3b09da92415, c-a1418e5f889c179ecb556107c7ed8a723e027a57ae031f574fd0f92a88c90aaf, c-edf9d68a395c0a7c8061db8e33f6002df989686aacbe37c13df9101e37e90c8f, c-6295741318abd7e11e0ee770cb631f329ee721d5c64de9ff76377f534377b3bc, c-d3488f42d4903dc5a4c0ebc2a3ca87f5db2c95071203e734a39884ac312eb09c, c-120849d9a1cc77f9f00576d774df503d722daefbea106f729b3ea85e0f0b5e2c, c-3582e35a088a0545a0b613b1652364046c27d29ce56e72e84880c7136e46a924, c-e3861f91ffc375b26c27e238109c86b08541e76064a4c47a7919581b20257333, c-5adcb756eb010ecefa1cc15af6dd6715d8ea06077fc305d926f324df6b1cec64, c-37e084deb962407e16ca4733bc69b43117974bd24c852657347815e02e6c8bfa, c-ca14f8270fe81037914053504fdf3e31f14aa0f559cbe1e80fb0eef9e069b670, c-baa1c3c598b5e1e72d016468c899c95b40639eaa3208525cdc9e35199edd8d80, c-f2236b25ac24fb094f1f2b7614a26b890b066403056925839e6d6ac5ed880ee6, c-d5f10b0b96219c36936a624524fd930a86cd6977e58c0e68b876d2fb28f37dc7, c-f584e89a2d52da183150e81d75e42d935919484f940f88018596b346644715c6, c-26890214496ed74a90c3bd2e7c4e6df8337a7dd510fdfd3ffccbf59b9d98f1f9]
+↳   isEmpty → false
+✘ Test "PROBE-W1b: over a whole bounded follow, no transfer of a replaced content starts after the apply" failed after 6.297 seconds with 1 issue.
+↳ /// PROBE-W1b: the same without any seam: count, over the whole follow, the transfers of replaced content started
+↳ /// after the apply (production scheduling of the follow-ups against the drains).
+✘ Suite "VerifyC3Reqs re-run of the cycle-2 correctness probes" failed after 6.298 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 2, correctness lens). Never committed.
+✘ Test run with 8 tests in 2 suites failed after 6.299 seconds with 9 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

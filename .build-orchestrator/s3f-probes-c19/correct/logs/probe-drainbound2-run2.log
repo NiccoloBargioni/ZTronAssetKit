@@ -1,0 +1,41 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC19Correct" started.
+◇ Test "PROBE-C19C-DRAIN-BOUND" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, defaultTuning → false to "PROBE-C19C-DRAIN-BOUND" started.
+PROBE-C19C-DRAIN-BOUND followVisitedFirst defaultTuning false bound 4 atV4 9 turns [9] drainTurn nil answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+◇ Test case passing 2 arguments visit → .followVisitedFirst, defaultTuning → true to "PROBE-C19C-DRAIN-BOUND" started.
+PROBE-C19C-DRAIN-BOUND followVisitedFirst defaultTuning true bound 4 atV4 9 turns [9] drainTurn nil answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, defaultTuning → false to "PROBE-C19C-DRAIN-BOUND" started.
+PROBE-C19C-DRAIN-BOUND sweepFollowsFirst defaultTuning false bound 4 atV4 9 turns [0, 0, 9] drainTurn Optional(9) answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+✘ Test "PROBE-C19C-DRAIN-BOUND" recorded an issue with 2 arguments visit → .sweepFollowsFirst, defaultTuning → false at VerifyC19CorrectProbes.swift:116:9: Expectation failed: visit != .sweepFollowsFirst || turns.allSatisfy { $0 <= bound }
+↳ // Visit-first releases the whole follow at once (`applyHeld`), so its single figure is not a turn: only the
+↳ // sweep-first loop above counts turns.
+↳ PROBE-C19C-DRAIN-BOUND: no follow turn moves more than followIDsPerTurn (4) ids: [0, 0, 9], drain turn Optional(9)
+↳ visit != .sweepFollowsFirst || turns.allSatisfy { $0 <= bound } → false
+↳   visit != .sweepFollowsFirst → false
+↳   turns.allSatisfy { $0 <= bound } → false
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, defaultTuning → true to "PROBE-C19C-DRAIN-BOUND" started.
+PROBE-C19C-DRAIN-BOUND sweepFollowsFirst defaultTuning true bound 4 atV4 9 turns [0, 0, 9] drainTurn Optional(9) answers [20, 20, 20, 20, 20, 20, 20, 20, 20] jStarts 3
+✘ Test "PROBE-C19C-DRAIN-BOUND" recorded an issue with 2 arguments visit → .sweepFollowsFirst, defaultTuning → true at VerifyC19CorrectProbes.swift:116:9: Expectation failed: visit != .sweepFollowsFirst || turns.allSatisfy { $0 <= bound }
+↳ // Visit-first releases the whole follow at once (`applyHeld`), so its single figure is not a turn: only the
+↳ // sweep-first loop above counts turns.
+↳ PROBE-C19C-DRAIN-BOUND: no follow turn moves more than followIDsPerTurn (4) ids: [0, 0, 9], drain turn Optional(9)
+↳ visit != .sweepFollowsFirst || turns.allSatisfy { $0 <= bound } → false
+↳   visit != .sweepFollowsFirst → false
+↳   turns.allSatisfy { $0 <= bound } → false
+✘ Test "PROBE-C19C-DRAIN-BOUND" with 4 test cases failed after 2.312 seconds with 2 issues.
+↳ /// Three jobs J0..J2 (16 B each), each shared by three prefetch members, download. v3 changes only fillers (the
+↳ /// follow is owed, held). The three attempts time out (a retry below every cap: the interests stay). v4 gives each
+↳ /// member a content of its own. Sweep-first, the three verdicts wait, v4's visits leave the jobs to them, and the drain
+↳ /// gives them and then moves each job's ids (`followAfterVerdict`). `followIDsPerTurn` is set to 4.
+✘ Suite "VerifyC19Correct" failed after 2.312 seconds with 2 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 19, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C19C-DRAIN-BOUND: the drain's visits after verdicts (`followAfterVerdict`) each get a whole turn's id budget
+↳ /// (`followIDsPerTurn`), and a drain batch replays many verdicts in one turn, so one turn moves more ids than
+↳ /// `followIDsPerTurn` (the bound cycle 19 states for every follow turn).
+✘ Test run with 1 test in 1 suite failed after 2.312 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

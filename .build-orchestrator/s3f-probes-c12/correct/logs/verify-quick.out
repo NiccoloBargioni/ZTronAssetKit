@@ -1,0 +1,56 @@
+::: STEP harness
+GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f
+HARNESS: unchanged since harness-frozen
+::: OK   harness
+::: STEP toolchain
+swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+toolchain OK: Swift 6.4 >= 6.3
+::: OK   toolchain
+::: STEP build-debug
+Build complete! (12,00 s)
+::: OK   build-debug
+::: STEP tests
+✔ Test "R-CLN-9: a released pack re-downloaded for an adopted asset counts as a source copy again" passed after 0.014 seconds.
+✔ Test "R-APL-4: a failing update check still returns the installed catalog, marked not update-checked" passed after 0.015 seconds.
+✔ Test "R-APL-4: packs removed by the update check are reported to the engine once, on notModified too" passed after 0.015 seconds.
+✔ Test "R-CLN-9: a released pack downloaded again on demand counts as a source copy until a later catalog generation releases it" passed after 0.014 seconds.
+✔ Test "R-CLN-10: a released pack a transfer downloaded again for an adopted asset stays installed until the next catalog generation" passed after 0.014 seconds.
+✔ Test "R-APL-1: a pack the system does not know is permanently missing" passed after 0.014 seconds.
+✔ Test "Seams: a wait for pack waiters ends when the coordinator closes with the count unmet" passed after 0.015 seconds.
+✔ Test "Seams: a cancelled wait for a drain returns while a staging write is still open" passed after 0.015 seconds.
+✔ Test "R-APL-2: every waiter on one pack sees the pack's progress in its own asset's bytes" passed after 0.015 seconds.
+✔ Suite "Apple tier: version skew" passed after 0.016 seconds.
+✔ Test "R-APL-2: progress reported under another flight's id never reaches the current flight's waiters" passed after 0.015 seconds.
+✔ Suite "Apple tier: catalog" passed after 0.016 seconds.
+✔ Test "R-APL-1: concurrent fetches of assets in one pack trigger one ensureAvailable" passed after 0.015 seconds.
+✔ Test "Seams: a cancelled wait for pack waiters returns while the count is still unmet" passed after 0.016 seconds.
+✔ Test "R-CLN-10: a pack a transfer downloaded again while its release call was running stays released for that generation" passed after 0.015 seconds.
+✔ Test "R-CLN-9: a pack whose release straddles a new catalog generation and comes back counts until that generation releases it" passed after 0.015 seconds.
+✔ Suite "Apple tier: test seams" passed after 0.016 seconds.
+✔ Test "R-APL-1: a cancelled waiter leaves the shared pack download running for the others" passed after 0.015 seconds.
+✔ Test "R-APL-1: invalidate cancels pack waiters and returns only after in-flight staging writes" passed after 0.016 seconds.
+✔ Test "R-APL-2: a pack download that outlived its waiters never reports into a newer download's waiters" passed after 0.016 seconds.
+✔ Test "R-OBS-1: a failed, cancelled or paused Apple transfer closes its interval before its terminal update" passed after 0.016 seconds.
+✔ Test "R-CLN-10: a transfer that ends in skew never re-arms its pack's release within a catalog generation" passed after 0.016 seconds.
+✔ Suite "Apple tier: transfers" passed after 0.017 seconds.
+✔ Test "R-CLN-10: requesting an excluded asset after its pack's release removes the pack once per catalog generation, never in a loop" passed after 0.016 seconds.
+✔ Test "R-APL-1: a racing stop is recorded exactly when the claim reports it" passed after 0.020 seconds.
+✔ Suite "Apple tier: terminal claim" passed after 0.021 seconds.
+✔ Test "R-NET-6: undocumented pack errors map to transient and never to integrity" passed after 0.024 seconds.
+✔ Suite "Apple tier: error mapping" passed after 0.025 seconds.
+✔ Test "R-CLN-10: a report larger than one survey slice releases exactly the packs settled in every slice" passed after 0.035 seconds.
+✔ Suite "Apple tier: releases and source copies" passed after 0.036 seconds.
+✔ Test "R-APL-2: scaled progress is quantised, monotonic and never exceeds the asset size" passed after 0.072 seconds.
+✔ Suite "Apple tier: progress" passed after 0.072 seconds.
+✔ Test "H-7: the sliced survey decides exactly what PackReleasePlanner decides over the whole report" passed after 0.119 seconds.
+✔ Test "R-APL-5: the package contains exactly one #available" passed after 0.163 seconds.
+✔ Suite "Apple tier: availability scan" passed after 0.164 seconds.
+✔ Test "C2: a 100,000-entry adoption report is surveyed in slices of at most 1,000 entries with a pause between them" passed after 0.456 seconds.
+✔ Suite "Apple tier: release survey" passed after 0.461 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.461 seconds.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: FAIL tests (full log: .verify-logs/tests.log)
+::: SUMMARY mode=--quick steps-failed=1
+VERIFY: FAIL (1 failed: tests)
+EXIT 1

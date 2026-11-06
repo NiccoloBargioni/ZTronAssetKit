@@ -1,0 +1,37 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[11 / 12] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (3,60 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended" started.
+✘ Test "R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended" recorded an issue at EngineFollowTests.swift:165:9: Expectation failed: first.held
+↳ the held job stays held while the follow is owed
+↳ first.held → false
+↳   first → (owed: true, held: false, violations: [])
+↳     owed → true
+↳     held → false
+↳     violations → []
+↳   held → false
+✘ Test "R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended" failed after 0.086 seconds with 1 issue.
+↳ /// While a follow still owes visits, a job held for a manifest catch-up (the store superseded its publication before
+↳ /// the engine's copy showed the new manifest, F-20) stays held when the last catch-up ends: it may be one the follow
+↳ /// moves, and dispatching it first would start a transfer of content no id wants any more. The follow's last turn
+↳ /// releases it. Jobs removed between two follow turns (here by the group's release) are skipped. The catch-up and
+↳ /// the held job are set up directly in one engine turn, the order a superseded publication and an `apply` in flight
+↳ /// leave, which no deterministic seam reaches end to end.
+✘ Suite "Engine runs" failed after 0.086 seconds with 1 issue.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 0.086 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,21 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20SupersedeBench" started.
+◇ Test "PROBE-C20C-SUPERSEDE-C2" started.
+PROBE-C20C-SUPERSEDE-C2 warm-up 1,000: supersede window 8.2005 ms (O gone true); D holds 1000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 5.786334 ms
+✘ Test "PROBE-C20C-SUPERSEDE-C2" recorded an issue at VerifyC20SupersedeBench.swift:171:6: Time limit was exceeded: 600.000 seconds
+✘ Test "PROBE-C20C-SUPERSEDE-C2" failed after 640.576 seconds with 1 issue.
+✘ Suite "VerifyC20SupersedeBench" failed after 640.576 seconds with 1 issue.
+↳ /// Scratch release probe (s3f close-out verification, cycle 20, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C20C-SUPERSEDE-C2: `SyncBench.concentration(.publication)`'s shape (10,000 members converge on O's content
+↳ /// during an owed follow, O's publication held at its first store unit), then, as `timeCommit(.movedAway)` does, v4 maps
+↳ /// every member to D (one job, held) while the publication waits at the store, but v4 also gives O's own id a content of
+↳ /// its own (E), so no id wants O's content any more: the store refuses the publication (`.superseded`), and the
+↳ /// engine's `publicationFailed` re-routes every interest of O's job in one turn (`supersede`). The heartbeat's longest
+↳ /// wait from the publication's release until O's job is gone, best of three. The draft's C2 inventory row "`supersede`
+↳ /// of a superseded publication | O(N) re-routes in one turn | no figure".
+✘ Test run with 1 test in 1 suite failed after 640.576 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

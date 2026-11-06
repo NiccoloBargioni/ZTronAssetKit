@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+index 9a91ef8..bf3f07e 100644
+--- a/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
++++ b/Sources/ZTronAssetTransport/Classify/TransferClassifier.swift
+@@ -61,7 +61,7 @@ public enum TransferClassifier {
+             guard resumed else {
+                 return .rejected(.unexpectedStatus(status))
+             }
+-            return facts.contentRangeStart == nil ? .transient(.resumeRejected, retryAfter: nil) : nil
++            return nil
+         case 304:
+             return sentConditional ? nil : .rejected(.unexpectedNotModified)
+         case 300...399:

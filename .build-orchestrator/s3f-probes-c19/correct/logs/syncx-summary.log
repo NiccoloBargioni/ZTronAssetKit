@@ -1,0 +1,9 @@
+run 1 start 21:42:00 load { 42.00 46.77 53.25 }
+run 1 exit 0 end 21:48:06 load { 40.06 38.69 47.21 }
+✔ Test run with 552 tests in 53 suites passed after 249.584 seconds.
+run 2 start 21:48:06 load { 40.06 38.69 47.21 }
+run 2 exit 0 end 21:54:18 load { 91.80 62.17 53.60 }
+✔ Test run with 552 tests in 53 suites passed after 368.400 seconds.
+run 3 start 21:54:18 load { 91.80 62.17 53.60 }
+run 3 exit 0 end 21:58:13 load { 24.11 47.83 49.66 }
+✔ Test run with 552 tests in 53 suites passed after 231.191 seconds.

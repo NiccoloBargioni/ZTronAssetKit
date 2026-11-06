@@ -1,0 +1,122 @@
+[
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "follow barrier: the lane a 429 is decided on (S3-R16 1(a); S3-R20 item 3: the bounded moves must not change an answer)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:722-728 (`here` in followedLane) and :771 (the `pending[asset] != nil` clause), both added in b9c0513; EngineFollow.swift:1060 (inboundPendingIDs). Probe: .build-orchestrator/s3f-probes-c18/correct/VerifyC18CorrectProbes.swift:150 (PROBE-C18C-PENDING-LANE)",
+  "problem": "**The wrong premise.** followedLane counts an id that an owed move carries only on that move's target, \"whatever a later copy maps it to\". This is false when the target is a failed job whose exit verdict waits and an apply has been followed since (movesAfterVerdict). In that case the drain's followAfterVerdict moves the id on, under the later copy, as visit-first's visit at that apply did. A 429 that arrives while the move is still owed is therefore decided on the wrong lane.\n\n**Setup.** Seed 1_818_902. Tuning: shortInteractiveRetry (user cap 30 s), 12 slots, 4 reserved.\n- O: zz-a, 100 kB, user waiter A.\n- J: zz-p, 16 B, prefetch waiter P.\n- N prefetch holders, then H: zz-b, 50 kB, user waiter B, created last.\n- v3 maps zz-b and every holder id to O.\n- O's first attempt times out (a retry).\n- v4 maps zz-b to J.\n- J gets a 429 with Retry-After 60 s.\n\n**Sweep-first timeline.** O's end makes 64 of the N+1 moves. v4's turn then leaves H's move owed, in two shapes:\n- shape 1: K's publication is held, so applyWalked; N=72; printed `owedMoves=9 hOwed=true`.\n- shape 2: no publication, so continueInbound(256) runs; N=330; printed `owedMoves=11 hOwed=true`.\n\nAt J's 429, `throttled` reads followedLane(J) behind the barrier. It returns prefetch; visit-first returns userInitiated. So the decision is `.until`, and the origin is throttled 61 s; visit-first gives `.exhausted` and no throttle.\n\n**Answers, sweep-first vs visit-first:**\n- P: success, 16 B, jStarts 2 vs serverUnavailable(60), jStarts 1.\n- A: serverUnavailable(60), because O's retry meets the throttle vs success, 100,000 B.\n- B: serverUnavailable(60) in both.\n\n**Reproduction.** Shape 1 failed 6/6 runs and shape 2 failed 4/4, sweep-first only. Visit-first matched its own expectation every run.\n\n**Cause.** Before b9c0513, bringInbound made every move in the attempt-end turn. B was then already on O, and the `after` branch counted it on J.\n\n**Control.** PROBE-C18C-PENDING-404 (J ends in a 404, decided at the drain) gives equal answers in both orders. Only the lane decided when the 429 arrives is affected.",
+  "fix": "Change followedLane. For an id pending onto a target t that is not this job, where t's exit verdict waits with movesAfterVerdict(t), decide it as the `after` branch decides ids already on t:\n- `here` is read from the engine's copy;\n- the interest counts when t's waiting verdict does not answer it, using verdicts[t], t's event stamp and jobAtVerdict(t).\n\nKeep the pending rule for publishing targets. Commit PROBE-C18C-PENDING-LANE as a test: both LaneDropVisit orders, both shapes, expecting visit-first's answers. Kill its drop-mutant 2/2 (S3-R16 1(e))."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "follow barrier: the publication waits for owed moves (timing, S3-R16 item 2 and S3-R20 item 3)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1030-1046 (publish, then awaitInboundMoves). Probes: VerifyC18CorrectProbes.swift:310 (PROBE-C18C-PUBLICATION-WAIT-APPLY) and :378 (-HELD)",
+  "problem": "Seed 1_818_952. O is zz-o, 16 B, user waiter U; there are 72 prefetch holders.\n\n- v3 maps the holders to O.\n- O's bytes arrive. Its publication waits for 8 owed moves (`waits true movesOwed 8 O verifying ids 65`).\n- v4 maps zz-o to Z (48 B) during the wait. The store then refuses zz-o, and U follows its content to Z.\n- U is served 48 B with zStarts 1. Visit-first, with v4 after O's commit, serves 16 B.\n\nThis failed 4/4 runs. But visit-first also serves 48 B (zStarts 1) when v4 lands while O's publication is held at its first store unit (-HELD, 2/2). So in both engines the answer depends on whether the apply lands before the bind. The wait only widens that window by the follow's move turns.",
+  "fix": "Record it as a residual risk with both probes, next to RR-17 and RR-18. No code change is needed unless the orchestrator rules otherwise."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "C2 benchmark: missed under load only",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchSync.swift:678 (concentrationPublicationTurns)",
+  "problem": "**Full release `--filter Benchmarks` run** (08:44:56-08:55:01; 1-min load mean 46.8, max 247): longest actor wait [17.86, 12.35, 14.71] ms; best 12.35 ms, over the 10 ms budget.\n\n**Re-runs of the barrier C2 cases**, all passing:\n- At load 8.9 to 9.4: [5.73, 6.93, 6.21] ms.\n- At load 9.4 to 19: [6.12, 5.99, 12.63] ms.\n- In those re-runs, concentrationNotFoundTurns best is 6.42 and 6.66 ms; concentrationFollowTurns best is 4.02 and 9.23 ms (load rising).\n\nThe S3-R20 and S3-R21 C2 items are fixed (formerly about 408 ms and 17.7 ms).",
+  "fix": "None for WP-F. Quote the low-load re-runs."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "other WP (WP-B): StorageBenchmarks P-13",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249",
+  "problem": "In the full run under heavy load, P-13 failed: the longest unit was 7.979 ms wall against a 5 ms batch budget. On-CPU time was at most 1.14 ms, so the excess is I/O wait. This is the same known WP-B item as in earlier cycles.",
+  "fix": "For WP-B or the orchestrator. It is outside WP-F."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "documentation accuracy (order only)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:969 (findInbound doc); EngineDispatch.swift:697-698",
+  "problem": "The findInbound doc says the holders are taken \"in the order their jobs were created (`Job.epoch`)\". But epoch is reassigned at every attempt start (`self.state.lastEpoch += 1; job.epoch = ...`). The order is therefore by creation or last start. This affects order only.",
+  "fix": "Correct the doc comment."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "hardening and invariants for cycle 18's state",
+  "location": "EngineFollow.swift:1175-1189 (awaitInboundMoves); EngineState inboundWaits, inboundOnto, inboundMoves",
+  "problem": "`inboundWaits[transfer] = continuation` overwrites any existing continuation without checking for one. By analysis this cannot happen: a second publication of the same transfer needs downloading \u2192 verifying, which needs an admission that the barrier blocks while moves are owed, and verifying \u2192 verifying is illegal. Still, a leaked continuation would hang that publish.\n\nNo invariant in invariantViolations() checks inboundOnto against the owed moves, or inboundWaits against verifying jobs.\n\nOn shutdown, a resumed publication returns without discarding its staged file. That matches the existing isRunning return after store.publish.",
+  "fix": "Optional:\n- precondition on, or resume, an existing wait before storing a new one;\n- add the two invariants."
+ },
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "C2 / S3F-5 / S3-R21 item 1 (and S3-R20 item 3)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:828 follow(_:) -> :856 move(_:of:listing:) (and supersede when every id moves). Turn budgets count visits (continueFollow :111, followsPerTurn 256) and holders (continueInbound :1113, makeInboundNow :1090, inboundMovesNow 64), never ids.",
+  "problem": "A follow visit, or an owed inbound move, re-routes every id it carries in one actor turn. move() sorts the job's interests and each interest's ids, then calls reroute or supersede once per id. When one job holds many ids, a single turn grows with the id count. Measured in release (best of 3, SyncBench.longestWait heartbeat, after a 1,000 warm-up): (a) VERIFY-C18R-SHARED-CONVERGENCE: 10,000 prefetch members share H's content and v3 maps them to O's content, so H's one visit moves 10,000 ids onto O. Waits [53.88, 53.88, 54.14] ms, best 53.88, load 3.31 (earlier run: best 61.74 at load 8-13). (b) VERIFY-C18R-SHARED-DIVERGENCE: 10,000 members share O's content and the next manifest gives each its own content, so O's one visit moves 10,000 ids. Best 55.63 ms at load 3.78-3.85 (earlier: 68.12 at load ~7). Control, the same apply when every member already had its own content (R-SYN-6's shape): best 4.23 ms. (c) VERIFY-C18R-DIVERGENCE: S3-R20's concentration shape, then v4 maps the 10,000 converged ids away from O's job. Best 55.20 ms (back to their own contents) and 55.00 ms (to fresh contents) at load 3.31-3.34. Control, the convergence's own turns: 4.37-4.39 ms. All three are 'an apply under a 10,000-member prefetch group' (S3F-5), inside C2's reference set (S3-R21 item 1). No BenchSync case has one job holding many ids. By code reading (not probed), the same move() path also runs from makeInboundNow when one holder carries 10,000 ids. That is S3-R20's case ('10,000 ids, held by other jobs') with a single holder.",
+  "fix": "Bound each follow turn by the ids it moves, as S3-R21 item 1 orders ('also bound the turns by the work done'). (1) Split a visit or InboundMove whose moved set exceeds a per-turn id budget across turns: the remaining ids stay owed behind the barrier, as owed visits and moves already are. (2) Count ids against the turn's budget in continueFollow, continueInbound and makeInboundNow. (3) Avoid sorting all 10,000 ids per move() call. (4) Add BenchSync release cases for shapes (a), (b) and (c), plus S3-R20's bringInbound case with one 10,000-id holder; each best of 3 <= SyncBenchmarks.c2Budget. Probe sources: VerifyC18ReqsTurns.swift (sharedConvergenceProbe, sharedDivergenceProbe) and VerifyC18ReqsDivergence.swift (divergenceProbe), under .build-orchestrator/s3f-probes-c18/reqs/."
+ },
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "S3-R16 1(e) test strength: followedLane's owed-move clauses",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:724-726 (here()'s pending branch; line 725 has 0 hits in the coverage run) and :771 (the disjunct '|| (!pending.isEmpty && pending[asset] != nil)').",
+  "problem": "The draft's 'The lane' behaviour of the cycle-18 deferral is unpinned: an owed move's ids count on the move's target, whatever a later copy maps them to. Drop-mutant followedLanePendingHereDrop deletes lines 724-726. Drop-mutant followedLanePendingFilterDrop drops the :771 disjunct. Under each, the full ZTronAssetSyncTests bundle passes: '\u2714 Test run with 543 tests in 53 suites passed', exit 0. No test reaches a lane decision while an inbound move is owed for an id whose current copy maps elsewhere.",
+  "fix": "Add a test where a 429, or another followedLane reader, is decided while an inbound move is owed. The decided lane must depend on counting the owed ids on the target and not on the holder. It must fail 2/2 under each drop-mutant. Alternatively, remove the clauses and give the reason in the draft."
+ },
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "S3-R16 1(e) test strength: the owed moves' walk and target re-check (RR-14 fix, S3-R21 item 4)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:1024 (foundInbound's pending guard); 0-hit lines :985, :1031, :1039, :1041, :1043, :1050, :1156",
+  "problem": "The pending guard in foundInbound is unpinned. Drop-mutant findInboundPendingDrop turns it into 'guard let listed = copy.entry(for: asset)', so a later walk records moves again for ids an owed move already carries. The full bundle passes 543/543 under it, exit 0. Several branches never run in the coverage run: a target without a checksum (:985), a listed entry without a checksum (:1031), a second id of the same holder onto the same target (:1039), one holder giving ids to two targets (:1041, :1043, :1050), and inboundTargetWaits' queued/blocked/downloading case (:1156). Every RR-14 test uses holders with one id moving onto checksummed targets. Nothing checks that one move carries all of a holder's converging ids, or that an id is never recorded twice. A duplicate changes inboundPendingIDs()' target, which followedLane reads.",
+  "fix": "Add tests with a holder that holds 2 or more converging ids. Cover one target, two targets, and one target without a checksum. Add a second attempt end while a move is owed, assert the answers and the moves recorded, and kill findInboundPendingDrop and the insert-drop mutants 2/2. Alternatively, record in the draft, with the reason, any branch that cannot be reached (for example :1156, if a target at the same epoch cannot be queued or downloading)."
+ },
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "S3-R16 1(e)/1(c): liveness of the publication's wait for owed moves (RE-S48)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineShutdown.swift:117 (releaseInboundWaits() in shutdown); EngineFollow.swift:1168 (inboundMade resumes [move.target, move.holder]), :1177, :1183, :1199, :1246; EngineDispatch.swift:1036-1046",
+  "problem": "The paths that release the publication's wait are unpinned. Drop-mutant shutdownReleaseInboundWaitsDrop removes EngineShutdown.swift:117. Drop-mutant inboundMadeHolderResumeDrop changes [move.target, move.holder] to [move.target]. Each survives: full bundle 543/543, exit 0. The whole bundle enters the wait only 3 times (EngineDispatch.swift:1036). These have 0 hits: the re-checks after the wait (:1038, shutdown during the wait; :1041-1046, job retired or replaced, so recordBreaker(.abandoned) and the staged file is discarded); shutdown resuming a waiting publication (EngineFollow :1199); the unspawnable follow-up's release (:1246); and awaitInboundMoves' early return and in-closure resume (:1177, :1183). Under either mutant, a publication could wait until shutdown or forever. No test would notice.",
+  "fix": "Add tests that: (a) shut down while a publication waits for an owed move, asserting shutdown completes and the waiter is answered shutDown (kills shutdownReleaseInboundWaitsDrop 2/2); (b) let a holder's publication wait for a move off its job and complete once the move is made, before any shutdown (kills inboundMadeHolderResumeDrop 2/2); (c) retire or replace the job during the wait, asserting the retired exit and the staged file discarded. Alternatively, record what cannot be reached (for example :1183), with the reason, in the draft."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "C2 margin: the concentration publication's commit turn (unpinned)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1103 committed (binds every id, then resolveAll / publishTerminal, EngineJobs.swift:618/:639); Tests/ZTronAssetKitBenchmarks/BenchSync.swift:2678",
+  "problem": "Probe VERIFY-C18R-CONC-COMMIT uses concentrationPublicationTurns' shape, then lets O's publication of 10,001 ids complete. The commit window's longest wait: [9.64, 9.66, 9.72] ms, best 9.64, at load 3.84, which is within C2 by 0.36 ms. Under load 6.65-7.04 it was [11.98, 11.93, 11.77] ms. The moves-window control: 4.87-5.01 ms. BenchSync's .publication window ends at bulk.waitForHeldUnits(atLeast: 1) (BenchSync.swift:2678), before the commit, so no case pins this turn.",
+  "fix": "Extend concentrationPublicationTurns, or add a case, through the commit (best of 3 <= c2Budget). Consider bounding the commit's per-id work before it regresses."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "Doc accuracy",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:833 (verdictAnswers doc)",
+  "problem": "The doc says a Retry-After is 'read against the clock now, as `retryLater` reads it'. The code (:855-860) reads it against `wall`, the failure's arrival, as cycle 18's reqs-1 fix intended.",
+  "fix": "Change the doc to say the date is read against the wall clock at the failure's arrival."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "Residual-risk accuracy (RR-18)",
+  "location": "docs/adr-drafts/s3f.md:4045-4052 (RR-18) and :4056; code EngineFollow.swift:800 (rerouteOnVisit's failed clause), :452-458 (recordPublicationEnd doc)",
+  "problem": "This is from code reading only; I did not probe it. RR-18 says a visit-first engine answers the id with the failed publication's outcome. However, for an apply made after the publication ended (appliesFollowed != end.failedAfter), rerouteOnVisit returns nil on a failed job with no verdict yet. The visit then moves the id off it, 'as met failed' in recordPublicationEnd's own doc. That gives the sweep-first walk's result, so the difference RR-18 describes may not exist.",
+  "fix": "Re-check RR-18's premise against rerouteOnVisit's failed clause and correct the entry, or probe it once a seam can hold integrityFailed's store await."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "Bookkeeping after an empty binding (order-dependent; answers equal)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1052-1085 (publish after the wait: ids == [], objectSuccess, .committing, committedSinceRead/committedTotal += file.byteCount; free-space estimate :605); Sources/ZTronAssetStorage AssetStore+Publish.swift:18-20 (empty ids return [:] before touching the staged file)",
+  "problem": "Probe VERIFY-C18R-EMPTY-BINDING ran 2/2 (seeded PublicationHopTests .back flow, H's job holding zz-x only). On sweepFollowsFirst, H's publication waits, the owed move takes H's only id, and the publication then binds nothing. H's staged .part (100,000 or 50,000 bytes) stays in staging after every answer is in. committedTotal reads 100,300 or 50,300, against 300 on followVisitedFirst, where H was superseded while it downloaded. The breaker records an object success. The engine's free-space estimate drops by H's bytes until the next read. W's answer is integrityFailure in both orders. Staging GC (R-CLN-3) removes the file later.",
+  "fix": "When the binding is empty after the wait, discard the staged file and retire or supersede the job, without counting a commit, committed bytes or an object success. Adapt the probe (VerifyC18ReqsEmptyBinding.swift) into a test."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "Coverage of cycle-18 join code",
+  "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:151 (job vanished), :163-165 (in-place lane raise of an interest already on the job)",
+  "problem": "These in-place join branches have 0 hits in the coverage run. If the lane-raise were dropped, an interest joining again at a higher lane would keep its old lane, and no test would notice.",
+  "fix": "Add a test where the same token joins the job again at a higher lane and the lane is raised; or show the branch is unreachable and say so in the draft."
+ }
+]

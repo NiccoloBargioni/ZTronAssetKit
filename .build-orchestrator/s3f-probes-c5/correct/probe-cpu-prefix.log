@@ -1,0 +1,90 @@
+ 4:10  up 4 days, 16:33, 2 users, load averages: 11.27 51.71 173.43
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 6]
+[2 / 7] ZTronAssetModel
+[3 / 8] ZTronAssetModel
+[6 / 11] ZTronAssetStorage
+[7 / 12] ZTronAssetStorage
+[10 / 15] ZTronAssetTransport
+[11 / 16] ZTronAssetTransport
+[14 / 19] ZTronAssetAppleHosted
+[15 / 20] ZTronAssetAppleHosted
+[18 / 23] ZTronAssetSync
+[19 / 24] ZTronAssetSync
+[23 / 26] ZTronAssetKit
+[32 / 36] ZTronAssetTestSupport
+[34 / 37] ZTronAssetTestSupport
+[44 / 63] ZTronAssetModelTests-product
+[53 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetKitTests-product
+[59 / 71] ZTronAssetKitTests-product
+[59 / 71] ZTronAssetTransportTests-product
+[62 / 72] ZTronAssetTransportTests-product
+[65 / 74] ZTronAssetTransportTests-product
+[65 / 75] ZTronAssetKitBenchmarks-product
+[67 / 75] ZTronAssetKitBenchmarks-product
+[67 / 75] ZTronAssetModelTests-product
+[69 / 75] ZTronAssetModelTests-product
+[69 / 75] ZTronAssetSyncTests-product
+[72 / 76] ZTronAssetSyncTests-product
+[76 / 79] ZTronAssetStorageTests-product
+[87 / 88] ZTronAssetStorageTests-product
+[90 / 90] ZTronAssetStorageTests-product
+[94 / 94] ZTronAssetModelTests-product
+[98 / 98] ZTronAssetKitTests-product
+[102 / 102] ZTronAssetKitBenchmarks-product
+[106 / 106] ZTronAssetCompatibilityTests-product
+[110 / 110] ZTronAssetAppleHostedTests-product
+Build complete! (139,58 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC5CorrectProbes" started.
+◇ Test "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+◇ Test case passing 1 argument mode → alternating changed=false handles=1 to "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+PROBE-C5-SWEEP-CPU alternating changed=false handles=1: turns 20; cpu ms ["3.95", "3.78", "3.83", "3.87", "3.96", "4.08", "4.27", "4.45", "4.65", "4.79", "4.99", "5.16", "5.40", "5.58", "5.78", "5.97", "6.12", "6.35", "6.60", "6.16"]; cpu max 6.60 median 4.99; wall max 6.60 median 4.99; followed [0, 0, 0, 0]... left awaiting [517, 512, 512, 512]...
+◇ Test case passing 1 argument mode → alternating changed=true handles=1 to "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+PROBE-C5-SWEEP-CPU alternating changed=true handles=1: turns 11; cpu ms ["10.66", "9.70", "9.32", "8.90", "8.54", "8.28", "8.05", "7.82", "7.58", "4.36", "0.15"]; cpu max 10.66 median 8.28; wall max 10.66 median 8.28; followed [1024, 1024, 1024, 1024]... left awaiting [1024, 1024, 1024, 1024]...
+✘ Test "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" recorded an issue with 1 argument mode → alternating changed=true handles=1 at VerifyC5CorrectProbes.swift:433:9: Expectation failed: turns.allSatisfy { $0.followed <= SyncEngine.followsPerTurn }
+↳ turns.allSatisfy { $0.followed <= SyncEngine.followsPerTurn } → <not evaluated>
+✘ Test "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" recorded an issue with 1 argument mode → alternating changed=true handles=1 at VerifyC5CorrectProbes.swift:434:9: Expectation failed: (cpu.max() ?? 0) <= 10.0
+↳ alternating changed=true handles=1: the longest sweep turn used 10.657333 ms of CPU
+↳ (cpu.max() ?? 0) <= 10.0 → false
+↳   (cpu.max() ?? 0) → 10.657333
+◇ Test case passing 1 argument mode → alternating changed=true handles=2 to "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+PROBE-C5-SWEEP-CPU alternating changed=true handles=2: turns 11; cpu ms ["14.05", "13.09", "12.56", "12.68", "11.99", "11.69", "11.42", "11.17", "10.96", "6.14", "0.16"]; cpu max 14.05 median 11.69; wall max 14.05 median 11.68; followed [1024, 1024, 1024, 1024]... left awaiting [1024, 1024, 1024, 1024]...
+✘ Test "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" recorded an issue with 1 argument mode → alternating changed=true handles=2 at VerifyC5CorrectProbes.swift:433:9: Expectation failed: turns.allSatisfy { $0.followed <= SyncEngine.followsPerTurn }
+↳ turns.allSatisfy { $0.followed <= SyncEngine.followsPerTurn } → <not evaluated>
+✘ Test "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" recorded an issue with 1 argument mode → alternating changed=true handles=2 at VerifyC5CorrectProbes.swift:434:9: Expectation failed: (cpu.max() ?? 0) <= 10.0
+↳ alternating changed=true handles=2: the longest sweep turn used 14.052042 ms of CPU
+↳ (cpu.max() ?? 0) <= 10.0 → false
+↳   (cpu.max() ?? 0) → 14.052042
+◇ Test case passing 1 argument mode → pattern changed=false handles=1 to "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+PROBE-C5-SWEEP-CPU pattern changed=false handles=1: turns 19; cpu ms ["4.30", "3.60", "3.59", "3.97", "3.91", "4.10", "4.15", "5.20", "4.72", "4.81", "5.60", "5.80", "6.51", "6.00", "6.60", "6.27", "7.30", "7.24", "6.24"]; cpu max 7.30 median 5.20; wall max 7.30 median 5.20; followed [0, 0, 0, 0]... left awaiting [1024, 595, 512, 512]...
+◇ Test case passing 1 argument mode → pattern changed=true handles=1 to "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+PROBE-C5-SWEEP-CPU pattern changed=true handles=1: turns 19; cpu ms ["6.80", "5.50", "5.91", "5.96", "5.21", "5.42", "5.11", "5.25", "5.17", "5.89", "5.66", "5.81", "6.21", "6.60", "7.83", "7.14", "7.57", "6.50", "5.56"]; cpu max 7.83 median 5.89; wall max 7.83 median 5.88; followed [64, 167, 128, 128]... left awaiting [1024, 666, 512, 512]...
+◇ Test case passing 1 argument mode → pattern changed=true handles=2 to "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" started.
+PROBE-C5-SWEEP-CPU pattern changed=true handles=2: turns 19; cpu ms ["6.58", "7.26", "5.64", "5.93", "6.21", "7.02", "7.00", "7.42", "7.25", "6.15", "6.41", "6.19", "6.35", "6.40", "6.47", "6.48", "7.86", "6.75", "4.95"]; cpu max 7.86 median 6.47; wall max 7.88 median 6.47; followed [64, 167, 128, 128]... left awaiting [1024, 666, 512, 512]...
+✘ Test "PROBE-C5-SWEEP-CPU: sweep turns at 10,000 in wall and CPU time, with and without an owed follow" with 6 test cases failed after 8.926 seconds with 4 issues.
+✘ Suite "VerifyC5CorrectProbes" failed after 8.926 seconds with 4 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 5, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C5-SWEEP-TURNS: `count` prefetch members alternating 400 and 3,000 bytes (`handles` prefetch handles over the
+↳ /// same ids) wait `awaitingSpace` for a pruned 2,000-byte blob with 100 bytes of room; a forced sync changes every
+↳ /// member's content and the follow's follow-ups are held after its first turn (the follow owes its visits). The space
+↳ /// sweep's follow-ups are held. The deletion grace ends: the alarm reaps the blob and runs its `.reclaimed` sweep (the
+↳ /// first turn, counted, not timed). Every later sweep turn is then run directly on the actor (`releaseSpaceSweepFollowUps`
+↳ /// re-arming the hold in the same turn), timed with `ContinuousClock`, and the jobs it followed are counted (jobs that
+↳ /// hold a moved id before minus after). Requirement: every sweep turn follows at most `followsPerTurn` jobs and takes at
+↳ /// most C2's 10 ms; at the end every member left `awaitingSpace` and holds its new content.
+✘ Test run with 1 test in 1 suite failed after 8.926 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+exit 1
+ 4:12  up 4 days, 16:36, 2 users, load averages: 8.45 35.41 147.13

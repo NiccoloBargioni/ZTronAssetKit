@@ -1,0 +1,52 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+✔ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" with 2 test cases passed after 1.071 seconds.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+✔ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" with 2 test cases passed after 1.136 seconds.
+◇ Test "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .sameFollow to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .afterTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .beforeTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .afterTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .beforeTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .sameFollow to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .afterTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .beforeTheApply to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .afterTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .beforeTheApplyRest to "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" started.
+✔ Test "R-SYN-6: the visit after a verdict joins its moved ids behind a verdict that waits later, or at once, as visited first (F-28)" with 10 test cases passed after 6.425 seconds.
+◇ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+✔ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" with 2 test cases passed after 1.125 seconds.
+◇ Test "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+✔ Test "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" with 2 test cases passed after 1.139 seconds.
+◇ Test "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" started.
+✔ Test "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" with 2 test cases passed after 1.192 seconds.
+◇ Test "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, walked → false to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, walked → true to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, walked → false to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, walked → true to "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+✔ Test "R-SYN-5: an ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" with 4 test cases passed after 1.867 seconds.
+◇ Test "R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" started.
+✔ Test "R-SYN-5: a transfer's ENOSPC whose free-space read runs the follow's join onto its job gives its verdict at the attempt cap, as visited first (F-28)" with 2 test cases passed after 0.827 seconds.
+◇ Test "R-SYN-5: a follow's visit for an apply after a publication's failure joins a user interest that skips the backoff, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a follow's visit for an apply after a publication's failure joins a user interest that skips the backoff, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a follow's visit for an apply after a publication's failure joins a user interest that skips the backoff, as visited first (F-28)" started.
+✔ Test "R-SYN-5: a follow's visit for an apply after a publication's failure joins a user interest that skips the backoff, as visited first (F-28)" with 2 test cases passed after 0.876 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 15.663 seconds.
+✔ Test run with 9 tests in 1 suite passed after 15.663 seconds.

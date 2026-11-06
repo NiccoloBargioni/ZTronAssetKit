@@ -1,0 +1,332 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineCommands.swift b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+index b167f85..feff802 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineCommands.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+@@ -1818,7 +1818,9 @@ extension SyncEngine {
+             violations.append("a pump waits for a follow that nothing owes")
+         }
+         if self.followOwed {
+-            let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
++            // The jobs a space sweep brought forward (`followBroughtForward`) were visited: the owed ones follow them.
++            let owedFrom = min(self.state.followOrder.count, max(self.state.followNext, self.state.followBroughtForward))
++            let unmarked = self.state.followOrder[owedFrom...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
+             if unmarked > 0 {
+                 violations.append("\(unmarked) jobs a follow still owes a visit are not in unfollowed")
+             }
+diff --git a/Sources/ZTronAssetSync/Engine/EngineFollow.swift b/Sources/ZTronAssetSync/Engine/EngineFollow.swift
+index 18230b9..c60326d 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineFollow.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineFollow.swift
+@@ -38,6 +38,7 @@ extension SyncEngine {
+     func followApplied(from previous: ValidatedManifest) {
+         self.state.followOrder = self.state.unfollowed.sorted()
+         self.state.followNext = 0
++        self.state.followBroughtForward = 0
+         if !self.state.jobs.isEmpty || !self.state.followScans.isEmpty, previous.digest != self.state.applied.digest || previous.count != self.state.applied.count {
+             self.state.followScans.append(FollowScan(manifest: previous))
+         }
+@@ -54,11 +55,30 @@ extension SyncEngine {
+     /// the run is checked.
+     private func continueFollow() {
+         self.continueFollowScans()
++        // The jobs space sweeps brought forward were visited, in this order: the follow resumes after them. The cursor is
++        // a local: an inout access to `state` would overlap the visits' own accesses to it (exclusivity).
++        var cursor = max(self.state.followNext, min(self.state.followBroughtForward, self.state.followOrder.count))
++        var moved = self.visitFollowOrder(from: &cursor)
++        self.state.followNext = cursor
++        if self.followOwed {
++            // A pump that left a queue's head to this follow (`pumpWaitsForFollow`) looks again: its job may be followed now.
++            if moved || self.state.pumpWaitsForFollow {
++                self.pump()
++            }
++            self.scheduleFollowFollowUp()
++            return
++        }
++        self.endFollow(moved: &moved)
++    }
++
++    /// Visits `followOrder` from `cursor`, in order, at most `followsPerTurn` jobs still owed a visit (in `unfollowed`);
++    /// `true` when a visit moved a job.
++    private func visitFollowOrder(from cursor: inout Int) -> Bool {
+         var visited = 0
+         var moved = false
+-        while visited < Self.followsPerTurn, self.state.followNext < self.state.followOrder.count {
+-            let transfer = self.state.followOrder[self.state.followNext]
+-            self.state.followNext += 1
++        while visited < Self.followsPerTurn, cursor < self.state.followOrder.count {
++            let transfer = self.state.followOrder[cursor]
++            cursor += 1
+             // A job owed a visit stays in `unfollowed` until it; one that left it was removed meanwhile (`removeJob`).
+             guard self.state.unfollowed.remove(transfer) != nil else {
+                 continue
+@@ -68,16 +88,15 @@ extension SyncEngine {
+                 moved = true
+             }
+         }
+-        if self.followOwed {
+-            // A pump that left a queue's head to this follow (`pumpWaitsForFollow`) looks again: its job may be followed now.
+-            if moved || self.state.pumpWaitsForFollow {
+-                self.pump()
+-            }
+-            self.scheduleFollowFollowUp()
+-            return
+-        }
++        return moved
++    }
++
++    /// Ends a follow that owes nothing more: the jobs held for a manifest catch-up that no catch-up holds any more are
++    /// released, the run is checked, and the queues are pumped when anything moved or waited for the follow.
++    private func endFollow(moved: inout Bool) {
+         self.state.followOrder = []
+         self.state.followNext = 0
++        self.state.followBroughtForward = 0
+         if self.state.manifestCatchUps == 0, !self.state.heldForManifest.isEmpty {
+             // `manifestCaughtUp` left them held while this follow was owed.
+             self.state.heldForManifest.removeAll()
+@@ -89,6 +108,61 @@ extension SyncEngine {
+         }
+     }
+ 
++    /// Whether the owed follow still has passes or visits that neither its own turns nor a space sweep
++    /// (`bringFollowForward()`) have done: until they are, a job's place and lane, the jobs counted ahead and the
++    /// ledger's in-flight bytes may not be those the follow leaves. O(1).
++    var followVisitsPending: Bool {
++        !self.state.followScans.isEmpty || max(self.state.followNext, self.state.followBroughtForward) < self.state.followOrder.count
++    }
++
++    /// What `bringFollowForward()` did.
++    enum FollowBroughtForward {
++        /// Nothing an owed follow would visit is left to bring forward (or no follow is owed): the jobs and the queues
++        /// are as the follow's visits leave them, and a space sweep may judge in this turn.
++        case nothing
++        /// It continued the follow's passes or visited jobs, within one follow turn's bounds: a space sweep judges
++        /// nothing in this turn (C2) and leaves the judging, or the rest of the follow, to its follow-up sweep.
++        case visited
++    }
++
++    /// Brings the owed follow's remaining work forward for a space sweep (`sweepSpaceParked`), in the follow's own
++    /// order and within one follow turn's bounds: its owed passes (`followScansPerTurn`, `followFormatsPerTurn`), which
++    /// find every job holding an id the copy maps to other content or no longer lists, then its owed visits from
++    /// `followOrder` (`followsPerTurn`), whatever state the job is in (parked for space, queued, downloading, blocked,
++    /// failed), and the pump the follow's turn runs after its visits. The follow's own turns resume after the jobs
++    /// brought forward (`followBroughtForward`) and end the follow; this one ends it only when it finished the follow's
++    /// passes and nothing was left to visit, so the follow's end is not lost.
++    ///
++    /// Why every owed visit, not only those of the jobs a sweep would judge: a visit changes what a sweep reads through
++    /// jobs it does not judge too. A job that is not parked for space (queued, downloading) gives a moved id's interest
++    /// to the parked job of its new content and raises its rank (the close-out cycle-8 requirements lens,
++    /// PROBE-C8R-INFLIGHT-PROMOTE); a download no id wants any more is abandoned and leaves the ledger's in-flight
++    /// bytes; a job re-queued by an earlier sweep and counted ahead (`spaceAdmitted`) is superseded; a dropped id's
++    /// interest ends `.notFound` and takes its lane with it (the cycle-8 correctness lens, PROBE-C8-DROPPED, -KEEP and
++    /// -LANE); and the jobs a visit creates for the new contents take their queue tickets in the visit order, which the
++    /// pump and the sweep serve. Bringing forward a subset, or the same jobs in another order, judged some of these at
++    /// their pre-follow places. A visit that moves nothing changes nothing; it costs a lookup per id.
++    func bringFollowForward() -> FollowBroughtForward {
++        guard self.followVisitsPending else {
++            // No follow is owed, or every owed visit is brought forward already (the follow's own turn ends it).
++            return .nothing
++        }
++        self.continueFollowScans()
++        var cursor = max(self.state.followNext, min(self.state.followBroughtForward, self.state.followOrder.count))
++        var moved = self.visitFollowOrder(from: &cursor)
++        self.state.followBroughtForward = cursor
++        if !self.followOwed {
++            // The passes ended here and found nothing left to visit: the follow ends in this turn.
++            self.endFollow(moved: &moved)
++            return .visited
++        }
++        // As the follow's turn does after its visits: the new contents' jobs are gated in the visit order.
++        if moved || self.state.pumpWaitsForFollow {
++            self.pump()
++        }
++        return .visited
++    }
++
+     /// Whether `job` waits for the follow before it starts: a follow is owed and the job holds an id the engine's copy
+     /// does not map to its content (listed at another transfer, or dropped), so the job's content may be what no id
+     /// wants any more. Such a job is one the follow still owes a visit, one its pass has not reached yet (both up to
+@@ -110,8 +184,8 @@ extension SyncEngine {
+     /// legitimately, and the follow would end its interest `.notFound`; a dropped id's interest gets the failure's own
+     /// answer instead of the follow's `.notFound`, which no rule forbids. One lookup in the copy and one key comparison
+     /// per id of the job (`sameTransfer` against the job's own entry, whose transfer is the job's), no transfer
+-    /// formatted: a space sweep checks every job it would judge while a follow is owed (`followSweptHolders`), and a
+-    /// formatted transfer costs about 0.75 µs in release, 7.5 ms at SPEC §6's 10,000.
++    /// formatted: a failure path checks its job while a follow is owed (`followBeforeActing`), and a formatted transfer
++    /// costs about 0.75 µs in release.
+     func holdsMovedID(_ job: Job) -> Bool {
+         guard self.followOwed else {
+             return false
+@@ -122,8 +196,8 @@ extension SyncEngine {
+     }
+ 
+     /// Brings the follow's visit of `transfer` forward to the moment its job is about to answer its interests with a
+-    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`) or to be judged by a space sweep
+-    /// (`sweepSpaceParked`, which follows every job it would judge before it orders them): the moved ids' interests
++    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`; a space sweep brings the whole follow forward
++    /// instead, `bringFollowForward()`): the moved ids' interests
+     /// follow their new content first (T22), exactly as the visit would have moved them before the failure arrived, and
+     /// only the ids the copy still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
+     /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to
+@@ -242,6 +316,7 @@ extension SyncEngine {
+             self.state.followFollowUpScheduled = false
+             self.state.followOrder = []
+             self.state.followNext = 0
++            self.state.followBroughtForward = 0
+             self.state.followScans = []
+             self.state.pumpWaitsForFollow = false
+         }
+diff --git a/Sources/ZTronAssetSync/Engine/EngineJobs.swift b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+index 17bfe0f..bd7f95d 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -683,67 +683,49 @@ extension SyncEngine {
+     /// turn that re-admitted 10,000 members when the volume gained room took about 15 ms: review of close-out cycle 8,
+     /// C2). A read stops re-checking once the room left cannot admit even the smallest job parked `insufficientSpace`.
+     ///
+-    /// While a follow is owed, the sweep first follows every job it would judge that holds an id the follow has not moved
+-    /// yet (`followSweptHolders`), then collects and orders the jobs again, and only then judges any: it judges each job
+-    /// as the follow leaves it, at the place the pump would serve it from. A follow changes what the sweep reads two ways:
+-    /// the followed job loses the moved interests, which may have set its lane (and with it its rank and the volume its
+-    /// verdict and figures read; the two readings are not ordered, so the room may shrink or grow), and the job of the
+-    /// moved id's new content gains them, which may raise its lane. The cycles before judged a job at its pre-follow place
+-    /// and followed it only as the sweep reached it, so each change was patched where it showed: a job re-queued on its
+-    /// pre-follow user lane took the next user job's room (PROBE-C5-LANEDROP), a job parked after a follow that left it
+-    /// room answered its waiter with an `available` above its `required` (PROBE-C6-LANEGAIN), and, with both patched,
+-    /// prefetch work was still admitted and counted ahead of user work the pump serves first, and a job the follow raised
+-    /// to user work was still judged at its prefetch place, so a user waiter's fail-fast reported a shortage the room did
+-    /// not have (the close-out cycle-7 correctness lens, PROBE-C7-RANK-ADMIT, -PARK and -PROMOTE). Following first gives
+-    /// the outcome the sweep gives when the follow visited those jobs before it. The ids leave a job before its fail-fast
+-    /// answers the rest, so a moved id's waiter or ensure member is never answered with its replaced content's figures,
+-    /// and the replaced content is never re-queued to stall its queue's head until the follow's visit (the close-out
+-    /// cycle-3 correctness lens, PROBE-C3-SPACE). At `s3-base` the follow moved every job in the apply's turn, so no
+-    /// sweep ran between the two. A follow costs what a follow turn's visit costs, about ten times a re-queue or a park:
+-    /// the sweep follows at most `followsPerTurn` jobs per turn besides its parks and re-queues (counted as the re-queue
+-    /// or park it preceded, one turn followed up to 1,024 jobs, 9.3 to 13 ms at 10,000 members: the close-out cycle-4
+-    /// correctness lens, PROBE-C4-SWEEP2-C2), and a turn that cannot follow them all judges nothing and leaves the rest
+-    /// to its follow-up sweep, since a job not followed yet would be judged at a place it may not keep.
++    /// While a follow is owed, a sweep judges nothing until the follow's remaining work is brought forward
++    /// (`bringFollowForward()`): its owed passes and its owed visits, in the follow's own order, for every job whatever
++    /// its state, within one follow turn's bounds per turn. A turn that brought any of it forward judges nothing and
++    /// owes a follow-up sweep, which continues or judges (C2: a turn that followed the owed holders and then collected,
++    /// sorted and judged 10,000 jobs held the actor 10 to 12 ms, the close-out cycle-8 correctness lens,
++    /// VERIFY-C8-C2-MIXED). So every sweep judges a state in which every visit the follow owes has been made, in the
++    /// follow's order (`followVisitsPending` is false): the jobs, their lanes and places, the jobs counted ahead and the
++    /// ledger's in-flight bytes are those the follow's visits leave, and the re-admissions, re-queues, parks, `ahead` and
++    /// the fail-fast answers of its parks are those a sweep gives when the follow visited first. (A job verifying or
++    /// committing is not moved by a visit in either order, and a job joined after its visit holds what it would hold
++    /// after the follow's end.) The cycles before followed only some jobs before judging (none, then the job being judged,
++    /// then the space-parked jobs holding a moved id, in the sweep's order), and each left a case judged at a
++    /// pre-follow place: a re-queue on a lowered lane (PROBE-C5-LANEDROP), a park after a follow that left room
++    /// (PROBE-C6-LANEGAIN), prefetch work admitted ahead of user work and a raised job judged at its prefetch place
++    /// (PROBE-C7-RANK-ADMIT, -PARK, -PROMOTE), a job whose lane came from a dropped id (PROBE-C8-DROPPED, -KEEP,
++    /// -LANE), and the parked job of a moved id held by a download (PROBE-C8R-INFLIGHT-PROMOTE). At `s3-base` the
++    /// follow moved every job in the apply's turn, so no sweep ran between the two. The follow's work is bounded and
++    /// shrinks every turn, its own turns and the sweep's both advance it, so the sweep judges within the follow's own
++    /// bound (about 40 turns at SPEC §6's 10,000 changed members); a later apply starts its visits over and the sweep
++    /// judges the newer copy.
+     func sweepSpaceParked(_ sweep: SpaceSweep) {
++        switch self.bringFollowForward() {
++        case .nothing:
++            break
++        case .visited:
++            self.scheduleSpaceSweepFollowUp(sweep)
++            return
++        }
+         let ahead = self.spaceAdmittedAhead()
+         var (candidates, smallest) = self.spaceSweepCandidates(sweep)
+         // A read re-checks only jobs parked `insufficientSpace`, and leaves untouched each it does not admit: once the
+-        // room left cannot hold the smallest of them, nothing more changes (a follow moves interests, not sizes).
++        // room left cannot hold the smallest of them, nothing more changes.
+         let room = sweep == .read ? self.state.freeSpace.map { self.largestRoom(in: $0) } : nil
+         if let room, smallest > room.subtractingClamped(ahead) {
+             return
+         }
+         candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+-        switch self.followSweptHolders(candidates) {
+-        case .none:
+-            break
+-        case .followed:
+-            // Ranks, lanes and the jobs themselves may have changed: collect and order them again.
+-            (candidates, smallest) = self.spaceSweepCandidates(sweep)
+-            if let room, smallest > room.subtractingClamped(ahead) {
+-                return
+-            }
+-            candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+-        case .bounded:
+-            self.scheduleSpaceSweepFollowUp(sweep)
+-            return
+-        }
+         self.judgeSpaceParked(candidates, sweep: sweep, room: room, smallest: smallest, ahead: ahead)
+     }
+ 
+     /// One space-parked job a sweep may judge, with its place in the pump's order.
+     private typealias SweepCandidate = (rank: Int, ticket: UInt64, transfer: TransferID)
+ 
+-    /// What `followSweptHolders` did.
+-    private enum SweptFollow {
+-        /// No job the sweep would judge holds an id an owed follow has not moved: the collected order stands.
+-        case none
+-        /// It followed every such job: the jobs must be collected and ordered again.
+-        case followed
+-        /// It followed `followsPerTurn` of them and more are left: the sweep judges nothing this turn.
+-        case bounded
+-    }
+-
+     /// The jobs `sweep` judges (every space-parked job, or only the `insufficientSpace` ones for a read), unordered, and
+     /// the size of the smallest.
+     private func spaceSweepCandidates(_ sweep: SpaceSweep) -> (candidates: [SweepCandidate], smallest: Int64) {
+@@ -759,27 +741,6 @@ extension SyncEngine {
+         return (candidates, smallest)
+     }
+ 
+-    /// Follows, in `candidates`' order, each job that holds an id an owed follow has not moved yet (`followBeforeActing`,
+-    /// the follow's visit brought forward), at most `followsPerTurn` of them. One check per job and id while a follow is
+-    /// owed (`holdsMovedID`, a lookup and a key comparison); nothing otherwise.
+-    private func followSweptHolders(_ candidates: [SweepCandidate]) -> SweptFollow {
+-        guard self.followOwed else {
+-            return .none
+-        }
+-        var follows = 0
+-        for candidate in candidates {
+-            guard let job = self.state.jobs[candidate.transfer], self.holdsMovedID(job) else {
+-                continue
+-            }
+-            guard follows < Self.followsPerTurn else {
+-                return .bounded
+-            }
+-            follows += 1
+-            _ = self.followBeforeActing(candidate.transfer)
+-        }
+-        return follows > 0 ? .followed : .none
+-    }
+-
+     /// Judges `candidates`, in the pump's order and as the follow leaves them, against `room` (a read's) or the ledger
+     /// (`sweepSpaceParked`), counting the bytes of the jobs re-admitted ahead of each.
+     private func judgeSpaceParked(_ candidates: [SweepCandidate], sweep: SpaceSweep, room: Int64?, smallest: Int64, ahead: Int64) {
+diff --git a/Sources/ZTronAssetSync/Engine/EngineShutdown.swift b/Sources/ZTronAssetSync/Engine/EngineShutdown.swift
+index 235c9a1..d70b1e7 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineShutdown.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineShutdown.swift
+@@ -110,6 +110,7 @@ extension SyncEngine {
+         drain.indexes.followOrder = self.state.followOrder
+         self.state.followOrder = []
+         self.state.followNext = 0
++        self.state.followBroughtForward = 0
+         self.state.followScans = []
+         self.state.pumpWaitsForFollow = false
+         self.state.laneParksOwed.removeAll()
+diff --git a/Sources/ZTronAssetSync/Engine/EngineState.swift b/Sources/ZTronAssetSync/Engine/EngineState.swift
+index aaf2166..e627348 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineState.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineState.swift
+@@ -60,6 +60,10 @@ struct EngineState {
+     var followScans: [FollowScan] = []
+     /// The next index of `followOrder` to visit.
+     var followNext = 0
++    /// The next index of `followOrder` a space sweep has not brought forward yet (`SyncEngine.bringFollowForward()`):
++    /// the jobs from `followNext` up to it were visited by sweeps ahead of the follow's own turns, which resume after them.
++    /// `0` whenever `followOrder` is rebuilt or emptied.
++    var followBroughtForward = 0
+     /// A later turn is scheduled to continue the follow.
+     var followFollowUpScheduled = false
+     /// Test seam: while set, the scheduled follow-up keeps its visits owed and stays scheduled instead of running

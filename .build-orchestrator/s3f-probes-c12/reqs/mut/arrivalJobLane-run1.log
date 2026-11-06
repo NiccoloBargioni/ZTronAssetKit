@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:283:13: Expectation failed: abs(throttle - background) < 0.000_001
+↳ the origin's throttle is the backoff of C's prefetch lane (visit-first): (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+↳ abs(throttle - background) < 0.000_001 → false
+↳   abs(throttle - background) → 0.6287160519433109
+↳   0.000_001 → 1e-06
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:288:13: Expectation failed: abs(throttle - background) < 0.000_001
+↳ right after the 429 the origin is throttled for the backoff of C's prefetch lane (visit-first): 0.209572016 against (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+↳ abs(throttle - background) < 0.000_001 → false
+↳   abs(throttle - background) → 0.6287160519433109
+↳   0.000_001 → 1e-06
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" with 2 test cases failed after 0.842 seconds with 2 issues.
+↳ /// A 429 without Retry-After that arrives while the follow owes a visit throttles the origin for the backoff of the
+↳ /// lane the visit leaves its job: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter);
+↳ /// v3 moves zz-a while the follow owes C's visit. C gets a 429 without Retry-After. Visited first, C is prefetch work,
+↳ /// so the throttle is the background policy's first backoff; decided before the visit, it was the interactive
+↳ /// policy's (PROBE-C10-THROTTLE-LANE).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.842 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.842 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

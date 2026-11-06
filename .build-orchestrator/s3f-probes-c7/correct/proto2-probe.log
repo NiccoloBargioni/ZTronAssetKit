@@ -1,0 +1,13 @@
+PROBE-C7-RANK-admit visitFirst=true kResult: success(ZTronAssetModel.ok(zz-k,3000000)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 2999000)) aResult: success(ZTronAssetModel.ok(zz-a,16))
+✔ Test "PROBE-C6-READDROP: a read sweep's re-queue after a partial follow takes no room from the next user job" with 2 test cases passed after 0.961 seconds.
+PROBE-C7-RANK-admit visitFirst=false kResult: success(ZTronAssetModel.ok(zz-k,3000000)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 2999000)) aResult: success(ZTronAssetModel.ok(zz-a,16))
+✔ Test "PROBE-C7-RANK-ADMIT: a followed job lowered to prefetch is not admitted ahead of a user job" with 2 test cases passed after 1.015 seconds.
+PROBE-C7-RANK-park visitFirst=true kResult: success(ZTronAssetModel.ok(zz-k,3900000)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4099987)) aResult: success(ZTronAssetModel.ok(zz-a,16))
+✔ Test "PROBE-C6-PARKFIGURES: the kept prefetch waiter of a re-judged job gets its own lane's figures" with 2 test cases passed after 0.924 seconds.
+PROBE-C7-RANK-park visitFirst=false kResult: success(ZTronAssetModel.ok(zz-k,3900000)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4100003)) aResult: success(ZTronAssetModel.ok(zz-a,16))
+✔ Test "PROBE-C7-RANK-PARK: a parked-branch job re-queued on its new lane is not admitted ahead of a user job" with 2 test cases passed after 0.953 seconds.
+PROBE-C7-RANK-PROMOTE visitFirst=true aResult: success(ZTronAssetModel.ok(zz-a,3000000)) rResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 3000000)) pResult: success(ZTronAssetModel.ok(zz-p,3000000))
+✔ Test "PROBE-C6-LANEGAIN: a park after a follow that raised the job's room" with 2 test cases passed after 0.888 seconds.
+PROBE-C7-RANK-PROMOTE visitFirst=false aResult: success(ZTronAssetModel.ok(zz-a,3000000)) rResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3500000, available: 3000000)) pResult: success(ZTronAssetModel.ok(zz-p,3000000))
+✔ Test "PROBE-C7-RANK-PROMOTE: a parked job a sweep's follow raised to user work is judged before prefetch work" with 2 test cases passed after 0.875 seconds.
+✔ Test run with 6 tests in 2 suites passed after 2.844 seconds.

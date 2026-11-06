@@ -1,0 +1,36 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine runs" started.
+◇ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C11R-UNCONSTRAIN-DEMOTE" started.
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .followVisitedFirst at VerifyC11ReqsProbes.swift:42:6: Time limit was exceeded: 60.000 seconds
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:42:6: Time limit was exceeded: 60.000 seconds
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst before: (owed: true, lane: Optional(ZTronAssetModel.AssetPriority.userInitiated), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst pausesAtBefore=0
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst before: (owed: false, lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst pausesAtBefore=1
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst after: (lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.downloading), policyPause: nil) pauses=1
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst after: (lane: Optional(ZTronAssetModel.AssetPriority.prefetch), c: Optional(ZTronAssetSync.JobState.downloading), policyPause: Optional(ZTronAssetModel.PolicyBlock.constrainedNetwork)) pauses=1
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst dbg: w=Optional((ZTronAssetSync.JobState.verifying, ZTronAssetModel.AssetPriority.userInitiated, 1)) c=Optional((ZTronAssetSync.JobState.downloading, ZTronAssetModel.AssetPriority.prefetch, 1, [zz-p])) starts=["o", "C", "W"]
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst dbg: w=nil c=Optional((ZTronAssetSync.JobState.downloading, ZTronAssetModel.AssetPriority.prefetch, 1, [zz-p])) starts=["o", "C", "W", "C"]
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC11ReqsProbes.swift:97:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A is served from W: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+PROBE-C11R-UNCONSTRAIN-DEMOTE sweepFollowsFirst: pauses=1 starts=2 a=failure(ZTronAssetModel.AssetError.cancelled)
+PROBE-C11R-UNCONSTRAIN-DEMOTE followVisitedFirst: pauses=1 starts=2 a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/9c/9c0f314f7df8b4106912842b48a9d26fd62d9a9e44f2b5f2a416985db08342bb.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C11R-UNCONSTRAIN-DEMOTE" with 2 test cases failed after 64.124 seconds with 3 issues.
+↳ /// PROBE-C11R-UNCONSTRAIN-DEMOTE (the draft's residual R-D, "a visit reads inputs that arrived after it was owed"):
+↳ /// under Low Data Mode, C (1 MB, content X) downloads for A's user waiter (zz-a) and a prefetch member P (zz-p).
+↳ /// v3 moves zz-a to a 16-byte content W while the follow owes C's visit. The network then becomes unrestricted.
+↳ /// Visit-first: C's visit lowers it to the prefetch lane while Low Data Mode still holds, so `relane`'s demotion
+↳ /// pause (`pauseIfRefused`) pauses it (1 pause), and the later unrestricted element re-admits it (2 starts). Behind
+↳ /// the barrier the unrestricted conditions are already in `state.conditions` when the visit runs, so the demotion
+↳ /// pause reads them and does not pause C (0 pauses, 1 start); the deferred conditions pass (snapshot unrestricted)
+↳ /// pauses nothing either.
+✘ Suite "Engine runs" failed after 64.125 seconds with 3 issues.
+↳ /// Runs end to end over the real store (R-NET-1, R-SYN-6, R-SYN-8, R-SYN-9, R-NET-6).
+✘ Test run with 1 test in 1 suite failed after 64.125 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

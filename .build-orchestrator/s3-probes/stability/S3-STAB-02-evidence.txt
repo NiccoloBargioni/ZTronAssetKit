@@ -1,0 +1,31 @@
+S3-STAB-02 evidence (check-then-act polls in other Storage tests).
+
+== Replay probes S3-STAB-02.swift, debug (probes-debug.log):
+✘ Test "R-CLN-12: (S3-STAB-02) cancelledCollection's poll leaves a staged file for the next run whatever the schedule" recorded an issue at S3StabilityPollProbes.swift:92:9: Expectation failed: an error was expected but none was thrown and "CleanupResult(bytesFreed: 150, filesRemoved: 3, bytesDefe
+↳ StoreError.cancelled → <not evaluated>
+↳   StoreError → <not evaluated>
+↳   cancelled → <not evaluated>
+✘ Test "R-CLN-12: (S3-STAB-02) cancelledCollection's poll leaves a staged file for the next run whatever the schedule" recorded an issue at S3StabilityPollProbes.swift:95:9: Expectation failed: remaining.count < garbage.count && !remaining.isEmpty
+↳ the unit that ran stays done, the rest is left
+↳ remaining.count < garbage.count && !remaining.isEmpty → false
+↳   remaining.count < garbage.count → true
+↳   !remaining.isEmpty → false
+✘ Test "R-CLN-2: (S3-STAB-02) sweepChunksReleaseActor's poll stops the sweep after its first chunk whatever the schedule" recorded an issue at S3StabilityPollProbes.swift:127:9: Expectation failed: !held.isEmpty && table[planted[0]] != nil && table[planted[1]] == nil && table[planted[2]] == nil
+↳ one chunk doomed, then the actor is free
+↳ !held.isEmpty && table[planted[0]] != nil && table[planted[1]] == nil && table[planted[2]] == nil → false
+↳   !held.isEmpty && table[planted[0]] != nil && table[planted[1]] == nil → false
+↳   table[planted[2]] == nil → <not evaluated>
+✘ Test "R-CLN-4: (S3-STAB-02) chunkYieldRevalidates' poll stops eviction at its first chunk's yield whatever the schedule" recorded an issue at S3StabilityPollProbes.swift:59:9: Expectation failed: await harness.isPresent(assets[2].id, at: assets[2].key)
+↳ nothing after the chunk is marked yet
+↳ await harness.isPresent(assets[2].id, at: assets[2].key) → <not evaluated>
+
+== Replays under TSan, 5 repetitions (probes-tsan.log): failing line counts
+   5 R-CLN-12: (S3-STAB-02) cancelledCollecti at S3StabilityPollProbes.swift:92
+   5 R-CLN-12: (S3-STAB-02) cancelledCollecti at S3StabilityPollProbes.swift:95
+   5 R-CLN-2: (S3-STAB-02) sweepChunksRelease at S3StabilityPollProbes.swift:127
+   5 R-CLN-4: (S3-STAB-02) chunkYieldRevalida at S3StabilityPollProbes.swift:59
+  10 R-STO-11: (S3-STAB-01) phase 4's stop te at S3StabilityLegacyProbes.swift:81
+
+== The unchanged originals, TSan, --repetitions 200 (load ~75-80; class-unfixed-tsan-200.log):
+✔ Test run with 22 tests in 5 suites passed after 45.045 seconds.
+issues recorded: 0

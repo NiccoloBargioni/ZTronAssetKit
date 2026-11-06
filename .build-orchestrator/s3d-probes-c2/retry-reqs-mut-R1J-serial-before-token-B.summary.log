@@ -1,0 +1,193 @@
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test "R-NET-7: the size guard decides at the edges of Int64 without trapping" with 7 test cases passed after 0.022 seconds.
+✔ Test "R-NET-8: a driver tags a start as a continuation exactly when it was handed resume data, whatever the data holds" passed after 0.065 seconds.
+✔ Test "R-NET-7: the size guard aborts when the written or announced size exceeds the cap or byteSize is exceeded" passed after 0.065 seconds.
+✔ Test "R-NET-3: the background identifier is stable, namespaced and recognised by the hook" passed after 0.065 seconds.
+✔ Test "R-NET-4: plain HTTP is refused by the production policy even for loopback hosts" passed after 0.065 seconds.
+✔ Test "R-NET-3: the production source builds a background coordinator only when background transfers are enabled with a valid namespace" passed after 0.071 seconds.
+✔ Test "R-NET-6: the task-marker codec round-trips every marker and decodes nothing else" passed after 0.087 seconds.
+✔ Test "R-NET-6: an unparsable, negative or over-long Retry-After is treated as absent" with 29 test cases passed after 0.097 seconds.
+✔ Test "R-NET-9: path mapping exposes satisfied, expensive and constrained exactly, and thermal maps to four levels" passed after 0.098 seconds.
+✔ Test "R-NET-10: AssetPriority maps to URLSessionTask priorities 0.75, 0.5 and 0.25" passed after 0.098 seconds.
+✔ Test "R-NET-6: an XML 403 on the manifest is object-missing-likely, never key rejection" passed after 0.098 seconds.
+✔ Test "R-NET-6: HTTP statuses map to the closed taxonomy" with 27 test cases passed after 0.098 seconds.
+✔ Test "R-NET-6: a 403 is reported as forbiddenAmbiguous with evidence, never as notFound or a confirmed rejection" passed after 0.098 seconds.
+✔ Test "R-NET-6: URL error codes map to the closed taxonomy" with 42 test cases passed after 0.098 seconds.
+✔ Test "R-NET-4: a redirect outside the allow-list, past the hop limit or without a usable Location is refused" passed after 0.101 seconds.
+✔ Test "R-NET-4: an origin needs an http or https scheme and a host, and an absent origin is an invalid URL" passed after 0.101 seconds.
+✔ Test "R-NET-4: an HTTPS to HTTP downgrade is refused" passed after 0.101 seconds.
+✔ Test "R-NET-4: the redirect decision keeps the key only while every hop stays on the original origin" with 7 test cases passed after 0.101 seconds.
+✔ Test "R-NET-6: Retry-After parses delta-seconds and all three HTTP-date formats" with 13 test cases passed after 0.102 seconds.
+✔ Test "R-NET-4: the foreground session configuration has no httpAdditionalHeaders and no URLCache" passed after 0.104 seconds.
+✔ Test "R-SYN-5: a base URL without a host falls back to its text as the origin identifier the circuit breaker is keyed by" passed after 0.102 seconds.
+✔ Test "R-NET-3: the background task tag round-trips through taskDescription with its continuation flag, rejects foreign or over-long tags, and labels a download" passed after 0.104 seconds.
+✔ Test "R-NET-3: the events relay keeps a handler only for our identifiers and completes it once" passed after 0.108 seconds.
+✔ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" passed after 0.108 seconds.
+✔ Suite "Transport contracts" passed after 0.126 seconds.
+✔ Suite "Transfer classification" passed after 0.135 seconds.
+✔ Suite "Redirect policy" passed after 0.135 seconds.
+✔ Test "R-NET-7: a chunk of a resumed 206 announcing Int64.max is judged oversize, not added up" passed after 0.390 seconds.
+✔ Test "R-NET-3: foreign or undecodable background tasks are cancelled at launch and never reported" passed after 0.391 seconds.
+✔ Test "R-NET-4: a background request carries the key only when the coordinator was given one, and only to allowed origins" passed after 0.391 seconds.
+✔ Test "R-NET-3: invalidation releases the session, ends waiting transfers and refuses later starts" passed after 0.391 seconds.
+✔ Test "R-NET-10: a background transfer's priority change reaches its OS task" passed after 0.391 seconds.
+✔ Test "R-NET-3: the background task cap counts re-attached tasks" passed after 0.391 seconds.
+✔ Test "R-NET-8: a response that arrives after the client's discard opens no partial, moves no earlier partial, and stops the task" passed after 0.391 seconds.
+✔ Test "R-NET-7: a background download tagged without byteSize is staged only when it holds bytes" passed after 0.391 seconds.
+✔ Test "R-NET-8: the background delegate reads a task's answers as a continuation's only when its tag says so and it is checksummed content" passed after 0.391 seconds.
+✔ Test "R-NET-6: background cancel reasons map to cancelled by the system and file errors keep their POSIX code" passed after 0.391 seconds.
+✔ Test "R-NET-6: a response that is not HTTP stops the task and is reported as a bad server response" passed after 0.391 seconds.
+✔ Test "R-NET-3: a background download is reported under its tag, a foreign one is ignored, and didFinishEvents follows" passed after 0.391 seconds.
+✔ Test "R-NET-6: a client's discard is never turned into a staging failure by a later write into the discarded partial" passed after 0.391 seconds.
+✔ Test "R-NET-7: a completion that races a verdict, or stages more than byteSize or the cap, is never reported staged" with 13 test cases passed after 0.391 seconds.
+✔ Test "R-NET-2: a foreground delegate ignores download callbacks and tasks without a mailbox" passed after 0.391 seconds.
+✔ Test "R-NET-6: a timed-out foreground task without a response is reported as timed out and keeps nothing" passed after 0.391 seconds.
+✔ Test "R-NET-9: the first element is the path observer's first delivery, even when a notification arrives as observation starts" passed after 0.390 seconds.
+✔ Test "R-NET-7: the background path takes only transfers whose byteSize is known and within the cap" with 2 test cases passed after 0.392 seconds.
+✔ Test "R-NET-3: an enabled background policy builds a coordinator and reports background support without creating a session" passed after 0.392 seconds.
+✔ Test "R-NET-3: re-attachment through a plain background backend reports its live transfers as running" passed after 0.392 seconds.
+✔ Test "R-NET-7: a negative byteSize never creates a background task: the source runs it in the foreground and the coordinator refuses it" with 2 test cases passed after 0.392 seconds.
+✔ Test "R-NET-3: a key-bearing transfer never uses the background session unless the owner accepted redirect exposure" with 14 test cases passed after 0.392 seconds.
+✔ Test "R-NET-9: the live conditions source yields the current state first, then on change, without polling" passed after 0.398 seconds.
+✔ Test "R-NET-3: when the coordinator refuses new work the transfer runs in the foreground" passed after 0.756 seconds.
+✔ Test "Seams: a waitForObservations whose task is cancelled returns while no observation is active" passed after 0.759 seconds.
+✔ Test "R-NET-3: a background task cap of Int.max sizes the coordinator's tables without trapping" passed after 0.759 seconds.
+✔ Test "R-NET-3: handling background events returns after every event that preceded didFinishEvents was staged" passed after 0.787 seconds.
+✔ Test "R-NET-6: a staging failure while adopting a background download maps to insufficientSpace" passed after 0.796 seconds.
+✔ Test "R-NET-10: a priority change through the background handle reaches its OS task, an unknown name changes nothing" passed after 0.797 seconds.
+✔ Test "R-NET-3: an unusable background session fails the transfer for a foreground retry and disables background for the process" passed after 0.797 seconds.
+✔ Test "R-NET-3: dropping a background handle before its outcome cancels the OS task" passed after 0.869 seconds.
+✔ Test "R-NET-3: a didFinishEvents that arrives before anybody waits releases the next wait at once" passed after 0.869 seconds.
+✔ Test "R-NET-7: a start that joins a live OS task is never handed a staged file of another byteSize" with 2 test cases passed after 0.869 seconds.
+✔ Test "R-NET-3: the coordinator reports a download finished while the app was dead as a reattached staged transfer" passed after 0.870 seconds.
+✔ Test "R-NET-7: a background download is staged only when its status and size are right" with 6 test cases passed after 0.870 seconds.
+✔ Test "R-NET-3: unclaimed outcomes beyond the task cap drop the oldest, whose file stays in staging" passed after 0.871 seconds.
+✔ Test "R-NET-3: an invalidated session ends every waiting background transfer" passed after 0.888 seconds.
+✔ Test "R-NET-3: a second start for content already attached replaces the first handle, which ends cancelled" passed after 0.888 seconds.
+✔ Test "R-NET-4: a background-mode delegate refuses bytes that arrived through a cross-origin redirect" passed after 0.888 seconds.
+✔ Test "R-NET-3: a background pause is reported paused and keeps its resume data" with 2 test cases passed after 0.888 seconds.
+✔ Test "R-NET-3: a start for content an OS task is still fetching attaches to that task instead of creating another" passed after 0.888 seconds.
+✔ Test "R-NET-8: a background download not created from resume data refuses a 206, even one with a Content-Range" with 2 test cases passed after 1.068 seconds.
+✔ Test "R-NET-8: a task tagged without the continuation flag is re-attached as a fresh download" with 3 test cases passed after 1.069 seconds.
+✔ Test "R-NET-9: path changes reach the stream as full snapshots, power notifications carry the current path, and nothing is read between changes" passed after 1.069 seconds.
+✔ Test "R-NET-3: a download that finishes while nobody waits is handed to the next start for its content, not downloaded again" passed after 1.069 seconds.
+✔ Test "R-NET-3: an outcome reported at re-attachment is not handed out again, since launch reconciliation owns its file" passed after 1.069 seconds.
+✔ Test "R-NET-3: a replaced handle's controls and its terminated stream never reach the transfer that replaced it" passed after 1.123 seconds.
+✔ Test "R-NET-4: the production source refuses a plain-HTTP base URL before any request" passed after 1.124 seconds.
+✔ Test "R-NET-4: the production background backend carries the key only when the owner accepted redirect exposure, with the configured timeout and log route" with 2 test cases passed after 1.124 seconds.
+✔ Test "R-NET-4: the production source allows only HTTPS to its base host and the configured additional hosts" passed after 1.124 seconds.
+✔ Test "R-NET-7: a chunk that arrives after a verdict or the client's discard is not written, while a pausing task keeps writing" passed after 1.125 seconds.
+✔ Test "R-NET-3: cancelling a background transfer ends it as cancelled by the client and keeps no resume data" passed after 1.130 seconds.
+✔ Test "R-NET-8: a checksum-less background transfer is never resumed: its pause keeps no resume data" passed after 1.129 seconds.
+✔ Test "R-SYN-14: a background handle's control task ends with its attach, however the attach ends" with 5 test cases passed after 1.135 seconds.
+✔ Test "R-NET-4: a remote path that could leave the base path is refused as an invalid URL" with 10 test cases passed after 1.135 seconds.
+✔ Test "R-NET-4: a request to an origin outside the policy is refused before any byte is sent" passed after 1.135 seconds.
+✔ Test "R-NET-3: a start that overlaps invalidation re-checks it after listing the tasks and starts nothing" passed after 1.134 seconds.
+✔ Test "R-NET-3: the pump ends once it absorbed a pause's cancellation, also when the paused handle's consumer then goes away" passed after 1.134 seconds.
+✔ Test "R-NET-3: the coordinator owns a pump task only while a background transfer is outstanding" passed after 1.134 seconds.
+✔ Test "R-NET-5: a manifest path that is not a plain relative path is refused before any request" passed after 1.135 seconds.
+✔ Test "R-NET-3: a buffered download is handed only to a start that expects its size, else a new download is created" passed after 1.134 seconds.
+✔ Test "R-NET-3: resume data kept by background pauses is bounded by the task cap" passed after 1.134 seconds.
+✔ Test "R-NET-10: a background handle's priority changes reach its OS task in the order the engine made them" passed after 1.134 seconds.
+✔ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" passed after 1.134 seconds.
+✔ Test "R-NET-10: a newer promotion is kept over an older demotion whose listing returns later" passed after 1.135 seconds.
+✔ Suite "Session delegate, called directly" passed after 1.138 seconds.
+✔ Test "R-NET-8: a continuation re-attached after a relaunch keeps its meaning: a refusal reads resumeRejected, a ranged answer is staged as resumed" with 4 test cases passed after 1.136 seconds.
+✔ Test "R-NET-8: a continued background download answered 200 (validator changed) stages the whole body as a fresh, non-resumed file" with 2 test cases passed after 1.136 seconds.
+✔ Test "R-NET-8: any other failure of a continued background download keeps its meaning, and the data is not used again" passed after 1.136 seconds.
+✔ Test "R-NET-9: terminating the conditions stream stops path monitoring and removes the observers" passed after 1.136 seconds.
+✔ Test "R-NET-3: a start for the very attempt whose task is being cancelled is refused as a name clash" passed after 1.136 seconds.
+✔ Test "R-NET-8: a paused background transfer restarted by the engine continues from the kept resume data, once" passed after 1.137 seconds.
+✔ Test "Seams: requireObservations throws CancellationError when cancelled first and returns once the count matches, cancelled or not" passed after 1.139 seconds.
+✔ Test "Seams: a waitForObservations for fewer observations, cancelled while registered, reports no match and leaves the observation running" passed after 1.139 seconds.
+✔ Suite "Background handle control task" passed after 1.139 seconds.
+✔ Test "R-NET-3: a background download that finishes while its pause is being requested ends staged" passed after 1.138 seconds.
+✔ Test "R-NET-3: a pause whose cancellation is reported before the resume data returns still ends paused with that data" passed after 1.138 seconds.
+✘ Test "R-NET-10: PROBE a replaced handle's buffered control never cancels the joining handle's newer change" recorded an issue at S3DC2ReqsRetryProbeTests.swift:55:9: Expectation failed: changes == [0.75, 0.25]
+↳ the joining handle's bulk (0.25) must reach the OS task: [0.75]
+↳ changes == [0.75, 0.25] → false
+↳   changes → [0.75]
+✔ Test "R-NET-8: resume data the task cap evicted is not used: that restart downloads afresh" passed after 1.137 seconds.
+✔ Test "R-NET-10: a priority change from a handle replaced while it listed the tasks never reaches the transfer that replaced it" passed after 1.191 seconds.
+✔ Suite "Live device conditions" passed after 1.196 seconds.
+✔ Test "R-NET-3: a start during a cancel or pause of the same content creates its own download and each handle ends as its own control asked" with 2 test cases passed after 1.193 seconds.
+✔ Test "R-NET-3: re-attachment that overlaps a finished download reports it once, as staged, and keeps no phantom live task" passed after 1.193 seconds.
+✔ Test "Seams: a waitForObservations cancelled while registered reports no match, and a later observation resumes only a new wait" passed after 1.196 seconds.
+✔ Test "R-NET-3: a start whose listing names a task the pump already ended creates a new download instead of waiting forever" passed after 1.195 seconds.
+✔ Test "R-NET-8: a resume offset of Int64.min from a corrupt sidecar never traps, and the origin's 200 is staged from zero" passed after 1.197 seconds.
+✔ Test "R-NET-7: an empty body for an asset without byteSize is reported as truncated" passed after 1.197 seconds.
+✔ Test "R-NET-7: a body written past the cap without an announced length is aborted while streaming" passed after 1.197 seconds.
+✔ Test "R-NET-10: a priority write that lands after its transfer finished is followed by no other write" passed after 1.195 seconds.
+✔ Test "R-NET-3: dropping a handle while a later start lists the tasks never ends the later transfer" passed after 1.195 seconds.
+✔ Test "R-NET-7: a close-delimited body shorter than byteSize is reported as truncated" passed after 1.197 seconds.
+✔ Test "R-NET-7: a resumed 206 announcing Content-Length Int64.max aborts as oversize and leaves the earlier partial untouched" passed after 1.197 seconds.
+✔ Test "R-NET-8: a 206 whose Content-Range does not start at the resume offset is never appended" with 4 test cases passed after 1.197 seconds.
+✔ Test "R-NET-7: an announced size over maxAssetBytes aborts before any progress is reported" passed after 1.197 seconds.
+✔ Test "R-NET-7: a body shorter than its Content-Length is reported as a lost connection" passed after 1.197 seconds.
+✔ Test "R-NET-4: a remote path is joined by percent-encoded components under the base path" passed after 1.197 seconds.
+✔ Test "R-NET-8: a Last-Modified validator is sent as If-Range and a full answer is staged from zero" passed after 1.197 seconds.
+✔ Test "R-NET-8: a changed validator makes the origin send the whole body, which is staged from zero" passed after 1.197 seconds.
+✔ Test "R-NET-2: invalidation fails every live transfer and later starts without touching the network" passed after 1.197 seconds.
+✔ Test "R-NET-7: a resumed partial already longer than byteSize is a size mismatch before any byte is appended" passed after 1.197 seconds.
+✔ Test "R-NET-3: a second cancel that finds the task already gone keeps a stale listing from joining it while the first is still ending it" passed after 1.195 seconds.
+✔ Test "R-NET-3: concurrent transfers never take more background tasks than the cap" passed after 1.195 seconds.
+✔ Test "R-NET-7: a gzip response is accepted when the decoded size equals byteSize though Content-Length differs" passed after 1.198 seconds.
+✔ Test "R-NET-6: status mapping through the real delegate matches the pure table" with 9 test cases passed after 1.196 seconds.
+✔ Test "R-NET-6: an error body past the evidence cap stops the transfer and is still classified by its status" passed after 1.196 seconds.
+✔ Test "R-NET-5: an announced manifest length over the cap is aborted before any byte is staged" passed after 1.196 seconds.
+✔ Test "R-NET-6: an XML 403 on the manifest is reported with its evidence through the delegate" passed after 1.196 seconds.
+✔ Test "R-NET-5: a staged manifest that cannot be read back fails as a local error and is discarded" passed after 1.196 seconds.
+✔ Test "R-NET-4: a redirect without a usable Location is delivered as a refused redirect" passed after 1.196 seconds.
+✔ Test "R-NET-4: a backend built without a key sends none and still stages" passed after 1.195 seconds.
+✔ Test "R-NET-5: a manifest over 32 MiB is aborted while streaming" passed after 1.196 seconds.
+✔ Test "R-NET-5: a 304 without a conditional request is rejected" passed after 1.196 seconds.
+✔ Test "R-NET-8: stale background resume data falls back to a fresh download through resumeRejected" with 3 test cases passed after 1.196 seconds.
+✔ Suite "Live device conditions: the observation census wait ends on cancellation" passed after 1.201 seconds.
+✔ Test "R-NET-10: PROBE a rewrite that lands after a newer write is followed by the newest value" passed after 1.200 seconds.
+✘ Test "R-NET-10: PROBE a replaced handle's buffered control never cancels the joining handle's newer change" failed after 1.200 seconds with 1 issue.
+↳ /// Serial vs entry token check: the replaced handle's second control was made while its first write was in
+↳ /// flight, so it is delivered after a start replaced the attach, while the joining handle's own change lists the
+↳ /// tasks. The stale control must not take the newest serial, or the joining handle's change is dropped.
+✔ Test "R-NET-7: a size cap of Int64.max means unlimited and a negative one nothing, both through a whole transfer" passed after 1.200 seconds.
+✔ Suite "HTTP remote source" passed after 1.201 seconds.
+✔ Test "R-NET-8: pause on a stalled transfer yields paused(resumable: true) and writes a sidecar" passed after 1.200 seconds.
+✔ Suite "Background resume" passed after 1.201 seconds.
+✔ Test "R-NET-2: cancelling the consumer cancels the URLSession task and reports cancelled by the client" passed after 1.200 seconds.
+✘ Suite "S3D c2 reqs retry probes" failed after 1.202 seconds with 1 issue.
+↳ /// Verifier probes (close-out cycle 2, reqs lens, retry): properties of S3D-1's fix that the committed suite may not pin.
+↳ /// Scratch only; never committed.
+✔ Test "R-NET-3: a handler handed over while an earlier one still waits runs only after its own wake's events were staged, and the earlier one still runs" passed after 1.201 seconds.
+✔ Test "R-NET-5: URLSession never answers a manifest fetch from its own cache, even within max-age" passed after 1.201 seconds.
+✔ Test "R-NET-4: a redirect to a host outside the allow-list is refused and that host receives no request" passed after 1.201 seconds.
+✔ Test "R-NET-5: a manifest fetch sends If-None-Match with the stored ETag and maps 304 to notModified" passed after 1.201 seconds.
+✔ Test "R-NET-6: a 403 after the key was withheld on a cross-origin redirect is reported as keyWithheldOnRedirect" passed after 1.201 seconds.
+✔ Test "R-NET-4: a cross-host redirect to an allow-listed host is followed without the app key" passed after 1.201 seconds.
+✔ Suite "Background coordinator" passed after 1.204 seconds.
+✔ Test "R-NET-8: a weak ETag is never the resume validator: a pause keeps Last-Modified instead, or nothing without it" with 2 test cases passed after 1.203 seconds.
+✔ Suite "Manifest fetch" passed after 1.204 seconds.
+✔ Test "R-NET-10: setPriority on a running transfer changes URLSessionTask.priority synchronously" passed after 1.203 seconds.
+✔ Test "R-NET-4: once stripped, the key never returns on a redirect back to the original origin" passed after 1.202 seconds.
+✔ Test "R-NET-6: every staging failure kind maps into the taxonomy, a cap as oversize and a source failure as local I/O" passed after 1.203 seconds.
+✔ Test "R-NET-6: ENOSPC while staging maps to insufficientSpace and other staging failures to local I/O" passed after 1.204 seconds.
+✔ Test "R-NET-8: a live resumed transfer counts the resume offset only when the origin continued it with a 206" with 2 test cases passed after 1.204 seconds.
+✔ Suite "Arithmetic on server and configuration figures" passed after 1.205 seconds.
+✔ Test "R-NET-8: checksum-less transfers are never resumed" passed after 1.207 seconds.
+✔ Test "R-NET-8: a refused or invalid resume yields resumeRejected and a fresh attempt stages the whole body" passed after 1.208 seconds.
+✔ Test "R-NET-10: a replaced attach's priority write that lands last never leaves the OS task at an older priority than the joining handle's newer one" passed after 1.190 seconds.
+✔ Suite "Background coordinator interleavings" passed after 1.209 seconds.
+✔ Test "R-NET-4: same-origin redirects keep the key and the sixth hop is refused" passed after 1.212 seconds.
+✔ Suite "Redirects and the app key" passed after 1.215 seconds.
+✔ Test "R-SEC-1: the canary key appears in no transport update, error or log line" passed after 1.214 seconds.
+✔ Suite "Status mapping through the delegate" passed after 1.216 seconds.
+✔ Test "R-NET-8: a resumed request carries the current key, never a stale one" passed after 1.217 seconds.
+✔ Test "R-SYN-14: no task outlives a transfer in the live foreground backend" passed after 1.351 seconds.
+✔ Test "R-NET-8: cancelling a foreground handle discards its partial, unlike a pause, and a cancel after the outcome changes nothing" passed after 1.511 seconds.
+✔ Test "R-NET-8: a connection dropped mid-download resumes with Range and If-Range and the staged file is complete" passed after 1.514 seconds.
+✔ Test "R-NET-7: writing more than byteSize aborts early as a size mismatch" passed after 1.539 seconds.
+✔ Suite "Sizes and resume" passed after 1.540 seconds.
+✔ Test "R-NET-2: 500 downloads through one backend use at most maxConnectionsPerHost TCP connections" passed after 1.548 seconds.
+✔ Test "R-NET-2: every task's bytes reach its own staging file and the transfer interval ends once per transfer" passed after 1.935 seconds.
+✔ Test "R-NET-2: cancelling by staging name discards the partial unless it keeps it for a pause" passed after 1.963 seconds.
+✔ Suite "Foreground backend" passed after 1.965 seconds.
+✘ Test run with 163 tests in 18 suites failed after 1.965 seconds with 1 issue.

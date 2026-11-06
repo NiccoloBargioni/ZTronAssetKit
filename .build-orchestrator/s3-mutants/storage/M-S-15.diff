@@ -1,0 +1,15 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+index 1f6deca..a1ced59 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+@@ -58,9 +58,7 @@ extension AssetStore {
+         if let leases = self.state.cleanup.leases[key], !leases.isEmpty {
+             return .lease
+         }
+-        if eligibleAt > self.environment.time.uptimeNow() {
+-            return .grace(eligibleAt)
+-        }
++
+         guard let fresh = self.state.core.snapshots.lastAcknowledgedInstallStart, fresh >= eligibleAt else {
+             let attempted = self.state.core.snapshots.lastInstallStart.map { $0 >= eligibleAt } ?? false
+             return .freshAcknowledgement(unanswered: attempted)

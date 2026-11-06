@@ -1,0 +1,44 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "StorageBenchmarks" started.
+◇ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" started.
+P-13 reclaim of 10000 blobs: 7.768893291 s in 1472 units, unit max 113.737459 ms (p50 0.897917 ms, p95 6.277042 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.039791 ms, p99 0.111333 ms, max 1.4905 ms; unit on-CPU max 1.082917 ms; units over the batch budget: ["29.567417 ms wall, 0.478625 ms on CPU", "33.129291 ms wall, 0.77875 ms on CPU", "6.509583 ms wall, 0.243083 ms on CPU", "15.816875 ms wall, 0.717666 ms on CPU", "6.280958 ms wall, 0.295875 ms on CPU", "49.869875 ms wall, 0.685959 ms on CPU", "27.969458 ms wall, 0.353417 ms on CPU", "33.757209 ms wall, 0.920542 ms on CPU", "7.086416 ms wall, 0.313333 ms on CPU", "45.372459 ms wall, 0.60925 ms on CPU", "51.336375 ms wall, 0.880083 ms on CPU", "13.364541 ms wall, 0.313375 ms on CPU", "8.935958 ms wall, 0.270875 ms on CPU", "21.542833 ms wall, 0.7905 ms on CPU", "12.355917 ms wall, 0.820417 ms on CPU", "6.729625 ms wall, 1.082917 ms on CPU", "10.743417 ms wall, 0.830292 ms on CPU", "8.902917 ms wall, 0.298834 ms on CPU", "9.552375 ms wall, 0.198 ms on CPU", "6.0545 ms wall, 0.289667 ms on CPU", "73.963875 ms wall, 0.779 ms on CPU", "13.852333 ms wall, 0.260583 ms on CPU", "27.417125 ms wall, 0.295458 ms on CPU", "18.205583 ms wall, 0.414875 ms on CPU", "7.144167 ms wall, 0.915875 ms on CPU", "36.295791 ms wall, 0.321958 ms on CPU", "9.178 ms wall, 0.619625 ms on CPU", "7.166209 ms wall, 0.315959 ms on CPU", "40.671666 ms wall, 0.723334 ms on CPU", "6.112709 ms wall, 0.837 ms on CPU", "10.894333 ms wall, 0.882084 ms on CPU", "113.737459 ms wall, 0.34725 ms on CPU", "10.066875 ms wall, 0.564459 ms on CPU", "6.516041 ms wall, 0.774167 ms on CPU", "13.626583 ms wall, 1.006291 ms on CPU", "56.204334 ms wall, 0.901583 ms on CPU", "16.703084 ms wall, 0.513666 ms on CPU", "17.21225 ms wall, 0.400834 ms on CPU", "5.770167 ms wall, 0.324708 ms on CPU", "17.537166 ms wall, 0.553917 ms on CPU", "7.052041 ms wall, 0.518792 ms on CPU", "27.721667 ms wall, 0.80525 ms on CPU", "9.834292 ms wall, 0.208959 ms on CPU", "49.811458 ms wall, 0.502 ms on CPU", "7.146459 ms wall, 0.328375 ms on CPU", "14.833875 ms wall, 0.468208 ms on CPU", "21.451833 ms wall, 0.257833 ms on CPU", "8.881625 ms wall, 0.606792 ms on CPU", "5.130042 ms wall, 0.216417 ms on CPU", "6.897417 ms wall, 0.219209 ms on CPU", "11.783458 ms wall, 0.34 ms on CPU", "6.248584 ms wall, 0.867625 ms on CPU", "5.585875 ms wall, 0.552125 ms on CPU", "24.670041 ms wall, 0.234542 ms on CPU", "16.413959 ms wall, 0.200208 ms on CPU", "23.51025 ms wall, 0.784959 ms on CPU", "23.482667 ms wall, 0.087292 ms on CPU", "8.421084 ms wall, 0.811708 ms on CPU", "44.381583 ms wall, 0.340625 ms on CPU", "32.199792 ms wall, 0.881875 ms on CPU", "6.793584 ms wall, 0.567792 ms on CPU", "8.373417 ms wall, 0.70375 ms on CPU", "7.104667 ms wall, 0.760417 ms on CPU", "8.964458 ms wall, 0.822125 ms on CPU", "24.409666 ms wall, 0.94925 ms on CPU", "7.471 ms wall, 0.791458 ms on CPU", "9.009209 ms wall, 0.326875 ms on CPU", "5.993083 ms wall, 0.298667 ms on CPU", "6.396542 ms wall, 0.474209 ms on CPU", "8.469125 ms wall, 0.94025 ms on CPU", "7.34725 ms wall, 0.786916 ms on CPU", "6.782834 ms wall, 0.507292 ms on CPU", "5.521833 ms wall, 0.287416 ms on CPU", "15.861292 ms wall, 0.278583 ms on CPU", "6.277042 ms wall, 0.276042 ms on CPU", "5.812417 ms wall, 0.383042 ms on CPU", "5.381 ms wall, 0.71175 ms on CPU", "6.487 ms wall, 0.593417 ms on CPU", "14.4285 ms wall, 0.696875 ms on CPU", "6.746375 ms wall, 0.535458 ms on CPU", "9.865917 ms wall, 0.232792 ms on CPU", "5.240916 ms wall, 0.631167 ms on CPU", "6.890083 ms wall, 0.637708 ms on CPU", "5.83875 ms wall, 0.926958 ms on CPU", "6.711583 ms wall, 0.707083 ms on CPU", "5.396125 ms wall, 0.389125 ms on CPU", "5.263875 ms wall, 0.767917 ms on CPU", "7.223125 ms wall, 0.48625 ms on CPU", "6.077 ms wall, 0.384667 ms on CPU"]; blob unlinks inside the reclaim: max 113.453875 ms, 102 over 4.0 ms [4.001917, 29.145083, 6.46475, 15.193334, 6.234958, 49.227083, 32.902333, 7.021625, 44.980666, 50.674417, 13.276375, 4.272291, 8.782667, 20.813292, 11.581625, 10.123709, 8.849541, 9.516417, 5.972416, 73.266208, 13.812375, 27.351709, 17.783041, 6.34625, 36.235333, 7.020041, 40.013833, 5.413791, 4.752583, 113.453875, 9.724959, 5.932125, 12.777541, 55.486459, 16.417958, 16.976166, 4.033416, 4.580958, 5.5945, 16.996042, 4.628208, 6.595083, 27.127708, 9.788084, 49.467792, 7.083541, 14.529833, 4.093917, 21.247125, 8.354209, 5.008958, 6.862292, 11.739209, 5.410084, 5.083583, 4.796208, 24.338667, 16.269542, 4.482083, 22.78225, 23.465125, 4.234417, 7.733875, 44.321041, 31.375, 6.428917, 6.515125, 8.3365, 6.834584, 5.824834, 6.094458, 4.376167, 7.591833, 6.839125, 4.25325, 6.419833, 5.440417, 15.800833, 6.225875, 4.073666, 4.075541, 4.612292, 4.422292, 5.578459, 4.787084, 6.145958, 13.859292, 6.142375, 9.834125, 4.789, 4.019292, 4.45325, 5.056542, 6.121667, 5.159125, 4.617208, 6.859125, 4.518209, 5.905083, 4.479667, 4.097792, 4.152958]
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:248:13: Expectation failed: total <= totalBudget
+↳ total <= totalBudget → false
+↳   total → 7.768893291
+↳   totalBudget → 2.0
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+↳ every batch between suspension points: the longest deletion unit took 113.737459 ms
+↳ longest <= batchBudget → false
+↳   longest → 113.737459
+↳   batchBudget → 5.0
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 15.187 seconds with 2 issues.
+✘ Suite "StorageBenchmarks" failed after 15.187 seconds with 2 issues.
+↳ /// P-2, P-5, P-6 and P-13 (WP-B), release configuration, live file system in directories inside this repository
+↳ /// (`.build-tests/`, git-ignored). Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// **Statistics (ADR draft B-9, as ruled by the orchestrator at the L2 close-out).** P-2 judges the p95 of cold
+↳ /// loads. P-5 judges **both** the ordered commit a bulk sync performs and the durable one (flush, close, adoption
+↳ /// report) on their p95 against `index_commit_ms`; the commits-per-second ceiling is a hard maximum over every
+↳ /// sliding second. Throughput (P-6) takes the best of five runs of each variant after a warm-up: interference only
+↳ /// ever slows a run down. Memory (P-6) is the peak resident delta sampled inside every read, while the chunk is
+↳ /// alive. P-13: SPEC §6 bounds **every** batch between suspension points, so the **maximum** deletion-unit
+↳ /// duration is asserted against `batch_ms_max` (p50 and p95 printed beside it); the unit's time budget (ADR draft
+↳ /// B-10) makes it fit by design, and an unlink profile of this volume is printed as the justification. Figures
+↳ /// measured while other worktrees build are informative; the orchestrator's quiet-machine run is the reference.
+↳ /// C2 has no budget key: its test reports the longest hold of the store's actor seen by a probe, best of five
+↳ /// runs, against the rule's own 10 ms.
+✘ Suite ZTronAssetKitBenchmarks failed after 15.187 seconds with 2 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 1 test in 2 suites failed after 15.187 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

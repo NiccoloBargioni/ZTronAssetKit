@@ -1,0 +1,25 @@
+✘ Test "probe Q0: evictable purge, first-chunk holder swapped for a pinned id before the first turn" recorded an issue at VerifierS3CC2CorrectProbe.swift:92:9: Expectation failed: purged.isEmpty
+↳ blob kept whole; purged ["w0"], PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 1)
+✘ Test "probe Q0: evictable purge, first-chunk holder swapped for a pinned id before the first turn" recorded an issue at VerifierS3CC2CorrectProbe.swift:93:9: Expectation failed: result.assetsRemoved == 0
+✘ Test "probe Q0: evictable purge, first-chunk holder swapped for a pinned id before the first turn" recorded an issue at VerifierS3CC2CorrectProbe.swift:94:9: Expectation failed: await LargeBlobTests.references(harness, key) == 6
+✘ Test "probe Q0: evictable purge, first-chunk holder swapped for a pinned id before the first turn" failed after 0.012 seconds with 3 issues.
+✘ Test "probe Q1: evictable purge, next-chunk holder swapped for a pinned id between turns" recorded an issue at VerifierS3CC2CorrectProbe.swift:131:9: Expectation failed: purged == ["w0", "w1"]
+↳ stops at the swap; purged ["w0", "w1", "w3"], PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 3)
+✘ Test "probe Q1: evictable purge, next-chunk holder swapped for a pinned id between turns" recorded an issue at VerifierS3CC2CorrectProbe.swift:132:9: Expectation failed: result == PurgeResult(bytesFreed: 0, bytesDeferred: 0, assetsRemoved: 2)
+✘ Test "probe Q1: evictable purge, next-chunk holder swapped for a pinned id between turns" recorded an issue at VerifierS3CC2CorrectProbe.swift:134:13: Expectation failed: await harness.isPresent(AssetID(rawValue: id), at: key)
+✘ Test "probe Q1: evictable purge, next-chunk holder swapped for a pinned id between turns" recorded an issue at VerifierS3CC2CorrectProbe.swift:136:9: Expectation failed: await LargeBlobTests.references(harness, key) == 4
+✘ Test "probe Q1: evictable purge, next-chunk holder swapped for a pinned id between turns" failed after 0.006 seconds with 4 issues.
+✘ Test "probe Q2: quota eviction, last victim swapped for a pinned id between turns" recorded an issue with 1 argument afterTurn → 1 at VerifierS3CC2CorrectProbe.swift:182:9: Expectation failed: evicted.count == 2 * afterTurn
+↳ after turn 1: eviction stops at the window; evicted ["w0", "w1", "w2", "w3", "w4", "w5"], CleanupResult(bytesFreed: 0, filesRemoved: 0, bytesDeferred: 0)
+✘ Test "probe Q2: quota eviction, last victim swapped for a pinned id between turns" recorded an issue with 1 argument afterTurn → 1 at VerifierS3CC2CorrectProbe.swift:185:9: Expectation failed: await LargeBlobTests.references(harness, key) == 7 - 2 * afterTurn
+✘ Test "probe Q2: quota eviction, last victim swapped for a pinned id between turns" recorded an issue with 1 argument afterTurn → 2 at VerifierS3CC2CorrectProbe.swift:182:9: Expectation failed: evicted.count == 2 * afterTurn
+↳ after turn 2: eviction stops at the window; evicted ["w0", "w1", "w2", "w3", "w4", "w5"], CleanupResult(bytesFreed: 0, filesRemoved: 0, bytesDeferred: 0)
+✘ Test "probe Q2: quota eviction, last victim swapped for a pinned id between turns" recorded an issue with 1 argument afterTurn → 2 at VerifierS3CC2CorrectProbe.swift:185:9: Expectation failed: await LargeBlobTests.references(harness, key) == 7 - 2 * afterTurn
+✘ Test "probe Q2: quota eviction, last victim swapped for a pinned id between turns" with 2 test cases failed after 0.013 seconds with 4 issues.
+✔ Test "probe Q3: evictable purge, a holder leaves between turns, the rest still purged" passed after 0.005 seconds.
+✘ Test "probe Q4: evictable purge, last holder swapped for an ordinary id between turns, every holder purged" recorded an issue at VerifierS3CC2CorrectProbe.swift:254:9: Expectation failed: await harness.record("w9")?.residency == .absent(.purged)
+✘ Test "probe Q4: evictable purge, last holder swapped for an ordinary id between turns, every holder purged" recorded an issue at VerifierS3CC2CorrectProbe.swift:255:9: Expectation failed: result == PurgeResult(bytesFreed: 100, bytesDeferred: 0, assetsRemoved: 6)
+✘ Test "probe Q4: evictable purge, last holder swapped for an ordinary id between turns, every holder purged" recorded an issue at VerifierS3CC2CorrectProbe.swift:256:9: Expectation failed: !harness.hasBlob(key)
+✘ Test "probe Q4: evictable purge, last holder swapped for an ordinary id between turns, every holder purged" failed after 0.065 seconds with 3 issues.
+✘ Suite "Verifier s3c c2 correctness probes" failed after 0.103 seconds with 14 issues.
+✘ Test run with 5 tests in 1 suite failed after 0.104 seconds with 14 issues.

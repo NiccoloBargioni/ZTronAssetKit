@@ -1,0 +1,7 @@
+✘ Test "R-MAN-2: remotePath must be relative, without parent segments, scheme, authority, control characters, query or fragment" failed after 0.001 seconds with 3 issues.
+✘ Test "R-MAN-2: a remote path with an empty or dot segment (also %2E), a backslash or a trailing slash is quarantined, the rest applied" with 14 test cases failed after 0.002 seconds with 12 issues.
+✘ Test "R-MAN-2: over seeded remote paths the decoder accepts only paths the transport can fetch, exactly so without schemes, queries or encoded separators" failed after 0.072 seconds with 704 issues.
+✘ Test "R-MAN-2: rules and identifier hashing see the same bytes in bridged and native strings" failed after 0.001 seconds with 1 issue.
+✘ Test run with 34 tests in 4 suites failed after 0.401 seconds with 720 issues.
+✔ Test run with 8 tests in 1 suite passed after 0.008 seconds.
+exit 1

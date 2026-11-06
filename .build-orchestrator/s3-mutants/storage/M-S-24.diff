@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+index 1f6deca..1567b1d 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift
+@@ -191,7 +191,7 @@ extension AssetStore {
+                         self.state.core.blobTable[key] = .doomed(info)
+                     }
+                     queue.insert(key, at: queue.startIndex + (position - outcome.attempted))
+-                } else if outcome.failures[key] != nil, var doom = info {
++                } else if false, outcome.failures[key] != nil, var doom = info {
+                     doom.failedUnlinks += 1
+                     doom.eligibleAt = uptime.adding(seconds: AssetStore.unlinkBackoff(afterFailures: doom.failedUnlinks))
+                     self.state.core.blobTable[key] = .doomed(doom)

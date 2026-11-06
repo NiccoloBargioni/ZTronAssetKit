@@ -1,0 +1,4 @@
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at S3ConcurrencyProbeTests.swift:35:9: Expectation failed: changes.last == 0.25
+↳ the newest request was bulk (0.25), the OS task ends at Optional(0.75); changes [0.25, 0.75]
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" recorded an issue at S3ConcurrencyProbeTests.swift:36:9: Expectation failed: await coordinator.liveTransfers().map(\.priority) == [0.25]
+✘ Test "R-NET-10: the newest of two overlapping priority changes is the one a background transfer's OS task keeps" failed after 0.013 seconds with 2 issues.

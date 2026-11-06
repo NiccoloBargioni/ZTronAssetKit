@@ -1,0 +1,4 @@
+726c726
+<                 if self.followBeforeActing(transfer) {
+---
+>                 if false, self.followBeforeActing(transfer) {

@@ -1,0 +1,30 @@
+P-13 reclaim of 10000 blobs: 0.6559875 s in 523 units, unit max 10.884541 ms (p50 0.964375 ms, p95 0.990833 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.044958 ms, p99 0.060167 ms, max 0.155292 ms; unit on-CPU max 1.020541 ms; units over the batch budget: ["10.884541 ms wall, 0.551125 ms on CPU", "9.281792 ms wall, 0.978833 ms on CPU", "9.52875 ms wall, 0.743792 ms on CPU", "10.507167 ms wall, 0.414042 ms on CPU", "8.98125 ms wall, 0.927 ms on CPU"]; blob unlinks inside the reclaim: max 10.54925 ms, 5 over 4.0 ms [10.54925, 8.434666, 8.925292, 10.215417, 8.256208]
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.207 seconds with 1 issue.
+✘ Suite "StorageBenchmarks" failed after 8.843 seconds with 1 issue.
+◇ Suite "SyncBenchmarks" started.
+R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking 4.003834 ms, during an ENOSPC's free-space read 2.680541 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.004667, 4.003834, 4.003666] and [2.602375, 2.877875, 2.680541]
+R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait 4.110458 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.110458, 4.048667, 4.27975]
+R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline 1.422083 ms, coming back 4.165125 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.422083, 1.405542, 1.434292] and [4.165125, 3.996666, 4.439625]
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 4.371083 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.302125, 4.382833, 4.371083]
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 1.529791 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.529791, 1.456917, 1.54375]; at 1,000: 0.2215 ms; the group without waiters: [0.595875, 0.566709, 0.589333]
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 1.238959 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.238959, 1.20975, 1.241292]
+R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait 4.447917 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.447917, 4.351625, 4.531625]
+R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait 4.829417 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.824458, 4.829417, 4.858833]
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 1.127916 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.1235, 1.127916, 1.132583]
+R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait 4.560125 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.468792, 4.560125, 5.211]
+R-SYN-3 re-join of a released 10,000-member prefetch handle: longest actor wait 4.763 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.724625, 4.763, 5.000458]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-3 re-join of a released 10,000-member bulk handle: longest actor wait 5.04825 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.093708, 5.04825, 4.879209]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait 0.020375 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.020375, 0.020292, 0.027958]
+R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait 0.061791 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.061292, 0.061791, 0.0685]
+R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait 0.191375 ms (budgets 50.0 ms median, 10.0 ms best); totals [1.120251291, 1.122530084, 1.135921] s; runs [0.188042, 0.191375, 0.244]
+R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait 6.969833 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.969833, 97.269042, 6.712417]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 4.076625 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.014791, 4.109542, 4.076625]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 5.068291 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.068291, 5.06725, 5.105291]
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 1 handle(s): longest actor wait 6.429084 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.326416, 6.652708, 6.429084]
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 2 handle(s): longest actor wait 7.69475 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.69475, 7.69575, 7.4455]
+R-SYN-11 follow end and drain of 10,000 places under 10,000 changed prefetch members: longest actor wait 5.453292 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.453292, 5.471334, 5.429958]; follow ended [195.810625, 202.625416, 200.232708] ms and drain ended [197.375417, 206.335166, 200.236125] ms after the release
+R-SYN-11 follow's last turn plus the drain's first batch under 10,000 prefetch members and 10,000 waiting places: the turn [4.941666, 5.172292, 4.995917] ms; longest actor wait 4.998917 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.947, 5.18225, 4.998917]
+✔ Suite "SyncBenchmarks" passed after 109.560 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 245.229 seconds with 1 issue.
+✘ Test run with 44 tests in 8 suites failed after 245.230 seconds with 1 issue.

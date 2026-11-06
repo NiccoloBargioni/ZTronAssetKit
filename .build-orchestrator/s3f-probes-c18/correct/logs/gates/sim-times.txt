@@ -1,0 +1,15 @@
+sim start 08:33:30 1793518410 load { 21.16 23.95 24.01 }
+    iPhone Air (5B940E6E-490F-4E9E-A917-A6456A18225E) (Shutdown) 
+Monitoring boot status for iPhone Air (5B940E6E-490F-4E9E-A917-A6456A18225E).
+[2026-11-01 07:33:34 +0000] Status=1, isTerminal=NO, Elapsed=00:03.
+	Waiting on BackBoard
+
+[2026-11-01 07:33:36 +0000] Status=3, isTerminal=YES, Elapsed=00:04.
+	Data Migration Failed
+
+booted 08:33:36
+sim test rc=0 08:41:37 1793518897 load { 20.28 76.40 66.56 }
+bundle=.build-verify-s3f-c18-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.11.01_08-34-00-+0100.xcresult
+summary rc=0 08:41:37
+shutdown rc=0 08:41:41
+    iPhone Air (5B940E6E-490F-4E9E-A917-A6456A18225E) (Shutdown) 

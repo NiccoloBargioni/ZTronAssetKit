@@ -1,0 +1,40 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wanters → .waitersAndGroup to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wanters → .userGroup to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+✘ Test "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" recorded an issue with 2 arguments visit → .followVisitedFirst, wanters → .userGroup at EngineFollowBarrierRerouteOwnerTests.swift:245:9: Expectation failed: after.pending.isEmpty && after.heal
+↳ X served the group's ids, and no heal came back: ["zz-a1", "zz-a2", "zz-a3"]
+↳ after.pending.isEmpty && after.heal → false
+↳   after.pending.isEmpty → false
+↳   after.heal → <not evaluated>
+◇ Test case passing 2 arguments visit → .followVisitedFirst, wanters → .prefetchWaiters to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wanters → .waitersAndGroup to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wanters → .userGroup to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+✘ Test "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, wanters → .userGroup at EngineFollowBarrierRerouteOwnerTests.swift:245:9: Expectation failed: after.pending.isEmpty && after.heal
+↳ X served the group's ids, and no heal came back: ["zz-a1", "zz-a2", "zz-a3"]
+↳ after.pending.isEmpty && after.heal → false
+↳   after.pending.isEmpty → false
+↳   after.heal → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, wanters → .prefetchWaiters to "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" started.
+✘ Test "R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)" with 6 test cases failed after 2.987 seconds with 2 issues.
+↳ /// rr21-T13 and T13-nonpurged at site 1 (`withdrawPurgedJoins`' `.reroutes` arm): zz-a1…zz-a3 are wanted as `wanters`
+↳ /// says; K0 maps them to X's content, O's commit owes their re-routes, and a purge of zz-a1 and zz-a2 arrives before
+↳ /// the replay. Visited first, the commit re-routed the interests to X at once, and the purge withdrew the non-user
+↳ /// ones of the purged ids from X (`interest.lane < .userInitiated && interest.kind != .waiter`): the prefetch group
+↳ /// stopped waiting for zz-a1 and zz-a2 and the heal was forgotten, while the user waiters, the user-lane group and
+↳ /// the prefetch-lane waiters kept theirs. The purge withdraws the owed ones alike, at the purge, and the replay
+↳ /// re-routes the rest to X. `.userGroup`: the group's ids are stored at X's content, so a later request for each is
+↳ /// answered from the store (X's later attempt would get a 404). `.prefetchWaiters`: the batch's items are required,
+↳ /// so that b23-no-kind, which leaves W1 and W2 on no job and in no batch, ends the test instead of hanging it; their
+↳ /// tasks are leaked then, by design.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.987 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.987 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

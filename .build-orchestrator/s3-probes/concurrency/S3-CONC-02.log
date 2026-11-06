@@ -1,0 +1,4 @@
+✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at S3ConcurrencyProbeTests.swift:55:9: Expectation failed: calls.sorted() == ["first", "second"]
+↳ each handler UIKit handed over runs once: ["second"]
+↳ calls.sorted() == ["first", "second"] → false
+↳   calls.sorted() → ["second"]

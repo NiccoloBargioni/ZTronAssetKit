@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC14CorrectProbes" started.
+◇ Test "PROBE-C14C-STAMP-AHEAD" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C14C-STAMP-AHEAD" started.
+PROBE-C14C-STAMP-AHEAD followVisitedFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: false, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading), k1: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C14C-STAMP-AHEAD followVisitedFirst at the barrier's end: (k1: Optional(ZTronAssetSync.JobState.downloading), k2: Optional(ZTronAssetSync.JobState.verifying))
+PROBE-C14C-STAMP-AHEAD followVisitedFirst k2=success(ZTronAssetModel.AssetLocation(id: zz-k2, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5d/5d041dde722fcdbe55ea42f5c4baec6b86afdcc16297c473971f3d2586effed2.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k1=success(ZTronAssetModel.AssetLocation(id: zz-k1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d23409d85cf976f3f51e75c85b005f273f48cc4b887f1f954157ec64fe1e5ba8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/35/352ce0075ea673aee578d6ee8127dd4e2233448baa460b83f1a2940e79756d48.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k2Starts=1
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C14C-STAMP-AHEAD" started.
+PROBE-C14C-STAMP-AHEAD sweepFollowsFirst after the manifest 429: none=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) (barrier: true, left: Optional(3.0), c: Optional(ZTronAssetSync.JobState.downloading), k1: nil)
+PROBE-C14C-STAMP-AHEAD sweepFollowsFirst at the barrier's end: (k1: Optional(ZTronAssetSync.JobState.downloading), k2: nil)
+PROBE-C14C-STAMP-AHEAD sweepFollowsFirst k2=failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0))) k1=success(ZTronAssetModel.AssetLocation(id: zz-k1, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d23409d85cf976f3f51e75c85b005f273f48cc4b887f1f954157ec64fe1e5ba8.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) a=success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/35/352ce0075ea673aee578d6ee8127dd4e2233448baa460b83f1a2940e79756d48.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) k2Starts=0
+✘ Test "PROBE-C14C-STAMP-AHEAD" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC14CorrectProbes.swift:389:9: Expectation failed: (try? k2Result.get())?.byteSize == 20
+↳ PROBE-C14C-STAMP-AHEAD: K2's caller is served (visit-first: K2 waited for a slot K1 had taken, and started on the live gates after the throttle ended): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0)))
+↳ (try? k2Result.get())?.byteSize == 20 → <not evaluated>
+✘ Test "PROBE-C14C-STAMP-AHEAD" with 2 test cases failed after 1.741 seconds with 1 issue.
+↳ /// PROBE-C14C-STAMP-AHEAD (cycle 14's slot record, `4b3dcee`): two slots. C (1 MB, held) downloads for user A and
+↳ /// holds one. While the follow is owed, user requests zz-k1 (K1, held when it runs); then an unknown id's manifest
+↳ /// fetch gets a 429 with Retry-After 3 s (no transfer slot is freed by it); then user requests zz-k2 (K2).
+↳ /// Visit-first: K1 started at once and took the free slot; the 429 throttled the origin; K2 was queued with no slot
+↳ /// free, so the pump gated nothing; the clock passes the throttle's end, C completes, and K2 starts on the live gates
+↳ /// and is served. Behind the barrier both places are stamped "slot free" (K1 had not started), and the barrier-end
+↳ /// pump refuses K2 on its stamp's throttle although the throttle has ended.
+✘ Suite "VerifyC14CorrectProbes" failed after 1.742 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 14, correctness lens). Never committed.
+↳ ///
+↳ /// Each runs in both orders (`LaneDropVisit`); every expectation is the visit-first outcome.
+✘ Test run with 1 test in 1 suite failed after 1.742 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

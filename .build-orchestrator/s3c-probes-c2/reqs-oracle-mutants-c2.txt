@@ -1,0 +1,58 @@
+=== S3MUT=none OracleTests
+exit=0
+R-STO-5 oracle, seed 1: 40 steps and 8 reaps, 7 lifetimes, 2 blob unlinks
+R-STO-5 oracle, seed 2: 40 steps and 15 reaps, 6 lifetimes, 1 blob unlinks
+R-STO-5 oracle, seed 3: 40 steps and 17 reaps, 8 lifetimes, 4 blob unlinks
+R-STO-5 oracle, seed 4: 40 steps and 15 reaps, 4 lifetimes, 3 blob unlinks
+R-STO-5 oracle, seed 5: 40 steps and 7 reaps, 9 lifetimes, 3 blob unlinks
+R-STO-5 oracle, seed 6: 40 steps and 15 reaps, 10 lifetimes, 3 blob unlinks
+R-STO-5 oracle, seed 7: 40 steps and 9 reaps, 8 lifetimes, 6 blob unlinks
+R-STO-5 oracle, seed 8: 40 steps and 9 reaps, 9 lifetimes, 4 blob unlinks
+R-STO-5 oracle, seed 9: 40 steps and 20 reaps, 9 lifetimes, 8 blob unlinks
+R-STO-5 oracle, seed 10: 40 steps and 10 reaps, 9 lifetimes, 4 blob unlinks
+R-STO-5 oracle, seed 11: 40 steps and 11 reaps, 6 lifetimes, 6 blob unlinks
+R-STO-5 oracle, seed 12: 40 steps and 16 reaps, 5 lifetimes, 5 blob unlinks
+R-STO-5 oracle, seed 13: 40 steps and 6 reaps, 6 lifetimes, 2 blob unlinks
+R-STO-5 oracle, seed 14: 40 steps and 12 reaps, 8 lifetimes, 1 blob unlinks
+R-STO-5 oracle, seed 15: 40 steps and 9 reaps, 8 lifetimes, 2 blob unlinks
+R-STO-5 oracle, seed 16: 40 steps and 13 reaps, 6 lifetimes, 5 blob unlinks
+✔ Test run with 1 test in 1 suite passed after 0.790 seconds.
+0
+=== S3MUT=Z OracleTests
+exit=1
+ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran
+0
+=== S3MUT=G OracleTests
+exit=1
+R-STO-5 oracle, seed 1: 40 steps and 10 reaps, 5 lifetimes, 4 blob unlinks
+R-STO-5 oracle, seed 2: 40 steps and 16 reaps, 5 lifetimes, 6 blob unlinks
+R-STO-5 oracle, seed 3: 40 steps and 17 reaps, 8 lifetimes, 6 blob unlinks
+R-STO-5 oracle, seed 4: 40 steps and 15 reaps, 4 lifetimes, 3 blob unlinks
+R-STO-5 oracle, seed 5: 40 steps and 7 reaps, 9 lifetimes, 3 blob unlinks
+R-STO-5 oracle, seed 6: 40 steps and 15 reaps, 10 lifetimes, 3 blob unlinks
+R-STO-5 oracle, seed 7: 40 steps and 9 reaps, 8 lifetimes, 6 blob unlinks
+R-STO-5 oracle, seed 8: 40 steps and 9 reaps, 9 lifetimes, 4 blob unlinks
+R-STO-5 oracle, seed 9: 40 steps and 20 reaps, 9 lifetimes, 8 blob unlinks
+R-STO-5 oracle, seed 10: 40 steps and 10 reaps, 9 lifetimes, 4 blob unlinks
+R-STO-5 oracle, seed 11: 40 steps and 11 reaps, 6 lifetimes, 6 blob unlinks
+R-STO-5 oracle, seed 12: 40 steps and 16 reaps, 5 lifetimes, 5 blob unlinks
+R-STO-5 oracle, seed 13: 40 steps and 6 reaps, 6 lifetimes, 5 blob unlinks
+R-STO-5 oracle, seed 14: 40 steps and 12 reaps, 8 lifetimes, 1 blob unlinks
+R-STO-5 oracle, seed 15: 40 steps and 9 reaps, 8 lifetimes, 2 blob unlinks
+R-STO-5 oracle, seed 16: 40 steps and 13 reaps, 6 lifetimes, 5 blob unlinks
+✘ Test run with 1 test in 1 suite failed after 0.763 seconds with 333 issues.
+333
+↳ seed 1, lifetime crash Optional(65) powerLossDropUnsynced, unacknowledged: after ["add m1", "reopen", "publish m1", "evict m1", "reap"]: ["I-3: op 59 unlinked 629df4591cb15095e5acf5b15b378a5e07f7a447af3ca653316a535ed5188fc8.png before a snapshot without it was acknowledged"]
+↳   violations → ["I-3: op 59 unlinked 629df4591cb15095e5acf5b15b378a5e07f7a447af3ca653316a535ed5188fc8.png before a snapshot without it was acknowledged"]
+=== S3MUT=E1 LargeBlobTests
+exit=1
+✘ Test run with 11 tests in 1 suite failed after 63.991 seconds with 18 issues.
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTes
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTes
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTes
+=== S3MUT=U1 LargeBlobTests
+exit=1
+✘ Test run with 11 tests in 1 suite failed after 63.996 seconds with 8 issues.
+✘ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" recorded an issue at LargeBlobTests.swift:180:9: Expectation failed: first == (2, 3)
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds also purges an id bound to it between its chunks" recorded an issue at LargeBlobTests.swift:323:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:189:6: Time limit was exceeded: 60.000 seconds

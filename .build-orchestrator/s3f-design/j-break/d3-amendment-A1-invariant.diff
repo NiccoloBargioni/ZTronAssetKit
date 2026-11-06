@@ -1,0 +1,18 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineCommands.swift b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+index b167f85..ab74db1 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineCommands.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+@@ -1843,7 +1843,12 @@ extension SyncEngine {
+         }
+         // Every queued job can still be dispatched: a valid entry of it waits in its queue, put back, or aside while only
+         // released groups want it (the rule above); a job with none would wait for ever (review of close-out cycle 10).
+-        let reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
++        var reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
++        // J-BREAK AMENDMENT (judge prototype): a job whose place waits for the follow's end (`eventsAfterFollow`) is queued
++        // there, not stranded.
++        for case .enqueue(let transfer) in self.state.eventsAfterFollow {
++            reachable.insert(transfer)
++        }
+         let stranded = self.state.jobs.values.filter { $0.state == .queued && !reachable.contains($0.transfer) }.count
+         if stranded > 0 {
+             violations.append("\(stranded) queued jobs wait in no queue")

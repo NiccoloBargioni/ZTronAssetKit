@@ -1,0 +1,82 @@
+--- .build-verify-s3f-c7-reqs/variants/EngineJobs.head.swift	2026-10-30 07:10:41
++++ .build-verify-s3f-c7-reqs/variants/EngineJobs.prefixC6.swift	2026-10-30 07:10:41
+@@ -688,16 +688,12 @@
+     /// with the replaced content's figures although the copy lists the id at content that may fit, and its re-queue would
+     /// stall its queue's head until the follow's visit (the close-out cycle-3 correctness lens, PROBE-C3-SPACE). A follow
+     /// that keeps some of the job's ids may lower its lane, since the moved interests may have set it, and with it the
+-    /// volume its verdict read. The two volume readings are not ordered (neither the store nor the ledger clamps them), so
+-    /// the lowered lane's room may be smaller or larger: a job is judged again after its follow either way. One admitted
+-    /// before its follow that no longer fits is treated as one that never did (left parked `insufficientSpace`, left
+-    /// waiting, or parked within `parksPerPump`): never re-queued, never counted ahead of the jobs behind it. Re-queued on
+-    /// its pre-follow user lane, its bytes counted ahead took the room the next user job was judged against, whose
+-    /// fail-fast answered that job's waiter with a shortage that did not exist, while the gate parked the followed job
+-    /// again (the close-out cycle-5 correctness lens, PROBE-C5-LANEDROP). One about to be parked that fits after its
+-    /// follow is re-queued as an admitted one is (within `readmissionsPerTurn`): parked, its fail-fast answered the kept
+-    /// waiter with an `available` above its `required` (the close-out cycle-6 correctness lens, PROBE-C6-LANEGAIN). At
+-    /// `s3-base` the follow moved every job in the apply's turn, so neither window existed. A follow
++    /// volume its verdict read; so a job admitted before its follow is judged again after it, and one that no longer
++    /// fits is treated as one that never did (left parked `insufficientSpace`, left waiting, or parked within
++    /// `parksPerPump`): never re-queued, never counted ahead of the jobs behind it. Re-queued on its pre-follow user lane,
++    /// its bytes counted ahead took the room the next user job was judged against, whose fail-fast answered that job's
++    /// waiter with a shortage that did not exist, while the gate parked the followed job again (the close-out cycle-5
++    /// correctness lens, PROBE-C5-LANEDROP; at `s3-base` the follow moved every job in the apply's turn). A follow
+     /// costs what a follow turn's visit costs (`followsPerTurn`), about ten times a re-queue or a park, so the sweep gives
+     /// it its own bound: at most `followsPerTurn` follows per turn besides `parksPerPump` parks and `readmissionsPerTurn`
+     /// re-queues, the rest left to the follow-up sweep. Counted as the re-queue or park it preceded, one turn followed up
+@@ -754,7 +750,10 @@
+                 verdict = self.spaceBlock(job, ahead: ahead)
+             }
+             guard let block = verdict else {
+-                if self.requeueSwept(job, ahead: &ahead) {
++                if self.transition(transfer, to: .queued) {
++                    self.enqueue(transfer)
++                    ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
++                    self.state.spaceAdmitted[transfer] = self.state.jobs[transfer]?.ticket
+                     requeues += 1
+                 }
+                 continue
+@@ -774,23 +773,9 @@
+                 break
+             }
+             // The ids that left this content leave before its fail-fast answers the rest; a job that keeps some is read
+-            // again, since the moved interests may have set its lane (and so the volume its verdict and figures read).
++            // again, since the moved interests may have set its lane (and so the volume its figures read).
+             guard !self.followBeforeActing(transfer), let parked = self.state.jobs[transfer] else {
+                 parks += 1
+-                continue
+-            }
+-            if self.spaceBlock(parked, ahead: ahead) == nil {
+-                // The lane the follow left reads the other volume, and the two readings are not ordered: a lowered lane
+-                // may read the larger room. A job that fits there is re-queued as an admitted one is, never parked with
+-                // figures whose `available` exceeds its `required` (PROBE-C6-LANEGAIN). Without a follow it is the same
+-                // job, which did not fit.
+-                guard requeues < Self.readmissionsPerTurn else {
+-                    self.scheduleSpaceSweepFollowUp(sweep)
+-                    break
+-                }
+-                if self.requeueSwept(parked, ahead: &ahead) {
+-                    requeues += 1
+-                }
+                 continue
+             }
+             if let space = self.state.freeSpace {
+@@ -820,19 +805,6 @@
+         }
+     }
+ 
+-    /// Re-queues a parked job the space sweep admitted, counts its bytes `ahead` of the jobs the sweep judges after it
+-    /// (the gate counts them in flight once it starts), and records it in `spaceAdmitted` so later sweeps count it too
+-    /// while it waits in the queue. `false` when the job could not leave its park (no transition to `.queued`).
+-    private func requeueSwept(_ job: Job, ahead: inout Int64) -> Bool {
+-        guard self.transition(job.transfer, to: .queued) else {
+-            return false
+-        }
+-        self.enqueue(job.transfer)
+-        ahead = PlanBuilder.adding(ahead, max(0, job.entry.byteSize ?? 0))
+-        self.state.spaceAdmitted[job.transfer] = self.state.jobs[job.transfer]?.ticket
+-        return true
+-    }
+-
+     /// Whether the sweep's turn may act on `job`: a job that holds an id an owed follow has not moved yet is followed
+     /// before the sweep acts on it and counts against `followsPerTurn` (counted in `follows`); any other job always fits.
+     /// `false` once the turn has followed `followsPerTurn` jobs, and the sweep leaves the rest to its follow-up turn.

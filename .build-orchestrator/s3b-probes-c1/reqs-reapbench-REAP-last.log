@@ -1,0 +1,14 @@
+Building for production...
+[Computing dependencies]
+Build complete! (0,84 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "StorageBenchmarks" started.
+◇ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" started.
+P-13 reap scaling (wall seconds of runDueWork, 20 of 64 keys per unit): [(key: 10000, value: 0.373402917), (key: 20000, value: 1.388668792), (key: 40000, value: 2.7712245)]; 40,000 / 20,000 = 1.995597881917404 (max 2.5); control with 20-key batches: 20,000 0.429047458 s, 40,000 0.843400583 s, ratio 1.9657512642808852
+✔ Test "P-13: reclaiming a doubled set of blobs in time-bounded units costs the store at most doubling_ratio_max times as much" passed after 63.719 seconds.
+✔ Suite "StorageBenchmarks" passed after 63.719 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 63.719 seconds.
+✔ Test run with 1 test in 2 suites passed after 63.719 seconds.

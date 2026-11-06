@@ -1,0 +1,66 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "tests / flake (requirement R-OBS-1, ARCHITECTURE 13.5 #2)",
+  "location": "Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift:368-379 racing Sources/ZTronAssetAppleHosted/PackTransfer.swift:142-143",
+  "problem": "The test 'R-OBS-1: an Apple transfer runs inside the transfer signpost interval' is flaky. `PackTransferDriver.run()` calls `Self.deliver(...)`, which calls `updates.finish()`, and only then calls `interval.end()`. `finish()` resumes the test's `collect(handle)` on another pool thread, so the test can read `fixture.tap.lines` before `.ended` is recorded. I reproduced it twice. Repeating only this test with `--repeat-until fail` while the coverage run was also going, it failed at repetition 398 with `intervals \u2192 [\u2026 phase: .began \u2026]` and no `.ended` event. Under 12 busy-loop processes it failed again at repetition 808. 3000 repetitions on an idle machine passed. The engine can also see a transfer's terminal update while its signpost interval is still open.",
+  "fix": "In `PackTransferDriver.run()`, call `interval.end()` before `await Self.deliver(terminal, to: self.updates, copier: self.parts.copier)`. The interval then ends before the stream finishes, so any consumer that sees the terminal update also sees the closed interval. Also add an assertion that the interval closes on a failed transfer (for example the skew or cancel path in the same suite). Then re-run `swift test --filter transferIsWrappedInTheInterval --maximum-repetitions 3000 --repeat-until fail` under CPU load to confirm the fix."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "requirement test scope (R-APL-3)",
+  "location": "Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift:385-417",
+  "problem": "The test name says the asset is 'served from blobs', but at L2 it only checks the source-level half. It checks that the engine receives a staging copy, that the release leaves that copy intact, and that the release opens no pack file. No store or blob is involved. The test would catch serve-in-place and missing-release regressions, but not a store-side regression. Round 2 already accepted this.",
+  "fix": "Keep this test. The orchestrator should add the end-to-end R-APL-3 test (an asset adopted from a FakePackBackend source is served from blobs/ after its pack is released) to the WP-F or WP-G row of ARCHITECTURE \u00a711, as docs/adr-drafts/e.md already asks (fix rounds 1 and 2)."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "tests without a requirement ID / test seams",
+  "location": "Tests/ZTronAssetAppleHostedTests/AppleTestSeamTests.swift:14-96; Sources/ZTronAssetAppleHosted/AppleSourceState.swift:120; Sources/ZTronAssetAppleHosted/PackAvailabilityCoordinator.swift:131",
+  "problem": "The four 'Seams:' tests check test-only waits that live in the production target, and they carry no requirement ID. Each one does assert behaviour (the wait returns while its condition is still unmet), so they are not assertion-free. The pre-cancelled branches at the two lines above are still never reached (0 hits).",
+  "fix": "The orchestrator should decide in DECISIONS whether internal test seams and their tests are allowed in production targets (request E-13). If not, move the waits behind a test-support protocol so their lines stop counting as production code."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "coverage",
+  "location": "Sources/ZTronAssetAppleHosted/AppleHostedTier.swift:43,48",
+  "problem": "The `.noSourceConfigured` failure returns in `AppleHostedTier.resolve` have 0 hits. They are Stage 1 contract code in WP-E's target. The target still meets its gate at 99.59%.",
+  "fix": "Add a test of `AppleHostedTier.resolve` with no HTTP and no Apple configuration, and one with the Apple tier selected but no pack backend (whichever branch applies to each line). Each should assert `.failure(.noSourceConfigured)`."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / ADR-027 release-once-per-generation (E-10 b)",
+  "location": "Sources/ZTronAssetAppleHosted/PackTransfer.swift:166-171 (forgetRelease at :170)",
+  "problem": "PackTransferDriver.attempt calls state.forgetRelease(pack) whenever the coordinator's wait ends .available. That includes two cases where nothing was adopted: (1) the file is missing from an installed pack (.source(.notFound), i.e. catalog/pack skew), where ensure is a no-op on a live device, and (2) the second copy ends in skew. So a skewed transfer re-arms the release of its pack in the same catalog generation. The pack is then removed again by the next reclaimSourceCopies, and the next retry downloads the whole pack again. This breaks ADR-027 ('at most once per pack per catalog generation, so a pack that comes back is never released in a loop') and E-10(b)'s claim that 'releases still never loop'. Timeline, all in one generation: pack ZTronMedia holds a (adopted); the catalog also lists b (excluded by the retention scope, file missing from the pack). (i) reclaim releases ZTronMedia. (ii) The user requests b: copy gives .notInstalled, ensure downloads the whole pack, forgetRelease runs, copy gives .notFound, the transfer ends transient(.sourceVersionSkew). (iii) The next reclaim releases ZTronMedia again. (iv) The engine retries b and steps (ii) and (iii) repeat. Proven by probe PROBE-R3-1 (.build-verify-e-correct/probes/pkg/Tests/Probe/R3Probes.swift, run against the unmodified sources through symlinks): 3 skewed transfers produced 'PROBE-R3-1 releases=4 removes=4 mediaEnsures=3'. Expectations 'releases == 1' and 'removes == 1' failed. The churn (one whole-pack download plus one removal per retry) is limited only by the engine's backoff and breaker and by how often maintenance runs.",
+  "fix": "Forget the release only when the on-demand download actually produced an adopted copy. In attempt(), set `var demanded = false`, set `demanded = true` in the `.available` case instead of calling forgetRelease, then use `let terminal = await self.settle(outcome); if demanded, case .staged = terminal { await self.parts.state.forgetRelease(location.pack) }; return terminal`. Checked in a scratch copy (.build-verify-e-correct/probes/pkg-fix, sources copied and patched): PROBE-R3-1 passes ('releases=1 removes=1'). All 86 existing ZTronAssetAppleHostedTests pass, including the forgottenWhileReleasing race test and the E-10(b) re-release test. The only failure is the R-APL-5 source-scan test, an artifact of the scratch package's symlinked layout. Add PROBE-R3-1 as a regression test (R-CLN-10) and update E-10(b) to say 'downloaded again and staged'."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "robustness / integer overflow",
+  "location": "Sources/ZTronAssetAppleHosted/AppleHostedRemoteSource.swift:150-156 (`total += ...` at :153)",
+  "problem": "sourceCopyBytes() adds PackBackend.installedBytes values with checked `+=`, so sizes that sum past Int64.max trap the process. PackBackend is public and resolve() accepts any injected backend. Proven with a fake: two adopted packs of Int64.max/2+1 bytes each (retention .keepPacks) made the test helper exit with 'unexpected signal code 5' (SIGTRAP). PROBE-R3-2 is in .build-verify-e-correct/probes/pkg/Tests/Probe/R3OverflowProbe.swift. The live backend reports AssetPack.downloadSize, which cannot realistically get near this, so this is not blocking. E-7 already fixed the same kind of trap in the progress scaler.",
+  "fix": "Saturate the sum: `let (sum, overflow) = total.addingReportingOverflow(max(0, bytes)); total = overflow ? .max : sum`. Optionally add the probe as a test."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "concurrency / TransferHandle contract (ADR-021)",
+  "location": "Sources/ZTronAssetAppleHosted/PackTransfer.swift:136-142 and :154",
+  "problem": "run() reads stop.requested and then deliver() yields the terminal element. A cancel() or pause() from the engine's thread can land between the two. The engine then receives .staged although it cancelled before any terminal element was yielded. The contract says controls are no-ops only after the terminal element, and cancel \u2192 .failed(.cancelled(.byClient)). There is no suspension point in the window, so this could not be reproduced deterministically. Not proven.",
+  "fix": "Make 'terminal claimed' and 'stop requested' one atomic decision in PackTransferStop's Mutex. For example, add `func claimTerminal() -> Kind?` that marks the terminal as claimed and returns the stop recorded so far, and have request(_:) ignore stops that arrive after the claim. run() would call claimTerminal() right before deliver."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "spec conformance / network policy",
+  "location": "Sources/ZTronAssetAppleHosted/PackTransfer.swift:235-248, AppleCatalogReader.swift:32, AppleSourceState.swift:140-156",
+  "problem": "TransferRequest.access and ManifestRequest.access ('OS-enforced network permissions') are ignored by the Apple tier. ensureAvailable and checkForUpdates download over whatever network the OS chooses, so a Wi-Fi-only or constrained-network policy is not enforced for pack downloads. A skew also schedules checkForUpdates regardless of policy. None of E-1\u2026E-16 records this.",
+  "fix": "Record the decision in docs/adr-drafts/e.md and request rows in APPLE-API-VERIFICATION / DEVICE-TEST-PLAN: BackgroundAssets cannot honour NetworkAccess, so the engine (WP-F) must gate Apple-tier dispatch and update checks on its own DeviceConditions. Ask the orchestrator to add that obligation to the WP-F \u00a711 rows."
+ }
+]

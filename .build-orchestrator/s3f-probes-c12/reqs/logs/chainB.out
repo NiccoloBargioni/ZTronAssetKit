@@ -1,0 +1,11 @@
+=== ios 02:23:55 { 26.89 15.57 20.68 }
+ios exit 0
+ios warnings 0 errors 0
+=== sim 02:24:27 { 58.94 24.32 23.66 }
+sim exit 65
+bundle .build-verify-s3f-c12-reqs/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_02-24-34-+0100.xcresult
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c12-reqs/chainB.sh: line 17: 61306 Terminated: 15          sample > $L/load-sim.txt
+summary exit 0
+{'result': 'Failed', 'totalTestCount': 1428, 'passedTests': 1427, 'failedTests': 1, 'skippedTests': 0, 'expectedFailures': 0}
+FAIL {'failureText': 'Test exceeded execution time allowance of 3 minutes', 'targetName': 'ZTronAssetSyncTests', 'testIdentifier': 194, 'testIdentifierString': 'EngineFollowBarrierTests/barrierRetriesBehindTheOwedVisitsPlaces(_:)', 'testIdentifierURL': 'test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierRetriesBehindTheOwedVisitsPlaces(_:)', 'testName': 'R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)'}
+=== done 02:35:41 { 35.17 85.20 77.02 }

@@ -1,0 +1,61 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" started.
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitBatchTests.swift:19:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitBatchTests.swift:91:9: Expectation failed: scenario(after.queued) == Array(announced.dropFirst())
+↳ the waiting queue then holds zz-t2's and zz-t3's, ascending: []
+↳ scenario(after.queued) == Array(announced.dropFirst()) → false
+↳   scenario(after.queued) → []
+↳   Array(announced.dropFirst()) → [ZTronAssetModel.AssetEvent.assetAvailable(zz-t2, generation: 9), ZTronAssetModel.AssetEvent.assetAvailable(zz-t3, generation: 9)]
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitBatchTests.swift:92:9: Expectation failed: scenario(after.held) == announced
+↳ the stalled queue holds the three, ascending, zz-t1's moved to the tail: [ZTronAssetModel.AssetEvent.snapshotChanged(generation: 9), ZTronAssetModel.AssetEvent.conditionsChanged(ZTronAssetModel.DeviceConditions(network: ZTronAssetModel.NetworkConditions(satisfied: true, expensive: false, constrained: false), power: ZTronAssetModel.PowerConditions(lowPowerMode: false, thermal: ZTronAssetModel.ThermalLevel.nominal))), ZTronAssetModel.AssetEvent.assetFailed(zz-t1, ZTronAssetModel.AssetError.notFound, ZTronAssetModel.RetryDisposition.nextRun), ZTronAssetModel.AssetEvent.syncStarted(run-3, ZTronAssetModel.SyncTrigger.explicit), ZTronAssetModel.AssetEvent.syncFinished(run-3, ZTronAssetModel.SyncOutcome.complete(ZTronAssetModel.SyncReport(runID: run-3, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 0, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4203, unchangedCount: 1, fetchBytes: 0, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 0, bytesDownloaded: 0, failures: []))), ZTronAssetModel.AssetEvent.transferProgress(zz-t1, ZTronAssetModel.TransferProgress(received: 0, expected: nil))]
+↳ scenario(after.held) == announced → false
+↳   scenario(after.held) → [ZTronAssetModel.AssetEvent.assetFailed(zz-t1, ZTronAssetModel.AssetError.notFound, ZTronAssetModel.RetryDisposition.nextRun)]
+↳   announced → [ZTronAssetModel.AssetEvent.assetAvailable(zz-t1, generation: 9), ZTronAssetModel.AssetEvent.assetAvailable(zz-t2, generation: 9), ZTronAssetModel.AssetEvent.assetAvailable(zz-t3, generation: 9)]
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitBatchTests.swift:93:9: Expectation failed: after.coalesced - before.coalesced == 1
+↳ the commit moves one live slot, zz-t1's in the stalled queue: 16 -> 16
+↳ after.coalesced - before.coalesced == 1 → false
+↳   after.coalesced - before.coalesced → 0
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitBatchTests.swift:94:9: Expectation failed: after.delivered - before.delivered == 1
+↳ the commit delivers one event, by hand-off: 0 -> 0
+↳ after.delivered - before.delivered == 1 → false
+↳   after.delivered - before.delivered → 0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" started.
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitBatchTests.swift:19:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitBatchTests.swift:91:9: Expectation failed: scenario(after.queued) == Array(announced.dropFirst())
+↳ the waiting queue then holds zz-t2's and zz-t3's, ascending: []
+↳ scenario(after.queued) == Array(announced.dropFirst()) → false
+↳   scenario(after.queued) → []
+↳   Array(announced.dropFirst()) → [ZTronAssetModel.AssetEvent.assetAvailable(zz-t2, generation: 9), ZTronAssetModel.AssetEvent.assetAvailable(zz-t3, generation: 9)]
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitBatchTests.swift:92:9: Expectation failed: scenario(after.held) == announced
+↳ the stalled queue holds the three, ascending, zz-t1's moved to the tail: [ZTronAssetModel.AssetEvent.snapshotChanged(generation: 9), ZTronAssetModel.AssetEvent.conditionsChanged(ZTronAssetModel.DeviceConditions(network: ZTronAssetModel.NetworkConditions(satisfied: true, expensive: false, constrained: false), power: ZTronAssetModel.PowerConditions(lowPowerMode: false, thermal: ZTronAssetModel.ThermalLevel.nominal))), ZTronAssetModel.AssetEvent.assetFailed(zz-t1, ZTronAssetModel.AssetError.notFound, ZTronAssetModel.RetryDisposition.nextRun), ZTronAssetModel.AssetEvent.syncStarted(run-3, ZTronAssetModel.SyncTrigger.explicit), ZTronAssetModel.AssetEvent.syncFinished(run-3, ZTronAssetModel.SyncOutcome.complete(ZTronAssetModel.SyncReport(runID: run-3, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 0, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4203, unchangedCount: 1, fetchBytes: 0, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 0, bytesDownloaded: 0, failures: []))), ZTronAssetModel.AssetEvent.transferProgress(zz-t1, ZTronAssetModel.TransferProgress(received: 0, expected: nil))]
+↳ scenario(after.held) == announced → false
+↳   scenario(after.held) → [ZTronAssetModel.AssetEvent.assetFailed(zz-t1, ZTronAssetModel.AssetError.notFound, ZTronAssetModel.RetryDisposition.nextRun)]
+↳   announced → [ZTronAssetModel.AssetEvent.assetAvailable(zz-t1, generation: 9), ZTronAssetModel.AssetEvent.assetAvailable(zz-t2, generation: 9), ZTronAssetModel.AssetEvent.assetAvailable(zz-t3, generation: 9)]
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitBatchTests.swift:93:9: Expectation failed: after.coalesced - before.coalesced == 1
+↳ the commit moves one live slot, zz-t1's in the stalled queue: 16 -> 16
+↳ after.coalesced - before.coalesced == 1 → false
+↳   after.coalesced - before.coalesced → 0
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitBatchTests.swift:94:9: Expectation failed: after.delivered - before.delivered == 1
+↳ the commit delivers one event, by hand-off: 0 -> 0
+↳ after.delivered - before.delivered == 1 → false
+↳   after.delivered - before.delivered → 0
+✘ Test "R-SYN-12: a commit hands its first id to a waiting pull and queues its other ids ascending, and moves an id a stalled queue held to its tail, counting one move and one hand-off (S3-R27 item 1, a3)" with 2 test cases failed after 384.143 seconds with 10 issues.
+↳ /// T-A-3: zz-t1, zz-t2 and zz-t3 share X's content, each with a user waiter; zz-t1 failed before on W's content (v2,
+↳ /// a 404), so the stalled subscriber, which reads nothing, still holds its slot (a failure leaves no stale bytes to
+↳ /// answer zz-t1's waiter with, which a commit would: d1 review should-fix 3). X's publication is held at its first
+↳ /// store unit while v4 makes the follow owe its visits (swept first) or ends it (visited first). At X's commit the
+↳ /// other subscriber's pull waits on an empty queue: it is handed zz-t1's `assetAvailable` and queues the other two in
+↳ /// ascending order; the stalled queue moves zz-t1's slot to its tail, behind which it queues the other two. The
+↳ /// commit's turn counts one move (`eventsCoalesced`) and one hand-off (`eventsDelivered`).
+✘ Suite "Engine follow barrier (F-28)" failed after 384.143 seconds with 10 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 384.144 seconds with 10 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

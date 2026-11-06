@@ -1,0 +1,119 @@
+ 3:18  up 4 days, 15:41, 2 users, load averages: 39.86 58.03 63.47
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 6]
+[2 / 7] ZTronAssetModel
+[3 / 8] ZTronAssetModel
+[6 / 11] ZTronAssetStorage
+[7 / 12] ZTronAssetStorage
+[10 / 15] ZTronAssetTransport
+[11 / 16] ZTronAssetTransport
+[14 / 19] ZTronAssetAppleHosted
+[15 / 20] ZTronAssetAppleHosted
+[18 / 23] ZTronAssetSync
+[19 / 24] ZTronAssetSync
+[22 / 25] ZTronAssetKit
+[23 / 26] ZTronAssetKit
+[32 / 36] ZTronAssetTestSupport
+[34 / 37] ZTronAssetTestSupport
+[44 / 63] ZTronAssetModelTests-product
+[49 / 67] ZTronAssetCompatibilityTests-product
+[50 / 68] ZTronAssetKitTests-product
+[51 / 69] ZTronAssetStorageTests-product
+[53 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetCompatibilityTests-product
+[55 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetAppleHostedTests-product
+[57 / 71] ZTronAssetKitTests-product
+[61 / 71] ZTronAssetKitBenchmarks-product
+[61 / 71] ZTronAssetTransportTests-product
+[64 / 72] ZTronAssetTransportTests-product
+[67 / 74] ZTronAssetTransportTests-product
+[68 / 76] ZTronAssetModelTests-product
+[70 / 76] ZTronAssetModelTests-product
+[70 / 76] ZTronAssetSyncTests-product
+[73 / 77] ZTronAssetSyncTests-product
+[76 / 79] ZTronAssetSyncTests-product
+[77 / 81] ZTronAssetStorageTests-product
+[85 / 86] ZTronAssetStorageTests-product
+[88 / 88] ZTronAssetStorageTests-product
+[92 / 92] ZTronAssetModelTests-product
+[96 / 96] ZTronAssetKitTests-product
+[99 / 100] ZTronAssetKitBenchmarks-product
+[100 / 100] ZTronAssetKitBenchmarks-product
+[104 / 104] ZTronAssetCompatibilityTests-product
+[108 / 108] ZTronAssetAppleHostedTests-product
+Build complete! (782,03 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC5CorrectProbes" started.
+◇ Test "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" started.
+◇ Test case passing 1 argument mode → count=1000 handles=1 to "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" started.
+PROBE-C5-SWEEP-TURNS count=1000 handles=1: owed before 744; first (alarm) turn followed 256; follow-up turns 2; followed per turn [256, 232]; ms ["9.29", "108.65"]; max 108.65 median 108.65; awaiting after 0
+✘ Test "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" recorded an issue with 1 argument mode → count=1000 handles=1 at VerifyC5CorrectProbes.swift:134:9: Expectation failed: (ms.max() ?? 0) <= 10.0
+↳ count=1000 handles=1: the longest sweep turn took 108.653917 ms
+↳ (ms.max() ?? 0) <= 10.0 → false
+↳   (ms.max() ?? 0) → 108.653917
+◇ Test case passing 1 argument mode → count=10000 handles=1 to "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" started.
+PROBE-C5-SWEEP-TURNS count=10000 handles=1: owed before 9744; first (alarm) turn followed 256; follow-up turns 38; followed per turn [256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 16]; ms ["122.63", "207.27", "132.26", "207.94", "49.60", "142.56", "214.26", "71.37", "7.34", "71.99", "219.78", "129.31", "88.54", "53.43", "127.70", "72.22", "92.36", "191.84", "127.20", "107.88", "144.66", "160.29", "119.78", "29.01", "168.53", "159.80", "87.23", "112.08", "91.30", "137.29", "188.82", "16.08", "164.50", "127.65", "81.33", "286.42", "130.40", "224.48"]; max 286.42 median 127.70; awaiting after 0
+✘ Test "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" recorded an issue with 1 argument mode → count=10000 handles=1 at VerifyC5CorrectProbes.swift:134:9: Expectation failed: (ms.max() ?? 0) <= 10.0
+↳ count=10000 handles=1: the longest sweep turn took 286.416542 ms
+↳ (ms.max() ?? 0) <= 10.0 → false
+↳   (ms.max() ?? 0) → 286.416542
+◇ Test case passing 1 argument mode → count=10000 handles=2 to "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" started.
+PROBE-C5-SWEEP-TURNS count=10000 handles=2: owed before 9744; first (alarm) turn followed 256; follow-up turns 38; followed per turn [256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 16]; ms ["186.51", "98.38", "179.05", "148.81", "189.06", "7.69", "137.67", "112.81", "112.43", "73.09", "210.87", "232.94", "245.15", "144.43", "286.72", "220.51", "195.96", "75.61", "206.08", "11.20", "252.52", "102.06", "188.46", "180.81", "159.45", "317.19", "119.51", "146.51", "234.59", "126.34", "13.65", "112.51", "61.58", "253.80", "124.67", "131.15", "79.07", "90.36"]; max 317.19 median 146.51; awaiting after 0
+✘ Test "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" recorded an issue with 1 argument mode → count=10000 handles=2 at VerifyC5CorrectProbes.swift:134:9: Expectation failed: (ms.max() ?? 0) <= 10.0
+↳ count=10000 handles=2: the longest sweep turn took 317.190833 ms
+↳ (ms.max() ?? 0) <= 10.0 → false
+↳   (ms.max() ?? 0) → 317.190833
+◇ Test case passing 1 argument mode → count=10000 handles=3 to "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" started.
+PROBE-C5-SWEEP-TURNS count=10000 handles=3: owed before 9744; first (alarm) turn followed 256; follow-up turns 38; followed per turn [256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 16]; ms ["69.61", "82.63", "72.50", "49.58", "89.50", "223.97", "99.95", "66.97", "145.53", "18.45", "157.20", "129.82", "43.85", "120.28", "112.02", "42.54", "84.94", "49.98", "129.12", "157.44", "81.55", "103.58", "130.57", "112.61", "234.61", "43.09", "116.46", "183.82", "255.60", "104.71", "159.60", "98.07", "156.38", "159.03", "94.46", "76.72", "226.02", "34.11"]; max 255.60 median 104.71; awaiting after 0
+✘ Test "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" recorded an issue with 1 argument mode → count=10000 handles=3 at VerifyC5CorrectProbes.swift:134:9: Expectation failed: (ms.max() ?? 0) <= 10.0
+↳ count=10000 handles=3: the longest sweep turn took 255.596708 ms
+↳ (ms.max() ?? 0) <= 10.0 → false
+↳   (ms.max() ?? 0) → 255.596708
+✘ Test "PROBE-C5-SWEEP-TURNS: every reclaim sweep turn during an owed follow follows at most followsPerTurn jobs within C2" with 4 test cases failed after 68.078 seconds with 4 issues.
+◇ Test "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" started.
+◇ Test case passing 1 argument handles → 1 to "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" started.
+PROBE-C5-SWEEP-MAX handles=1: owed 8976, awaiting 10000; alarm turn followed 256, left awaiting 400; follow-up turns (ms, followed, left awaitingSpace, queued delta): ["(34.60, 256, 472, 364)", "(114.35, 256, 400, 328)", "(8.24, 256, 382, 319)"]
+✘ Test "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" recorded an issue with 1 argument handles → 1 at VerifyC5CorrectProbes.swift:310:9: Expectation failed: turns.first.map { $0.followed == SyncEngine.followsPerTurn && $0.left == 1_024 } ?? false
+↳ the second turn is at all three bounds: (ms: 34.597083, followed: 256, left: 472, queued: 364)
+↳ turns.first.map { $0.followed == SyncEngine.followsPerTurn && $0.left == 1_024 } ?? false → false
+↳   turns.first.map { $0.followed == SyncEngine.followsPerTurn && $0.left == 1_024 } → false
+↳     some → false
+↳   false → <not evaluated>
+✘ Test "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" recorded an issue with 1 argument handles → 1 at VerifyC5CorrectProbes.swift:312:9: Expectation failed: (turns.map(\.ms).max() ?? 0) <= 10.0
+↳ handles=1: [34.597083, 114.351208, 8.244875]
+↳ (turns.map(\.ms).max() ?? 0) <= 10.0 → false
+↳   (turns.map(\.ms).max() ?? 0) → 114.351208
+◇ Test case passing 1 argument handles → 2 to "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" started.
+PROBE-C5-SWEEP-MAX handles=2: owed 8976, awaiting 10000; alarm turn followed 256, left awaiting 382; follow-up turns (ms, followed, left awaitingSpace, queued delta): ["(27.15, 256, 454, 355)", "(112.18, 256, 418, 337)", "(79.96, 256, 394, 325)"]
+✘ Test "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" recorded an issue with 1 argument handles → 2 at VerifyC5CorrectProbes.swift:310:9: Expectation failed: turns.first.map { $0.followed == SyncEngine.followsPerTurn && $0.left == 1_024 } ?? false
+↳ the second turn is at all three bounds: (ms: 27.154292, followed: 256, left: 454, queued: 355)
+↳ turns.first.map { $0.followed == SyncEngine.followsPerTurn && $0.left == 1_024 } ?? false → false
+↳   turns.first.map { $0.followed == SyncEngine.followsPerTurn && $0.left == 1_024 } → false
+↳     some → false
+↳   false → <not evaluated>
+✘ Test "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" recorded an issue with 1 argument handles → 2 at VerifyC5CorrectProbes.swift:312:9: Expectation failed: (turns.map(\.ms).max() ?? 0) <= 10.0
+↳ handles=2: [27.154292, 112.181291, 79.963625]
+↳ (turns.map(\.ms).max() ?? 0) <= 10.0 → false
+↳   (turns.map(\.ms).max() ?? 0) → 112.181291
+✘ Test "PROBE-C5-SWEEP-MAX: a sweep turn at all three bounds during an owed follow stays within C2" with 2 test cases failed after 19.499 seconds with 4 issues.
+✘ Suite "VerifyC5CorrectProbes" failed after 87.578 seconds with 8 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 5, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C5-SWEEP-TURNS: `count` prefetch members alternating 400 and 3,000 bytes (`handles` prefetch handles over the
+↳ /// same ids) wait `awaitingSpace` for a pruned 2,000-byte blob with 100 bytes of room; a forced sync changes every
+↳ /// member's content and the follow's follow-ups are held after its first turn (the follow owes its visits). The space
+↳ /// sweep's follow-ups are held. The deletion grace ends: the alarm reaps the blob and runs its `.reclaimed` sweep (the
+↳ /// first turn, counted, not timed). Every later sweep turn is then run directly on the actor (`releaseSpaceSweepFollowUps`
+↳ /// re-arming the hold in the same turn), timed with `ContinuousClock`, and the jobs it followed are counted (jobs that
+↳ /// hold a moved id before minus after). Requirement: every sweep turn follows at most `followsPerTurn` jobs and takes at
+↳ /// most C2's 10 ms; at the end every member left `awaitingSpace` and holds its new content.
+✘ Test run with 2 tests in 1 suite failed after 87.578 seconds with 8 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+ 3:33  up 4 days, 15:56, 2 users, load averages: 524.52 310.37 178.20

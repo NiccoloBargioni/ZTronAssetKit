@@ -1,0 +1,18 @@
+◇ Test run started.
+PROBE2 iteration 0: reaped 17+17, rescued 14, left 14
+PROBE2 iteration 1: reaped 17+16, rescued 15, left 15
+PROBE2 iteration 2: reaped 18+18, rescued 12, left 12
+PROBE2 iteration 3: reaped 18+17, rescued 13, left 13
+PROBE2 iteration 4: reaped 17+16, rescued 15, left 15
+PROBE2 iteration 5: reaped 17+16, rescued 15, left 15
+PROBE2 iteration 6: reaped 18+17, rescued 13, left 13
+PROBE2 iteration 7: reaped 18+18, rescued 12, left 12
+PROBE2 iteration 8: reaped 16+16, rescued 16, left 16
+PROBE2 iteration 9: reaped 17+17, rescued 14, left 14
+PROBE2 iteration 10: reaped 18+18, rescued 12, left 12
+PROBE2 iteration 11: reaped 18+17, rescued 13, left 13
+PROBE2 iteration 12: reaped 17+16, rescued 15, left 15
+PROBE2 iteration 13: reaped 17+16, rescued 15, left 15
+PROBE2 iteration 14: reaped 18+17, rescued 13, left 13
+PROBE2 iteration 15: reaped 18+17, rescued 13, left 13
+✔ Test run with 1 test in 1 suite passed after 45.004 seconds.

@@ -1,0 +1,82 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "C2 / ruling R4 (lens item 5): apply's eviction hook over a large plan at 10,000 records. Needs an orchestrator decision; WP-C's part is done.",
+  "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:157-189 (performApplyEviction, one synchronous turn inside apply's write fence, called from WP-B's Store/AssetStore+Apply.swift); docs/adr-drafts/c.md CCR-3 cycle-6 paragraph (Contract change requests) and C-22 cycle 6 (2) (about lines 733-752); Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift:924-940 and the hook lines of applyEvictionStretch (recorded, not asserted).",
+  "problem": "R4 in l3-rulings.md says every cleanup path holds the store actor \u2264 10 ms at 10,000 records. BenchCleanup, release, idle host (run 2, 13:58\u201314:00, load 18\u21925):\n- hook over a plan of all 10,000 blobs: 13.895833 ms of thread CPU (WP-B's setResidency of the same victims alone: 8.799792 ms);\n- hook over a plan of half after an apply bound an alias to half its blobs: 10.639292 ms (max of runs 10.938292). Here a plan of only 5,000 blobs already breaks the limit;\n- hook over a plan of half: 7.153625 ms;\n- at 100,000: 91.60 ms (50,000 blobs) and 177.22 ms (100,000 blobs).\n\nRun 1 (load 12\u21926) gave single-sample figures of 13.03 ms for 5,000 blobs and 19.50 ms for 10,000.\n\nBoth plan shapes are reachable through the engine's evictionPlan(toFree:) followed by apply(manifest, eviction: plan): a large sync on a full device, or a manifest that adds aliases of planned blobs. c.md documents the threshold (about 7,000 blobs, about 5,000 with aliases), but l3-rulings.md still decides none of the three options for CCR-3. WP-C cannot close this while the hook runs in one turn inside WP-B's fence.",
+  "fix": "Orchestrator, before merge, choose one:\n- (a) approve CCR-3: WP-B passes the plan to the hook in chunks of AssetStore.evictionChunk records, cut at blob boundaries behind its fence, and yields between chunks;\n- (b) have WP-F cap each apply's eviction plan at about 4,000\u20134,500 blobs, leaving the rest to evictIfNeeded's chunks. 5,000 is not enough: the aliased half-plan case is 10.64 ms;\n- (c) record an explicit exception to R4.\n\nAfter (a), WP-C replaces the recorded hook lines in BenchCleanup with per-chunk figures (best of \u2265 3, as holdsAfterBinding does) and asserts them \u2264 10 ms."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "C2 / R4 at 10,000 records: one blob that many ids share is evicted (or purged) in one turn",
+  "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:110-117 (a chunk ends only at a blob boundary) and :303-305 (setResidency for every victim of the blob in one turn); StorePurge chunking at blob boundaries; BenchCleanup.swift sharedBlobHolds (the 'one blob 10,000 ids share' line is recorded only); docs/adr-drafts/c.md C-22 cycle 6 (3), which calls the residual 'inherent'.",
+  "problem": "Idle release run: eviction of one blob that 10,000 ids share took 15.367708 ms of thread CPU (max of runs 15.573666); run 1 gave 15.318833 ms. The previous review measured purge(.evictable) of the same shape at 13.43 ms.\n\nThis is a 10,000-record store over the 10 ms limit. At about 1.5 \u00b5s per holder, any blob with more than about 6,500 holders crosses the limit.\n\nThe residual follows from C-1's all-or-nothing choice, not from necessity. evict already has a .stillReferenced outcome (C-3) for records that leave while their blob stays live, so a blob's holders could leave across yields.",
+  "fix": "Orchestrator: record an explicit R4 exception for blobs with more than about 6,500 holders, or ask WP-C to chunk a single blob's holders (about evictionChunk records per turn, re-validating each chunk and stopping on a failed one, which accepts C-3's partial .stillReferenced outcome). In either case, amend C-22 (3) so that it no longer calls the residual inherent."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "TSan headroom of the shared Storage bundle (WP-H's test, carried; no data race)",
+  "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift:400 ('start racing stop', .timeLimit 1 min); TSan step of Scripts/verify.sh --full",
+  "problem": "My TSan run (13:46:33\u201313:52:34; load rose from 8 to 95.6 because another agent's simulator was running): 'Test run with 433 tests in 58 suites passed after 322.612 seconds', 0 ThreadSanitizer lines. The race passed after 40.850 s, which leaves only 32% headroom against its 60 s limit. Previous cycles failed it at load 15\u201320. wp/c does not touch this file.",
+  "fix": "Orchestrator and WP-H: run the sanitizer step on an idle host, one agent at a time, or split the race's 400 rounds into parameterized cases, each with its own limit. Every assertion stays. No WP-C change."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "Phase 3 liveness under access stamps and the WP-F handoff (carried, re-measured)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift (phase 3 returns undecided when every pass is interrupted); docs/adr-drafts/c.md C-24 and OI-6; ARCHITECTURE RE-S29 and \u00a74.7 (orchestrator)",
+  "problem": "In both benchmark runs, 3 of 3 runs at 10,000 files ended with 'finished: false' after 3 last calls (16,725\u201316,893 stamps), and so did the 100,000-file run (16,047 stamps). The holds stay small: 3.03 ms at 10,000 and 7.43 ms at 100,000. RE-S29 and \u00a74.7 are still not amended to call again while !finished.",
+  "fix": "Orchestrator with WP-F, before L4: amend RE-S29 and \u00a74.7 so the caller keeps calling migrateLegacy while !progress.finished, backing off when a call returns remaining == 0 && !finished. Alternatively take C-24's CCR: a WP-B serial bumped only by mutations that reduce presence."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "Carried orchestrator items (re-measured)",
+  "location": "docs/adr-drafts/c.md OI-5, OI-7, OI-9, OI-11, OI-12, OI-13, OI-14; docs/ARCHITECTURE.md \u00a71.2, \u00a711 (R-CLN-8), \u00a712.2 (S2-06), \u00a714; .build-orchestrator/l3-rulings.md",
+  "problem": "- **OI-5:** Migration/LiveLegacyDefaults.swift still has 3 of 14 lines covered (21.43%). It is the only WP-C file below 90%; the gap is deliberate.\n- **OI-7:** \u00a71.2 still does not list BenchCleanup.swift.\n- **OI-9 at 100,000 assets** (idle run), assigned to Stage 3 by l3-rulings:\n  - dry run 38.61 ms (30.75 ms protecting)\n  - quota eviction of half 21.19 ms\n  - purge(.all) of the rest 22.99 ms\n  - full-store purges 33.79 / 33.78 ms\n  - orphan GC of 100,000 orphans 18.42 ms\n  - first records copy 9.31 ms (14.94 ms under load)\n  - WP-B reaper queue 22.89 ms\n  - legacy batch of 500 14.10 ms\n  - setResidency of 100,000 alone 126.51 ms\n- **OI-13:** not reproduced. WP-A's 84 tests passed in --quick and on the simulator.\n- **OI-11 (a)/(b), OI-12, OI-14** (the residual over-eviction when an apply that prunes overlaps, via WP-B's release path): still need a ruling or routing.",
+  "fix": "Orchestrator at merge, as l3-rulings.md assigns:\n- \u00a714 to '11 of 14 lines uncovered';\n- add BenchCleanup.swift to \u00a71.2;\n- \u00a711 R-CLN-8 credit and a distinct name for WP-F's test;\n- \u00a712.2: name WP-C's test 'R-CLN-4: pending reclaim decides a second eviction\u2026';\n- route OI-9 to Stage 3 with WP-B;\n- tag OI-11 (a)/(b) NEEDS-HUMAN-REVIEW;\n- route OI-12, OI-13 and OI-14."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "C2 at 10,000 records (ruling R4) / CCR-3: apply's eviction hook. Its cost follows victims (records), not blobs. Merge-gating decision for the orchestrator.",
+  "location": "Sources/ZTronAssetStorage/Eviction/QuotaEviction.swift:157 (performApplyEviction, one turn inside apply's fence) and :285-301 (evict's multi-victim branch, which still copies records whole); docs/adr-drafts/c.md:743-748 (C-22 cycle 6 (2)) and :944-946 (CCR-3 cycle 6: 'about 7,000 blobs', cap 'about 5,000 blobs per apply')",
+  "problem": "Thread CPU of the hook, release build, load about 6 (probe ZP6-c2-hook, .build-verify-c-close-correct6/probe/Tests/ZTronAssetKitBenchmarks/ZProbeC2Six.swift):\n- one id per blob, whole store (10,000): 14.04\u201315.70 ms;\n- two ids per blob, whole store (5,000 blobs, 10,000 records): 19.92\u201320.36 ms;\n- two ids per blob, half the store (2,500 blobs, 5,000 records): 10.16\u201310.36 ms.\n\nThe author's CleanupBenchmarks in my run (load 4\u20139):\n- 10,000 blobs: 17.92 ms;\n- 5,000 blobs: 8.23 ms;\n- half after aliases: 10.37 ms.\n\nThe per-record cost (about 2 \u00b5s per record) bounds the hook, not the per-blob cost. c.md's threshold of about 7,000 blobs, and the CCR-3 option of an engine cap of about 5,000 blobs, would therefore still allow 20 ms turns when blobs are shared: 5,000 blobs \u00d7 2 ids already takes 20 ms.\n\nWP-C's share of the shared path is about 4\u00d7 the single path's. The multi-victim branch still reads records through three whole-record copies (allSatisfy referencedBlob, planned.allSatisfy(rules.allows), holders.first \u2192 recordedSize) plus a Dictionary per blob. The single-victim path was cut in cycle 6.\n\nl3-rulings.md still has no decision on CCR-3, a cap or an exception.",
+  "fix": "Orchestrator, before merge (R4 says C2 at 10,000 records is mandatory): approve CCR-3 (WP-B chunks the plan behind its fence), or cap plans in WP-F by victims/records (at most about 4,500 per apply), or record an exception to R4.\n\nWP-C, non-blocking:\n- Restate the threshold in C-22 cycle 6 (2) and CCR-3 in records (victims), with these shared-blob figures.\n- Optionally read the multi-victim branch in place, as the single path does: EvictionOrder.stillEvictable per victim, then holders(of:known:scan:).count == unique victim ids, with bytes from the first stillEvictable.\n\nI checked that sketch in a scratch copy. The ratio of shared-blob to single-blob hook time fell from 1.42 to 1.08, and half the store with 2 ids per blob measured 9.45 ms (best). The Storage bundle passed with it: 443/443, including my 10 probes. Whole-store plans stay above 10 ms either way, which is why the orchestrator decision is still required."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness (R-CLN-4; C-2 cycle 6, R13 amendment, OI-14): a quarantine during a maintenance eviction is not counted toward its need",
+  "location": "Sources/ZTronAssetStorage/Integrity/IntegrityBookkeeping.swift:44-58 (quarantine(blob:known:scan:) dooms through setResidency(..., dooming: .corrupt) without touching EvictionState.releasedBytes). Writers of releasedBytes: QuotaEviction.swift:311 and StorePurge.swift:135 only. docs/adr-drafts/c.md:52-76 (C-2 cycle 6) and :1136-1142 (OI-14: 'count ... only when WP-C releases them (eviction, apply's plan, purge)').",
+  "problem": "Probe ZP6-overlap-quarantine (.build-verify-c-close-correct6/probe/Tests/ZTronAssetStorageTests/ZProbes6/ZProbes6.swift; debug; stepped bulk executor):\n- Setup: 12 assets of 100 bytes, budget 600, target 540.\n- evictIfNeeded measures used 1,200, so its need is 660.\n- While its candidates unit is held, reportUnreadable(v11) quarantines the most recent asset. Its blob is doomed as corrupt, so used drops to 1,100.\n- The run still evicts 7 blobs (result 700 bytes, 7 files).\n\nA fresh measurement after the quarantine needs 560, i.e. 6 blobs. One extra asset is evicted and must be downloaded again.\n\nThe same applies to deep verification's quarantine and recordIntegrityFailure, all in WP-C's own files. The excess is bounded by the quarantined bytes, the same residual class as OI-14. C-2 and OI-14 describe WP-C's release paths as covered without naming quarantine.",
+  "fix": "Failing test first: the probe's timeline in EvictionOverlapTests, expecting 6 evicted.\n\nThen, in quarantine(blob:known:scan:), add the blob's bytes to state.eviction.releasedBytes in the turn the blob becomes doomed. For example, after the loop: if the blob is now .doomed, add the recorded size read before the first setResidency.\n\nAlternatively, record quarantine next to OI-14 as an accepted residual and amend C-2 and the R13 row to name it."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "TSan headroom of the shared Storage bundle (WP-H's test; carried, re-measured; no data race)",
+  "location": "Tests/ZTronAssetStorageTests/TestSupport/LoopbackHTTPServerTests.swift (start racing stop, .timeLimit 1 min); TSan step",
+  "problem": "This run (13:35:57\u201313:41:08, load 7\u201312):\n- 'Test run with 433 tests in 58 suites passed after 229.692 seconds'\n- 0 ThreadSanitizer lines\n- 'start racing stop' passed after 42.800 s, about 29% headroom against its 60 s limit.\n\nThis is unchanged since earlier cycles, and wp/c does not touch the file.",
+  "fix": "Orchestrator and WP-H, as already routed: run the sanitizer step on an idle host, one agent at a time, or split the race's rounds into parameterised cases with their own limits. No WP-C change."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "Phase-3 liveness under access stamps (carried; OI-6 / RE-S29 / \u00a74.7)",
+  "location": "Sources/ZTronAssetStorage/Migration/LegacyPhases.swift:445-468 (legacyEntriesPresent returns nil after checkPasses interrupted passes); docs/adr-drafts/c.md OI-6, C-24",
+  "problem": "The author's CleanupBenchmarks in release (my run, 13:42\u201313:45):\n- at 10,000 files, 3 of 3 runs ended 'finished: false' after 3 last calls (17,442\u201318,917 stamps);\n- at 100,000 files: 19,279 stamps, 'finished: false'.\n\nThe holds stay small: 3.07 ms and 7.82 ms. The WP-F handoff (call again while !finished, with backoff) is still not in ARCHITECTURE.",
+  "fix": "Orchestrator with WP-F, as already recorded: amend RE-S29 and \u00a74.7 to call again while !progress.finished, backing off when remaining == 0 && !finished. Alternatively take C-24's mutation-serial CCR."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "Carried orchestrator items (re-measured)",
+  "location": "docs/adr-drafts/c.md OI-4, OI-5, OI-7, OI-9, OI-11, OI-12, OI-14; docs/ARCHITECTURE.md:877 (\u00a714), \u00a71.2",
+  "problem": "- **OI-5:** LiveLegacyDefaults.swift is 3 of 14 lines covered (21.43%); \u00a714 still says '3 lines'.\n- **OI-7:** BenchCleanup.swift is not named anywhere in ARCHITECTURE.md.\n- **OI-4:** resolved at 10,000 (dry run 3.00 / 2.67 ms in the benchmark). At 100,000 the dry run is 42.78 ms (protecting every other id 35.19), recorded.\n- **OI-9 at 100,000** (my run, load 4\u20139):\n  - WP-B grace start 74.90 ms (wall)\n  - reaper queue 27.40\n  - first records copy 6.31 (worst 14.32)\n  - quarantine hold 15.36\n  - eviction of half 22.63\n  - purge(.all) of the rest 24.95\n  - full-store purges 35.48 / 34.60\n  - orphan GC of 100,000 orphans 18.67\n  - hook over 50,000 / 100,000 blobs 104.42 / 181.96\n  - legacy batch of 500: 15.45\n- **OI-11, OI-12, OI-14:** unchanged.\n- **OI-13:** not reproduced. ZTronAssetModelTests passed in --quick (84 tests) and on the simulator.",
+  "fix": "Orchestrator at merge, as already assigned:\n- \u00a714 to '11 of 14 lines uncovered';\n- add BenchCleanup.swift to \u00a71.2;\n- route OI-9 to Stage 3 with WP-B;\n- tag OI-11 (a)/(b) NEEDS-HUMAN-REVIEW with R5's deviations;\n- route OI-12 and OI-14 to WP-B."
+ }
+]

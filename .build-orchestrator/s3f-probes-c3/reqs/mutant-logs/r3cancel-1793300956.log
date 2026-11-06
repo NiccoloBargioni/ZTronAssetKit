@@ -1,0 +1,76 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[8 / 12] ZTronAssetSync
+[10 / 13] ZTronAssetKit
+[11 / 12] ZTronAssetCompatibilityTests-product
+[13 / 13] ZTronAssetCompatibilityTests-product
+[14 / 15] ZTronAssetKitBenchmarks-product
+[17 / 18] ZTronAssetKitTests-product
+[20 / 21] ZTronAssetSyncTests-product
+[22 / 22] ZTronAssetSyncTests-product
+Build complete! (5,69 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine failure paths" started.
+◇ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" started.
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:105:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:135:9: Expectation failed: (try? answer.get()) != nil
+↳ the next attempt delivered: failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? answer.get()) != nil → <not evaluated>
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:136:9: Expectation failed: await harness.source.starts.count == 2
+↳ re-queued once, at once
+↳ await harness.source.starts.count == 2 → <not evaluated>
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:146:9: Expectation failed: after.retries == FailureCounts()
+↳ no retry was counted: FailureCounts(offline: 0, transient: 1, serverError: 0, throttled: 0, notFound: 0, authentication: 0, integrity: 0, insufficientSpace: 0, rejected: 0, storage: 0)
+↳ after.retries == FailureCounts() → false
+↳   after.retries → FailureCounts(offline: 0, transient: 1, serverError: 0, throttled: 0, notFound: 0, authentication: 0, integrity: 0, insufficientSpace: 0, rejected: 0, storage: 0)
+↳     offline → 0
+↳     transient → 1
+↳     serverError → 0
+↳     throttled → 0
+↳     notFound → 0
+↳     authentication → 0
+↳     integrity → 0
+↳     insufficientSpace → 0
+↳     rejected → 0
+↳     storage → 0
+↳   FailureCounts() → FailureCounts(offline: 0, transient: 0, serverError: 0, throttled: 0, notFound: 0, authentication: 0, integrity: 0, insufficientSpace: 0, rejected: 0, storage: 0)
+↳     offline → 0
+↳     transient → 0
+↳     serverError → 0
+↳     throttled → 0
+↳     notFound → 0
+↳     authentication → 0
+↳     integrity → 0
+↳     insufficientSpace → 0
+↳     rejected → 0
+↳     storage → 0
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:154:9: Expectation failed: !record.states.contains { $0.kind == .failed }
+↳ the job never failed or waited for a backoff: [ZTronAssetSync.JobState.queued, ZTronAssetSync.JobState.downloading, ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1012051096ns))]
+↳ !record.states.contains { $0.kind == .failed } → <not evaluated>
+↳   record.states.contains { $0.kind == .failed } → <not evaluated>
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:155:9: Expectation failed: record.attempts == 0
+↳ no attempt was counted against the retry cap: 1
+↳ record.attempts == 0 → false
+↳   record.attempts → 1
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" recorded an issue at EnginePublicationRefusalTests.swift:156:9: Expectation failed: record.retries == 0
+↳ no retry deadline was scheduled
+↳ record.retries == 0 → false
+↳   record.retries → 6
+✘ Test "R-NET-6: a transfer cancelled by the client without the engine asking is re-queued at once and its next attempt delivers" failed after 64.002 seconds with 7 issues.
+↳ /// A transfer the transport reports cancelled by the client although the engine cancelled nothing (an app extension,
+↳ /// a cancelled task the engine did not own) is no failure (T7/T13): the job is re-queued at once, with no backoff and
+↳ /// no failure counted, and its next attempt delivers the asset. A condition observer, called at every notification,
+↳ /// records the job's states, counted attempts and retry deadline: it never waits `failed(.at)` for a backoff, never
+↳ /// counts the attempt and never has a retry scheduled (a cancel treated as the system's, retried with backoff,
+↳ /// passed every other check: the close-out cycle-2 requirements lens).
+✘ Suite "Engine failure paths" failed after 64.002 seconds with 7 issues.
+↳ /// Failure paths of ARCHITECTURE §7.6 and §7.7, reconcile-time job changes (T21, T22), the manifest deadline,
+↳ /// launch reconciliation and a store that cannot open.
+✘ Test run with 1 test in 1 suite failed after 64.002 seconds with 7 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

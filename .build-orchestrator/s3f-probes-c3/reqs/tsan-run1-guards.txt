@@ -1,0 +1,28 @@
+  194.17s / Nones     ? failed                                               R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as j
+  106.03s / Nones     ? passed                                               R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subject du
+   84.63s / Nones     ? passed                                               R-SYN-6: the seeded gate walks with one slot reserved for user-initiated work, so jobs wait in 
+   84.05s / Nones     ? passed                                               R-SYN-6: seeded walks over clock moves, held alarm turns, probe outcomes, 429s and space events
+   82.71s / Nones     ? passed                                               R-SYN-2: 10,000 seeded random operations never leave the transition table and keep every engine
+   62.70s / Nones     ? passed                                               R-SYN-3: seeded random releases and re-joins of overlapping handles larger than one release tur
+   48.51s / Nones     ? passed                                               R-SYN-6: a run whose parked claim a re-admission turn still owes a re-queue waits for it instea
+   47.97s / Nones     ? passed                                               R-SYN-14: while a job's adoption holds the last claimed prior-art file the migration loop waits
+   45.84s / Nones     ? passed                                               R-STO-11: ensureAvailable right after start, beside a legacy migration that runs at its own pac
+   45.35s / Nones     ? passed                                               R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that fell d
+   45.03s / Nones     ? passed                                               R-STO-11: a user-initiated prefetch group joined right after start, beside a legacy migration t
+   30.61s / Nones     ? passed                                               R-SYN-15: a shutdown over more waiters and jobs than one turn takes answers every waiter shutDo
+   29.84s / Nones     ? passed                                               R-SYN-2: an apply that moves more jobs than one turn takes follows them a bounded slice per tur
+   26.76s / Nones     ? passed                                               R-SYN-6: one failing asset among 100 never aborts the sync and is listed in the report
+   26.04s / Nones     ? passed                                               R-SYN-2: a 404 for a prefetch member's replaced content before the follow's pass reached it mov
+   25.67s / Nones     ? passed                                               R-SYN-5: when a 429 extends the throttle under more user-initiated waiters than one turn answer
+   23.29s / Nones     ? passed                                               R-SYN-3: never more than maxConcurrentTransfers transfers count as running for every setting 1…
+   23.20s / Nones     ? passed                                               R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per prob
+   21.80s / Nones     ? passed                                               R-STO-13: during legacy migration a bulk sync whose jobs adopt 100 prior-art files installs onl
+   21.29s / Nones     ? passed                                               R-SYN-6: with the default tuning, a run does not download an asset the store holds present afte
+   21.03s / Nones     ? passed                                               R-SYN-3: lane queues stay within twice their live entries while queued jobs move between lanes
+   20.78s / Nones     ? passed                                               R-SYN-4: the transfer is cancelled only after the last of 100 callers cancels
+   20.46s / Nones     ? passed                                               R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and
+   20.45s / Nones     ? passed                                               R-SYN-7: a Low Data Mode flap reported as two conditions elements never leaves a paused prefetc
+   20.17s / Nones     ? passed                                               R-SYN-2: no transfer of a replaced content starts after the apply while a bounded follow still 
+   20.15s / Nones     ? passed                                               R-SYN-4: 100 callers on one asset with seeded random cancellations share one transfer and each 
+   20.10s / Nones     ? passed                                               R-SYN-2: a queued user job of an id the apply dropped does not start while the follow still owe
+   20.04s / Nones     ? passed                                               R-SYN-5: prefetch probes that each end without a verdict start no run per probe while the clock

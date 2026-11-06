@@ -1,0 +1,11 @@
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -723,7 +723,7 @@
+                 continue
+             }
+             guard let verdict = self.spaceBlock(job, ahead: ahead) else {
+-                guard requeues < Self.readmissionsPerTurn, self.followFits(job, follows: &follows) else {
++                guard requeues < Self.readmissionsPerTurn else {
+                     self.scheduleSpaceSweepFollowUp(sweep)
+                     break
+                 }

@@ -1,0 +1,24 @@
+--- ../EngineJobs.head.swift	2026-10-30 05:23:40
++++ Sources/ZTronAssetSync/Engine/EngineJobs.swift	2026-10-30 05:41:56
+@@ -778,6 +778,21 @@
+                 parks += 1
+                 continue
+             }
++            if parked.assets.count != job.assets.count, self.spaceBlock(parked, ahead: ahead) == nil {
++                // PROTOTYPE (verifier c6): the follow raised the job's room (an opportunistic reading above the
++                // important one); it fits on the lane the follow left it, so it is re-queued, not parked.
++                guard requeues < Self.readmissionsPerTurn else {
++                    self.scheduleSpaceSweepFollowUp(sweep)
++                    break
++                }
++                if self.transition(transfer, to: .queued) {
++                    self.enqueue(transfer)
++                    ahead = PlanBuilder.adding(ahead, max(0, parked.entry.byteSize ?? 0))
++                    self.state.spaceAdmitted[transfer] = self.state.jobs[transfer]?.ticket
++                    requeues += 1
++                }
++                continue
++            }
+             if let space = self.state.freeSpace {
+                 // The room is computed before the write: the right side of an optional-chained assignment runs inside
+                 // the write's access to `state` (an exclusivity conflict, review of close-out cycle 6).

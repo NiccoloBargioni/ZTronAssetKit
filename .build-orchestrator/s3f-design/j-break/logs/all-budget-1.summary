@@ -1,0 +1,33 @@
+exit=1
+✘ Test "PROBE-D3-PUMP-ABANDON" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:147:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+✘ Test "PROBE-D3-PUMP-ABANDON" with 2 test cases failed after 2.516 seconds with 1 issue.
+✘ Test "PROBE-D-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyDDeferProbes.swift:109:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(nBytes.count)
+✘ Test "PROBE-D-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyDDeferProbes.swift:113:25: Issue recorded
+✘ Test "PROBE-D-PUMP-PROMOTE" with 2 test cases failed after 2.800 seconds with 2 issues.
+✘ Test "PROBE-D3-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:209:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+✘ Test "PROBE-D3-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:210:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+✘ Test "PROBE-D3-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:214:25: Issue recorded
+✘ Test "PROBE-D3-PUMP-PROMOTE" with 2 test cases failed after 1.962 seconds with 3 issues.
+✘ Test "PROBE-D-PUMP-FREED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyDDeferProbes.swift:218:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(kBytes.count)
+✘ Test "PROBE-D-PUMP-FREED" with 2 test cases failed after 2.341 seconds with 1 issue.
+✘ Test "PROBE-D3-PUMP-STALLED-USER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:267:9: Expectation failed: (try? zResult.get())?.byteSize == Int64(zBytes.count)
+✘ Test "PROBE-D3-PUMP-STALLED-USER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:270:25: Issue recorded
+✘ Test "PROBE-D3-PUMP-STALLED-USER" with 2 test cases failed after 1.975 seconds with 2 issues.
+✘ Test "PROBE-D-JOIN-FREED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyDDeferProbes.swift:218:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(kBytes.count)
+✘ Test "PROBE-D-JOIN-FREED" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyDDeferProbes.swift:223:13: Expectation failed: second == .failure(.cancelled) || (try? second.get())?.byteSize == Int64(kBytes.count)
+✘ Test "PROBE-D-JOIN-FREED" with 2 test cases failed after 1.545 seconds with 2 issues.
+✘ Test "PROBE-D3-JOIN-ABANDON" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:324:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(pBytes.count)
+✘ Test "PROBE-D3-JOIN-ABANDON" with 2 test cases failed after 1.252 seconds with 1 issue.
+✘ Test "PROBE-D2-GATE-ABANDON" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:251:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+✘ Test "PROBE-D2-GATE-ABANDON" with 2 test cases failed after 1.660 seconds with 1 issue.
+✘ Test "PROBE-D3-READ-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:373:25: Issue recorded
+✘ Test "PROBE-D3-READ-PROMOTE" with 2 test cases failed after 1.453 seconds with 1 issue.
+✘ Test "PROBE-D2-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:322:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(pBytes.count)
+✘ Test "PROBE-D2-PUMP-PROMOTE" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:326:25: Issue recorded
+✘ Test "PROBE-D2-PUMP-PROMOTE" with 2 test cases failed after 1.386 seconds with 2 issues.
+✘ Test "PROBE-D3-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:422:9: Expectation failed: (try? aResult.get())?.byteSize == Int64(nBytes.count)
+✘ Test "PROBE-D3-TICKET" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignD3Probes.swift:423:9: Expectation failed: (try? kResult.get()) == nil
+✘ Test "PROBE-D3-TICKET" with 2 test cases failed after 1.008 seconds with 2 issues.
+✘ Test "PROBE-D2-READ-ORDER" recorded an issue with 1 argument visit → .sweepFollowsFirst at DesignBudgetProbes.swift:386:25: Issue recorded
+✘ Test "PROBE-D2-READ-ORDER" with 2 test cases failed after 0.795 seconds with 1 issue.
+✘ Test run with 29 tests in 7 suites failed after 10.400 seconds with 19 issues.

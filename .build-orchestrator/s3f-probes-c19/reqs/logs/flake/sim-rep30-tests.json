@@ -1,0 +1,620 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "6BE15CAF-7E02-4060-9338-9DAC025EDF0B",
+      "deviceName" : "iPhone 18 Pro Max",
+      "modelName" : "iPhone 18 Pro Max",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "children" : [
+                    {
+                      "children" : [
+                        {
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.8532078266143799,
+                          "name" : "Repetition 1",
+                          "nodeIdentifier" : "1",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.8962440490722656,
+                          "name" : "Repetition 2",
+                          "nodeIdentifier" : "2",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.6440229415893555,
+                          "name" : "Repetition 3",
+                          "nodeIdentifier" : "3",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.3834810256958008,
+                          "name" : "Repetition 4",
+                          "nodeIdentifier" : "4",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,9s",
+                          "durationInSeconds" : 0.9027979373931885,
+                          "name" : "Repetition 5",
+                          "nodeIdentifier" : "5",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,67s",
+                          "durationInSeconds" : 0.6658792495727539,
+                          "name" : "Repetition 6",
+                          "nodeIdentifier" : "6",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,94s",
+                          "durationInSeconds" : 0.9385101795196533,
+                          "name" : "Repetition 7",
+                          "nodeIdentifier" : "7",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.2748949527740479,
+                          "name" : "Repetition 8",
+                          "nodeIdentifier" : "8",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,95s",
+                          "durationInSeconds" : 0.9542078971862793,
+                          "name" : "Repetition 9",
+                          "nodeIdentifier" : "9",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "children" : [
+                            {
+                              "name" : "Expectation failed: started.first == n.transferID\nstarted.first → c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d\nn.transferID → c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb: N, queued at P's visit, starts before the members the follow-up re-queues (visit-first): [c-cd9e41e86726f95cddb4d3a113dab18468065d2541ed12a28c44bae1e351318d, c-d2d5570fbc4b2bea8b5dd91e820a443881d9f7573a11d5c58fadacb46b1fdfc1, c-72c7c67fb949140c2d85824e93fc4c3ccc9f7b01ac8306ac9c41eee5e4cd9ecb]",
+                              "nodeType" : "Failure Message",
+                              "sourceLocation" : {
+                                "filePath" : "/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierReplayTests.swift",
+                                "lineNumber" : 92
+                              }
+                            }
+                          ],
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.2166659832000732,
+                          "name" : "Repetition 10",
+                          "nodeIdentifier" : "10",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Failed"
+                        },
+                        {
+                          "duration" : "1 s",
+                          "durationInSeconds" : 1.1101219654083252,
+                          "name" : "Repetition 11",
+                          "nodeIdentifier" : "11",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,8s",
+                          "durationInSeconds" : 0.800774097442627,
+                          "name" : "Repetition 12",
+                          "nodeIdentifier" : "12",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,89s",
+                          "durationInSeconds" : 0.8903160095214844,
+                          "name" : "Repetition 13",
+                          "nodeIdentifier" : "13",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,72s",
+                          "durationInSeconds" : 0.7217099666595459,
+                          "name" : "Repetition 14",
+                          "nodeIdentifier" : "14",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,75s",
+                          "durationInSeconds" : 0.7528021335601807,
+                          "name" : "Repetition 15",
+                          "nodeIdentifier" : "15",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,68s",
+                          "durationInSeconds" : 0.6824309825897217,
+                          "name" : "Repetition 16",
+                          "nodeIdentifier" : "16",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,68s",
+                          "durationInSeconds" : 0.6811389923095703,
+                          "name" : "Repetition 17",
+                          "nodeIdentifier" : "17",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,74s",
+                          "durationInSeconds" : 0.7437789440155029,
+                          "name" : "Repetition 18",
+                          "nodeIdentifier" : "18",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,92s",
+                          "durationInSeconds" : 0.9239468574523926,
+                          "name" : "Repetition 19",
+                          "nodeIdentifier" : "19",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,89s",
+                          "durationInSeconds" : 0.8865048885345459,
+                          "name" : "Repetition 20",
+                          "nodeIdentifier" : "20",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,83s",
+                          "durationInSeconds" : 0.8349049091339111,
+                          "name" : "Repetition 21",
+                          "nodeIdentifier" : "21",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,76s",
+                          "durationInSeconds" : 0.7590839862823486,
+                          "name" : "Repetition 22",
+                          "nodeIdentifier" : "22",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,83s",
+                          "durationInSeconds" : 0.8255159854888916,
+                          "name" : "Repetition 23",
+                          "nodeIdentifier" : "23",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,73s",
+                          "durationInSeconds" : 0.7325489521026611,
+                          "name" : "Repetition 24",
+                          "nodeIdentifier" : "24",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6155240535736084,
+                          "name" : "Repetition 25",
+                          "nodeIdentifier" : "25",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.614429235458374,
+                          "name" : "Repetition 26",
+                          "nodeIdentifier" : "26",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,63s",
+                          "durationInSeconds" : 0.6262722015380859,
+                          "name" : "Repetition 27",
+                          "nodeIdentifier" : "27",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6238181591033936,
+                          "name" : "Repetition 28",
+                          "nodeIdentifier" : "28",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6176719665527344,
+                          "name" : "Repetition 29",
+                          "nodeIdentifier" : "29",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,63s",
+                          "durationInSeconds" : 0.6289949417114258,
+                          "name" : "Repetition 30",
+                          "nodeIdentifier" : "30",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=87442379a77e3626f6a0c20df3df24d6feba00461354fcaa0cc9ce2f768796a6",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        }
+                      ],
+                      "details" : "29/30 (96%) passed, 1/30 (3%) failed",
+                      "name" : ".followVisitedFirst",
+                      "nodeType" : "Arguments",
+                      "result" : "Failed"
+                    },
+                    {
+                      "children" : [
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6170899868011475,
+                          "name" : "Repetition 1",
+                          "nodeIdentifier" : "1",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,64s",
+                          "durationInSeconds" : 0.6416678428649902,
+                          "name" : "Repetition 2",
+                          "nodeIdentifier" : "2",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,63s",
+                          "durationInSeconds" : 0.6281120777130127,
+                          "name" : "Repetition 3",
+                          "nodeIdentifier" : "3",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,64s",
+                          "durationInSeconds" : 0.6356430053710938,
+                          "name" : "Repetition 4",
+                          "nodeIdentifier" : "4",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6179358959197998,
+                          "name" : "Repetition 5",
+                          "nodeIdentifier" : "5",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6234021186828613,
+                          "name" : "Repetition 6",
+                          "nodeIdentifier" : "6",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6193761825561523,
+                          "name" : "Repetition 7",
+                          "nodeIdentifier" : "7",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6217069625854492,
+                          "name" : "Repetition 8",
+                          "nodeIdentifier" : "8",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6070730686187744,
+                          "name" : "Repetition 9",
+                          "nodeIdentifier" : "9",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6079709529876709,
+                          "name" : "Repetition 10",
+                          "nodeIdentifier" : "10",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6108062267303467,
+                          "name" : "Repetition 11",
+                          "nodeIdentifier" : "11",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6087770462036133,
+                          "name" : "Repetition 12",
+                          "nodeIdentifier" : "12",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6070170402526855,
+                          "name" : "Repetition 13",
+                          "nodeIdentifier" : "13",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6100120544433594,
+                          "name" : "Repetition 14",
+                          "nodeIdentifier" : "14",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6086020469665527,
+                          "name" : "Repetition 15",
+                          "nodeIdentifier" : "15",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,64s",
+                          "durationInSeconds" : 0.6375279426574707,
+                          "name" : "Repetition 16",
+                          "nodeIdentifier" : "16",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6119751930236816,
+                          "name" : "Repetition 17",
+                          "nodeIdentifier" : "17",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.606276273727417,
+                          "name" : "Repetition 18",
+                          "nodeIdentifier" : "18",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6131510734558105,
+                          "name" : "Repetition 19",
+                          "nodeIdentifier" : "19",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,62s",
+                          "durationInSeconds" : 0.6178300380706787,
+                          "name" : "Repetition 20",
+                          "nodeIdentifier" : "20",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,64s",
+                          "durationInSeconds" : 0.6398172378540039,
+                          "name" : "Repetition 21",
+                          "nodeIdentifier" : "21",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6130011081695557,
+                          "name" : "Repetition 22",
+                          "nodeIdentifier" : "22",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6105530261993408,
+                          "name" : "Repetition 23",
+                          "nodeIdentifier" : "23",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6108229160308838,
+                          "name" : "Repetition 24",
+                          "nodeIdentifier" : "24",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6096389293670654,
+                          "name" : "Repetition 25",
+                          "nodeIdentifier" : "25",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,6s",
+                          "durationInSeconds" : 0.6048531532287598,
+                          "name" : "Repetition 26",
+                          "nodeIdentifier" : "26",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6119101047515869,
+                          "name" : "Repetition 27",
+                          "nodeIdentifier" : "27",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,61s",
+                          "durationInSeconds" : 0.6106200218200684,
+                          "name" : "Repetition 28",
+                          "nodeIdentifier" : "28",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,63s",
+                          "durationInSeconds" : 0.6288671493530273,
+                          "name" : "Repetition 29",
+                          "nodeIdentifier" : "29",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        },
+                        {
+                          "duration" : "0,75s",
+                          "durationInSeconds" : 0.7479548454284668,
+                          "name" : "Repetition 30",
+                          "nodeIdentifier" : "30",
+                          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)?args=78506b79362a76d1f385dc78589c2798f1ea2382a14810e594378d02409c92ea",
+                          "nodeType" : "Repetition",
+                          "result" : "Passed"
+                        }
+                      ],
+                      "name" : ".sweepFollowsFirst",
+                      "nodeType" : "Arguments",
+                      "result" : "Passed"
+                    }
+                  ],
+                  "duration" : "0,77s",
+                  "durationInSeconds" : 0.7740365465482076,
+                  "name" : "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)",
+                  "nodeIdentifier" : "EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests/barrierReadmitsBehindTheOwedVisitsPlaces(_:)",
+                  "nodeType" : "Test Case",
+                  "result" : "Failed"
+                }
+              ],
+              "name" : "Engine follow barrier (F-28)",
+              "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests/EngineFollowBarrierTests",
+              "nodeType" : "Test Suite",
+              "result" : "Failed"
+            }
+          ],
+          "name" : "ZTronAssetSyncTests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/ZTronAssetKit/ZTronAssetSyncTests",
+          "nodeType" : "Unit test bundle",
+          "result" : "Failed"
+        }
+      ],
+      "name" : "ZTronAssetKit",
+      "nodeType" : "Test Plan",
+      "result" : "Failed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

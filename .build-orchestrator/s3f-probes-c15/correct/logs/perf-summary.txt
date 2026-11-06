@@ -1,0 +1,8 @@
+Build complete! (151,54 s)
+P-13 reclaim of 10000 blobs: 0.640354125 s in 514 units, unit max 12.155375 ms (p50 0.962833 ms, p95 0.992667 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.045292 ms, p99 0.067166 ms, max 0.355333 ms; unit on-CPU max 1.001041 ms; units over the batch budget: ["5.756375 ms wall, 0.507375 ms on CPU", "7.355334 ms wall, 0.675084 ms on CPU", "6.261334 ms wall, 1.001041 ms on CPU", "12.155375 ms wall, 0.835292 ms on CPU", "5.256083 ms wall, 0.8035 ms on CPU"]; blob unlinks inside the reclaim: max 11.541916 ms, 5 over 4.0 ms [5.399417, 6.854, 5.419417, 11.541916, 4.583]
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.220 seconds with 1 issue.
+✘ Suite "StorageBenchmarks" failed after 8.986 seconds with 1 issue.
+✘ Suite ZTronAssetKitBenchmarks failed after 251.236 seconds with 1 issue.
+✘ Test run with 44 tests in 8 suites failed after 251.236 seconds with 1 issue.
+exit=1

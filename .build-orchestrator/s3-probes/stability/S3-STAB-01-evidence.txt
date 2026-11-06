@@ -1,0 +1,39 @@
+S3-STAB-01 evidence (phaseFourStopsListing). Loads are 1/5/15-minute load averages at start/end (runs-and-loads.txt).
+
+== Unfixed, TSan, 20 repetitions x 2 cases (load ~75): p4-unfixed-tsan.log
+✘ Test "R-STO-11: phase 4 stops listing the legacy tree after the unit in flight once the caller cancels or the store closes" recorded an issue with 1 argument stop → cancelled at LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2
+↳   listings() → 3
+✘ Test "R-STO-11: phase 4 stops listing the legacy tree after the unit in flight once the caller cancels or the store closes" recorded an issue with 1 argument stop → closed at LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2
+↳   listings() → 3
+✘ Test "R-STO-11: phase 4 stops listing the legacy tree after the unit in flight once the caller cancels or the store closes" recorded an issue with 1 argument stop → cancelled at LegacyEdgeTests.swift:446:9: Expectation failed: listings() == 2
+↳   listings() → 3
+
+== Unfixed, TSan, 100 repetitions x 2 cases (load ~32-35): failures:
+   3 stop → cancelled
+case starts: 200
+
+== Unfixed, debug (no TSan), 100 repetitions x 2 cases (load ~74): failures:
+   1 stop → closed
+case starts: 200
+
+== Fixed (S3-STAB-01-fix-a.diff), debug, 200 repetitions x 2 cases (load ~40): failures 0, case starts 400
+== Fixed, TSan, 200 repetitions x 2 cases (load ~30-33): failures 0, case starts 400
+
+== Replay probe S3-STAB-01.swift, debug (probes-debug.log):
+✘ Test "R-STO-11: (S3-STAB-01) phase 4's stop test counts the root and the unit in flight even when its poll's listing read predates the root's listing" recorded an issue with 1 argument stop → cancelled at S3StabilityLegacyProbes.swift:81:9: Expectation f
+↳ // phaseFourStopsListing's oracle (LegacyEdgeTests.swift:444): fails here with 3.
+↳ the root, then the unit that was in flight; no listing after it
+↳ listings() == 2 → false
+↳   listings() → 3
+✘ Test "R-STO-11: (S3-STAB-01) phase 4's stop test counts the root and the unit in flight even when its poll's listing read predates the root's listing" recorded an issue with 1 argument stop → closed at S3StabilityLegacyProbes.swift:81:9: Expectation fail
+↳ // phaseFourStopsListing's oracle (LegacyEdgeTests.swift:444): fails here with 3.
+↳ the root, then the unit that was in flight; no listing after it
+↳ listings() == 2 → false
+↳   listings() → 3
+
+== Replay probe under TSan, 5 repetitions (probes-tsan.log): failing line counts
+   5 R-CLN-12: (S3-STAB-02) cancelledCollecti at S3StabilityPollProbes.swift:92
+   5 R-CLN-12: (S3-STAB-02) cancelledCollecti at S3StabilityPollProbes.swift:95
+   5 R-CLN-2: (S3-STAB-02) sweepChunksRelease at S3StabilityPollProbes.swift:127
+   5 R-CLN-4: (S3-STAB-02) chunkYieldRevalida at S3StabilityPollProbes.swift:59
+  10 R-STO-11: (S3-STAB-01) phase 4's stop te at S3StabilityLegacyProbes.swift:81

@@ -1,0 +1,14 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineJobs.swift b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+index bb22010..edc3978 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -194,8 +194,8 @@ extension SyncEngine {
+             if after > before {
+                 self.state.metrics.promotions += 1
+             }
+-            self.setPriority(transfer, after)
+             if after < before {
++                self.setPriority(transfer, after)
+                 self.pauseIfRefused(transfer)
+             }
+         case .failed(let disposition):

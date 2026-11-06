@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C15R-AWAIT-WINDOW" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C15R-AWAIT-WINDOW" started.
+PROBE-C15R-AWAIT-WINDOW followVisitedFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C15R-AWAIT-WINDOW" started.
+PROBE-C15R-AWAIT-WINDOW sweepFollowsFirst in the window: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4, published: true)), holdsB: true) heldUnits=0
+PROBE-C15R-AWAIT-WINDOW sweepFollowsFirst after the turn that finds C: (owed: true, c: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.untilEntryChanges)), verdict: Optional(ZTronAssetSync.VerdictAfterFollow(epoch: 4, published: true)), holdsB: true, visited: true)
+PROBE-C15R-AWAIT-WINDOW sweepFollowsFirst a=failure(ZTronAssetModel.AssetError.integrityFailure) b=failure(ZTronAssetModel.AssetError.integrityFailure)
+✔ Test "PROBE-C15R-AWAIT-WINDOW" with 2 test cases passed after 0.878 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 0.878 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.878 seconds.

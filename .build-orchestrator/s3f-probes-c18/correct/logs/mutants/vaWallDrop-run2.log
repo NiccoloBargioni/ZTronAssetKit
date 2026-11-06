@@ -1,0 +1,67 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleFailFastLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAfterDateLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFastLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:224:13: Expectation failed: outcome.throttled
+↳ J's 429 throttles the origin on J's own prefetch lane: O's .retryAfterDateLater answered B (visit-first)
+↳ outcome.throttled → false
+↳   outcome → VerdictLaneOutcome(before: nil, after: nil, b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(31.0))), p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))))
+↳     before → nil
+↳     after → nil
+↳     b → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(31.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(31.0))
+↳         serverUnavailable → (retryAfter: Optional(31.0))
+↳           retryAfter → 31.0
+↳             some → 31.0
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:226:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+↳ J's 429 throttles the origin until its own end only on J's prefetch lane, O's .retryAfterDateLater having answered B (visit-first): before nil, after nil
+↳ outcome.throttledByJ == !ending.keepsB → false
+↳   outcome.throttledByJ → false
+↳   !ending.keepsB → true
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:231:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ P is served J's retry after the throttle: O's .retryAfterDateLater answered B (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" with 20 test cases failed after 33.745 seconds with 3 issues.
+↳ /// A 429 that arrives while another job's verdict waits with a later apply's moved id reads that id's interest on
+↳ /// its lane when the verdict leaves the job alive, and not when the verdict answers it (`verdictLane`; ruling S3-R19
+↳ /// item 1): visited first, v4's visit moved B onto J from O backing off (a user lane, the 429 throttles nothing and
+↳ /// fails J, answering P), or found B answered by O's 404, 429 beyond the caps, timeout at the cap, `Retry-After`
+↳ /// beyond the cap, throttle's fail-fast, offline fail-fast or ENOSPC fail-fast (a prefetch lane, the 429 throttles
+↳ /// the origin until its own end and J's retry serves P). Cycle 17 adds four endings and the assertions on J's own
+↳ /// throttle end and on the answers of B and P; cycle 18 the throttle's fail-fast read 9 s after it, and a
+↳ /// `Retry-After` date read 9 s after its arrival.
+✘ Suite "Engine follow barrier (F-28)" failed after 33.745 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 33.746 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

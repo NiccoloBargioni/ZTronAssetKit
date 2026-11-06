@@ -1,0 +1,28 @@
+id	killed	catcher
+M-S-01	yes	StorePublishTests: R-INT-6 recorded blob hash; R-STO-3 never at final path before verification
+M-S-02	yes	StorePublishTests: R-INT-6 recorded blob hash; R-STO-3 never at final path before verification
+M-S-03	yes	R-CLN-5: a deref during an in-flight install starts its grace only with a later acknowledged install (5 cases)
+M-S-04	yes	StoreOpenTests: R-STO-9 second store on the same root fails with locked
+M-S-05	yes	(storage suite only, incidental) R-CLN-4 quota eviction measured before apply; R-CLN-4 bytes apply's plan dooms while eviction yields
+M-S-06	yes	PurgeTests: R-CLN-6 stamp cleared before selection; R-CLN-6 purge all makes a sync due
+M-S-07	NO	survives Storage (459), Sync (351), Kit (85), Compat (71); probe test kills it
+M-S-08	NO	survives Storage (459), Sync (351), Kit (85), Compat (71); probe test kills it
+M-S-09	yes	EvictionTests: R-CLN-4 essential, pinned, leased and recently accessed assets are never evicted
+M-S-10	yes	IndexCommit state-space: R-STO-4 (169 cases), R-STO-5 (49 cases), R-STO-5 unordered-name survivors
+M-S-11	NO	survives Storage (459), Sync (351), Kit (85), AppleHosted (104), Compat (71); probe test kills it
+M-S-12	yes	StoreCommitTests: R-STO-4 commit order tmp, sync, bin to prev, tmp to bin, root sync
+M-S-13	yes	LegacyMigrationTests: R-STO-11 legacy file whose bytes do not verify is dropped
+M-S-14	yes	LeaseTests: R-CLN-5 every lease on a blob must end before it is deleted
+M-S-15	yes	LeaseTests: R-CLN-5 deref during in-flight install starts grace only with a later acknowledged install (5 cases)
+M-S-16	yes	StoreRecoveryTests: R-CLN-5 launch whose root barrier fails unlinks nothing; R-STO-4 keys doomed only in loaded index.tmp
+M-S-17	yes	NOT by Storage (459 pass); killed only by ZTronAssetSyncTests: R-SYN-10 ensureAvailable downloads a member that an apply evicted before it threw; probe test kills it at storage level
+M-S-18	yes	EvictionTests: R-CLN-4 LRU first, larger first on ties, down to 90 % of budget
+M-S-19	yes	GarbageCollectionTests: R-CLN-3 staging GC removes unowned partials; R-CLN-3 handed-off staged file survives launch GC
+M-S-20	NO	survives Storage (459), Sync (351), Kit (85), Compat (71); probe test kills it
+M-S-21	yes	LaunchReconciliationTests: R-CLN-7 wrong-sized blob makes records needsHeal
+M-S-22	yes	IndexCodecTests: R-STO-4 newer schema, corrupt index.bin or degraded generation makes the load degraded
+M-S-23	yes	IntegrityTests: R-INT-4 deep verification repairs a corrupted resident blob; R-CLN-12 cancelled deep verification
+M-S-24	yes	GarbageCollectionTests: R-CLN-2 orphan whose unlink keeps failing stays doomed with backoff
+M-S-25	yes	(full storage suite) R-STO-4: a degraded fallback deletes no blob listed in the older generation's doomed set
+M-S-26	yes	StoreSnapshotTests: R-STO-13 accesses clamped to now and never moved backwards
+M-S-27	yes	EvictionTests: R-CLN-4 pending reclaim decides a second eviction within the grace window (2 cases)

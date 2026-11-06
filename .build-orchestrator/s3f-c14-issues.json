@@ -1,0 +1,114 @@
+[
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / follow barrier, S3-R16 1(a): a passed publication's mark moves ids a later apply moved during the same publication (new in 4b3dcee/d2fad39)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:677-682 (the mark: once publishedAfterApply, a later apply's pass with publishingSince < apply keeps it), :579-584 (followPassedPublication moves every id holdsIDListedElsewhere finds), :567-568 (followedForVerdict, the same move behind the barrier); EngineDispatch.swift:1206. Probe: .build-orchestrator/s3f-probes-c14/correct/Verify/VerifyC14CorrectProbes.swift `markTwoApplies` (failing line :209)",
+  "problem": "PROBE-C14C-MARK-TWO-APPLIES fails sweep-first 2/2 (logs/all-1.log, all-2.log) and passes visit-first 2/2.\n\nScenario:\n- C (100 kB) is the content of zz-a, zz-b and zz-c, with a user waiter on each.\n- v3 moves zz-b to N (16 B). C's publication begins after v3's apply and is held.\n- v4, applied while the same publication still verifies (follow completed in both orders), moves zz-c to N2 (24 B).\n- C's bytes then fail their checksum.\n\nVisit-first:\n- v3's visit moved zz-b while C downloaded.\n- v4's follow passed C (mark `publishingAtApply`, assets [zz-a, zz-c]).\n- Answers: A integrityFailure, B served 16 B, zz-c's user integrityFailure.\n\nBehind v3's barrier:\n- v3's pass marks C `publishedAfterApply`. After v4's follow the mark is still `publishedAfterApply` with assets [zz-a, zz-b, zz-c].\n- At the failure, `followPassedPublication` moves zz-b and zz-c.\n- zz-c's user is served N2 (`byteSize: 24`) where visit-first answered `integrityFailure`.\n\nThe draft's \"a mark once publishedAfterApply stays so through a later apply's pass\" is the cause. The mark does not say which ids a visit-first engine moved. The fixer's retry test covers only a later apply during a second publication, where a real move cleared the mark.",
+  "fix": "First commit PROBE-C14C-MARK-TWO-APPLIES as a barrier test in both LaneDropVisit orders and show it failing.\n\nThen make the mark carry the ids:\n- At the pass that sets `publishedAfterApply` (publishingSince >= apply), record the ids it found moved (`moved` at EngineFollow.swift:670).\n- A later pass with publishingSince < apply adds nothing.\n- `followPassedPublication` and `followedForVerdict` move only the recorded ids that the copy still lists elsewhere. The others stay and are answered with the publication's outcome, as visit-first's pass left them.\n\nA mutant that moves every listed-elsewhere id must fail the new test. Correct I8 and the 'New, followedForVerdict' inventory row."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / follow barrier, S3-R16 1(a): RR-1's remainder changes answers; a 429 is decided on the wrong lane when the moved interest sits on a job that publishes",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:689 (followedLane's jobs walk: `other.state != .verifying && other.state != .committing`), :358-367 (the `.exhausted`/`.until` decision on that lane); draft docs/adr-drafts/s3f.md 'Residual risks (cycle 14)', RR-1 'Not probed'. Probe: .build-orchestrator/s3f-probes-c14/correct/Verify/VerifyC14CorrectProbes.swift `passedLane` (failing lines :309, :312, :316)",
+  "problem": "PROBE-C14C-PASSED-LANE fails sweep-first 2/2 (logs/all-1.log, all-2.log) and passes visit-first 2/2.\n\nSetup:\n- Interactive `maxRetryAfter` is 30 s; background stays at 3,600 s.\n- C (1 MB, zz-b) runs for P, a prefetch waiter.\n- Y (100 kB, zz-u and zz-y) runs for U (user, zz-u) and Q (prefetch, zz-y).\n- v3 moves zz-u onto C's content.\n- C then gets a 429 with Retry-After 60 s.\n\nVisit-first:\n- v3's visit moved U onto C while Y downloaded, so C was user work.\n- The 429 was `.exhausted`; the origin was not throttled (`throttle: nil`).\n- U and P were answered `serverUnavailable(retryAfter: 60)`.\n\nBehind the barrier:\n- Y verifies at the 429 (publication began after the apply). `followedLane` skips publishing jobs, so C is prefetch work (`cLane: prefetch`).\n- The background policy throttles the origin for 60 s on arrival (`throttle: Optional(60.0)`), and C is parked `throttled(until: 61 s)`.\n- When Y's commit leaves zz-u unbound, U moves onto C. C retries (`cStarts=2`) and serves both U and P 1,000,000 B.\n\nTwo callers get success where visit-first gave an error. The origin also carries a 60 s throttle that visit-first never set. Under S3-R16 item 2, which lane's backoff applies is non-blocking only while item 1 holds; here 1(a) is broken. S3-R17 does not apply: no live gate input changed during the barrier.",
+  "fix": "First commit PROBE-C14C-PASSED-LANE as a barrier test in both orders and show it failing.\n\nThen, in followedLane's jobs walk, do not skip a verifying or committing job whose publication began at or after the apply its owed visit belongs to. Use `other.publishingSince >= (state.followStamps[transfer]?.apply ?? state.appliesFollowed)`, or `other.passedPublishing == .publishedAfterApply`: the same rule `follow` uses at EngineFollow.swift:677-679. Count that job's interests in ids the copy maps to this content, because a visit-first engine visited it while it downloaded.\n\nCorrect RR-1's remainder and I12. The walk stays O(jobs) while a follow is owed: my C2 probe measured `followedLane` at 10,000 owed jobs and 10,000 waiting joins at best 3.50 ms (release)."
+ },
+ {
+  "lens": "correct",
+  "blocking": true,
+  "area": "correctness / follow barrier, S3-R16 1(a) and S3-R17 item 4: a place stamped 'slot free' although an earlier place a visit-first pump started had taken the slot; refused on the stamp's throttle after the live throttle ended",
+  "location": "Sources/ZTronAssetSync/Engine/EngineDispatch.swift:82-92 (freeSlots counts only jobs in flight), EngineJobs.swift:471 (enqueue stamps on `stamp.freeSlots.admit`), EngineDispatch.swift:548-549 (gate refuses on the stamp's throttle); draft 'Cycle 14' finding-8 row ('the verifier's \"less the places stamped ahead of it\" is not needed: a place refused on the throttle takes no slot'). Probe: .build-orchestrator/s3f-probes-c14/correct/Verify/VerifyC14CorrectProbes.swift `stampAhead` (failing line :389)",
+  "problem": "PROBE-C14C-STAMP-AHEAD fails sweep-first 2/2 (logs/ahead-1.log, ahead-2.log) and passes visit-first 2/2.\n\nScenario:\n- Two slots. C (1 MB, held) downloads for user A and holds one.\n- While v3's follow is owed, a user asks for zz-k1 (K1, held when it runs).\n- Then an unknown id's manifest fetch gets a 429 with Retry-After 3 s, which frees no transfer slot.\n- Then a user asks for zz-k2 (K2).\n- The clock passes the throttle's end and C completes.\n\nVisit-first:\n- K1 started at once and took the free slot.\n- K2 was queued with no slot free; the pump gated nothing.\n- After C completed, K2 started on the live gates and was served 20 B.\n\nBehind the barrier:\n- K2's stamp records a user slot free, because K1 had not started. Its view has the throttle in force.\n- The barrier-end pump starts K1, then refuses K2 on its stamp's throttle although the live throttle has ended.\n- K2's caller gets `serverUnavailable(retryAfter: 3.0)` and K2 never starts (`k2Starts=0`).\n\nThis is the wrong SPEC answer for the live state, and visit-first's pump never tried K2 at that instant, so S3-R17 items 2-3 do not cover it. The draft's reasoning holds only for places ahead that were refused. It misses places ahead that a visit-first pump admitted, which a non-transfer 429 (a manifest fetch) lets happen.",
+  "fix": "First commit PROBE-C14C-STAMP-AHEAD as a barrier test in both orders and show it failing.\n\nThen stamp a place only when a visit-first pump had a slot for it after the places given earlier in this barrier. Subtract from `FreeSlots` the places still queued whose own stamp admitted them: a slot was free and their view had no throttle in force, so a visit-first engine started them. When that leaves no slot for the lane, read the place live. A place read live is answered by the live gates, which S3-R17 item 2 accepts.\n\nAlternatively, remove the stamp's throttle refusal under S3-R16 item 3 and ask the orchestrator to authorise the one-to-one change of `barrierGatesTheFollowsNewContentOnTheThrottleAtTheApply` under S3-R17 item 2.\n\n`placeStampsIgnored`, `stampParkLive`, `slotIgnored` and `slotLaneBlind` must stay killed. Correct I1."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "evidence quality: the merged coverage profile reports 0 hits for a line a passing test executes",
+  "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:2083-2092 (unwakeableBreakerParks past `guard !waiting.isEmpty`); Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierAnswerTests.swift:129-132",
+  "problem": "In my coverage run, `llvm-cov show` over the Sync bundle alone and over all 8 bundles both give lines 2083-2092 0 hits. `llvm-profdata show` on the Sync bundle's Swift Testing profraw gives the same: function count 21221, block counts [2150, 3952, 15119, 0].\n\nYet `barrierStartsAVisitsPlaceOnceTheBreakerCloses` passes, and its assertion at :132 can only hold if line 2092 runs. In a copy of that test with a print, the seam returned [\"nothing will re-admit the 2 jobs the breaker parked while it is closed\"] in both orders (logs/unwake-1.log).\n\nSo line-level hit counts from this profile can be falsely zero. Earlier cycles' S3-R16 1(e) '0 hits' findings relied on them. The coverage gate itself is conservative and passes.",
+  "fix": "No WP-F code change, and Scripts/ is frozen. Verifiers and fixers should confirm any '0 hits' claim with a drop-mutant, not the profile alone. Flag this for the orchestrator."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "concurrency / re-entrancy (carried, unproven): a space sweep started inside a drain replay runs a nested drain",
+  "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift sweepSpaceParked; EngineFollow.swift:700-704 (advanceFollowForSpaceSweep \u2192 drainEventsAfterFollow with no re-entry guard), :148-176",
+  "problem": "This is the cycle-13 correctness verifier's item 11. The fixer put it to the orchestrator undone, and cycle 14 does not change it.\n\nI did not reach it with a probe. It needs a run claim parked `insufficientSpace` that the ledger admits while the drain replays, through checkRunSettled's `.read` sweep.\n\nThe timeline stays as cycle 13 reported it: the nested drain applies later events before the rest of the outer batch, and resets `drainingAfterFollow`.",
+  "fix": "As cycle 13 suggested: inside the drain, have `sweepSpaceParked` judge at once (`if state.drainingAfterFollow { judgeSpaceSweep; return }`), or guard `drainEventsAfterFollow` against re-entry. Pair it with a test if a seam can reach it."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "C2 margins (WP-F), load-caused misses in the first benchmark run",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchSync.swift:478 (R-SYN-5 throttle extension) and :531 (R-SYN-11 reclaim during an owed follow, 1 member in 20)",
+  "problem": "First full release run: `\u2718 Test run with 44 tests in 8 suites failed after 241.744 seconds with 3 issues.` Load: 1-minute mean 7.70, min 3.60, max 15.72, n=28, with another verifier active.\n- Throttle extension: runs [15.107042, 21.214333, 46.122583] ms.\n- Reclaim, 1 member in 20, 1 handle: [12.684458, 14.818, 43.474875] ms.\n\nThe same SyncBenchmarks suite re-run alone (load mean 7.16, min 5.62, max 8.75, n=12) passed: `\u2714 Suite \"SyncBenchmarks\" passed after 108.527 seconds.`\n- Throttle extension: best 6.761083 ms.\n- Reclaim, 1 handle: best 6.459333 ms.\n- Reclaim, 2 handles: runs [9.381625, 9.471791, 8.051667], best 8.05 ms against the 10 ms budget (cycle 13: 7.35).\n\nMy C2 probe of the new `followedLane` at 10,000 owed jobs and 10,000 waiting joins measured best 3.499 ms, median 3.708 ms (release).",
+  "fix": "None blocking. The misses were caused by load, and both cleared on the quieter re-run. Record the thin 2-handle reclaim margin; if it crosses 10 ms on an idle host, profile `worldStamp`'s `freeSlots()` per deferred event (new in 4b3dcee)."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "other-wp:b: P-13 batch-duration miss",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249",
+  "problem": "P-13 failed again (`Expectation failed: longest <= batchBudget`) in the full release run, at load mean 7.70. This is the same miss cycles 12 and 13 reported. WP-F's own benchmarks passed on the re-run.",
+  "fix": "None for WP-F; route to WP-B."
+ },
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "S3-R16 1(a) answer difference: a passed publication keeps the interests a visit-first engine moved at the apply (the draft's RR-1 remainder is wrong and unprobed)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFollow.swift:671 (follow's verifying/committing case marks `publishedAfterApply` but leaves the moved ids' interests on the publishing job); Sources/ZTronAssetSync/Engine/EngineFailures.swift:689 (followedLane skips verifying/committing jobs) and :358 (outside the barrier the 429 is decided on `job.lane`); Sources/ZTronAssetSync/Engine/EngineDispatch.swift:1206 (`followPassedPublication` runs only when the passed job's own publication fails); docs/adr-drafts/s3f.md:2739-2742 (RR-1 'what is left': 'changes an answer only through the .exhausted cap \u2026 Not probed'). Probe: .build-orchestrator/s3f-probes-c14/reqs/VerifyC14ReqsProbes.swift; logs: logs/probes-c14r-run{1,2}.log, logs/probes-c14r-fail-{1,2}.log",
+  "problem": "PROBE-C14R-PASSED-LANE and PROBE-C14R-PASSED-FAIL fail the sweep-first order 2/2 and pass visit-first, both behind the barrier and after its drain.\n\nScenario:\n- C (zz-b, 1 MB) downloads for P, a prefetch waiter.\n- Y (zz-u and zz-y, 100 kB) downloads for U and W, user waiters.\n- v3 moves zz-u onto C's content while the follow is owed.\n- Y's download completes after the apply, so its publication begins after the apply, and the follow passes Y while it verifies (mark `publishedAfterApply`).\n\nVisit-first, Y's visit at the apply moved U onto C.\n\n(1) C gets a 429 with Retry-After 60 s (interactive maxRetryAfter 30).\n- Visit-first: C is user work, so `.exhausted`: no throttle, and U and P are answered serverUnavailable(60).\n- Behind the barrier: `followedLane(C)` is prefetch, because Y's interests are skipped while Y verifies. The origin is throttled for 60 s on arrival, and C's retry serves U and P 1 MB each (`cStarts=2`).\n- After the drain the result is the same through `job.lane`.\n\n(2) C gets a 404.\n- Visit-first: U is answered notFound.\n- Sweep-first: U waits on Y. After Y commits, U re-routes to C's content, and a second request for content that just answered 404 serves U (`cStarts=2`).\n\nThe cause is the follow's visit order, not an R1 input or a live gate (S3-R17 item 4). So item 2's 'lane backoff' exception does not apply, because item 1 does not hold.",
+  "fix": "First commit these four cases as barrier tests in both LaneDropVisit orders: the 429 behind the barrier, the 429 after the drain, the 404 behind the barrier and the 404 after the drain. Show them failing.\n\nThen fix the cause. When `follow` passes a verifying or committing job whose publication began after this visit's apply (`publishingSince >= apply`), re-route the interests of its moved ids to their new content at once, as `visit` does for a downloading job. Leave the job's bytes, its ledger entry and its publication untouched: its commit already binds only the ids the copy still maps to it, so R-SYN-11 is unaffected. Then simplify or keep `followPassedPublication` and `followedForVerdict` accordingly, and keep their mutant kills.\n\nAs an alternative, count those interests in every decision that reads C's lane or answers C's interests, behind the barrier and after it. That is wider and harder to get complete.\n\nCorrect RR-1 and the I8, I12 and 'New, followedForVerdict' inventory rows."
+ },
+ {
+  "lens": "reqs",
+  "blocking": true,
+  "area": "G4 / S3-R16 1(e): followedLane branches added this cycle have 0 hits (cycle-13 precedent: world-view branches count)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:717-720 (the no-interest fallback: `if visited { return \u2026 heldLane ?? .bulk : nil }` and the new not-visited `return job.heldLane ?? .bulk`, 0 hits) and :705-706 (the joins walk's `continue` for a waiting join that targets other content or is no longer wanted, 0 hits); the draft's 'The branches this cycle adds (item 1(e))' table (docs/adr-drafts/s3f.md ~:2715-2717) has no mutant for either",
+  "problem": "Source of the counts: `llvm-cov show` over all 8 test bundles of the --quick run's profile, in which every bundle passed. The 1(e) claim does not hold for these two branches of the read that decides a 429's policy behind the barrier.\n\n- **Lines 705-706.** A mutant dropping the filter would count a user's waiting join for unrelated content and decide C on the interactive policy (`.exhausted` against `.until`). `barrierDecidesA429OnTheLaneAWaitingJoinGives` cannot kill it: its only join targets C.\n- **Lines 717-720.** The fallback, including the new not-visited branch that replaced cycle 13's early `return job.lane`, is reached by no test. Its result decides whether a 429 throttles the origin (R-SYN-5).",
+  "fix": "For each branch, do one of the following:\n- Add a serialized barrier test in both orders that reaches it and asserts the visit-first outcome, and show its drop-mutant failing 2/2.\n  - Line 706: a user's waiting join for other content while C (prefetch) gets a 429 with a Retry-After between the caps.\n  - Lines 717-720: a job whose only interest is withdrawn by a waiting removal, or that the visit supersedes, gets a 429.\n- Or simplify, for example return `job.lane` when nothing counts, and record the reason in the draft.\n\nUpdate the 1(e) mutant table."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "invariant coverage: unwakeableBreakerParks' exclusion for a waiting re-admission is never reached",
+  "location": "Sources/ZTronAssetSync/Engine/EngineCommands.swift:2083-2090 (`readmissionWaits` closure and its `return nil`, 0 hits)",
+  "problem": "The new invariant is shown to fire on the stranded state (`breakerInvariantDropped` killed). Its exclusion is never evaluated: jobs parked `circuitOpen` behind a closed breaker while the close's `.unblock(.circuitOpen)` still waits in `eventsAfterFollow`. A mistake there would make `invariantViolations()` fire falsely in a legitimate barrier state, and no test checks that state. This is an invariant, not a replay branch, so it is not blocking.",
+  "fix": "In `barrierStartsAVisitsPlaceOnceTheBreakerCloses`, sweep-first, assert `invariantViolations()` is empty while the close's `.unblock` still waits (before releasing the follow-ups)."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "C2 (S3-R5): followedLane's walk is O(jobs + waiting events) per 429 behind the barrier; measured within budget, not pinned",
+  "location": "Sources/ZTronAssetSync/Engine/EngineFailures.swift:688-713 (walk over every job and every waiting event; the cycle-13 verifier suggested O(changed) lookups)",
+  "problem": "My release probe ran 10,000 jobs, all changed by an owed follow, so the walk runs to the end. One `followedLane` call took a best of 2.41-2.69 ms per run, with single samples up to 24 ms, at 1-minute load 95-106. A debug build took 13.3-16.8 ms. That is within the C2 budget, but no C2 benchmark covers a 429 behind the barrier at 10,000, and the draft's '(C2)' claim cites no figure.",
+  "fix": "Optional: add a SyncBenchmarks C2 case, a 429 during an owed follow under a 10,000-member group, or restrict the jobs walk to the ids the owed passes changed. Cite the figure in the draft."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "records (S3-R16 item 2), carried over from cycle 13",
+  "location": "docs/adr-drafts/s3f.md (cycle 14 disposition of finding 5: RR-2 and RR-4 'Not done')",
+  "problem": "RR-2 (the space sweep's second judgement after the barrier) and RR-4 (the places of `.superseded` and ENOENT) are still unprobed. RR-1's remainder, recorded the same way, turned out to change answers (blocking issue 1), so 'Not probed' residuals are not shown to be order-only.",
+  "fix": "Probe RR-2 and RR-4 in both orders and cite the figures. If either gives a different answer, it is blocking under 1(a)."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "concurrency / re-entrancy (carried over from the cycle-13 correctness lens; put to the orchestrator)",
+  "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift (sweepSpaceParked while `drainingAfterFollow`), Sources/ZTronAssetSync/Engine/EngineFollow.swift (advanceFollowForSpaceSweep \u2192 drainEventsAfterFollow, no re-entry guard)",
+  "problem": "Not done this cycle. The fixer explains: no seam reaches checkRunSettled's `.read` sweep from a replay. It is unproven either way.",
+  "fix": "Orchestrator decision: accept as recorded, or require the suggested `judgeSpaceSweep` at once inside the drain together with a seam test."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "other-wp:b: P-13 batch-duration miss",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249",
+  "problem": "`P-13 reclaim of 10000 blobs: \u2026 unit max 10.884541 ms` against the 5.0 ms batch budget, at benchmark-run load mean 5.52 (min 2.86, max 7.68). Every WP-F SyncBenchmark passed (`\u2714 Suite \"SyncBenchmarks\" passed after 109.560 seconds.`).",
+  "fix": "None for WP-F; route to WP-B."
+ }
+]

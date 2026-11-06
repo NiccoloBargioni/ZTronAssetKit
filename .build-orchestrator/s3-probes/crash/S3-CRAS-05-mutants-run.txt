@@ -1,0 +1,120 @@
+# S3-CRAS-05 crash mutants (env S3MUT switches, diff in S3-CRAS-05-mutants.diff), batch 1
+ 9:26  up 3 days, 21:49, 2 users, load averages: 31.08 77.00 93.17
+mutant none exit=0
+✔ Test run with 98 tests in 11 suites passed after 45.665 seconds.
+ 9:27  up 3 days, 21:50, 2 users, load averages: 28.19 69.31 89.41
+mutant A exit=1
+   2 ✘ Test "R-CLN-5: a launch whose root barrier fails unlinks nothing a power loss could still need, until a commit succeeds"
+   2 ✘ Test "R-CLN-6: a purge is not undone by a power loss after the reaper ran"
+   3 ✘ Test "R-STO-5: a blob reaped and then republished before the lazy commit survives a crash and the next launch"
+   4 ✘ Test "R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it"
+  89 ✘ Test "R-STO-5: a fault at every commit step, a kill, then a launch on a full volume that ends in a kill or a power loss preserve I-1…I-5"
+1797 ✘ Test "R-STO-5: a kill during a quarantine, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+3038 ✘ Test "R-STO-5: a kill during an eviction with a lease, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+2671 ✘ Test "R-STO-5: a kill during an update, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+ 910 ✘ Test "R-STO-5: a kill during purge(.all), then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+1937 ✘ Test "R-STO-5: a kill while bytes are placed under a second extension, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+   3 ✘ Test "R-STO-5: a launch that promotes an index.tmp written but never synced before a kill keeps a valid generation through a full volume and a power loss"
+3108 ✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5"
+ 133 ✘ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5"
+  85 ✘ Test "R-STO-5: crash at every boundary during a quarantine and its re-download preserves I-1…I-5"
+ 138 ✘ Test "R-STO-5: crash at every boundary during an eviction that waits for a lease preserves I-1…I-5"
+ 115 ✘ Test "R-STO-5: crash at every boundary during an update (audited I-3) preserves I-1…I-5"
+  71 ✘ Test "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5"
+ 155 ✘ Test "R-STO-5: crash at every boundary during eviction preserves I-1…I-5"
+  33 ✘ Test "R-STO-5: crash at every boundary during orphan GC preserves I-1…I-5"
+  54 ✘ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5"
+  85 ✘ Test "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5"
+  83 ✘ Test "R-STO-5: crash at every boundary while identical bytes are placed under a second extension, then one is removed, preserves I-1…I-5"
+ 923 ✘ Test "R-STO-5: crash at every boundary, then a launch on a full volume that ends in a kill or a power loss, preserves I-1…I-5"
+ 105 ✘ Test "R-STO-5: crash at every file-system boundary during a first sync preserves I-1…I-5"
+   5 ✘ Test "R-STO-5: power loss after a durable commit keeps the store root reachable"
+  16 ✘ Test "R-STO-5: seeded random store, relocate, remove, evict, crash and reopen sequences match the oracle with I-1…I-5 after every step"
+✘ Test run with 98 tests in 11 suites failed after 52.026 seconds with 15545 issues.
+ 9:28  up 3 days, 21:51, 2 users, load averages: 40.90 66.19 87.00
+mutant B exit=1
+   4 ✘ Test "R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it"
+  44 ✘ Test "R-STO-5: a fault at every commit step, a kill, then a launch on a full volume that ends in a kill or a power loss preserve I-1…I-5"
+ 897 ✘ Test "R-STO-5: a kill during a quarantine, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+1496 ✘ Test "R-STO-5: a kill during an eviction with a lease, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+1241 ✘ Test "R-STO-5: a kill during an update, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+ 226 ✘ Test "R-STO-5: a kill during purge(.all), then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+ 803 ✘ Test "R-STO-5: a kill while bytes are placed under a second extension, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+   2 ✘ Test "R-STO-5: a launch that promotes an index.tmp written but never synced before a kill keeps a valid generation through a full volume and a power loss"
+1265 ✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5"
+   4 ✘ Test "R-STO-5: blobs published before a rate-limited commit are adopted after a crash, never re-downloaded"
+  66 ✘ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5"
+  43 ✘ Test "R-STO-5: crash at every boundary during a quarantine and its re-download preserves I-1…I-5"
+  71 ✘ Test "R-STO-5: crash at every boundary during an eviction that waits for a lease preserves I-1…I-5"
+  57 ✘ Test "R-STO-5: crash at every boundary during an update (audited I-3) preserves I-1…I-5"
+  36 ✘ Test "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5"
+  81 ✘ Test "R-STO-5: crash at every boundary during eviction preserves I-1…I-5"
+ 271 ✘ Test "R-STO-5: crash at every boundary during legacy migration preserves I-1…I-5 and adopts every verified file"
+  17 ✘ Test "R-STO-5: crash at every boundary during orphan GC preserves I-1…I-5"
+  26 ✘ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5"
+  43 ✘ Test "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5"
+  27 ✘ Test "R-STO-5: crash at every boundary while identical bytes are placed under a second extension, then one is removed, preserves I-1…I-5"
+ 323 ✘ Test "R-STO-5: crash at every boundary, then a launch on a full volume that ends in a kill or a power loss, preserves I-1…I-5"
+  37 ✘ Test "R-STO-5: crash at every file-system boundary during a first sync preserves I-1…I-5"
+   3 ✘ Test "R-STO-5: power loss after a durable commit keeps the store root reachable"
+   9 ✘ Test "R-STO-5: seeded random store, relocate, remove, evict, crash and reopen sequences match the oracle with I-1…I-5 after every step"
+✘ Test run with 98 tests in 11 suites failed after 47.031 seconds with 7067 issues.
+ 9:28  up 3 days, 21:52, 2 users, load averages: 44.02 63.44 84.81
+mutant C exit=1
+   6 ✘ Test "R-CLN-5: a deref during an in-flight commit or install never makes its blob deletable before a later commit and acknowledgement"
+   4 ✘ Test "R-CLN-5: a launch whose root barrier fails unlinks nothing a power loss could still need, until a commit succeeds"
+   4 ✘ Test "R-STO-4: keys doomed only in a loaded index.tmp wait for a commit that survives the failed launch commit"
+   2 ✘ Test "R-SYN-11: eviction frees space while every index commit fails with ENOSPC"
+✘ Test run with 98 tests in 11 suites failed after 44.684 seconds with 13 issues.
+ 9:29  up 3 days, 21:53, 2 users, load averages: 29.36 56.58 81.06
+mutant E exit=1
+   3 ✘ Test "R-STO-5: a commit during a corrupt key's replacement keeps the key doomed, so a crash never adopts the rotten bytes"
+✘ Test run with 98 tests in 11 suites failed after 59.728 seconds with 2 issues.
+ 9:30  up 3 days, 21:54, 2 users, load averages: 27.62 50.97 77.29
+mutant F exit=1
+   6 ✘ Test "R-CLN-5: a deref during an in-flight install starts its grace only with a later acknowledged install"
+   9 ✘ Test "R-CLN-5: a sink that keeps an older or foreign snapshot never counts as acknowledgement"
+   2 ✘ Test "R-CLN-5: deletion waits for the acknowledged snapshot without the blob, the grace window and every lease"
+✘ Test run with 98 tests in 11 suites failed after 71.313 seconds with 14 issues.
+
+# batch 2 (adds S3OracleReapProbe)
+ 9:32  up 3 days, 21:55, 2 users, load averages: 50.90 54.82 76.12
+mutant none exit=0
+✔ Test run with 99 tests in 12 suites passed after 31.627 seconds.
+ 9:32  up 3 days, 21:56, 2 users, load averages: 31.68 49.63 73.37
+mutant H exit=1
+  21 ✘ Test "R-STO-5: a kill during an update, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+  81 ✘ Test "R-STO-5: a kill while bytes are placed under a second extension, then a power loss at every boundary of the next lifetime, preserves I-1…I-5"
+ 248 ✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5"
+   4 ✘ Test "R-STO-5: blobs published before a rate-limited commit are adopted after a crash, never re-downloaded"
+  39 ✘ Test "R-STO-5: crash at every boundary, then a launch on a full volume that ends in a kill or a power loss, preserves I-1…I-5"
+✘ Test run with 99 tests in 12 suites failed after 44.997 seconds with 388 issues.
+ 9:33  up 3 days, 21:57, 2 users, load averages: 24.71 45.23 70.52
+mutant I exit=1
+   2 ✘ Test "R-CLN-5: a launch whose root barrier fails unlinks nothing a power loss could still need, until a commit succeeds"
+   3 ✘ Test "R-CLN-6: a purge is not undone by a power loss after the reaper ran"
+   2 ✘ Test "R-STO-5: a blob reaped and then republished before the lazy commit survives a crash and the next launch"
+   2 ✘ Test "R-STO-5: a fan-out created by a failed placement is synced into blobs/ before a commit references a blob in it"
+   4 ✘ Test "R-STO-5: a fault at every commit step, a kill, then a launch on a full volume that ends in a kill or a power loss preserve I-1…I-5"
+  97 ✘ Test "R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1…I-5"
+   8 ✘ Test "R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1…I-5"
+   8 ✘ Test "R-STO-5: crash at every boundary during an update (audited I-3) preserves I-1…I-5"
+   7 ✘ Test "R-STO-5: crash at every boundary while identical bytes are placed under a second extension, then one is removed, preserves I-1…I-5"
+ 199 ✘ Test "R-STO-5: crash at every boundary, then a launch on a full volume that ends in a kill or a power loss, preserves I-1…I-5"
+  67 ✘ Test "R-STO-5: crash at every file-system boundary during a first sync preserves I-1…I-5"
+  11 ✘ Test "R-STO-5: seeded random store, relocate, remove, evict, crash and reopen sequences match the oracle with I-1…I-5 after every step"
+  17 ✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step"
+✘ Test run with 99 tests in 12 suites failed after 66.692 seconds with 414 issues.
+ 9:34  up 3 days, 21:58, 2 users, load averages: 37.24 44.85 68.39
+mutant S exit=1
+   2 ✘ Test "R-CLN-1: prune removes blobs of removed entries only after acknowledgement and grace"
+   7 ✘ Test "R-CLN-5: a deref during an in-flight install starts its grace only with a later acknowledged install"
+   2 ✘ Test "R-CLN-5: a failed unlink keeps the key doomed with backoff and retries it"
+   2 ✘ Test "R-CLN-5: deletion grace uses the awake clock and a fresh acknowledgement after a device sleep"
+✘ Test run with 99 tests in 12 suites failed after 63.971 seconds with 9 issues.
+ 9:35  up 3 days, 21:59, 2 users, load averages: 30.40 40.78 65.09
+mutant F exit=1
+   6 ✘ Test "R-CLN-5: a deref during an in-flight install starts its grace only with a later acknowledged install"
+   9 ✘ Test "R-CLN-5: a sink that keeps an older or foreign snapshot never counts as acknowledgement"
+   2 ✘ Test "R-CLN-5: deletion waits for the acknowledged snapshot without the blob, the grace window and every lease"
+✘ Test run with 99 tests in 12 suites failed after 31.875 seconds with 14 issues.

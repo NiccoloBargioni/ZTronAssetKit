@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineJobs.swift b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+index bb22010..87b5d60 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -184,7 +184,7 @@ extension SyncEngine {
+         let isUser = after == .userInitiated
+         switch job.state {
+         case .queued:
+-            if after != before || isUser {
++            if after < before || isUser {
+                 self.enqueue(transfer)
+             }
+         case .downloading:

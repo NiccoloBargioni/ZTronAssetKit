@@ -1,0 +1,39 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceEnds to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceApplies to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .divergencePublishes to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .attemptEnd to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .convergenceBystander to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceEnds to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceApplies to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+✘ Test "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .convergenceApplies at EngineFollowBarrierSharedMoveTests.swift:345:13: Expectation failed: outcome.movesAfterApply == outcome.moveSizes
+↳ v4's walk records no move for the members the owed move still carries: Optional([6, 4]), owed before v4 [6]
+↳ outcome.movesAfterApply == outcome.moveSizes → false
+↳   outcome.movesAfterApply → [6, 4]
+↳     some → [6, 4]
+↳   outcome.moveSizes → [6]
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergence to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .divergencePublishes to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .attemptEnd to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .convergenceBystander to "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" started.
+✘ Test "R-SYN-6: a visit or an owed move of more ids than a follow turn moves makes them over the follow's turns, at most followIDsPerTurn a turn, with the visit-first answers (C2, F-28)" with 14 test cases failed after 11.492 seconds with 1 issue.
+↳ /// A visit or an owed move of more ids than a turn moves makes them over the follow's turns, at most
+↳ /// `followIDsPerTurn` a turn and `inboundIDsNow` in an attempt's end turn, and every member gets the visit-first
+↳ /// answer: O's outcome converging, its own content's bytes diverging. An apply's walk while the owed move still
+↳ /// carries members owes no second move of them (`.convergenceApplies`): each id an owed move carries is owed once,
+↳ /// so the follow's turns do not walk it again and `inboundPendingIDs` names the one move that carries it.
+✘ Suite "Engine follow barrier (F-28)" failed after 11.492 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 11.493 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

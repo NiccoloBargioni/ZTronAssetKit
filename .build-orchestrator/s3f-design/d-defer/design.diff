@@ -1,0 +1,790 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineCommands.swift b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+index b167f85..b485b0b 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineCommands.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineCommands.swift
+@@ -1814,9 +1814,18 @@ extension SyncEngine {
+         if self.isRunning, self.followOwed, !self.state.followFollowUpScheduled {
+             violations.append("a follow owes \(self.state.followScans.count) passes and \(self.state.followOrder.count - self.state.followNext) visits but no turn is scheduled for them")
+         }
+-        if self.isRunning, self.state.pumpWaitsForFollow, !self.followOwed {
++        if self.isRunning, self.state.pumpWaitsForFollow, !self.spaceDecisionsWait, !self.state.pumpFollowUpScheduled {
+             violations.append("a pump waits for a follow that nothing owes")
+         }
++        if self.isRunning, !self.followOwed, self.spaceDecisionsOwed, !self.state.spaceDecisionsTurnScheduled {
++            violations.append("space decisions wait for a follow that ended but no turn is scheduled to take them")
++        }
++        if self.state.spaceRecheckSet != Set(self.state.spaceRechecksAfterFollow) || self.state.spaceRecheckSet.count != self.state.spaceRechecksAfterFollow.count {
++            violations.append("the deferred space re-checks are not unique")
++        }
++        if self.state.spaceSweepPosition > self.state.spaceRechecksAfterFollow.count || (self.state.spaceSweepAfterFollow == nil && self.state.spaceSweepPosition != 0) {
++            violations.append("the deferred sweep's place among the re-checks is out of range")
++        }
+         if self.followOwed {
+             let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
+             if unmarked > 0 {
+diff --git a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+index ed34d95..10085aa 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineDispatch.swift
+@@ -305,7 +305,7 @@ extension SyncEngine {
+             let ready = queues.peek(kind, isValid: { self.isValid($0) }, setAside: { self.setsAside($0) }) { entry in
+                 self.state.draining[entry.transfer] == nil && !self.state.heldForManifest.contains(entry.transfer)
+             }
+-            found = ready.map { entry in self.state.jobs[entry.transfer].map { !self.awaitsFollow($0) } ?? true } ?? false
++            found = ready.map { entry in self.state.jobs[entry.transfer].map { !self.waitsForFollow($0) } ?? true } ?? false
+         }
+         self.state.queues = queues
+         return found
+@@ -364,15 +364,17 @@ extension SyncEngine {
+     /// starts after the apply at 3,000 members). It goes back to the head of its queue, which waits for the follow; each follow turn
+     /// pumps again (`pumpWaitsForFollow`). The check costs one queue head per lane and pump, never a scan, and the visit
+     /// stays the follow's, bounded per turn (C2): following the job here would move up to a queue of jobs per pump.
++    /// While space decisions wait for the follow (`spaceDecisionsWait`), a job the headroom ledger would start or park
++    /// waits the same way (`waitsForFollow`): the follow may raise other work ahead of it, or free the room it lacks.
+     private func dispatch(_ transfer: TransferID, parkLimit: Int) -> Dispatched {
+-        if let job = self.state.jobs[transfer], self.awaitsFollow(job) {
+-            self.enqueue(transfer, front: true)
++        if let job = self.state.jobs[transfer], self.waitsForFollow(job) {
++            self.requeueAtHead(transfer)
+             self.state.pumpWaitsForFollow = true
+             return .waitsForFollow
+         }
+         switch self.gate(transfer) {
+         case .wait:
+-            self.enqueue(transfer, front: true)
++            self.requeueAtHead(transfer)
+             return .parked(1)
+         case .block(let reason):
+             let lane = self.state.jobs[transfer]?.lane
+@@ -392,6 +394,16 @@ extension SyncEngine {
+         }
+     }
+ 
++    /// Puts a job the pump popped back at the head of its queue. A job a space sweep re-admitted keeps counting ahead of
++    /// the jobs later sweeps re-check (`spaceAdmitted`) under its new ticket: it is the same wait in the queue.
++    private func requeueAtHead(_ transfer: TransferID) {
++        let admitted = self.state.spaceAdmitted[transfer] != nil
++        self.enqueue(transfer, front: true)
++        if admitted {
++            self.state.spaceAdmitted[transfer] = self.state.jobs[transfer]?.ticket
++        }
++    }
++
+     /// Parks the queued jobs of `lane` whose gate gives the lane-wide `reason` (offline, a policy), so a run can settle
+     /// blocked, in queue order and at most `limit` of them; returns how many it parked. When it stops at the limit the
+     /// lane is owed the rest (`laneParksOwed`), which every later pump continues before it dispatches (a slot need not
+diff --git a/Sources/ZTronAssetSync/Engine/EngineFailures.swift b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+index 4266169..c7cff58 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineFailures.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+@@ -504,7 +504,22 @@ extension SyncEngine {
+         // REENTRANCY: f-4 (proposed) — the lifecycle and the epoch below; the figures are a fresh snapshot; the ids an
+         // owed follow moved (an apply may have landed during the read) leave the job before its park answers them.
+         await self.refreshFreeSpace()
+-        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch, !self.followBeforeActing(transfer), let job = self.state.jobs[transfer] else {
++        guard self.isRunning, self.state.jobs[transfer]?.epoch == epoch, !self.followBeforeActing(transfer), self.state.jobs[transfer] != nil else {
++            return
++        }
++        if self.spaceDecisionsWait {
++            // The verdict reads the ledger, which the follow may change (a superseded transfer's bytes leave it): it
++            // waits for the follow's end, the job `failed` meanwhile (`deferSpaceFailure`). The job's own visit was
++            // brought forward just above, so a job whose every id moved is gone already (F-20, PROBE-W4).
++            self.deferSpaceFailure(DeferredSpaceFailure(transfer: transfer, epoch: epoch, required: required))
++            return
++        }
++        self.decideSpaceFailure(transfer, required: required)
++    }
++
++    /// `spaceFailed`'s verdict on the free space read after the ENOSPC, or on the ledger as the follow left it.
++    func decideSpaceFailure(_ transfer: TransferID, required: Int64) {
++        guard let job = self.state.jobs[transfer] else {
+             return
+         }
+         let space = self.state.freeSpace
+diff --git a/Sources/ZTronAssetSync/Engine/EngineFollow.swift b/Sources/ZTronAssetSync/Engine/EngineFollow.swift
+index 18230b9..e89d1f1 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineFollow.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineFollow.swift
+@@ -83,6 +83,9 @@ extension SyncEngine {
+             self.state.heldForManifest.removeAll()
+             moved = true
+         }
++        // The space decisions left to the follow's end (`spaceDecisionsWait`) are taken in a turn of their own, which
++        // pumps the jobs they leave at their queues' heads; this turn's pump still leaves those there.
++        self.scheduleSpaceDecisionsAfterFollow()
+         self.checkRunSettled()
+         if moved || self.state.pumpWaitsForFollow {
+             self.pump()
+@@ -110,8 +113,7 @@ extension SyncEngine {
+     /// legitimately, and the follow would end its interest `.notFound`; a dropped id's interest gets the failure's own
+     /// answer instead of the follow's `.notFound`, which no rule forbids. One lookup in the copy and one key comparison
+     /// per id of the job (`sameTransfer` against the job's own entry, whose transfer is the job's), no transfer
+-    /// formatted: a space sweep checks every job it would judge while a follow is owed (`followSweptHolders`), and a
+-    /// formatted transfer costs about 0.75 µs in release, 7.5 ms at SPEC §6's 10,000.
++    /// formatted. Space decisions do not use it: they wait for the follow's end (`spaceDecisionsWait`).
+     func holdsMovedID(_ job: Job) -> Bool {
+         guard self.followOwed else {
+             return false
+@@ -122,10 +124,9 @@ extension SyncEngine {
+     }
+ 
+     /// Brings the follow's visit of `transfer` forward to the moment its job is about to answer its interests with a
+-    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`) or to be judged by a space sweep
+-    /// (`sweepSpaceParked`, which follows every job it would judge before it orders them): the moved ids' interests
+-    /// follow their new content first (T22), exactly as the visit would have moved them before the failure arrived, and
+-    /// only the ids the copy still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
++    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`, whose verdict then waits for the follow's end): the moved ids' interests follow their new content
++    /// first (T22), exactly as the visit would have moved them before the failure arrived, and only the ids the copy
++    /// still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
+     /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to
+     /// answer. A pump is scheduled for the new content's jobs, since some callers do not pump afterwards.
+     func followBeforeActing(_ transfer: TransferID) -> Bool {
+diff --git a/Sources/ZTronAssetSync/Engine/EngineJobs.swift b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+index 17bfe0f..47225f9 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -192,7 +192,14 @@ extension SyncEngine {
+     /// A new interest in a job that stays parked gets the answer a new job would get when it parks (the fail-fast
+     /// policy runs only when a job parks, so a joiner would otherwise wait for a gate that may never open). A job parked
+     /// for lack of space is re-checked first against the latest free-space read: a new job would start if it fits.
++    /// While space decisions wait for an owed follow, a job parked `insufficientSpace` is neither re-checked nor its
++    /// joiner answered: both wait for the follow's end (`deferSpaceRecheck`), since the follow may free the room (a
++    /// superseded transfer's bytes leave the ledger) or change the job's lane and so its volume.
+     private func failFastJoiner(_ token: InterestToken, of transfer: TransferID) {
++        if case .blocked(.insufficientSpace)? = self.state.jobs[transfer]?.state, self.spaceDecisionsWait {
++            self.deferSpaceRecheck(transfer)
++            return
++        }
+         if case .blocked(.insufficientSpace)? = self.state.jobs[transfer]?.state, let job = self.state.jobs[transfer], self.spaceBlock(job) == nil {
+             if self.transition(transfer, to: .queued) {
+                 self.enqueue(transfer)
+@@ -261,7 +268,10 @@ extension SyncEngine {
+                 }
+             }
+         case .blocked(let reason):
+-            if after > before, self.blockCleared(reason, lane: after, job: job) {
++            if after > before, reason == .insufficientSpace, self.spaceDecisionsWait {
++                // The re-check reads the ledger: it waits for the follow's end (`deferSpaceRecheck`).
++                self.deferSpaceRecheck(transfer)
++            } else if after > before, self.blockCleared(reason, lane: after, job: job) {
+                 if self.transition(transfer, to: .queued) {
+                     self.enqueue(transfer)
+                 }
+@@ -683,67 +693,39 @@ extension SyncEngine {
+     /// turn that re-admitted 10,000 members when the volume gained room took about 15 ms: review of close-out cycle 8,
+     /// C2). A read stops re-checking once the room left cannot admit even the smallest job parked `insufficientSpace`.
+     ///
+-    /// While a follow is owed, the sweep first follows every job it would judge that holds an id the follow has not moved
+-    /// yet (`followSweptHolders`), then collects and orders the jobs again, and only then judges any: it judges each job
+-    /// as the follow leaves it, at the place the pump would serve it from. A follow changes what the sweep reads two ways:
+-    /// the followed job loses the moved interests, which may have set its lane (and with it its rank and the volume its
+-    /// verdict and figures read; the two readings are not ordered, so the room may shrink or grow), and the job of the
+-    /// moved id's new content gains them, which may raise its lane. The cycles before judged a job at its pre-follow place
+-    /// and followed it only as the sweep reached it, so each change was patched where it showed: a job re-queued on its
+-    /// pre-follow user lane took the next user job's room (PROBE-C5-LANEDROP), a job parked after a follow that left it
+-    /// room answered its waiter with an `available` above its `required` (PROBE-C6-LANEGAIN), and, with both patched,
+-    /// prefetch work was still admitted and counted ahead of user work the pump serves first, and a job the follow raised
+-    /// to user work was still judged at its prefetch place, so a user waiter's fail-fast reported a shortage the room did
+-    /// not have (the close-out cycle-7 correctness lens, PROBE-C7-RANK-ADMIT, -PARK and -PROMOTE). Following first gives
+-    /// the outcome the sweep gives when the follow visited those jobs before it. The ids leave a job before its fail-fast
+-    /// answers the rest, so a moved id's waiter or ensure member is never answered with its replaced content's figures,
+-    /// and the replaced content is never re-queued to stall its queue's head until the follow's visit (the close-out
+-    /// cycle-3 correctness lens, PROBE-C3-SPACE). At `s3-base` the follow moved every job in the apply's turn, so no
+-    /// sweep ran between the two. A follow costs what a follow turn's visit costs, about ten times a re-queue or a park:
+-    /// the sweep follows at most `followsPerTurn` jobs per turn besides its parks and re-queues (counted as the re-queue
+-    /// or park it preceded, one turn followed up to 1,024 jobs, 9.3 to 13 ms at 10,000 members: the close-out cycle-4
+-    /// correctness lens, PROBE-C4-SWEEP2-C2), and a turn that cannot follow them all judges nothing and leaves the rest
+-    /// to its follow-up sweep, since a job not followed yet would be judged at a place it may not keep.
++    /// While space decisions wait for an owed follow (`spaceDecisionsWait`), the sweep judges nothing: it is left to the
++    /// follow's end, merged with any sweep already left there, and runs in a turn of its own after the follow's last
++    /// visit (`takeSpaceDecisionsAfterFollow`), so it judges every job at the place, on the volume and against the room
++    /// the follow leaves, the outcome it gives when the follow visited first. The cycles before followed jobs from inside
++    /// the sweep, which left each job the sweep did not follow at its pre-follow place: a job lowered by a dropped id
++    /// (PROBE-C8-DROPPED, -KEEP, -LANE) and the parked job of a moved id whose holder was queued or downloading
++    /// (PROBE-C8R-INFLIGHT-PROMOTE), and a turn that followed and judged held the actor over C2 (VERIFY-C8-C2-MIXED).
+     func sweepSpaceParked(_ sweep: SpaceSweep) {
++        if self.spaceDecisionsWait {
++            self.deferSpaceSweep(sweep)
++            return
++        }
++        self.judgeSpaceSweep(sweep)
++    }
++
++    /// The sweep itself (`sweepSpaceParked`); the turn that takes the decisions an owed follow deferred calls it directly.
++    func judgeSpaceSweep(_ sweep: SpaceSweep) {
+         let ahead = self.spaceAdmittedAhead()
+-        var (candidates, smallest) = self.spaceSweepCandidates(sweep)
++        let collected = self.spaceSweepCandidates(sweep)
++        let smallest = collected.smallest
+         // A read re-checks only jobs parked `insufficientSpace`, and leaves untouched each it does not admit: once the
+-        // room left cannot hold the smallest of them, nothing more changes (a follow moves interests, not sizes).
++        // room left cannot hold the smallest of them, nothing more changes.
+         let room = sweep == .read ? self.state.freeSpace.map { self.largestRoom(in: $0) } : nil
+         if let room, smallest > room.subtractingClamped(ahead) {
+             return
+         }
+-        candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+-        switch self.followSweptHolders(candidates) {
+-        case .none:
+-            break
+-        case .followed:
+-            // Ranks, lanes and the jobs themselves may have changed: collect and order them again.
+-            (candidates, smallest) = self.spaceSweepCandidates(sweep)
+-            if let room, smallest > room.subtractingClamped(ahead) {
+-                return
+-            }
+-            candidates.sort { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+-        case .bounded:
+-            self.scheduleSpaceSweepFollowUp(sweep)
+-            return
+-        }
++        let candidates = collected.candidates.sorted { ($0.rank, $0.ticket) < ($1.rank, $1.ticket) }
+         self.judgeSpaceParked(candidates, sweep: sweep, room: room, smallest: smallest, ahead: ahead)
+     }
+ 
+     /// One space-parked job a sweep may judge, with its place in the pump's order.
+     private typealias SweepCandidate = (rank: Int, ticket: UInt64, transfer: TransferID)
+ 
+-    /// What `followSweptHolders` did.
+-    private enum SweptFollow {
+-        /// No job the sweep would judge holds an id an owed follow has not moved: the collected order stands.
+-        case none
+-        /// It followed every such job: the jobs must be collected and ordered again.
+-        case followed
+-        /// It followed `followsPerTurn` of them and more are left: the sweep judges nothing this turn.
+-        case bounded
+-    }
+-
+     /// The jobs `sweep` judges (every space-parked job, or only the `insufficientSpace` ones for a read), unordered, and
+     /// the size of the smallest.
+     private func spaceSweepCandidates(_ sweep: SpaceSweep) -> (candidates: [SweepCandidate], smallest: Int64) {
+@@ -759,28 +741,7 @@ extension SyncEngine {
+         return (candidates, smallest)
+     }
+ 
+-    /// Follows, in `candidates`' order, each job that holds an id an owed follow has not moved yet (`followBeforeActing`,
+-    /// the follow's visit brought forward), at most `followsPerTurn` of them. One check per job and id while a follow is
+-    /// owed (`holdsMovedID`, a lookup and a key comparison); nothing otherwise.
+-    private func followSweptHolders(_ candidates: [SweepCandidate]) -> SweptFollow {
+-        guard self.followOwed else {
+-            return .none
+-        }
+-        var follows = 0
+-        for candidate in candidates {
+-            guard let job = self.state.jobs[candidate.transfer], self.holdsMovedID(job) else {
+-                continue
+-            }
+-            guard follows < Self.followsPerTurn else {
+-                return .bounded
+-            }
+-            follows += 1
+-            _ = self.followBeforeActing(candidate.transfer)
+-        }
+-        return follows > 0 ? .followed : .none
+-    }
+-
+-    /// Judges `candidates`, in the pump's order and as the follow leaves them, against `room` (a read's) or the ledger
++    /// Judges `candidates`, in the pump's order, against `room` (a read's) or the ledger
+     /// (`sweepSpaceParked`), counting the bytes of the jobs re-admitted ahead of each.
+     private func judgeSpaceParked(_ candidates: [SweepCandidate], sweep: SpaceSweep, room: Int64?, smallest: Int64, ahead: Int64) {
+         var ahead = ahead
+@@ -879,7 +840,7 @@ extension SyncEngine {
+ 
+     /// The bytes the headroom ledger needs free for `job` (`spaceBlock`): its entry's size, or the larger figure an
+     /// earlier ENOSPC reported.
+-    private func spaceSize(of job: Job) -> Int64 {
++    func spaceSize(of job: Job) -> Int64 {
+         var size = job.entry.byteSize ?? 0
+         if case .insufficientSpace(let required, _)? = job.lastError {
+             size = max(size, required)
+diff --git a/Sources/ZTronAssetSync/Engine/EngineRuns.swift b/Sources/ZTronAssetSync/Engine/EngineRuns.swift
+index 9034aff..7ab1598 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineRuns.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineRuns.swift
+@@ -583,7 +583,7 @@ extension SyncEngine {
+             edge: self.state.edgeOwed,
+             lanes: self.state.readmissionsOwed.contains(.conditions) ? Set(AssetPriority.allCases.filter { self.laneAdmitsAfterConditions($0) }) : []
+         )
+-        let spaceSweepOwed = self.state.spaceSweepFollowUp != nil
++        let spaceSweepOwed = self.state.spaceSweepFollowUp != nil || self.spaceDecisionsOwed
+         // Most calls find a claimed job still working for the run: then nothing can settle and nothing else is needed
+         // (a claim on a job that lost the run's interest is found by the pass below once no claimed job works; each
+         // lookup copies a job in debug and sanitizer builds, so the common answer takes one, L4-R8). A parked claim that a
+diff --git a/Sources/ZTronAssetSync/Engine/EngineShutdown.swift b/Sources/ZTronAssetSync/Engine/EngineShutdown.swift
+index 235c9a1..55f7947 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineShutdown.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineShutdown.swift
+@@ -105,6 +105,8 @@ extension SyncEngine {
+         self.state.edgeOwed = []
+         self.state.originOwed = []
+         self.state.spaceSweepFollowUp = nil
++        self.dropDeferredSpaceDecisions()
++        self.state.spaceDecisionsTurnScheduled = false
+         self.state.spaceAdmitted.removeAll()
+         self.state.readmissionsOwed = []
+         drain.indexes.followOrder = self.state.followOrder
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSpaceAfterFollow.swift b/Sources/ZTronAssetSync/Engine/EngineSpaceAfterFollow.swift
+new file mode 100644
+index 0000000..7647383
+--- /dev/null
++++ b/Sources/ZTronAssetSync/Engine/EngineSpaceAfterFollow.swift
+@@ -0,0 +1,172 @@
++import ZTronAssetModel
++
++/// An ENOSPC whose verdict (`spaceFailed`: retry, wait for the reaper, or park) waits for an owed follow to end.
++struct DeferredSpaceFailure: Hashable {
++    /// The job whose attempt failed.
++    let transfer: TransferID
++    /// The job's epoch when it failed: a later epoch is another job of the same content.
++    let epoch: UInt64
++    /// The bytes the attempt needed (the transport's `required`, else the entry's size).
++    let required: Int64
++}
++
++/// Space decisions wait for an owed follow (R-SYN-11, F-28; Stage 3 close-out, design D1 "defer").
++///
++/// A follow changes what every space decision reads: a visit moves an id's interests to its new content (raising that
++/// job's lane, its place in the pump's order and the volume it is judged on), lowers or supersedes the job the id left
++/// (its in-flight bytes leave the ledger), and ends a dropped id's interests. A decision taken while the follow still
++/// owes visits judged jobs at places, on volumes and against room the visits were about to change, and each cycle that
++/// brought one visit forward to one decision site left another site reading the pre-visit state (close-out cycles 2 to 8:
++/// PROBE-C7-RANK-*, PROBE-C8-DROPPED*, PROBE-C8R-INFLIGHT-PROMOTE). So while a follow is owed no decision that reads the
++/// headroom ledger is taken at all: a space sweep, a join's or a promotion's re-check of a job parked `insufficientSpace`,
++/// an ENOSPC's verdict and the pump's start or park of a job the ledger judges are each left to one turn after the
++/// follow's last visit, which takes them as the follow left the jobs. Every decision then reads a state in which the
++/// follow visited every moved and dropped id first, whichever of the two ran first.
++extension SyncEngine {
++    /// The jobs whose deferred re-check one turn takes at most before it leaves the rest to another turn (C2): a re-check
++    /// is one ledger read and a re-queue or a fail-fast, about a park's cost.
++    static let spaceRechecksPerTurn = 512
++
++    /// Whether the follow left space decisions to take: a sweep, re-checks, or ENOSPC verdicts.
++    var spaceDecisionsOwed: Bool {
++        self.state.spaceSweepAfterFollow != nil || !self.state.spaceRechecksAfterFollow.isEmpty || !self.state.spaceFailuresAfterFollow.isEmpty
++    }
++
++    /// Whether a space decision must wait: a follow is owed, or the decisions it deferred have not been taken yet (they
++    /// are taken in request order after its last visit, so a later request waits behind them).
++    var spaceDecisionsWait: Bool {
++        self.followOwed || self.spaceDecisionsOwed
++    }
++
++    /// Leaves `sweep` to the follow's end, merged with any sweep already left there.
++    func deferSpaceSweep(_ sweep: SpaceSweep) {
++        if self.state.spaceSweepAfterFollow == nil {
++            // Its place among the re-checks: those asked for before it are taken before it.
++            self.state.spaceSweepPosition = self.state.spaceRechecksAfterFollow.count
++        }
++        self.state.spaceSweepAfterFollow = sweep.merged(with: self.state.spaceSweepAfterFollow)
++        self.scheduleSpaceDecisionsAfterFollow()
++    }
++
++    /// Leaves the re-check of a job parked `insufficientSpace` that a join or a promotion asked for to the follow's end:
++    /// the waiters and ensures that joined it meanwhile are answered then, from the room the follow leaves.
++    func deferSpaceRecheck(_ transfer: TransferID) {
++        if self.state.spaceRecheckSet.insert(transfer).inserted {
++            self.state.spaceRechecksAfterFollow.append(transfer)
++        }
++        self.scheduleSpaceDecisionsAfterFollow()
++    }
++
++    /// Leaves an ENOSPC's verdict to the follow's end; the job stays `failed` until then.
++    func deferSpaceFailure(_ failure: DeferredSpaceFailure) {
++        self.state.spaceFailuresAfterFollow.append(failure)
++        self.scheduleSpaceDecisionsAfterFollow()
++    }
++
++    /// Whether the pump leaves `job` at the head of its queue for an owed follow: it holds an id the copy maps elsewhere
++    /// or no longer lists (`awaitsFollow`), or space decisions wait and its gate would read the ledger (a known size, a
++    /// free-space read, no adoption) to start or park it. A start takes room the follow may give to work it raises
++    /// ahead of this job, and a park answers a shortage the follow may end. A gate that blocks for another reason
++    /// (offline, a policy, the origin) parks the job as before: those verdicts read no room.
++    func waitsForFollow(_ job: Job) -> Bool {
++        if self.awaitsFollow(job) {
++            return true
++        }
++        guard self.spaceDecisionsWait, job.adopt == nil, self.state.freeSpace != nil, self.spaceSize(of: job) > 0 else {
++            return false
++        }
++        switch self.gate(job.transfer) {
++        case .start, .block(.insufficientSpace), .block(.awaitingSpace):
++            return true
++        case .wait, .block:
++            return false
++        }
++    }
++
++    /// Schedules the turn that takes the deferred decisions once no follow is owed; the follow's last turn calls it again.
++    func scheduleSpaceDecisionsAfterFollow() {
++        guard !self.followOwed, self.spaceDecisionsOwed, !self.state.spaceDecisionsTurnScheduled else {
++            return
++        }
++        self.state.spaceDecisionsTurnScheduled = true
++        let spawned = self.spawn(.entry) { engine in
++            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the turn re-reads whether a follow is
++            // owed again (a later apply's), each deferred job's state and epoch, and the ledger as it stands then.
++            await engine.takeSpaceDecisionsAfterFollow()
++        }
++        if spawned == nil {
++            // Shutting down: nothing is decided any more.
++            self.state.spaceDecisionsTurnScheduled = false
++            self.dropDeferredSpaceDecisions()
++        }
++    }
++
++    /// Forgets every deferred decision (shutdown).
++    func dropDeferredSpaceDecisions() {
++        self.state.spaceSweepAfterFollow = nil
++        self.state.spaceRechecksAfterFollow = []
++        self.state.spaceRecheckSet = []
++        self.state.spaceFailuresAfterFollow = []
++        self.state.spaceSweepPosition = 0
++    }
++
++    /// Takes the deferred decisions: the ENOSPC verdicts first (each job's own attempt, at most the transfers that were
++    /// in flight), then the re-checks and the sweep in the order they were first asked for, at most
++    /// `spaceRechecksPerTurn` re-checks or the sweep per turn (the sweep collects and orders every space-parked job: it
++    /// shares its turn with nothing larger, C2); a re-check asked for after the sweep waits for it. Once
++    /// nothing deferred is left, a pump turn serves the jobs left at their queues' heads. A follow owed again (a later
++    /// apply landed) keeps them all for its own end.
++    private func takeSpaceDecisionsAfterFollow() {
++        self.state.spaceDecisionsTurnScheduled = false
++        guard self.isRunning, !self.followOwed else {
++            return
++        }
++        let failures = self.state.spaceFailuresAfterFollow
++        self.state.spaceFailuresAfterFollow = []
++        for failure in failures where self.state.jobs[failure.transfer]?.epoch == failure.epoch {
++            self.decideSpaceFailure(failure.transfer, required: failure.required)
++        }
++        if let sweep = self.state.spaceSweepAfterFollow, self.state.spaceSweepPosition == 0 {
++            self.state.spaceSweepAfterFollow = nil
++            self.judgeSpaceSweep(sweep)
++        } else {
++            // The re-checks asked for before the sweep, or all of them when none is owed.
++            let limit = self.state.spaceSweepAfterFollow == nil ? Self.spaceRechecksPerTurn : min(Self.spaceRechecksPerTurn, self.state.spaceSweepPosition)
++            let taken = Array(self.state.spaceRechecksAfterFollow.prefix(limit))
++            self.state.spaceRechecksAfterFollow.removeFirst(taken.count)
++            if self.state.spaceSweepAfterFollow != nil {
++                self.state.spaceSweepPosition -= taken.count
++            }
++            for transfer in taken {
++                self.state.spaceRecheckSet.remove(transfer)
++                self.recheckSpaceParked(transfer)
++            }
++        }
++        self.scheduleSpaceDecisionsAfterFollow()
++        self.checkRunSettled()
++        if !self.spaceDecisionsWait {
++            // The jobs the pump left at their queues' heads (`pumpWaitsForFollow`) are served in a turn of their own: this
++            // one may have swept every space-parked job (C2).
++            self.schedulePumpFollowUp()
++        }
++        self.settleUnwakeableSpaceWaits()
++        self.rearm()
++        self.reconcileIdle()
++    }
++
++    /// The re-check a join or a promotion of a job parked `insufficientSpace` asked for (`failFastJoiner`, `relane`): the
++    /// job is re-queued when the ledger holds it, and otherwise its waiters and ensures, the interests that joined it
++    /// while the re-check waited (a park answers every one it finds), get the answer a job parked now would give.
++    private func recheckSpaceParked(_ transfer: TransferID) {
++        guard let job = self.state.jobs[transfer], job.state == .blocked(.insufficientSpace) else {
++            return
++        }
++        if self.spaceBlock(job) == nil {
++            if self.transition(transfer, to: .queued) {
++                self.enqueue(transfer)
++            }
++            return
++        }
++        self.failFast(transfer, reason: .insufficientSpace)
++    }
++}
+diff --git a/Sources/ZTronAssetSync/Engine/EngineState.swift b/Sources/ZTronAssetSync/Engine/EngineState.swift
+index aaf2166..179c41a 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineState.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineState.swift
+@@ -68,8 +68,10 @@ struct EngineState {
+     /// Test seam: a follow-up turn reached the hold and waits for its release.
+     var followFollowUpWaiting = false
+     /// A pump left a queue's head in place because its job holds an id the copy maps to other content, or no longer
+-    /// lists, while a follow is owed (`SyncEngine.awaitsFollow`): every follow turn pumps again, so the queue moves on
+-    /// once that job's visit has followed it (Stage 3, close-out cycle 3).
++    /// lists, while a follow is owed (`SyncEngine.awaitsFollow`), or because its start or park reads the headroom ledger
++    /// while space decisions wait for the follow (`SyncEngine.waitsForFollow`): every follow turn pumps again, and the
++    /// turn after the follow's deferred decisions schedules a pump, so the queue moves on (Stage 3, close-out cycle 3;
++    /// design D1).
+     var pumpWaitsForFollow = false
+     /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
+     /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
+@@ -298,6 +300,22 @@ struct EngineState {
+     var spaceSweepFollowUpsHeld = false
+     /// Test seam: a follow-up sweep reached the hold and waits for its release.
+     var spaceSweepFollowUpWaiting = false
++    /// The space sweep a sweep request made while space decisions wait for a follow left to the follow's end
++    /// (`SyncEngine.spaceDecisionsWait`), merged across requests (R-SYN-11, F-28: a decision taken before the follow's
++    /// visits judged jobs at places and on room the visits change).
++    var spaceSweepAfterFollow: SpaceSweep?
++    /// The jobs parked `insufficientSpace` whose re-check a join or a promotion asked for while space decisions waited
++    /// for a follow (`failFastJoiner`, `relane`), in request order, each once: re-checked after the follow, and their
++    /// waiters and ensures answered then (`spaceRecheckSet` keeps them unique).
++    var spaceRechecksAfterFollow: [TransferID] = []
++    /// See `spaceRechecksAfterFollow`.
++    var spaceRecheckSet: Set<TransferID> = []
++    /// The ENOSPC verdicts left to the follow's end (`spaceFailed`): the job, its epoch and the bytes its attempt needed.
++    var spaceFailuresAfterFollow: [DeferredSpaceFailure] = []
++    /// The turn that takes the deferred space decisions once the follow has ended is scheduled.
++    var spaceDecisionsTurnScheduled = false
++    /// How many of `spaceRechecksAfterFollow` were asked for before `spaceSweepAfterFollow` was first: taken before it.
++    var spaceSweepPosition = 0
+     /// Test seam (close-out cycle 18): while set, a manifest fetch that ends keeps its outcome from the runs and
+     /// `ensureAvailable` calls waiting for it (`heldManifestDeliveries`) until a test releases it
+     /// (`holdManifestOutcomeDelivery()`, `releaseManifestOutcomeDelivery()`), so the test can let other engine work, such
+diff --git a/Sources/ZTronAssetSync/Engine/EngineTimers.swift b/Sources/ZTronAssetSync/Engine/EngineTimers.swift
+index f9b2ba9..c5f3f15 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineTimers.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineTimers.swift
+@@ -300,7 +300,7 @@ extension SyncEngine {
+     /// flight, the settling read of `settleUnwakeableSpaceWaits` in flight, or a space sweep's follow-up owed.
+     var spaceWakeExpected: Bool {
+         self.state.storeDeadline != nil || self.state.storeWorkInFlight || self.state.spaceDeadlineReread || self.state.spaceSettleRead
+-            || self.state.spaceSweepFollowUp != nil
++            || self.state.spaceSweepFollowUp != nil || self.state.spaceSweepAfterFollow != nil
+     }
+ 
+     /// A job was parked `awaitingSpace`: the bytes it waits for are reclaimed only by `runDueWork()`, which only the
+diff --git a/Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift b/Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift
+index c3229ad..8a3567b 100644
+--- a/Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift
++++ b/Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift
+@@ -453,7 +453,7 @@ extension EngineSyncTests {
+         let startedBetween = await harness.source.starts.dropFirst(before).map(\.id)
+         #expect(!startedBetween.contains(dropped.transferID), "the dropped id's transfer was requested after the apply")
+         #expect(between.queued == .queued, "it waits in its queue for the follow: \(between)")
+-        #expect(between.steady == .downloading, "the freed slot went to the unchanged prefetch member: \(between)")
++        #expect(between.steady == .queued, "the freed slot waits for the follow too: the unchanged member's start reads the headroom ledger, and space decisions wait for an owed follow (D1): \(between)")
+         #expect(between.preemptions == preemptions, "no transfer was preempted for a job that waits for the follow")
+         #expect(between.violations.isEmpty, "\(between.violations.prefix(3))")
+         await engine.readForTests { $0.releaseFollowFollowUps() }
+@@ -461,6 +461,9 @@ extension EngineSyncTests {
+         #expect(outcome.completeReport != nil, "\(outcome)")
+         let answer = await EngineHarness.value(of: waiter)
+         #expect(answer == .failure(.notFound), "the follow's visit ends the dropped id's interest: \(answer)")
++        await engine.awaitCondition { $0.state.jobs[unchanged[0].transferID]?.state != .queued }
++        let steadyAfter = await engine.readForTests { $0.state.jobs[unchanged[0].transferID]?.state }
++        #expect(steadyAfter == .downloading || steadyAfter == nil, "once the follow ended the freed slot went to the unchanged prefetch member: \(String(describing: steadyAfter))")
+         #expect(!(await harness.source.starts.dropFirst(before).map(\.id)).contains(dropped.transferID), "never requested after the apply")
+         await harness.source.release(running[1].transferID, with: .progress(received: 0, expected: nil))
+         _ = await EngineHarness.value(of: runningWaiters[1])
+@@ -581,9 +584,7 @@ extension EngineSyncTests {
+         // The room the reclaim adds to: too little for the replaced 5 MB, or enough.
+         try await Self.leaveRoom(swept.roomBeforeReclaim, harness: harness, fileSystem: fileSystem)
+         // The grace ends: the alarm's due store work reaps x's 4 MB, then the `.reclaimed` sweep runs.
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { $0.state.jobs[old.transferID]?.state != .blocked(.awaitingSpace) }
+-        }
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { $0.state.jobs[old.transferID]?.state != .blocked(.awaitingSpace) }
+         let afterSweep = await engine.readForTests { engine in
+             (
+                 holds: engine.state.jobs[old.transferID]?.assets.contains(old.identifier) == true,
+@@ -592,7 +593,7 @@ extension EngineSyncTests {
+                 violations: engine.invariantViolations()
+             )
+         }
+-        #expect(afterSweep.owed, "the sweep ran while the follow still owed the id's visit")
++        #expect(waited && !afterSweep.owed, "the sweep was asked for while the follow still owed the id's visit, and judged after the follow's end (D1)")
+         #expect(!afterSweep.holds, "the replaced content's job no longer holds the id after the sweep: \(String(describing: afterSweep.state))")
+         #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
+         await engine.readForTests { $0.releaseFollowFollowUps() }
+@@ -686,8 +687,10 @@ extension EngineSyncTests {
+         await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+             await engine.awaitCondition { engine in
+                 engine.state.spaceSweepFollowUpWaiting || !engine.state.jobs.values.contains { $0.state == .blocked(.awaitingSpace) }
++                    || (engine.followOwed && engine.state.spaceSweepAfterFollow != nil)
+             }
+         }
++        let deferred = await engine.readForTests { $0.followOwed && $0.state.spaceSweepAfterFollow != nil }
+         let after = await engine.readForTests { engine in
+             (
+                 owed: Self.jobsHoldingMovedIDs(engine, large: largeIDs),
+@@ -698,10 +701,9 @@ extension EngineSyncTests {
+         }
+         let followed = (small: before.small - after.owed.small, large: before.large - after.owed.large)
+         #expect(after.pending == 0, "setup: the sweep read the volume after the reclaim: \(String(describing: after.pending))")
+-        #expect(followed.small + followed.large == SyncEngine.followsPerTurn, "one sweep turn followed \(followed.small + followed.large) jobs (\(followed.small) of 400 bytes, \(followed.large) of 3,000), at most followsPerTurn = \(SyncEngine.followsPerTurn)")
+-        #expect(followed.small > 0 && followed.large > 0, "the turn followed jobs of both sizes: \(followed)")
+-        #expect(after.waiting == after.owed.small + after.owed.large && after.waiting > 0, "a turn that could not follow every member judged none: the \(after.owed.small + after.owed.large) members it did not follow still wait, \(after.waiting) do")
+-        #expect(after.followUpHeld, "the jobs left over wait for the sweep's follow-up turn")
++        #expect(followed.small + followed.large == 0, "a sweep turn during an owed follow follows no job (D1: it waits for the follow): it followed \(followed.small + followed.large) (\(followed.small) of 400 bytes, \(followed.large) of 3,000)")
++        #expect(after.waiting == after.owed.small + after.owed.large && after.waiting > 0, "the sweep judged none: the \(after.owed.small + after.owed.large) members the follow still owes still wait, \(after.waiting) do")
++        #expect(deferred && !after.followUpHeld, "the sweep waits for the follow's end, not for a follow-up sweep turn")
+         await engine.readForTests { $0.releaseSpaceSweepFollowUps() }
+         await engine.readForTests { $0.releaseFollowFollowUps() }
+         let outcome = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: sync) }
+@@ -762,6 +764,37 @@ final class SweepTurnWatch: Sendable {
+     }
+ }
+ 
++extension EngineSyncTests {
++    /// Waits for the space sweep the clock's next store work asks for, until `condition` holds in the turn that judges
++    /// it (a recording condition records in that turn). Design D1 ("defer"): a sweep asked for while a follow is owed
++    /// judges nothing and waits for the follow's end; the follow's held turns are then released here and `condition` is
++    /// awaited again, in the turn of the sweep after the follow's last visit. Returns whether the sweep waited.
++    @available(macOS 15.0, iOS 18.0, *)
++    @discardableResult
++    static func awaitSpaceSweep(_ engine: SyncEngine, time: ManualTimeSource, _ condition: @escaping @Sendable (isolated SyncEngine) -> Bool) async -> Bool {
++        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
++            await engine.awaitCondition { condition($0) || ($0.followOwed && $0.state.spaceSweepAfterFollow != nil) }
++        }
++        return await Self.takeDeferredSpaceSweep(engine, time: time, condition)
++    }
++
++    /// Design D1: when a sweep waits for the owed follow, releases the follow's held turns and waits until the follow
++    /// and the decisions it deferred are over (and `condition` holds, in the turn it first does). `false` when no sweep
++    /// waited (the follow had visited first, or no sweep was asked for).
++    @available(macOS 15.0, iOS 18.0, *)
++    @discardableResult
++    static func takeDeferredSpaceSweep(_ engine: SyncEngine, time: ManualTimeSource, _ condition: @escaping @Sendable (isolated SyncEngine) -> Bool = { _ in true }) async -> Bool {
++        guard await engine.readForTests({ $0.followOwed && $0.state.spaceSweepAfterFollow != nil }) else {
++            return false
++        }
++        await engine.readForTests { $0.releaseFollowFollowUps() }
++        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
++            await engine.awaitCondition { condition($0) && !$0.followOwed && !$0.spaceDecisionsOwed && !$0.state.spaceDecisionsTurnScheduled }
++        }
++        return true
++    }
++}
++
+ /// When the follow visits the job of content shared by a moved id and a kept one, relative to the space sweep that
+ /// re-admits it.
+ enum LaneDropVisit: String, CaseIterable, Sendable {
+@@ -883,14 +916,12 @@ extension EngineSyncTests {
+         // is evaluated in every turn that notifies): the settle read that follows that turn decides a job the sweep left
+         // waiting, so a later read cannot tell a job the sweep parked from one it left `awaitingSpace` with no wake.
+         let watch = SweepTurnWatch()
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { engine in
+-                guard engine.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) else {
+-                    return false
+-                }
+-                watch.record(engine.state.jobs[a.transferID]?.state)
+-                return true
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { engine in
++            guard engine.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) else {
++                return false
+             }
++            watch.record(engine.state.jobs[a.transferID]?.state)
++            return true
+         }
+         let afterSweep = await engine.readForTests { engine in
+             (
+@@ -900,7 +931,7 @@ extension EngineSyncTests {
+                 violations: engine.invariantViolations()
+             )
+         }
+-        #expect(afterSweep.owed == (visit == .sweepFollowsFirst), "the sweep ran while the follow owed C's visit only when the follow had not visited first: \(afterSweep)")
++        #expect(waited == (visit == .sweepFollowsFirst) && !afterSweep.owed, "the sweep was asked for while the follow owed C's visit only when the follow had not visited first, and then judged after its end (D1): \(afterSweep)")
+         #expect(afterSweep.lane == .prefetch && afterSweep.shared != .queued, "C's job, left with B's prefetch interest, waits for room prefetch work has not: \(afterSweep)")
+         #expect(watch.state == .blocked(.insufficientSpace), "in the sweep's turn C's job, which does not fit its prefetch lane, is parked insufficientSpace (re-checked at every read), not left awaitingSpace with nothing pending and no wake: \(String(describing: watch.state))")
+         #expect(afterSweep.violations.isEmpty, "\(afterSweep.violations.prefix(3))")
+@@ -1012,9 +1043,7 @@ extension EngineSyncTests {
+         #expect(before.shared == .blocked(.awaitingSpace), "setup: \(before)")
+         // The grace ends: the alarm reaps x's 4 MB (4 MB of room for user work, 10 MB for prefetch work) and runs its
+         // `.reclaimed` sweep.
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { $0.state.jobs[a.transferID]?.state != .blocked(.awaitingSpace) }
+-        }
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { $0.state.jobs[a.transferID]?.state != .blocked(.awaitingSpace) }
+         let afterSweep = await engine.readForTests { engine in
+             (
+                 owed: engine.followOwed,
+@@ -1027,7 +1056,7 @@ extension EngineSyncTests {
+         let important = afterSweep.space.map { $0.volumeImportant - $0.reserveBytes } ?? 0
+         let opportunistic = afterSweep.space.map { $0.volumeOpportunistic - $0.reserveBytes } ?? 0
+         #expect(afterSweep.space?.pendingReclaim == 0 && important < Int64(cBytes.count) && opportunistic >= Int64(cBytes.count), "setup: after the reclaim C fits the prefetch lane's volume and not the user lane's: \(String(describing: afterSweep.space))")
+-        #expect(afterSweep.owed == (visit == .sweepFollowsFirst), "the sweep ran while the follow owed C's visit only when the follow had not visited first: \(afterSweep)")
++        #expect(waited == (visit == .sweepFollowsFirst) && !afterSweep.owed, "the sweep was asked for while the follow owed C's visit only when the follow had not visited first, and then judged after its end (D1): \(afterSweep)")
+         let parked: Bool
+         if case .blocked? = afterSweep.shared {
+             parked = true
+@@ -1144,6 +1173,7 @@ extension EngineSyncTests {
+         ballast -= 6_000_000 - (gained.volumeImportant - gained.reserveBytes)
+         try fileSystem.write(Data(repeating: 3, count: Int(ballast)), to: ballastURL, mode: .truncate)
+         await engine.refreshFreeSpace()
++        let waited = await Self.takeDeferredSpaceSweep(engine, time: time)
+         let after = await engine.readForTests { engine in
+             (
+                 owed: engine.followOwed,
+@@ -1153,7 +1183,7 @@ extension EngineSyncTests {
+                 violations: engine.invariantViolations()
+             )
+         }
+-        #expect(after.owed == (visit == .sweepFollowsFirst), "the read swept while the follow owed C's visit only when the follow had not visited first: \(after)")
++        #expect(waited == (visit == .sweepFollowsFirst) && !after.owed, "the read asked for its sweep while the follow owed C's visit only when the follow had not visited first, and the sweep judged after its end (D1): \(after)")
+         #expect(after.k != .blocked(.insufficientSpace), "K (3 MB, user lane) is re-queued for the 6 MB of room user work has: \(String(describing: after.k))")
+         #expect(after.lane == .prefetch && after.shared == .blocked(.insufficientSpace), "C's job, left with B's prefetch interest, stays parked for room prefetch work lacks: \(after)")
+         #expect(after.violations.isEmpty, "\(after.violations.prefix(3))")
+@@ -1246,9 +1276,8 @@ extension EngineSyncTests {
+         try await Self.leaveRoom(1_999_000, harness: harness, fileSystem: fileSystem)
+         // The grace ends: the alarm reaps x's 4 MB (6 MB of room for user work, none for prefetch work) and runs its
+         // `.reclaimed` sweep.
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { $0.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) }
+-        }
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { $0.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) }
++        #expect(waited == (visit == .sweepFollowsFirst), "the sweep waited for the follow only when the follow had not visited first (D1)")
+         let bResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: bWaiter) }
+         await engine.readForTests { $0.releaseFollowFollowUps() }
+         let kResult = await EngineRegressionCycle6Tests.driving([time], fence: engine) { await EngineHarness.value(of: kWaiter) }
+diff --git a/Tests/ZTronAssetSyncTests/Engine/EngineSweepOrderTests.swift b/Tests/ZTronAssetSyncTests/Engine/EngineSweepOrderTests.swift
+index 19810ce..b5ad180 100644
+--- a/Tests/ZTronAssetSyncTests/Engine/EngineSweepOrderTests.swift
++++ b/Tests/ZTronAssetSyncTests/Engine/EngineSweepOrderTests.swift
+@@ -158,9 +158,8 @@ extension EngineSyncTests {
+             try await Self.leaveRoom(again, harness: harness, fileSystem: fileSystem)
+         }
+         // The grace ends: the alarm reaps x's 4 MB and runs its `.reclaimed` sweep.
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { $0.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) }
+-        }
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { $0.state.jobs[k.transferID]?.state != .blocked(.awaitingSpace) }
++        #expect(waited == (visit == .sweepFollowsFirst), "the sweep waited for the follow only when the follow had not visited first (D1)")
+         // K's job is gone either way once its waiter is answered (fetched, or failed fast): the waiters' answers decide.
+         let violations = await engine.invariantViolations()
+         #expect(violations.isEmpty, "\(violations.prefix(3))")
+@@ -272,9 +271,8 @@ extension EngineSyncTests {
+             #expect(before.owed && before.c == .blocked(.awaitingSpace) && pJob.rank == rJob.rank, "setup: C's job still holds A, and P ranks as prefetch work: \(before)")
+         }
+         // The grace ends: the alarm reaps x's 4 MB (6 MB of room) and runs its `.reclaimed` sweep.
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { $0.state.jobs[r.transferID]?.state != .blocked(.awaitingSpace) }
+-        }
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { $0.state.jobs[r.transferID]?.state != .blocked(.awaitingSpace) }
++        #expect(waited == (visit == .sweepFollowsFirst), "the sweep waited for the follow only when the follow had not visited first (D1)")
+         // P's job is gone either way once its waiters are answered (fetched, or failed fast): the waiters' answers decide.
+         let violations = await engine.invariantViolations()
+         #expect(violations.isEmpty, "\(violations.prefix(3))")
+@@ -382,15 +380,14 @@ extension EngineSyncTests {
+         // The grace ends: the alarm reaps x's 4 MB (4 MB of room for user work, 10 MB for prefetch work) and runs its
+         // `.reclaimed` sweep. D's job is read in the first turn whose condition check sees C leave its wait: the sweep's.
+         let watch = SweepTurnWatch()
+-        await EngineRegressionCycle6Tests.driving([time], fence: engine) {
+-            await engine.awaitCondition { engine in
+-                guard engine.state.jobs[a.transferID]?.state != .blocked(.awaitingSpace) else {
+-                    return false
+-                }
+-                watch.record(engine.state.jobs[d.transferID]?.state)
+-                return true
++        let waited = await Self.awaitSpaceSweep(engine, time: time) { engine in
++            guard engine.state.jobs[a.transferID]?.state != .blocked(.awaitingSpace) else {
++                return false
+             }
++            watch.record(engine.state.jobs[d.transferID]?.state)
++            return true
+         }
++        #expect(waited == (visit == .sweepFollowsFirst), "the sweep waited for the follow only when the follow had not visited first (D1)")
+         #expect(watch.state == nil || watch.state == .blocked(.insufficientSpace), "in the sweep's turn D (7 MB) is judged behind C's 5 MB of the 10 MB of prefetch room and parked (its fail-fast ends the job), never re-queued: \(String(describing: watch.state))")
+         let violations = await engine.invariantViolations()
+         #expect(violations.isEmpty, "\(violations.prefix(3))")

@@ -1,0 +1,14 @@
+PROBE exhaustiveTwoAttaches runs=20 exhausted=true maxWrites=3 failures=0
+PROBE exhaustiveTwoWithFinish runs=76 exhausted=true maxWrites=3 failures=0
+PROBE exhaustiveThree finish=false runs=951 exhausted=true maxWrites=6 failures=0
+PROBE randomManyAttaches runs=1500 maxWrites=9 failures=0
+PROBE exhaustiveThree finish=true runs=4159 exhausted=true maxWrites=6 failures=0
+✔ Test run with 7 tests in 1 suite passed after 5.772 seconds.
+--- readerSeesEndBeforeOnTermination / shutdownCancelQueuedBehindPriority (run 03:3x):
+PROBE readerSeesEndBeforeOnTermination got=[1] onTerminationDoneWhenReaderReturned=false
+PROBE shutdownCancelQueuedBehindPriority cancellations=[] priorityChanges=[]
+--- MG (control task does not await each priority control), handleControlsInOrder alone x6: passed, passed, passed, passed, time limit exceeded, early.isEmpty failed
+--- S2-19 race amplifier (ForegroundSession.swift onTermination: Thread.sleep(0.05) before interval.end(), timing only):
+amplified: ✘ ForegroundBackendTests.swift:277:9: Expectation failed: edges.began == expected.count && edges.ended == expected.count
+amplified + proposed fix (edges asserted after `await rig.stop()`): ✔ Test run with 1 test in 1 suite passed
+--- MI-stale-takes-serial survives every committed test; killed only by S3DC2CorrectProbeTests.staleHandleNeverSupersedes (see correct-mutants.out)

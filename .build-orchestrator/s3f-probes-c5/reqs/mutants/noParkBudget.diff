@@ -1,0 +1,11 @@
+--- a/Sources/ZTronAssetSync/Engine/EngineJobs.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineJobs.swift
+@@ -747,7 +747,7 @@
+                 waiting = true
+                 continue
+             }
+-            guard parks < Self.parksPerPump, self.followFits(job, follows: &follows) else {
++            guard parks < Self.parksPerPump else {
+                 self.scheduleSpaceSweepFollowUp(sweep)
+                 break
+             }

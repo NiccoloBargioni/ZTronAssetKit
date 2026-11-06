@@ -1,0 +1,25 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyJC2Probe" started.
+◇ Test "VERIFY-J-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" started.
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 744, changeEvery 2, handles 1
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 1
+VERIFY-J-C2 10,000 members, changeEvery 20, 1 handle(s): runs [8.071917, 8.038, 7.947208] ms, best 7.947208 ms; follow+deferred wall [0.547292, 2.591709, 0.297083] ms
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-J-C2 setup: followOwed holders 244, space-parked 9744, changeEvery 20, handles 2
+VERIFY-J-C2 10,000 members, changeEvery 20, 2 handle(s): runs [7.587834, 8.370416, 7.766667] ms, best 7.587834 ms; follow+deferred wall [0.982458, 0.089083, 1.975583] ms
+VERIFY-J-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-J-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-J-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 1
+VERIFY-J-C2 10,000 members, changeEvery 1, 1 handle(s): runs [3.101416, 3.042792, 3.078708] ms, best 3.042792 ms; follow+deferred wall [0.773166, 0.518416, 3.321041] ms
+VERIFY-J-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-J-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-J-C2 setup: followOwed holders 9744, space-parked 9744, changeEvery 1, handles 2
+VERIFY-J-C2 10,000 members, changeEvery 1, 2 handle(s): runs [3.961084, 4.290958, 4.040125] ms, best 3.961084 ms; follow+deferred wall [3.951667, 0.301416, 0.184583] ms
+✔ Test "VERIFY-J-C2: reclaim during an owed follow, follow released, deferred sweep, 10,000 members" passed after 14.821 seconds.
+✔ Suite "VerifyJC2Probe" passed after 14.821 seconds.
+✔ Test run with 1 test in 1 suite passed after 14.821 seconds.

@@ -1,0 +1,38 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyDDeferProbes" started.
+◇ Test "PROBE-D-ENOSPC" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-D-ENOSPC" started.
+PROBE-D-ENOSPC followVisitedFirst between: (owed: false, d: nil, e: Optional(ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1223730389ns))), eError: Optional(ZTronAssetModel.AssetError.insufficientSpace(required: 1500000, available: 4999984)), violations: [])
+PROBE-D-ENOSPC followVisitedFirst U: success(ZTronAssetModel.AssetLocation(id: zz-e, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bd/bd1019e7ce2581f27e63987305e3ee8bdc968bffecd8085137d916dbb3e4a589.png, fileExtension: png, byteSize: 1500000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d22090ca39520437e6a2d842020c0d05cbd7d04b73f8904cf4fd59c798037c70.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-D-ENOSPC" started.
+PROBE-D-ENOSPC sweepFollowsFirst between: (owed: true, d: Optional(ZTronAssetSync.JobState.downloading), e: nil, eError: nil, violations: [])
+PROBE-D-ENOSPC sweepFollowsFirst U: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 1500000, available: 1000000)) | A: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d2/d22090ca39520437e6a2d842020c0d05cbd7d04b73f8904cf4fd59c798037c70.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-D-ENOSPC" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyDDeferProbes.swift:299:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(eBytes.count)
+↳ the ENOSPC is retried in the room the follow frees, and U is served: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 1500000, available: 1000000))
+↳ (try? uResult.get())?.byteSize == Int64(eBytes.count) → <not evaluated>
+✘ Test "PROBE-D-ENOSPC" with 2 test cases failed after 0.622 seconds with 1 issue.
+↳ /// PROBE-D-ENOSPC: D (4 MB, wanted only by A's user waiter) downloads; E (1.5 MB, U's user waiter) downloads beside
+↳ /// it in 6 MB of room. v3 moves A to a 16-byte content while the follow owes D's visit. The volume then shrinks to
+↳ /// 5 MB and E's attempt fails ENOSPC. Visited first, D is superseded, E's room is 5 MB, and the ENOSPC is retried
+↳ /// (`retryLater`): U is served. Decided first, E's room is 1 MB (D's 4 MB in flight) and E is parked
+↳ /// `insufficientSpace`, U answered with that shortage.
+✘ Suite "VerifyDDeferProbes" failed after 0.623 seconds with 1 issue.
+↳ /// Design probes (s3f structural design D1 "defer"). Never committed as is. Each compares the order "the follow's visit
+↳ /// first" with "the space decision first" and asserts the visit-first outcome in both, on code that compiles at 40ecd95
+↳ /// and with the design (only state both have is read).
+↳ ///
+↳ /// - PROBE-D-PUMP-PROMOTE: the pump starts a job that holds no moved id (J, prefetch, 3 MB) while the follow owes the
+↳ ///   visit that moves a user waiter's interest onto new content (N, 3 MB); 5 MB of room hold one of them.
+↳ /// - PROBE-D-PUMP-FREED: a user request (K, 3 MB) made during the owed follow is gated against room a downloading job the
+↳ ///   follow supersedes (D, 4 MB, wanted only by the moved id) still holds.
+↳ /// - PROBE-D-JOIN-FREED: a user waiter joins a job parked `insufficientSpace` (K, 3 MB, a prefetch group's) during the
+↳ ///   owed follow; the room is held by D as above. A second joiner cancels while its answer would wait.
+↳ /// - PROBE-D-REFOLLOW: the cycle-8 DROPPED-LANE setup, with a second follow started (`followApplied` again, as a later
+↳ ///   apply's follow restarts its visits) after the reclaim and before the follow's turns are released.
+↳ /// - PROBE-D-SHUTDOWN: shutdown while a sweep and a join wait for the follow: every waiter is answered `.shutDown`.
+↳ /// - PROBE-D-ENOSPC: an ENOSPC's verdict during the owed follow, on room a downloading job the follow supersedes holds.
+✘ Test run with 1 test in 1 suite failed after 0.623 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

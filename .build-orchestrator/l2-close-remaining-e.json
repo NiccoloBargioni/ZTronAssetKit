@@ -1,0 +1,50 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "test strength (R-OBS-1)",
+  "location": "Tests/ZTronAssetAppleHostedTests/AppleTransferTests.swift:368-380 and :382-411 (helper collectNotingIntervals at Tests/ZTronAssetAppleHostedTests/AppleTierFixture.swift:105-118)",
+  "problem": "Both R-OBS-1 tests catch the old ordering (interval.end() after deliver) only by chance, because they race the consumer's thread against the driver. Against that mutant they failed at repetition 319 of --repeat-until fail under load 16-30. The author saw repetition 76. A single CI run of the mutant would almost always pass. The fix itself is correct and deterministic: 3000 repetitions of both tests passed under load 25.",
+  "fix": "Add a regression test that drives PackTransferDriver.run() directly with a continuation the test creates. Set updates.onTermination to snapshot tap.lines.compactMap(LogIntervalEvent.init(line:)) into a Mutex. finish() runs that handler synchronously, so the snapshot is taken exactly when the stream ends. Then assert the snapshot == AppleTransferTests.closedInterval(of: request). I ran this probe in a scratch copy (.build-verify-e-close-reqs1/mut/obs/Tests/ZTronAssetAppleHostedTests/VerifierOBSProbe.swift). It failed 3 out of 3 single runs against the mutant and passed 200 out of 200 repetitions against the fixed driver."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "decision record (Mutex ruling)",
+  "location": "docs/adr-drafts/e.md:394-403 (Requests for the orchestrator, L2 close-out)",
+  "problem": "The Mutex ruling is recorded at e.md:379-385. The documents it overrides still say otherwise: ADR-003, and APPLE-API-VERIFICATION \u00a74.7 row 19 (\"Not allowed in production\") and item 7 (\"no Mutex in production\"). WP-E does not own those files, and nothing in e.md asks the orchestrator to amend them. A later verifier reading AAV row 19 would flag the three gated Mutex uses as violations.",
+  "fix": "Add a request to e.md's L2 close-out list: amend ADR-003 and AAV \u00a74.7 (row 19, item 7) at merge with the ratified exception. Mutex is allowed only inside code gated @available(iOS 26.0, macOS 26.0, *), never @unchecked, with no await or I/O in a critical section. List the three types: PackTransferStop, HashingChunkSource and FileHandleChunkReader."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "contract file change (informational)",
+  "location": "Sources/ZTronAssetAppleHosted/AppleHostedTier.swift:27-37",
+  "problem": "The contract file gained a new internal declaration: `static func resolve(..., select: (TierInputs) -> Result<AssetTier, TierUnavailable>)`. The public resolve now forwards to it. Every public, package and @available line in the four contract files is identical to l1-merged, so no contract signature changed. The overload is internal, documented as a test seam, and fixed to TierSelection.select in production, so it fits the E-13 ruling. The e.md header (lines 14-16) flags it. It is still a declaration added to an orchestrator-owned file after the ruling was written.",
+  "fix": "No code change. At merge, the orchestrator should acknowledge that this seam falls under the E-13 ratification when it numbers E-13 into DECISIONS."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "correctness / ADR-027 re-arm vs. the documented contract (residual of the claimTerminal fix)",
+  "location": "Sources/ZTronAssetAppleHosted/PackTransfer.swift:180-182 (forgetRelease inside conclude) vs :168-169 (doc says 'only when a staged copy is delivered') and :186-198 (deliver)",
+  "problem": "`conclude` claims the terminal, then re-arms the pack's release before `run()` yields anything. Between the claim and the yield there is an actor hop (`await self.parts.state.forgetRelease(pack)`) and `interval.end()`. If the consumer drops the stream in that window, `deliver` sees `.terminated` and discards the staged copy, but the release was already re-armed. So a pack can be released again when no consumer ever received a copy. That contradicts the doc comment at :168-169 and E-10's wording 'only a delivered staged copy re-arms'. PROBE-C1-6 reproduces run()'s exact steps through the `conclude` and `deliver` seams: conclude (staged, downloaded ZTronMedia), consumer task cancelled, deliver, reclaim. It printed 'PROBE-C1-6 copyDelivered=false copyLeft=false released=2 removes=2', so the expectation 'released == 1' failed. The pack is removed and downloaded once more per occurrence. This needs a fresh demand plus a drop in a sub-millisecond window each time, so it is not a loop. That is why it is non-blocking.",
+  "fix": "Re-arm only after a successful yield. Make `deliver` return whether the terminal was enqueued (`let delivered = !(updates.yield(terminal) is .terminated)`), have `conclude` return the pack to re-arm instead of calling `forgetRelease`, and in `run()` do `if delivered, let pack = rearm { await self.parts.state.forgetRelease(pack) }` after `deliver`. A reclaim that runs between the yield and the forget only skips the pack once (it is still marked released), which is harmless. Alternatively, reword the doc comment and E-10 to say 'claimed' and accept the narrow window. Add PROBE-C1-6 (in .build-verify-e-close-correct1/probes/pkg/Tests/Probe/CloseProbes.swift) as a regression test either way."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "design / ADR-027 'at most once per pack per catalog generation' (E-10(b) not explicitly ratified)",
+  "location": "Sources/ZTronAssetAppleHosted/PackTransfer.swift:180-182; Sources/ZTronAssetAppleHosted/AppleSourceState.swift:245-255; docs/adr-drafts/e.md E-10(b)",
+  "problem": "Re-arming on a staged on-demand copy is by design (E-10(b)). It means an asset that the retention scope excludes, but that its pack does hold, makes the source download the whole pack and remove it again on every request-then-maintenance cycle within one catalog generation. ADR-027 says the store evicts out-of-scope entries first, so this cycle is realistic for out-of-scope assets that are viewed on demand. PROBE-C1-1g (catalog = a adopted + x excluded and present, 4 rounds of transfer x then reclaim, one generation) printed 'PROBE-C1-1g released=5 removes=5 mediaEnsures=4 (one generation)'. ADR-027's decision text says 'at most once per pack per catalog generation'. The close-out rulings ratify E-1, E-4, E-15, E-13 and E-10's in-memory persistence, but not the (b) exception. This is not a regression: the close-out narrowed (b), it did not widen it.",
+  "fix": "Orchestrator: either ratify E-10(b) as an explicit ADR-027 amendment, accepting a whole-pack re-download per demand after release, or restrict the re-arm to the case (b) was written for. That case is an entry that was adopted in the last surveyed report: keep the adopted remote paths per media pack from `planRelease`, and forget only when `request.remotePath` is among them, never for an excluded-only entry. Add PROBE-C1-1g as a test of whichever behaviour is chosen."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "docs consistency (orchestrator-owned)",
+  "location": "docs/APPLE-API-VERIFICATION.md:212 (row 19 'Not allowed in production'), :269 ('no Mutex in production'); docs/DECISIONS.md ADR-003 context",
+  "problem": "The L2 close-out Mutex ruling is recorded only in docs/adr-drafts/e.md. AAV row 19 and \u00a74.7 item 7 still forbid Mutex in production, and the 'Requests for the orchestrator (L2 close-out)' list in e.md does not ask for those rows to be amended. I checked the ruling's premise at link level, so no code change is needed: the iOS object ZTronAssetAppleHosted.o (minos 15.0) imports every s15Synchronization and BackgroundAssets symbol as weak, and the macOS probe binary loads libswiftSynchronization.dylib and BackgroundAssets with LC_LOAD_WEAK_DYLIB.",
+  "fix": "At merge the orchestrator amends AAV row 19 / \u00a74.7 item 7 and ADR-003 with the ratified exception (Mutex only inside code gated @available(iOS 26.0, macOS 26.0, *); no await or I/O in a critical section). WP-E can add this to its request list in e.md."
+ }
+]

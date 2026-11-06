@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..151916c 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -417,7 +417,7 @@ package struct CircuitBreaker: Sendable, Hashable {
+         case .closed:
+             return .allow
+         case .open(let cause, let until, _):
+-            return now >= until ? .probe : .reject(cause, until: until)
++            return now > until ? .probe : .reject(cause, until: until)
+         case .halfOpen(let cause, _, let probe, let watchdog):
+             if let probe, probe != transfer, let watchdog, now < watchdog {
+                 return .reject(cause, until: watchdog)

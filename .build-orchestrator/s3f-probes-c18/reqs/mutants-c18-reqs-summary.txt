@@ -1,0 +1,145 @@
+08:04:20 rerouteOnPassKeepWhole: filter1 exit 1
+08:04:20     ✘ Test "R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome though a later apply moves it again (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMovedBeforeTests.swift:170:9: Expectation failed: bResult == .failure(.integrityFailure)
+08:04:20     ✘ Test run with 1 test in 1 suite failed after 1.764 seconds with 1 issue.
+08:04:20     # exit 1 after 6.8 s, load at end { 21.65 14.77 14.49 }
+08:04:20 rerouteOnPassKeepWhole: filter2 exit 1
+08:04:20     ✘ Test "R-INT-3: an id an apply moves back while a publication runs gets the publication's outcome though a later apply moves it again (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMovedBeforeTests.swift:170:9: Expectation failed: bResult == .failure(.integrityFailure)
+08:04:20     ✘ Test run with 1 test in 1 suite failed after 1.512 seconds with 1 issue.
+08:04:20     # exit 1 after 3.8 s, load at end { 22.16 14.99 14.57 }
+08:04:20 rerouteOnPassKeepWhole: reverted; sources diff: none
+08:04:36 takeOffAssetsKeep: filter1 exit 1
+08:04:36     ✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict at EngineFollowBarrierHopTests.swift:176:9: Expectation failed: !Self.reportsFailed("zz-b", in: outcome.events)
+08:04:36     ✘ Test "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierHopTests.swift:190:9: Expectation failed: !Self.reportsFailed("zz-b", in: outcome.events)
+08:04:36     ✘ Test run with 2 tests in 1 suite failed after 4.013 seconds with 2 issues.
+08:04:36     # exit 1 after 6.5 s, load at end { 19.51 14.66 14.46 }
+08:04:36 takeOffAssetsKeep: filter2 exit 1
+08:04:36     ✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict at EngineFollowBarrierHopTests.swift:176:9: Expectation failed: !Self.reportsFailed("zz-b", in: outcome.events)
+08:04:36     ✘ Test "R-SYN-4: an id an apply maps back to a content whose ENOSPC verdict waits joins it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierHopTests.swift:190:9: Expectation failed: !Self.reportsFailed("zz-b", in: outcome.events)
+08:04:36     ✘ Test run with 2 tests in 1 suite failed after 3.971 seconds with 2 issues.
+08:04:36     # exit 1 after 5.7 s, load at end { 18.19 14.46 14.39 }
+08:04:36 takeOffAssetsKeep: reverted; sources diff: none
+08:05:07 vaStampDrop: filter1 exit 1
+08:05:07     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFastLater at EngineFollowBarrierVerdictLaneTests.swift:226:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+08:05:07     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFastLater at EngineFollowBarrierVerdictLaneTests.swift:231:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+08:05:07     ✘ Test run with 1 test in 1 suite failed after 11.752 seconds with 2 issues.
+08:05:07     # exit 1 after 14.1 s, load at end { 14.96 13.93 14.20 }
+08:05:07 vaStampDrop: filter2 exit 1
+08:05:07     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFastLater at EngineFollowBarrierVerdictLaneTests.swift:226:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+08:05:07     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFastLater at EngineFollowBarrierVerdictLaneTests.swift:231:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+08:05:07     ✘ Test run with 1 test in 1 suite failed after 11.678 seconds with 2 issues.
+08:05:07     # exit 1 after 13.4 s, load at end { 12.66 13.48 14.03 }
+08:05:07 vaStampDrop: reverted; sources diff: none
+08:05:17 retryAfterWallDrop: filter1 exit 1
+08:05:17     ✘ Test "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRetryTests.swift:222:9: Expectation failed: after.map { abs($0 - 31) < 0.001 } == true
+08:05:17     ✘ Test "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRetryTests.swift:223:9: Expectation failed: cStarts == 1
+08:05:17     ✘ Test run with 1 test in 1 suite failed after 0.903 seconds with 2 issues.
+08:05:17     # exit 1 after 3.2 s, load at end { 11.97 13.32 13.97 }
+08:05:17 retryAfterWallDrop: filter2 exit 1
+08:05:17     ✘ Test "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRetryTests.swift:222:9: Expectation failed: after.map { abs($0 - 31) < 0.001 } == true
+08:05:17     ✘ Test "R-SYN-4: a Retry-After date is read at the response's arrival though its verdict waits for a follow (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRetryTests.swift:223:9: Expectation failed: cStarts == 1
+08:05:17     ✘ Test run with 1 test in 1 suite failed after 0.970 seconds with 2 issues.
+08:05:17     # exit 1 after 2.7 s, load at end { 11.41 13.18 13.92 }
+08:05:17 retryAfterWallDrop: reverted; sources diff: none
+08:05:50 vaWallDrop: filter1 exit 1
+08:05:50     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:224:13: Expectation failed: outcome.throttled
+08:05:50     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:226:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+08:05:50     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:231:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+08:05:50     ✘ Test run with 1 test in 1 suite failed after 11.597 seconds with 3 issues.
+08:05:50     # exit 1 after 13.9 s, load at end { 9.23 12.57 13.68 }
+08:05:50 vaWallDrop: filter2 exit 1
+08:05:50     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:224:13: Expectation failed: outcome.throttled
+08:05:50     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:226:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+08:05:50     ✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterDateLater at EngineFollowBarrierVerdictLaneTests.swift:231:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+08:05:50     ✘ Test run with 1 test in 1 suite failed after 13.414 seconds with 3 issues.
+08:05:50     # exit 1 after 15.2 s, load at end { 11.29 12.83 13.75 }
+08:05:50 vaWallDrop: reverted; sources diff: none
+08:06:09 applyWalkDrop: filter1 exit 1
+08:06:09     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:09     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:09     ✘ Test run with 2 tests in 1 suite failed after 5.169 seconds with 2 issues.
+08:06:09     # exit 1 after 8.1 s, load at end { 13.52 13.26 13.90 }
+08:06:09 applyWalkDrop: filter2 exit 1
+08:06:09     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:09     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:09     ✘ Test run with 2 tests in 1 suite failed after 4.378 seconds with 2 issues.
+08:06:09     # exit 1 after 6.2 s, load at end { 11.89 12.92 13.77 }
+08:06:09 applyWalkDrop: reverted; sources diff: none
+08:06:21 catchUpWalkDrop: filter1 exit 1
+08:06:21     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:21     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:21     ✘ Test run with 1 test in 1 suite failed after 2.207 seconds with 2 issues.
+08:06:21     # exit 1 after 4.6 s, load at end { 11.26 12.77 13.71 }
+08:06:21 catchUpWalkDrop: filter2 exit 1
+08:06:21     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:21     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+08:06:21     ✘ Test run with 1 test in 1 suite failed after 2.194 seconds with 2 issues.
+08:06:21     # exit 1 after 3.9 s, load at end { 10.68 12.63 13.65 }
+08:06:21 catchUpWalkDrop: reverted; sources diff: none
+08:13:14 inboundMovesNowUnbounded: filter1 exit 1
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierConvergenceTests.swift:121:17: Expectation failed: left.owed && left.moves == count - SyncEngine.inboundMovesNow
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .publication at EngineFollowBarrierConvergenceTests.swift:163:6: Time limit was exceeded: 180.000 seconds
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .publication at EngineFollowBarrierConvergenceTests.swift:121:17: Expectation failed: left.owed && left.moves == count - SyncEngine.inboundMovesNow
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween at EngineFollowBarrierConvergenceTests.swift:121:17: Expectation failed: left.owed && left.moves == count - SyncEngine.inboundMovesNow
+08:13:14     ✘ Test run with 1 test in 1 suite failed after 194.076 seconds with 4 issues.
+08:13:14     # exit 1 after 197.0 s, load at end { 9.66 11.89 13.18 }
+08:13:14 inboundMovesNowUnbounded: filter2 exit 1
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierConvergenceTests.swift:121:17: Expectation failed: left.owed && left.moves == count - SyncEngine.inboundMovesNow
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .publication at EngineFollowBarrierConvergenceTests.swift:163:6: Time limit was exceeded: 180.000 seconds
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .publication at EngineFollowBarrierConvergenceTests.swift:121:17: Expectation failed: left.owed && left.moves == count - SyncEngine.inboundMovesNow
+08:13:14     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween at EngineFollowBarrierConvergenceTests.swift:121:17: Expectation failed: left.owed && left.moves == count - SyncEngine.inboundMovesNow
+08:13:14     ✘ Test run with 1 test in 1 suite failed after 198.255 seconds with 4 issues.
+08:13:14     # exit 1 after 200.6 s, load at end { 35.28 18.99 15.59 }
+08:13:14 inboundMovesNowUnbounded: reverted; sources diff: none
+08:18:15 followedLanePendingHereDrop: bundle1 exit 0
+08:18:15     ✔ Test run with 543 tests in 53 suites passed after 235.210 seconds.
+08:18:15     # exit 0 after 239.6 s, load at end { 30.67 45.11 30.61 }
+08:18:15 followedLanePendingHereDrop: reverted; sources diff: none
+08:21:27 followedLanePendingFilterDrop: bundle1 exit 0
+08:21:27     ✔ Test run with 543 tests in 53 suites passed after 183.814 seconds.
+08:21:27     # exit 0 after 187.1 s, load at end { 10.61 31.52 27.99 }
+08:21:27 followedLanePendingFilterDrop: reverted; sources diff: none
+08:24:08 findInboundPendingDrop: bundle1 exit 0
+08:24:08     ✔ Test run with 543 tests in 53 suites passed after 154.798 seconds.
+08:24:08     # exit 0 after 157.1 s, load at end { 6.06 21.25 24.39 }
+08:24:08 findInboundPendingDrop: reverted; sources diff: none
+08:26:46 shutdownReleaseInboundWaitsDrop: bundle1 exit 0
+08:26:46     ✔ Test run with 543 tests in 53 suites passed after 151.708 seconds.
+08:26:46     # exit 0 after 154.1 s, load at end { 5.51 15.45 21.53 }
+08:26:46 shutdownReleaseInboundWaitsDrop: reverted; sources diff: none
+08:31:07 inboundMadeHolderResumeDrop: bundle1 exit 0
+08:31:07     ✔ Test run with 543 tests in 53 suites passed after 254.882 seconds.
+08:31:07     # exit 0 after 257.4 s, load at end { 48.00 29.39 25.76 }
+08:31:07 inboundMadeHolderResumeDrop: reverted; sources diff: none
+09:15:28 inboundTargetFailedDrop: bundle1 exit 1
+09:15:28     ✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:135:9: Expectation failed: nSecond != nil && (wFirst == nil || nSecond! < wFirst!)
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierConvergenceTests.swift:163:6: Time limit was exceeded: 180.000 seconds
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierConvergenceTests.swift:179:9: Expectation failed: wrong.isEmpty
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween at EngineFollowBarrierConvergenceTests.swift:179:9: Expectation failed: wrong.isEmpty
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween at EngineFollowBarrierConvergenceTests.swift:181:13: Expectation failed: outcome.zStarts == 0
+09:15:28     ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierHopTests.swift:327:13: Expectation failed: outcome.b == .failure(.notFound)
+09:15:28     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:220:6: Time limit was exceeded: 180.000 seconds
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:224:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:220:6: Time limit was exceeded: 180.000 seconds
+09:15:28     ✘ Test run with 543 tests in 53 suites failed after 723.328 seconds with 21 issues.
+09:15:28     # exit 1 after 726.4 s, load at end { 7.53 23.00 40.60 }
+09:15:28 inboundTargetFailedDrop: bundle2 exit 1
+09:15:28     ✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:135:9: Expectation failed: nSecond != nil && (wFirst == nil || nSecond! < wFirst!)
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierConvergenceTests.swift:163:6: Time limit was exceeded: 180.000 seconds
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierConvergenceTests.swift:179:9: Expectation failed: wrong.isEmpty
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween at EngineFollowBarrierConvergenceTests.swift:179:9: Expectation failed: wrong.isEmpty
+09:15:28     ✘ Test "R-SYN-4: ids converging on one content while a follow is owed get its outcome, the moves made over the follow's turns (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .applyBetween at EngineFollowBarrierConvergenceTests.swift:181:13: Expectation failed: outcome.zStarts == 0
+09:15:28     ✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierHopTests.swift:327:13: Expectation failed: outcome.b == .failure(.notFound)
+09:15:28     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest an apply moves onto a publishing content gets the publication's outcome, though the next apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:200:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content gets the publication's outcome, though a catch-up follows the next manifest (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:211:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:220:6: Time limit was exceeded: 180.000 seconds
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .smallPublisher at EngineFollowBarrierPublicationHopTests.swift:224:9: Expectation failed: outcome.w == .failure(.integrityFailure)
+09:15:28     ✘ Test "R-INT-3: an interest moved onto a publishing content and mapped back gets the publication's outcome, not its old job's bytes (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .largePublisher at EngineFollowBarrierPublicationHopTests.swift:220:6: Time limit was exceeded: 180.000 seconds
+09:15:28     ✘ Test run with 543 tests in 53 suites failed after 711.369 seconds with 21 issues.
+09:15:28     # exit 1 after 713.2 s, load at end { 2.06 3.44 15.17 }
+09:15:28 inboundTargetFailedDrop: reverted; sources diff: none

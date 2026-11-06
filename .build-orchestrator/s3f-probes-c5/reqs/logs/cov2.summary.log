@@ -1,0 +1,9 @@
+✔ Test run with 151 tests in 16 suites passed after 0.510 seconds.
+✔ Test "R-SYN-11: one space sweep turn during an owed follow follows at most followsPerTurn jobs and leaves the rest to its follow-up sweep (C2)" passed after 3.133 seconds.
+✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 10.497 seconds.
+✔ Test run with 406 tests in 52 suites passed after 10.663 seconds.
+✔ Test run with 459 tests in 60 suites passed after 63.515 seconds.
+✔ Test run with 84 tests in 18 suites passed after 60.440 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.296 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.357 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.394 seconds.

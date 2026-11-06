@@ -1,0 +1,4 @@
+752c752
+<             guard !self.followBeforeActing(transfer), let parked = self.state.jobs[transfer] else {
+---
+>             guard let parked = self.state.jobs[transfer] else {

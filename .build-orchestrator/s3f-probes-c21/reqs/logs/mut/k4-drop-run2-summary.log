@@ -1,0 +1,2 @@
+✘ Test "R-SYN-15: an event that waits for a follow once the engine stopped running is reported (F-28)" recorded an issue at EngineFollowShutdownTests.swift:96:9: Expectation failed: forced == ["1 events wait for a follow while the engine is shutDown"]
+✘ Test run with 1 test in 1 suite failed after 0.010 seconds with 1 issue.

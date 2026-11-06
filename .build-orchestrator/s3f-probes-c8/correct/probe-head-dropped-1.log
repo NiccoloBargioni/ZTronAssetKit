@@ -1,0 +1,76 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC8CorrectProbes" started.
+◇ Test "PROBE-C8-DROPPED: a job whose only id the copy dropped is not admitted ahead of a user job" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C8-DROPPED: a job whose only id the copy dropped is not admitted ahead of a user job" started.
+PROBE-C8-dropped visitFirst=true before: (owed: false, cHolds: nil, cAwaits: nil, cRank: nil, cTicket: nil, kRank: Optional(0), kTicket: Optional(4), c: nil, k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C8-dropped visitFirst=true afterSweep: (owed: false, c: nil, cAdmitted: false, k: Optional(ZTronAssetSync.JobState.downloading), kError: nil, violations: [])
+PROBE-C8-dropped visitFirst=true kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/10/104766510d8f980647ad8e95ab1fc47a261412c724b515e0fedc11f3e65158d0.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) aResult: failure(ZTronAssetModel.AssetError.notFound) bResult: -
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C8-DROPPED: a job whose only id the copy dropped is not admitted ahead of a user job" started.
+PROBE-C8-dropped visitFirst=false before: (owed: true, cHolds: Optional(false), cAwaits: Optional(true), cRank: Optional(0), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C8-dropped visitFirst=false afterSweep: (owed: true, c: Optional(ZTronAssetSync.JobState.queued), cAdmitted: true, k: nil, kError: nil, violations: [])
+PROBE-C8-dropped visitFirst=false kResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000)) aResult: failure(ZTronAssetModel.AssetError.notFound) bResult: -
+✘ Test "PROBE-C8-DROPPED: a job whose only id the copy dropped is not admitted ahead of a user job" recorded an issue with 1 argument visitFirst → false at VerifyC8CorrectProbes.swift:182:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ PROBE-C8-dropped: K's user waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "PROBE-C8-DROPPED: a job whose only id the copy dropped is not admitted ahead of a user job" with 2 test cases failed after 0.817 seconds with 1 issue.
+↳ /// C is wanted only by A (user); v3 drops A's id.
+◇ Test "PROBE-C8-DROPPED-KEEP: a job whose user lane comes from a dropped id is judged at its prefetch place" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C8-DROPPED-KEEP: a job whose user lane comes from a dropped id is judged at its prefetch place" started.
+PROBE-C8-dropped-keep visitFirst=true before: (owed: false, cHolds: Optional(false), cAwaits: Optional(false), cRank: Optional(2), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C8-dropped-keep visitFirst=true afterSweep: (owed: false, c: nil, cAdmitted: false, k: Optional(ZTronAssetSync.JobState.verifying), kError: nil, violations: [])
+PROBE-C8-dropped-keep visitFirst=true kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/10/104766510d8f980647ad8e95ab1fc47a261412c724b515e0fedc11f3e65158d0.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) aResult: failure(ZTronAssetModel.AssetError.notFound) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 2999000))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C8-DROPPED-KEEP: a job whose user lane comes from a dropped id is judged at its prefetch place" started.
+PROBE-C8-dropped-keep visitFirst=false before: (owed: true, cHolds: Optional(false), cAwaits: Optional(true), cRank: Optional(0), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C8-dropped-keep visitFirst=false afterSweep: (owed: true, c: Optional(ZTronAssetSync.JobState.queued), cAdmitted: true, k: nil, kError: nil, violations: [])
+PROBE-C8-dropped-keep visitFirst=false kResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000)) aResult: failure(ZTronAssetModel.AssetError.notFound) bResult: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e8/e8816bfee3ba0ee1b0814a7112095be7e17ed9afee04415d66eeebe0ac02c903.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "PROBE-C8-DROPPED-KEEP: a job whose user lane comes from a dropped id is judged at its prefetch place" recorded an issue with 1 argument visitFirst → false at VerifyC8CorrectProbes.swift:182:9: Expectation failed: (try? kResult.get())?.byteSize == Int64(kBytes.count)
+↳ PROBE-C8-dropped-keep: K's user waiter is answered from its content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 999000))
+↳ (try? kResult.get())?.byteSize == Int64(kBytes.count) → <not evaluated>
+✘ Test "PROBE-C8-DROPPED-KEEP: a job whose user lane comes from a dropped id is judged at its prefetch place" with 2 test cases failed after 0.864 seconds with 1 issue.
+↳ /// C is wanted by A (user) and B (prefetch); v3 drops A's id and keeps B's: C's user lane comes only from the
+↳ /// dropped id.
+◇ Test "PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume" started.
+◇ Test case passing 1 argument visitFirst → true to "PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume" started.
+PROBE-C8-dropped-lane visitFirst=true before: (owed: false, cHolds: Optional(false), cAwaits: Optional(false), cRank: Optional(2), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C8-dropped-lane visitFirst=true afterSweep: (owed: false, c: Optional(ZTronAssetSync.JobState.downloading), cAdmitted: true, k: Optional(ZTronAssetSync.JobState.downloading), kError: nil, violations: [])
+PROBE-C8-dropped-lane visitFirst=true kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/10/104766510d8f980647ad8e95ab1fc47a261412c724b515e0fedc11f3e65158d0.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) aResult: failure(ZTronAssetModel.AssetError.notFound) bResult: success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/e8/e8816bfee3ba0ee1b0814a7112095be7e17ed9afee04415d66eeebe0ac02c903.png, fileExtension: png, byteSize: 5000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+◇ Test case passing 1 argument visitFirst → false to "PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume" started.
+PROBE-C8-dropped-lane visitFirst=false before: (owed: true, cHolds: Optional(false), cAwaits: Optional(true), cRank: Optional(0), cTicket: Optional(3), kRank: Optional(0), kTicket: Optional(4), c: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)), k: Optional(ZTronAssetSync.JobState.blocked(ZTronAssetModel.BlockReason.awaitingSpace)))
+PROBE-C8-dropped-lane visitFirst=false afterSweep: (owed: true, c: nil, cAdmitted: false, k: Optional(ZTronAssetSync.JobState.downloading), kError: nil, violations: [])
+✘ Test "PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume" recorded an issue with 1 argument visitFirst → false at VerifyC8CorrectProbes.swift:178:17: Expectation failed: (try? bResult.get())?.byteSize == 5_000_000
+↳ PROBE-C8-dropped-lane: B's prefetch waiter is answered from C's content: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+↳ (try? bResult.get())?.byteSize == 5_000_000 → <not evaluated>
+PROBE-C8-dropped-lane visitFirst=false kResult: success(ZTronAssetModel.AssetLocation(id: zz-k, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/10/104766510d8f980647ad8e95ab1fc47a261412c724b515e0fedc11f3e65158d0.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) aResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078)) bResult: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+✘ Test "PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume" recorded an issue with 1 argument visitFirst → false at VerifyC8CorrectProbes.swift:187:13: Expectation failed: aResult == .failure(.notFound)
+↳ A's dropped id is answered notFound: failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+↳ aResult == .failure(.notFound) → false
+↳   aResult → failure(ZTronAssetModel.AssetError.insufficientSpace(required: 5000000, available: 4000078))
+↳     failure → .insufficientSpace(required: 5000000, available: 4000078)
+↳       insufficientSpace → (required: 5000000, available: 4000078)
+↳         required → 5000000
+↳         available → 4000078
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "PROBE-C8-DROPPED-LANE: a job whose user lane comes from a dropped id is judged on its own lane's volume" with 2 test cases failed after 0.836 seconds with 2 issues.
+↳ /// C (5 MB) is wanted by A (user) and B (prefetch); v3 drops A's id and keeps B's. After the reclaim the important
+↳ /// volume has 4 MB and the opportunistic one 12 MB. Followed first, C is prefetch work judged after K (3 MB, user,
+↳ /// important room): K fits, and C fits the opportunistic room K leaves (9 MB), so B is served. Judged at its
+↳ /// pre-follow user place, C does not fit the important room and is parked: B's prefetch waiter is answered
+↳ /// `insufficientSpace` although C's own lane has room.
+✘ Suite "VerifyC8CorrectProbes" failed after 2.518 seconds with 4 issues.
+↳ /// Scratch probes (s3f close-out verification, cycle 8, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C8-RANK-*: the cycle-7 blocking scenarios (ADMIT, PARK, PROMOTE) re-run against the cycle-8 code, in both
+↳ /// visit orders.
+↳ ///
+↳ /// PROBE-C8-DROPPED*: the sweep's pre-phase follows only jobs that `holdsMovedID`, which does not count an id the copy no
+↳ /// longer lists. A space-parked job whose user lane comes from a DROPPED id (v3 no longer lists it) is judged at its
+↳ /// pre-follow user place, re-queued and counted `ahead`, although it cannot start (`awaitsFollow`) and the follow's visit
+↳ /// will end the dropped id's interest `.notFound` (and supersede the job, or lower it to prefetch). The user job K behind
+↳ /// it is parked `insufficientSpace` and its waiter answered with a shortage. Visited first, the follow removes the
+↳ /// dropped interest and the same sweep serves K.
+✘ Test run with 3 tests in 1 suite failed after 2.518 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

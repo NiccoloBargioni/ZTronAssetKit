@@ -1,0 +1,8 @@
+08:23:17 build start load={ 8.36 24.61 25.72 } phase=sync2
+08:23:40 build exit 0 load={ 7.21 23.04 25.12 } phase=sync2
+08:23:40 run sharedDivergenceProbe start load={ 7.21 23.04 25.12 } phase=sync2
+08:23:47 run sharedDivergenceProbe exit 1 load={ 7.04 22.74 25.00 } phase=sync2
+08:23:47 run concentrationCommitProbe start load={ 7.04 22.74 25.00 } phase=sync2
+08:23:55 run concentrationCommitProbe exit 1 load={ 6.65 22.13 24.76 } phase=sync2
+08:23:55 run divergenceProbe start load={ 6.65 22.13 24.76 } phase=sync2
+08:24:05 run divergenceProbe exit 1 load={ 6.24 21.54 24.51 } phase=sync2

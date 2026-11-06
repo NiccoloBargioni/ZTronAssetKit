@@ -1,0 +1,15 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift
+index eb6f8c8..eac7b8f 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift
+@@ -341,9 +341,7 @@ extension AssetStore {
+         record.residency = .present(blob: key, byteSize: size, integrity: record.entry.checksum == key.hash ? .verified : .unverified)
+         record.storedAt = now
+         self.state.core.records[id] = record
+-        if let previous, previous != key {
+-            self.releaseReference(previous, dooming: .unreferenced)
+-        }
++        _ = previous // MUTANT S3-CONF-06: the previous blob is never released
+         self.state.core.commits.dirtyFanOuts.insert(key.hash.fanOut)
+         self.refreshPresentEntry(id)
+         return true

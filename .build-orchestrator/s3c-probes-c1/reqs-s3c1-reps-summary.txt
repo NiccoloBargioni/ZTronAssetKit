@@ -1,0 +1,14 @@
+loopback-tsan 18:40:02 load averages: 6.13 34.49 63.38
+exit 0
+✔ Test run with 26 tests in 1 suite passed after 0.271 seconds.
+tsan20 18:40:05 load averages: 5.88 33.97 63.03
+exit 0
+✔ Test run with 133 tests in 13 suites passed after 36.091 seconds.
+x=0 tsan=0 reps=3591
+fresh50 18:40:43 load averages: 9.38 31.43 60.77
+exits0=50 passes=50 x=0 tsan=0
+debug200 18:42:36 load averages: 13.21 25.45 54.82
+exit 0
+✔ Test run with 133 tests in 13 suites passed after 102.344 seconds.
+x=0
+DONE 18:44:19 load averages: 40.18 29.97 53.07

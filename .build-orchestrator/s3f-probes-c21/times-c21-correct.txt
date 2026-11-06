@@ -1,0 +1,58 @@
+perfbuild start 17:57:37 { 15.59 8.35 11.71 }
+perfbuild exit 0 18:02:13 { 44.54 25.92 18.36 }
+bench start 18:02:30 { 35.62 24.86 18.12 }
+bench exit 1 18:11:45 { 4.19 9.47 13.18 }
+pbrel start 18:14:26 { 2.85 6.71 11.40 }
+pbrel exit 1 18:15:43 { 24.32 12.76 13.31 }
+pbrel2 start 18:16:22 { 18.64 12.63 13.23 }
+pbrel2 exit 1 18:17:00 { 11.82 11.62 12.83 }
+pbrel3 start 18:17:07 { 11.03 11.46 12.77 }
+pbrel3 exit 0 18:20:04 { 21.24 14.90 13.92 }
+pin start 18:20:12 { 19.70 14.69 13.85 }
+pin exit 1 18:20:14 { 18.28 14.48 13.78 }
+quick start 18:32:57 { 58.98 141.06 95.94 }
+tsan-build start 18:41:31 { 72.60 84.78 84.03 }
+tsan-build exit 0 18:44:53 { 116.32 106.07 93.56 }
+quick exit 0 18:54:06 { 237.92 378.49 261.17 }
+release start 18:54:33 { 188.58 355.64 256.33 }
+iosgen start 18:54:42 { 183.16 348.97 255.12 }
+iosgen exit 0 18:55:26 { 161.09 318.75 248.75 }
+release exit 0 18:56:25 { 125.34 281.84 239.38 }
+sync1 start 18:56:25 { 125.34 281.84 239.38 }
+lock taken 19:03:16 { 113.32 250.08 246.60 } for: bash /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c21-correct/tools/sim.sh
+sync1 exit 0 19:14:18 { 69.16 195.02 234.29 }
+sync2 start 19:14:18 { 69.16 195.02 234.29 }
+sim-test exit 0 19:21:23 { 26.86 89.53 165.19 }
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+sim shutdown 149 19:21:23
+lock freed 19:21:23 rc 0 { 26.86 89.53 165.19 }
+gates2 chain stopped after sync2 (pid 42949 killed to free the CPU for probes) 19:21:59 { 16.81 80.07 158.69 }
+sync2 done 19:23:14 { 8.23 63.38 145.72 }
+purgeq start 19:23:23 { 7.65 61.44 144.07 }
+purgeq exit 1 19:23:26 { 7.65 61.44 144.07 }
+purgej start 19:23:26 { 7.65 61.44 144.07 }
+purgej exit 1 19:23:49 { 6.88 56.94 140.05 }
+apm start 19:23:49 { 6.88 56.94 140.05 }
+apm exit 0 19:24:21 { 5.92 51.91 135.35 }
+c20s start 19:24:21 { 5.92 51.91 135.35 }
+c20s exit 0 19:24:29 { 5.78 50.37 133.82 }
+reqs start 19:24:29 { 5.78 50.37 133.82 }
+reqs exit 1 19:24:36 { 6.28 49.73 133.11 }
+sup start 19:24:36 { 6.28 49.73 133.11 }
+sup exit 0 19:24:42 { 6.09 48.97 132.35 }
+parts start 19:25:55 { 5.01 39.04 121.54 }
+parts exit 1 19:25:58 { 4.85 38.44 120.84 }
+purgeq2 start 19:25:58 { 4.85 38.44 120.84 }
+purgeq2 exit 1 19:26:01 { 4.85 38.44 120.84 }
+alone start 19:26:27 { 15.43 38.10 118.33 }
+alone exit 1 19:27:25 { 50.23 43.57 114.88 }
+sync3 start 19:27:40 { 57.85 45.70 114.40 }
+sync3 exit 0 19:33:42 { 5.91 19.48 78.12 }
+tsan start 19:33:42 { 5.91 19.48 78.12 }
+tsan exit 0 20:02:00 { 3.12 3.32 14.09 }
+lock taken 20:02:00 { 3.12 3.32 14.09 } for: bash /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c21-correct/tools/cov.sh
+cov-test exit 0 20:10:59 { 4.92 7.35 12.41 }
+lock freed 20:10:59 rc 0 { 4.92 7.35 12.41 }
+alone2 start 20:11:51 { 3.78 6.65 11.86 }
+alone2 exit 1 20:12:16 { 3.56 6.37 11.61 }

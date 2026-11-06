@@ -1,0 +1,27 @@
+=== base build 02:29:29 { 215.04 169.93 89.31 }
+base build exit 0
+=== probes run 1 02:29:41 { 198.38 168.48 90.20 }
+probes run 1 exit 1
+✘ Test run with 8 tests in 5 suites failed after 64.133 seconds with 1 issue.
+✔ Test "PROBE-C9-THROTTLE" with 2 test cases passed after 2.014 seconds.
+✔ Test "PROBE-C11R-COMMIT-REROUTE" with 2 test cases passed after 2.114 seconds.
+✔ Test "PROBE-C10-THROTTLE-LANE" with 2 test cases passed after 2.729 seconds.
+✔ Test "PROBE-C11-JOIN-THROTTLE-EXT" with 2 test cases passed after 2.757 seconds.
+✔ Test "PROBE-C11-JOIN-THROTTLE-END" with 2 test cases passed after 1.143 seconds.
+✔ Test "PROBE-C11-MANIFEST-THROTTLE" with 2 test cases passed after 0.955 seconds.
+✔ Test "PROBE-C11-COMMIT-PLACE" with 2 test cases passed after 0.996 seconds.
+✘ Test "PROBE-C11R-RE-PENDING-RUN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyREProbe.swift:25:6: Time limit was exceeded: 60.000 seconds
+✘ Test "PROBE-C11R-RE-PENDING-RUN" with 2 test cases failed after 64.132 seconds with 1 issue.
+=== probes run 2 02:30:50 { 100.69 145.00 87.50 }
+probes run 2 exit 1
+✘ Test run with 8 tests in 5 suites failed after 64.059 seconds with 1 issue.
+✔ Test "PROBE-C9-THROTTLE" with 2 test cases passed after 1.506 seconds.
+✔ Test "PROBE-C11R-COMMIT-REROUTE" with 2 test cases passed after 1.524 seconds.
+✔ Test "PROBE-C11-JOIN-THROTTLE-EXT" with 2 test cases passed after 2.325 seconds.
+✔ Test "PROBE-C10-THROTTLE-LANE" with 2 test cases passed after 2.409 seconds.
+✔ Test "PROBE-C11-JOIN-THROTTLE-END" with 2 test cases passed after 1.501 seconds.
+✔ Test "PROBE-C11-MANIFEST-THROTTLE" with 2 test cases passed after 1.477 seconds.
+✔ Test "PROBE-C11-COMMIT-PLACE" with 2 test cases passed after 1.627 seconds.
+✘ Test "PROBE-C11R-RE-PENDING-RUN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyREProbe.swift:25:6: Time limit was exceeded: 60.000 seconds
+✘ Test "PROBE-C11R-RE-PENDING-RUN" with 2 test cases failed after 64.059 seconds with 1 issue.
+=== done 02:31:57

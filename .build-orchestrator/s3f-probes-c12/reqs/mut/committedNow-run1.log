@@ -1,0 +1,42 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:469:9: Expectation failed: nIndex != nil && wIndex != nil && nIndex! < wIndex!
+↳ N, queued by C's visit at the apply, starts before W (visit-first): n=Optional(4) w=Optional(3)
+↳ nIndex != nil && wIndex != nil && nIndex! < wIndex! → false
+↳   nIndex != nil && wIndex != nil → true
+↳   nIndex! < wIndex! → false
+✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" with 2 test cases failed after 1.018 seconds with 1 issue.
+↳ /// A commit that arrives while the follow owes the visit of its job's moved id leaves that id's re-route to the
+↳ /// visit, at the follow's place: two slots. C (1 MB, content X) downloads for A's user waiter (zz-a) and B's (zz-b);
+↳ /// H (100 kB) holds the other slot for a user waiter. v3 moves zz-a to N (16 bytes) while the follow owes C's visit.
+↳ /// W's user request (zz-w) then arrives, and C's bytes complete. Visited first, C's visit re-routed A to a new job N
+↳ /// at the apply, queued ahead of W; C's commit freed a slot and N started before W. Re-routed by the commit, A's join
+↳ /// waited behind W's, so W took the freed slot (PROBE-C11-COMMIT-PLACE).
+◇ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:528:9: Expectation failed: after.n == .downloading && after.r == .queued
+↳ N, created by C's visit before R's request, takes the slot C's commit frees (visit-first): (n: Optional(ZTronAssetSync.JobState.queued), r: Optional(ZTronAssetSync.JobState.downloading))
+↳ after.n == .downloading && after.r == .queued → false
+↳   after.n == .downloading → false
+↳   after.r == .queued → <not evaluated>
+✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" with 2 test cases failed after 1.425 seconds with 1 issue.
+↳ /// The slot a commit frees while the follow owes the visit of its job's moved id goes to the job that visit
+↳ /// creates: two slots. C (100 kB, content X) downloads for A's user waiter (zz-a) and B's (zz-b); H downloads for a
+↳ /// third user waiter. v3 moves zz-a to N (16 bytes) while the follow owes C's visit. R (zz-r) is then requested for
+↳ /// user work, and C completes. Visited first, C's visit re-routed A to N before R's request, so N took its queue
+↳ /// place first and took the slot C's commit freed; R waited. Re-routed by the commit, A's join waited behind R's,
+↳ /// and R took the slot (PROBE-C11R-COMMIT-REROUTE).
+✘ Suite "Engine follow barrier (F-28)" failed after 2.443 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 2.443 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

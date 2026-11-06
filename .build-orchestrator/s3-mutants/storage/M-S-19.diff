@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Cleanup/StagingCollection.swift b/Sources/ZTronAssetStorage/Cleanup/StagingCollection.swift
+index 6c65afe..e3382af 100644
+--- a/Sources/ZTronAssetStorage/Cleanup/StagingCollection.swift
++++ b/Sources/ZTronAssetStorage/Cleanup/StagingCollection.swift
+@@ -67,7 +67,7 @@ enum StagingCollection {
+             if age > policy.stagingMaxAge {
+                 return true
+             }
+-            return !claimed.contains(name.transfer) && age > policy.stagingClaimGrace
++            return age > policy.stagingClaimGrace
+         }
+     }
+ }

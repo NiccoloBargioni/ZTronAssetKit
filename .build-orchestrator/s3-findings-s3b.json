@@ -1,0 +1,489 @@
+[
+ {
+  "blocking": true,
+  "area": "BLOCKING S3B-1",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift:70 and :85 (currentAvailability(of:))",
+  "problem": "S3-SECU-01: `report.bytesMissing += entry.byteSize ?? 0` is a plain, trapping Int64 addition over byte sizes the manifest declares. Every other figure built from manifest sizes saturates (PlanBuilder.adding, InFlightBytes, addingSaturating in 26 places, SizeGuard, PackProgressScaler), and the transport explicitly supports `maxAssetBytes = Int64.max` meaning 'unlimited' (Tests/ZTronAssetTransportTests/ArithmeticSafetyTests.swift:100, extremeConfiguredCaps). With that public configuration (AssetClientConfiguration.limits), a manifest whose missing entries declare sizes summing past Int64.max (two entries of 2^62 bytes are enough) crashes the process on the first availability(scope:) or ensureAvailable(scope:) call. The path is AssetClient.availability (AssetClient.swift:210) \u2192 SyncEngine.performAvailability \u2192 store.availability, and EngineCommands.swift:601/705 for ensureAvailable. The default limits cannot overflow, because 100,000 \u00d7 4 GiB is below Int64.max. The crash needs maxAssetBytes \u00d7 maxEntries > Int64.max, so it is reachable only under a non-default but documented and tested configuration.",
+  "fix": "Saturate both additions in `currentAvailability(of:)` (`AssetStore+Reads.swift:70`, `:85`) with the store's existing `Int64.addingSaturating`; the probe becomes the regression test (expects `bytesMissing == Int64.max`, `missing == 2`). Check every other sum over manifest-declared sizes in WP-B's files for the same trap and list them in the draft.",
+  "detail": {
+   "id": "S3-SECU-01",
+   "kind": "hunt",
+   "lens": "security",
+   "location": "Sources/ZTronAssetStorage/Store/AssetStore+Reads.swift:70 and :85 (currentAvailability(of:))",
+   "requirements": "R-MAN-2 (untrusted manifest never crashes), R-MAN-3 (never crashes), R-STO-7 / R-SYN-10 (availability), R-NET-7 configuration maxAssetBytes = Int64.max ('unlimited', ArithmeticSafetyTests)",
+   "problem": "`report.bytesMissing += entry.byteSize ?? 0` is a plain, trapping Int64 addition over byte sizes the manifest declares. Every other figure built from manifest sizes saturates (PlanBuilder.adding, InFlightBytes, addingSaturating in 26 places, SizeGuard, PackProgressScaler), and the transport explicitly supports `maxAssetBytes = Int64.max` meaning 'unlimited' (Tests/ZTronAssetTransportTests/ArithmeticSafetyTests.swift:100, extremeConfiguredCaps). With that public configuration (AssetClientConfiguration.limits), a manifest whose missing entries declare sizes summing past Int64.max (two entries of 2^62 bytes are enough) crashes the process on the first availability(scope:) or ensureAvailable(scope:) call. The path is AssetClient.availability (AssetClient.swift:210) \u2192 SyncEngine.performAvailability \u2192 store.availability, and EngineCommands.swift:601/705 for ensureAvailable. The default limits cannot overflow, because 100,000 \u00d7 4 GiB is below Int64.max. The crash needs maxAssetBytes \u00d7 maxEntries > Int64.max, so it is reachable only under a non-default but documented and tested configuration.",
+   "evidence": ".build-orchestrator/s3-probes/security/S3-SECU-01.swift (probe) and S3-SECU-01.txt (run output). The test process exited with 'unexpected signal code 5'. The crash report triggered thread shows: 'Swift runtime failure: arithmetic overflow' \u2192 'AssetStore.currentAvailability(of:) AssetStore+Reads.swift 85' \u2192 'AssetStore.availability(of:) AssetStore.swift 99' \u2192 'S3SecurityStorageProbeTests.availabilitySaturatesBytesMissing() S3SecurityStorageProbeTests.swift 29' (EXC_BREAKPOINT / SIGTRAP). The manifest went through the real ManifestDecoder with ManifestLimits(maxAssetBytes: .max), was accepted (2 entries, 0 quarantined) and was applied by the store before the trap.",
+   "repro": "Copy S3-SECU-01.swift to Tests/ZTronAssetStorageTests/Core/S3SecurityStorageProbeTests.swift, then: swift test --scratch-path <scratch> --skip Benchmarks --filter S3SecurityStorageProbeTests",
+   "fix": "Saturate both additions: `report.bytesMissing = report.bytesMissing.addingSaturating(max(0, entry.byteSize ?? 0))` (the store's existing Int64.addingSaturating in Eviction/EvictionOrder.swift:381). Commit the probe as the regression test: it expects bytesMissing == Int64.max and missing == 2.",
+   "confirmer": {
+    "id": "S3-SECU-01",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "b",
+    "reason": "I reproduced this at s3-base (b5796ba) in my own detached worktree, with load averages around 42. The hunter's probe, copied unchanged, crashed the test process with 'unexpected signal code 5'. The new crash report swiftpm-testing-helper-2026-10-29-094735.ips shows EXC_BREAKPOINT/SIGTRAP, 'Swift runtime failure: arithmetic overflow', and the stack AssetStore.currentAvailability(of:) AssetStore+Reads.swift:85 \u2192 AssetStore.availability(of:) AssetStore.swift:99 \u2192 the probe. Lines 70 and 85 both use a plain `report.bytesMissing += entry.byteSize ?? 0`. The probe is not broken. When I changed only those two additions to `addingSaturating(max(0, \u2026))` (S3-SECU-01-fix.diff), it passed, so `missing == 2` and `bytesMissing == .max` hold. The crash is therefore only the overflow. The manifest goes through the real ManifestDecoder and its entries are valid under the configured limits. The input reaches this code through the public API. AssetClientConfiguration.limits is public and is never clamped (`clamped()` exists only for SyncTuning). EngineManifest.swift:193 decodes remote manifests with `self.configuration.limits`. AssetClient.availability (AssetClient.swift:210), SyncEngine.performAvailability (EngineCommands.swift:540) and the ensureAvailable paths (EngineCommands.swift:601 and :705) all call store.availability. Neither DECISIONS nor the ADR drafts restrict maxAssetBytes. The transport tests treat Int64.max as a supported 'unlimited' cap (ArithmeticSafetyTests.swift:100). Default limits cannot overflow, because 100,000 \u00d7 4 GiB is far below Int64.max. Any configured cap of about 92 TB or more lets a remote manifest within those limits crash the process. That is a crash caused by untrusted manifest content, which breaks the R-MAN-2 MUST 'treat the manifest as untrusted input \u2026 never crash' and meets the owner's 'crashes' bar. It is BLOCKING. The owner is WP-B: Store/AssetStore+Reads.swift is a WP-B Store/ file (ARCHITECTURE \u00a71.1/\u00a71.2). Evidence: .build-orchestrator/s3-probes/confirm-security/S3-SECU-01.swift, S3-SECU-01.txt and S3-SECU-01-fix.diff."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3B-2",
+  "location": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:128 (first sync only); Tests/ZTronAssetStorageTests/Cleanup/OracleTests.swift:215",
+  "problem": "S3-CONF-01: SPEC 7.3 says each mandatory scenario must exist. R-STO-5 says the test enumerates every crash point and does not sample. Exhaustive crash enumerations exist only for the first sync (StoreCrashTests.swift:128, :296), for eviction (CleanupCrashTests.swift:52) and for legacy migration (CleanupCrashTests.swift:91). No test enumerates crash points for the other three scenarios: a checksum-change update, a directory change and a removal. Those apply paths are reached only by the model-based oracle, which draws one random crash point per lifetime (`8 + random.below(60)`) across 16 seeds. That is sampling. ARCHITECTURE \u00a714 row 3 names writers for eviction and migration only, and no record covers the three update scenarios. The code itself is correct: the probe passes.",
+  "fix": "One item. Add R-STO-5 crash-at-every-boundary enumerations (SPEC 7.3) for an apply that changes an asset's content (checksum-change update), one that relocates it (directory change), and one that removes it, in every crash mode `StoreCrashTests`' first-sync enumeration uses, asserting I-1\u2026I-5 after each reopen. Enumerate every point (R-STO-5 does not sample). Adapt `s3-probes/crash/` and `confirm-crash/S3-CRAS-01-S3UpdateCrashProbe.swift` and `confirm-conformance/`.",
+  "detail": {
+   "id": "S3-CONF-01",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:128 (first sync only); Tests/ZTronAssetStorageTests/Cleanup/OracleTests.swift:215",
+   "requirements": "R-STO-5, SPEC 7.3 'Crash at every boundary', I-1..I-5, CLAUDE.md G4",
+   "problem": "SPEC 7.3 says each mandatory scenario must exist. R-STO-5 says the test enumerates every crash point and does not sample. Exhaustive crash enumerations exist only for the first sync (StoreCrashTests.swift:128, :296), for eviction (CleanupCrashTests.swift:52) and for legacy migration (CleanupCrashTests.swift:91). No test enumerates crash points for the other three scenarios: a checksum-change update, a directory change and a removal. Those apply paths are reached only by the model-based oracle, which draws one random crash point per lifetime (`8 + random.below(60)`) across 16 seeds. That is sampling. ARCHITECTURE \u00a714 row 3 names writers for eviction and migration only, and no record covers the three update scenarios. The code itself is correct: the probe passes.",
+   "evidence": ".build-orchestrator/s3-probes/conformance/S3-CONF-01.swift. Run on s3-base (evidence-01.txt): 'R-STO-5 update processKill: 41 crash points enumerated', the same line for processKillTornWrite, powerLossDropUnsynced and powerLossKeepMetadata, and '\u2714 Test \"R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1\u2026I-5\" with 4 test cases passed after 0.298 seconds'. After every crash the probe checks I-1, I-2, I-4, I-5, the snapshot table, that no blob is unlinked before the grace starts, convergence to v2, that the removed asset is no longer served, and that the moved and unchanged assets are never re-downloaded. Grep of all 1340 @Test display names: no other R-STO-5 test enumerates an apply with a content change, relocation or removal.",
+   "repro": "cp .build-orchestrator/s3-probes/conformance/S3-CONF-01.swift Tests/ZTronAssetStorageTests/Core/S3ConformanceUpdateCrashTests.swift && swift test --scratch-path <scratch> --skip Benchmarks --filter S3ConformanceUpdateCrashTests",
+   "fix": "Commit the probe as is. It takes 0.3 s for all four modes. Its display name starts with R-STO-5, it uses ManualTimeSource only, carries .timeLimit(.minutes(1)) and yields once per case (ADR-051 item 8).",
+   "confirmer": {
+    "id": "S3-CONF-01",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "b",
+    "reason": "Reproduced on s3-base: the probe passes with 41 crash points in each of the 4 modes, in 0.25 s at a load average of about 40. So the code is correct and the gap is in the tests. Every R-STO-5/R-STO-11 @Test name in Tests/ enumerates crash points only for the first sync, a kill followed by power loss after it, eviction and legacy migration. None enumerates an apply that changes content, moves an asset or removes one. OracleTests.swift:236 draws one crash point per lifetime (`8 + random.below(60)`), which is sampling. Neither the R-STO-5 traceability row (ARCHITECTURE:606) nor \u00a714 row 3 names a writer for the update scenarios, and no ADR records leaving them out. SPEC \u00a77.3 says each mandatory scenario must exist, and R-STO-5 [MUST] says the test 'enumerates every crash point; it does not sample'. A required test is therefore missing. Owner: B. The probe lives in Tests/ZTronAssetStorageTests/Core and exercises the Store/Apply paths. Fix: commit the probe; it is deterministic, uses ManualTimeSource and yields once per case."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3B-2",
+  "location": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:128 (only the first sync is enumerated); docs/ARCHITECTURE.md:606 (R-STO-5 row lists first sync, eviction, legacy migration, oracle)",
+  "problem": "S3-CRAS-01: Three of the six mandatory crash-at-every-boundary scenarios have no test. Only the first sync, eviction and legacy migration are enumerated. The oracle (OracleTests) samples one random crash point per lifetime, so the change, relocate and remove flows (apply diff, stale serving, new-blob publication, reaping the old blob) are never crashed at every boundary in every mode. No behaviour bug: the probe passes.",
+  "fix": "One item. Add R-STO-5 crash-at-every-boundary enumerations (SPEC 7.3) for an apply that changes an asset's content (checksum-change update), one that relocates it (directory change), and one that removes it, in every crash mode `StoreCrashTests`' first-sync enumeration uses, asserting I-1\u2026I-5 after each reopen. Enumerate every point (R-STO-5 does not sample). Adapt `s3-probes/crash/` and `confirm-crash/S3-CRAS-01-S3UpdateCrashProbe.swift` and `confirm-conformance/`.",
+  "detail": {
+   "id": "S3-CRAS-01",
+   "kind": "hunt",
+   "lens": "crash",
+   "location": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:128 (only the first sync is enumerated); docs/ARCHITECTURE.md:606 (R-STO-5 row lists first sync, eviction, legacy migration, oracle)",
+   "requirements": "R-STO-5, SPEC 7.3 'Crash at every boundary during: first sync \u00b7 checksum-change update \u00b7 directory change \u00b7 removal \u00b7 eviction \u00b7 legacy migration', I-1..I-5",
+   "problem": "Three of the six mandatory crash-at-every-boundary scenarios have no test. Only the first sync, eviction and legacy migration are enumerated. The oracle (OracleTests) samples one random crash point per lifetime, so the change, relocate and remove flows (apply diff, stale serving, new-blob publication, reaping the old blob) are never crashed at every boundary in every mode. No behaviour bug: the probe passes.",
+   "evidence": ".build-orchestrator/s3-probes/crash/S3-CRAS-01-S3UpdateCrashProbe.swift and S3-CRAS-01-run.txt: 'S3 probe processKill|processKillTornWrite|powerLossDropUnsynced|powerLossKeepMetadata: 29 crash points' each; 'Test ... with 4 test cases passed after 1.854 seconds'. The same scenario with an I-3 audit sink and kill->power-loss pairs (S3-CRAS-03-S3CleanupCrashProbe.swift, update/updatePairs) also passed: '... a kill during an update, then a power loss at every boundary of the next lifetime ... with 2 test cases passed after 21.013 seconds' (load 80-300). The probe kills crash mutants A, B and I (S3-CRAS-05-mutants-run.txt).",
+   "repro": "git worktree add --detach <wt> s3-base; mkdir <wt>/Tests/ZTronAssetStorageTests/S3Crash; cp .build-orchestrator/s3-probes/crash/S3UpdateCrashProbe.swift <wt>/Tests/ZTronAssetStorageTests/S3Crash/; cd <wt>; swift test --scratch-path <scratch> --skip Benchmarks --filter ZTronAssetStorageTests.S3UpdateCrashProbe",
+   "fix": "Commit S3UpdateCrashProbe.swift (display name 'R-STO-5: crash at every boundary during a checksum-change update, a directory change and a removal preserves I-1\u2026I-5') under Tests/ZTronAssetStorageTests/Core and add it to the ARCHITECTURE \u00a711 R-STO-5 row. Note that convergence must test presence by isPresent(id, at: key), because stale records keep serving the old blob.",
+   "confirmer": {
+    "id": "S3-CRAS-01",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "b",
+    "reason": "Reproduced on s3-base b5796ba using the hunter's probe unchanged (Tests/ZTronAssetStorageTests/S3Crash/S3UpdateCrashProbe.swift). It passes in all 4 modes with 29 crash points each, 4 test cases in 0.833 s at load ~35. The probe is not vacuous: it fails under the hunter's env-gated mutants A (132 issues), B (65) and I (7). I checked the gap in the code. StoreCrashTests only enumerates FirstSync. CleanupCrashTests enumerates eviction and legacy migration. A grep of the whole test tree finds no other crash-point loop. OracleTests samples one random crash point per lifetime, and R-STO-5 says the test 'does not sample'. SPEC 7.3 says these scenarios 'each must exist' and maps them to R-STO-5 [MUST]. B's own design (docs/design/store.md:965-967) planned all three tests by name, but the ARCHITECTURE section 11 R-STO-5 row and section 13.5 #3 dropped them, and no ADR or adr-draft records that choice. So this is not an accepted deviation. Because three of the six mandatory crash-at-every-boundary scenarios are missing, I rate it blocking under 'breaks a MUST requirement' (R-STO-5 as specified by 7.3), unlike the hunter. The code is correct (the probe passes), so the fix is cheap: commit the probe. Owner: B, whose Store/ holds apply, publish and the reaper and whose design planned the tests. The probe uses WP-C's Cleanup test helpers (CoreHarness.cleanup, CleanupFixture, CleanupCrashTests.checkGenerations); that is fine in the same target, but the orchestrator should place it accordingly. Evidence: .build-orchestrator/s3-probes/confirm-crash/S3-CRAS-01-confirm-run.txt and S3-CRAS-01-S3UpdateCrashProbe.swift."
+   }
+  }
+ },
+ {
+  "blocking": true,
+  "area": "BLOCKING S3B-3",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift:344-346 (adoptKnownBlob)",
+  "problem": "S3-CONF-06: When an apply changes an asset's checksum to bytes another asset already holds, adoptKnownBlob binds the record to the live blob. It then releases the record's previous blob (`if let previous, previous != key { releaseReference(previous, dooming: .unreferenced) }`), and that release is the only thing that ever schedules the old blob for pruning. The line has 0 executions in the suite. A mutant that removes the release leaves the old blob on disk with a live blob-table entry and no record, so the reaper and orphan GC never collect it. That is an undetected R-CLN-1 violation.",
+  "fix": "Test the release of the old blob when a content change adopts bytes another asset already holds (`AssetStore+Apply.swift:345-346`, count 0); the confirmer's mutant (`confirm-conformance/S3-CONF-02-06.mutants.sh`) must fail it.",
+  "detail": {
+   "id": "S3-CONF-06",
+   "kind": "hunt",
+   "lens": "conformance",
+   "location": "Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift:344-346 (adoptKnownBlob)",
+   "requirements": "R-CLN-1, R-SYN-8, SPEC 1.2 promise 2, CLAUDE.md G4",
+   "problem": "When an apply changes an asset's checksum to bytes another asset already holds, adoptKnownBlob binds the record to the live blob. It then releases the record's previous blob (`if let previous, previous != key { releaseReference(previous, dooming: .unreferenced) }`), and that release is the only thing that ever schedules the old blob for pruning. The line has 0 executions in the suite. A mutant that removes the release leaves the old blob on disk with a live blob-table entry and no record, so the reaper and orphan GC never collect it. That is an undetected R-CLN-1 violation.",
+   "evidence": "Mutant .build-orchestrator/s3-probes/conformance/S3-CONF-06.mutant.diff (evidence-mutant-06.txt). Results with it applied: Sync '356 tests \u2026 passed', Kit '85 tests \u2026 passed', compatibility '71 tests \u2026 passed', and Storage '461 tests \u2026 failed \u2026 with 2 issues', both issues from the probe: 'S3ConformanceUpdateCrashTests.swift:184:9: Expectation failed: !harness.exists(oldBlob)' and ':186:9: Expectation failed: oldState == nil'. All 459 existing Storage tests passed. The probe passes on s3-base (evidence-probes-on-s3-base.txt). Coverage: AssetStore+Apply.swift:345-346 has a count of 0.",
+   "repro": "cp .build-orchestrator/s3-probes/conformance/S3-CONF-06.swift Tests/ZTronAssetStorageTests/Core/ && git apply .build-orchestrator/s3-probes/conformance/S3-CONF-06.mutant.diff && swift test --scratch-path <scratch> --skip Benchmarks --filter 'ZTronAssetStorageTests|ZTronAssetSyncTests|ZTronAssetKitTests|ZTronAssetCompatibilityTests'",
+   "fix": "Commit 'R-CLN-1: a content change onto bytes another asset holds adopts them and prunes the old blob after grace' from the probe file. No production change is needed.",
+   "confirmer": {
+    "id": "S3-CONF-06",
+    "verdict": "confirmed",
+    "blocking": true,
+    "wp": "b",
+    "reason": "Reproduced. The probe passes on s3-base. With the mutant applied, all 459 existing Storage tests and all Sync, Kit and Compatibility tests pass; only the probe fails (`!harness.exists(oldBlob)` and `oldState == nil`). AssetStore+Apply.swift:345-346 has a count of 0. Correction to the hunter's claim that the blob leaks forever: my extra probe (S3-CONF-06.leak-duration.swift) shows that under the mutant the old blob survives the rest of the lifetime. It stays `live(references: 1)` through the reap and an orphan GC. After a relaunch, LaunchReconciliation rebuilds the blob table from the records, the key becomes an orphan (size 400), and orphan GC deletes it. Orphan GC runs only from performMaintenance (EngineCommands:1051), which depends on R-SYN-16, a SHOULD. The defect the mutant represents is still an undetected R-CLN-1 [MUST] prune violation at the default configuration, and the disk leak persists until maintenance runs after a relaunch. The production code is correct; the fix is to commit the probe."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3B-4",
+  "location": "Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift:175",
+  "problem": "M-S-11: StoreStagingSink.writeStaged swallows a .noSpace write failure and reports success (swallow ENOSPC)",
+  "fix": "R-STO-6: an ENOSPC while staging through `writeStaged` (`Staging/StoreStagingSink.swift:175`, the path the Apple tier's copier uses) surfaces as `noSpace` (ADR-013), never as success. Kill the mutant (S3-R3).",
+  "detail": {
+   "id": "M-S-11",
+   "kind": "surviving-mutant",
+   "location": "Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift:175",
+   "requirements": "R-STO-6 (ENOSPC injected and surfaced; ADR-013 maps it to insufficientSpace)",
+   "problem": "StoreStagingSink.writeStaged swallows a .noSpace write failure and reports success (swallow ENOSPC)",
+   "missing_test": "SURVIVED: ZTronAssetStorageTests 459/459, ZTronAssetSyncTests 351/351, ZTronAssetAppleHostedTests 104/104, ZTronAssetKitTests 85/85, ZTronAssetCompatibilityTests 71/71 all pass. MISSING TEST (Tests/ZTronAssetStorageTests/Core/StagingSinkTests.swift): 'R-STO-6: an ENOSPC while staging a chunk source surfaces as insufficientSpace and leaves nothing behind'. Using StagingSinkTests.sink() and ScriptedChunks([2 chunks]), add FaultRule(operation: .write, matching: URLMatcher(lastComponentSuffix: \".parttmp\"), occurrence: .nth(2), error: .noSpace); expect writeStaged to throw StagingError.insufficientSpace and neither the .parttmp nor the final staging name to exist. Verified: passes clean, fails on the mutant (probe test writeStagedNoSpace).",
+   "notes": "The only ENOSPC staging test (StagingSinkTests, partialsAndContinuations) covers appendPartial on '.part'; the writeStaged path (the Apple-tier PackCopier uses it) has no ENOSPC test, and the AppleHosted tests use a fake sink. With the mutant, writeStaged keeps going after a failed write and renames a short or empty file into place as a success, which would then fail the size check later as a misleading sizeMismatch instead of insufficientSpace.",
+   "diff": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-mutants/storage/M-S-11.diff"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3B-5",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift:193 (queue.insert(key, at: queue.startIndex + ...))",
+  "problem": "S3-PERF-04: The queue is an ArraySlice. With 64-key batches and the 1 ms unit time budget (ADR draft B-10), a unit attempts about 20 keys. The about 44 keys it did not attempt are each put back with queue.insert near the front, which shifts the whole remaining queue every time. The reclaim's actor work is therefore O(n squared / unit size). At 10,000 blobs it is within P-13's 2.0 s total, but the total doubles roughly 3x per doubling of the set.",
+  "fix": "Make the reaper's handling of keys a unit did not attempt linear (`AssetStore+Reaper.swift:193`; the confirmer's cursor experiment `confirm-performance/S3-PERF-04-cursor-reaper-experiment.diff` measured linear scaling). Pin it with a deterministic structural test (operations per key) and record the release measurement at 10k/20k/40k.",
+  "detail": {
+   "id": "S3-PERF-04",
+   "kind": "hunt",
+   "lens": "performance",
+   "location": "Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift:193 (queue.insert(key, at: queue.startIndex + ...))",
+   "requirements": "P-13 gc_total_s_max (met at 10,000; scaling); SPEC goal 4 (battery)",
+   "problem": "The queue is an ArraySlice. With 64-key batches and the 1 ms unit time budget (ADR draft B-10), a unit attempts about 20 keys. The about 44 keys it did not attempt are each put back with queue.insert near the front, which shifts the whole remaining queue every time. The reclaim's actor work is therefore O(n squared / unit size). At 10,000 blobs it is within P-13's 2.0 s total, but the total doubles roughly 3x per doubling of the set.",
+   "evidence": ".build-orchestrator/s3-probes/performance/S3-PERF-04-S3PerfReapProbe.swift (each unlink advances a ManualTimeSource by 50 us, so every unit stops after 20 unlinks, as on the reference volume), output in S3-PERF-04-output.txt. Release: 'S3-PERF reap scaling (wall seconds of runDueWork): [(key: 10000, value: 0.548809792), (key: 20000, value: 1.103597583), (key: 40000, value: 3.463065958)]; 40,000 / 20,000 = 3.137978925783856 (max 2.5)'. Failing line: 'S3PerfReapProbe.swift:30:9: Expectation failed: ratio <= ratioMax'. Control with 20-key batches, where nothing is re-inserted: '20,000 0.626252708 s, 40,000 1.145754541 s, ratio 1.8295402580518663'.",
+   "repro": "cp S3-PERF-04-S3PerfReapProbe.swift <wt>/Tests/ZTronAssetKitBenchmarks/; swift test -c release -Xswiftc -enable-testing --scratch-path <scratch> --filter reapScaling",
+   "fix": "Keep the sorted queue as an Array with a cursor. Build each batch from the cursor without consuming it, and after the unit advance the cursor by outcome.attempted only. The keys that were not attempted, put back to doomed, stay in place and are re-validated by the next batch's deletionBlocker check. This costs O(1) per key and keeps the order unchanged.",
+   "confirmer": {
+    "id": "S3-PERF-04",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "b",
+    "reason": "Reproduced in release at load 63.8 to 70.3. The probe failed at S3PerfReapProbe.swift:30: 10k 0.494 s, 20k 1.538 s, 40k 4.111 s, a 40k/20k ratio of 2.67 (the 20k/10k ratio was 3.1). The 20-key-batch control ratio was 2.09.\n\nTo test the root cause, I patched reap (AssetStore+Reaper.swift:193, queue.insert into the ArraySlice) to use a sorted Array with a cursor that is not advanced past unattempted keys. With the same probe, the times became 0.325, 0.700 and 1.405 s, a ratio of 2.006, and the test passed. The re-insertion is therefore the superlinear term.\n\nAt 10,000 the total is about 0.3 to 0.5 s, within P-13's 2.0 s. The per-unit actor work stays about 1 ms on average, so there is no C2 breach at the reference scale; the cost appears only past 10,000. Non-blocking (scaling and battery). The owner is WP-B (Store/)."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3B-6",
+  "location": "Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift:195 (case .doomed(let info)? where info.reason == .unreferenced)",
+  "problem": "S3-CRAS-05: Mutant E let launch adoption (7c) rescue every doomed key, .purged and .corrupt as well as .unreferenced. Across the 98 targeted storage tests it was killed only by 'R-STO-5: a commit during a corrupt key's replacement keeps the key doomed, so a crash never adopts the rotten bytes' (3 issues), which exercises the .corrupt half. 'R-CLN-6: a purge is not undone by a power loss after the reaper ran' did not fail: its purged record never accepts adoption, so the doom-reason guard is never reached. A record of another id that expects a purged key (a scope purge followed by a manifest that re-adds the same content) is never set up. A purged-only mutant was not run separately, so this is not proven. The bytes under a purged name are valid (I-1), so the impact is at most that a purge's freed space is reused, not data corruption.",
+  "fix": "Write the missing half of store-1 S1-03: a purged doom is never rescued by launch adoption. If it fails, it is a bug: the failing test first, then the fix.",
+  "detail": {
+   "id": "S3-CRAS-05",
+   "kind": "hunt",
+   "lens": "crash",
+   "location": "Sources/ZTronAssetStorage/Store/LaunchReconciliation.swift:195 (case .doomed(let info)? where info.reason == .unreferenced)",
+   "requirements": "store-1 S1-03, ADR-018, R-CLN-6",
+   "problem": "Mutant E let launch adoption (7c) rescue every doomed key, .purged and .corrupt as well as .unreferenced. Across the 98 targeted storage tests it was killed only by 'R-STO-5: a commit during a corrupt key's replacement keeps the key doomed, so a crash never adopts the rotten bytes' (3 issues), which exercises the .corrupt half. 'R-CLN-6: a purge is not undone by a power loss after the reaper ran' did not fail: its purged record never accepts adoption, so the doom-reason guard is never reached. A record of another id that expects a purged key (a scope purge followed by a manifest that re-adds the same content) is never set up. A purged-only mutant was not run separately, so this is not proven. The bytes under a purged name are valid (I-1), so the impact is at most that a purge's freed space is reused, not data corruption.",
+   "evidence": ".build-orchestrator/s3-probes/crash/S3-CRAS-05-mutants-run.txt: 'mutant E exit=1 / 3 \u2718 Test \"R-STO-5: a commit during a corrupt key's replacement keeps the key doomed, so a crash never adopts the rotten bytes\" / \u2718 Test run with 98 tests in 11 suites failed after 59.728 seconds with 2 issues.' Diff in S3-CRAS-05-mutants.diff (S3MUT == \"E\").",
+   "repro": "apply the S3MUT=E hunk of S3-CRAS-05-mutants.diff restricted to info.reason == .purged; S3MUT=E swift test --skip Benchmarks --filter 'ZTronAssetStorageTests\\.(StoreCrashTests|CleanupCrashTests|OracleTests|StoreRecoveryTests|StoreDeletionTests|PurgeTests|LeaseTests|StoreSnapshotTests|EvictionTests)'",
+   "fix": "Run the purged-only mutant. If it survives, add a test: scope-purge X (blob K doomed .purged), apply a manifest that adds Z with K's content, kill before the reap, relaunch, and expect Z absent until re-downloaded and K still doomed .purged. Alternatively, record in ADR-018 that rescuing a purged doom for another record is allowed.",
+   "confirmer": null
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3B-7",
+  "location": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:167; unchanged",
+  "problem": "S3-B-017: StoreCrashTests 'R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1...I-5' exceeds its one-minute limit at host loads of 441-834 and is slow under TSan (enumeration 5.6x larger since cycle 5); take verdicts near idle",
+  "fix": "`StoreCrashTests` 'R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1\u2026I-5' (`Core/StoreCrashTests.swift:167`) overruns its limit under load and TSan: apply S3-R4 (cheaper steps first; a raised guard only with measurements). The new enumerations of S3-CONF-01 follow the same rule.",
+  "detail": {
+   "id": "S3-B-017",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetStorageTests/Core/StoreCrashTests.swift:167; unchanged",
+   "problem": "StoreCrashTests 'R-STO-5: a process kill followed by a power loss in the next lifetime preserves I-1...I-5' exceeds its one-minute limit at host loads of 441-834 and is slow under TSan (enumeration 5.6x larger since cycle 5); take verdicts near idle",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-055 Assignments (Stage 5, WP-B owner)",
+    "l2-close5-remaining-b.json [1]",
+    "l3-close8-verify-c.json [16]"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "REQUIRED S3B-8",
+  "location": "docs/ARCHITECTURE.md:806 says 'not written at the level-4 merge (Stage 3, ADR-053)'",
+  "problem": "S3-B-023: T2-06: the R-SYN-1 cross-launch collision case (a persisted epoch unique per launch) is not written",
+  "fix": "Write T2-06 (ARCHITECTURE \u00a712.5): the R-SYN-1 cross-launch collision case, a persisted epoch unique per launch.",
+  "detail": {
+   "id": "S3-B-023",
+   "kind": "backlog",
+   "location": "docs/ARCHITECTURE.md:806 says 'not written at the level-4 merge (Stage 3, ADR-053)'",
+   "problem": "T2-06: the R-SYN-1 cross-launch collision case (a persisted epoch unique per launch) is not written",
+   "category": "test-or-environment",
+   "sources": [
+    "ADR-053 Assignments (\u00a712 names)",
+    "ARCHITECTURE \u00a712.5 T2-06"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "OPTIONAL S3B-9",
+  "location": "never met when maintenance runs apart from a sync's apply",
+  "problem": "S3-B-013: OI-14: a maintenance eviction overlapping a pruning apply can free up to the pruned bytes more than needed, because the prune's releases are not counted in WP-B's release path",
+  "fix": "OI-14: count a pruning apply's releases in WP-B's release path so an overlapping maintenance eviction frees no more than needed, if bounded within WP-B's files; otherwise record.",
+  "detail": {
+   "id": "S3-B-013",
+   "kind": "backlog",
+   "location": "never met when maintenance runs apart from a sync's apply",
+   "problem": "OI-14: a maintenance eviction overlapping a pruning apply can free up to the pruned bytes more than needed, because the prune's releases are not counted in WP-B's release path",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 Assignments (OI-14)",
+    "c.md OI-14"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "OPTIONAL S3B-10",
+  "location": "no per-key reap exclusion exists in WP-B's reaper",
+  "problem": "S3-B-012: OI-12: orphan GC's reap window is per run, not per key; on a busy store every run could outlast deletionGrace and collect nothing (liveness only, logged at .info)",
+  "fix": "OI-12: a per-key reap exclusion so a busy store's orphan runs still collect, if bounded within WP-B's files; otherwise record.",
+  "detail": {
+   "id": "S3-B-012",
+   "kind": "backlog",
+   "location": "no per-key reap exclusion exists in WP-B's reaper",
+   "problem": "OI-12: orphan GC's reap window is per run, not per key; on a busy store every run could outlast deletionGrace and collect nothing (liveness only, logged at .info)",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-052 Assignments (candidates)",
+    "c.md OI-12"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "OPTIONAL S3B-11",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift:301-302 adoptKnownBlob refuses absent(.evicted) for every blob state; probes ZP7-OI1b and ZP8-OI15 reproduce it; a redundant download, never a correctness bug",
+  "problem": "S3-B-014: OI-15 / L4-V3-12: a record whose new content is already live in another blob (an evicted record, or a shared-content late joiner) is downloaded again because ruling R3 is read literally",
+  "fix": "OI-15 / L4-R24(5): ruling R3 stands for `apply` and `admit`. If, within WP-B's files only, an on-demand binding of an `absent(.evicted)` record to a key that is live (referenced; not doomed, purged or corrupt) can avoid the redundant download without an engine change, do it with an exhaustive test over the blob states; otherwise record it as a CCR for WP-F (no engine edit here).",
+  "detail": {
+   "id": "S3-B-014",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Store/AssetStore+Apply.swift:301-302 adoptKnownBlob refuses absent(.evicted) for every blob state; probes ZP7-OI1b and ZP8-OI15 reproduce it; a redundant download, never a correctness bug",
+   "problem": "OI-15 / L4-V3-12: a record whose new content is already live in another blob (an evicted record, or a shared-content late joiner) is downloaded again because ruling R3 is read literally",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-052 (OI-15)",
+    "ADR-053 Assignments (L4-R24(5))",
+    "l3-rulings.md OI-15",
+    "l4-rulings.md L4-R22/L4-R24"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-12",
+  "location": "Sources/ZTronAssetStorage/Blobs/BlobUnits.swift:138-186 (BlobDeletionUnit); Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:193 (P-13), :388 (unlinkProfile)",
+  "problem": "S3-PERF-03: Isolated probe: 10,000 unlinks of 64-byte files. Each unlink is timed alongside a CPU spin of the same length on the same thread, as a preemption control. It varies:\n- file state: fresh/unsynced, F_BARRIERFSYNC'd, or sync()+5 s settled;\n- layout: 256-way fan-out versus flat, in sorted (reaper) or random order;\n- Spotlight: indexed directory versus '.noindex';\n- QoS: user-interactive, default, utility, background;\n- a separate process doing F_FULLFSYNC every 50 ms.\n\nResults at load 12:\n- The spin control shows 0-1 stalls; unlinks show 7-13 stalls over 2 ms per 10,000, max 4.4-6.6 ms, in every combination.\n- The stalls are regular in unlink count: about every 850-1,060 unlinks with fan-out and every 490-550 in a flat directory, often in pairs. A flat directory stalls about twice as often over the same per-iteration time, so the period follows the metadata dirtied, not a timer.\n\nEliminated causes:\n- the benchmark's fresh, unsynced files (settled and barrier-synced files stall alike);\n- directory syncs (none during the probe, and another process's F_FULLFSYNC adds no stalls);\n- fan-out directory removal (the store never removes fan-outs, and flat is worse);\n- Spotlight;\n- QoS at low load.\n\nUnder load (30-90) CPU preemption dominates and depends strongly on QoS. Unlinks over 4 ms per 10,000 were 18 at default QoS against 136 at utility, which is the metadata executor's QoS, 333 at background and 4 at user-interactive.\n\nMethod caveat: getrusage's voluntary/involuntary switch counters cannot separate the two causes, because usleep counts as involuntary (control run3). The interleaved spin control is the discriminator used.\n\nThe benchmark's unlinkProfile (2,000 unlinks, about 2-4 stall periods) reports p50/p99, which by construction cannot show an event that happens once per 500-900 unlinks.",
+  "fix": "P-13 stays the owner's (ADR-050). Record the hunter's root-cause evidence (a kernel stall in one unlink about every 850\u20131,060 unlinks, every 500 in a flat directory, independent of what the store controls) and the confirmer's re-run, as input for the owner. Never edit `BenchStorage.swift`'s P-13 assertion or the gate.",
+  "detail": {
+   "id": "S3-PERF-03",
+   "kind": "hunt",
+   "lens": "performance",
+   "location": "Sources/ZTronAssetStorage/Blobs/BlobUnits.swift:138-186 (BlobDeletionUnit); Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:193 (P-13), :388 (unlinkProfile)",
+   "requirements": "P-13 batch_ms_max (owner item ADR-050); SPEC 6 'propose a new number'",
+   "problem": "Isolated probe: 10,000 unlinks of 64-byte files. Each unlink is timed alongside a CPU spin of the same length on the same thread, as a preemption control. It varies:\n- file state: fresh/unsynced, F_BARRIERFSYNC'd, or sync()+5 s settled;\n- layout: 256-way fan-out versus flat, in sorted (reaper) or random order;\n- Spotlight: indexed directory versus '.noindex';\n- QoS: user-interactive, default, utility, background;\n- a separate process doing F_FULLFSYNC every 50 ms.\n\nResults at load 12:\n- The spin control shows 0-1 stalls; unlinks show 7-13 stalls over 2 ms per 10,000, max 4.4-6.6 ms, in every combination.\n- The stalls are regular in unlink count: about every 850-1,060 unlinks with fan-out and every 490-550 in a flat directory, often in pairs. A flat directory stalls about twice as often over the same per-iteration time, so the period follows the metadata dirtied, not a timer.\n\nEliminated causes:\n- the benchmark's fresh, unsynced files (settled and barrier-synced files stall alike);\n- directory syncs (none during the probe, and another process's F_FULLFSYNC adds no stalls);\n- fan-out directory removal (the store never removes fan-outs, and flat is worse);\n- Spotlight;\n- QoS at low load.\n\nUnder load (30-90) CPU preemption dominates and depends strongly on QoS. Unlinks over 4 ms per 10,000 were 18 at default QoS against 136 at utility, which is the metadata executor's QoS, 333 at background and 4 at user-interactive.\n\nMethod caveat: getrusage's voluntary/involuntary switch counters cannot separate the two causes, because usleep counts as involuntary (control run3). The interleaved spin control is the discriminator used.\n\nThe benchmark's unlinkProfile (2,000 unlinks, about 2-4 stall periods) reports p50/p99, which by construction cannot show an event that happens once per 500-900 unlinks.",
+   "evidence": ".build-orchestrator/s3-probes/performance/S3-PERF-03-P13UnlinkProbe-main.swift (swiftc -O). Clean run S3-PERF-03-unlink-probe-run6.txt, load 12.9: '[load 12.9] ... M1-matrix-fresh-fanout-default: unlink ... max 4.43 ms, >2ms 10, >4ms 7 | spin(45us cpu) ... max 0.06 ms, >2ms 0 ... | unlink-stall indices ... first [64, 920, 1831, 2645, 3528, 3538, 4416, 4418, 5743, 5746]'. M5 flat settled: '>2ms 12 ... spin >2ms 0 ... first [511, 1055, 1605, 2146, 2662, 3214, 3755, 4301, 4302, 4932]'. M7 .noindex settled: '>2ms 11'. M8 utility fresh: '>2ms 11, max 6.62'. QoS effect under load, run2 (load 87): 'A1 ... default: >4ms 18' against 'A2 ... utility: >4ms 136'. Runs 1-7 and loads are in README-loads.txt.",
+   "repro": "swiftc -O -swift-version 5 S3-PERF-03-P13UnlinkProbe-main.swift -o p13probe && ./p13probe <dir on the repo volume> 10000 matrix   (subsets: control | interleaved | userInteractive | period)",
+   "fix": "No code change removes the stall. It sits inside one unlink(2) and recurs by count, so smaller units, rate limiting, pre-syncing blobs and fan-out changes do not avoid it. Raising the deletion queue's QoS only removes the preemption share under load, at an energy cost for background GC. Options for the owner:\n(B, robust) Raise batch_ms_max to about 15 ms. One stall (up to about 11 ms in ADR-050's quiet runs, 6.6 ms here) plus the 1 ms unit budget fits.\n(A, marginal) Judge the per-batch bound on a percentile. At about 1 stall per 900 unlinks and about 20 unlinks per unit, 1.5-2 % of units contain one, so p99 passes only when fewer than half of the stalls exceed the 4 ms headroom. p98 would be robust.\n(C) Judge the batch bound on what it protects. Units run on the dedicated metadata DispatchQueue, so a stalled unlink holds neither the store's actor nor a cooperative-pool thread. The bound would be the longest actor hold between units (as StorageBenchmarks.actorStretches measures) plus unit on-CPU time, with the wall-clock maximum printed as information.\nAll three are SPEC 6 or quality-gates decisions; nothing was edited (G1).",
+   "confirmer": {
+    "id": "S3-PERF-03",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "b",
+    "reason": "I compiled and re-ran the standalone unlink probe (swiftc -O) on the repo volume, with the matrix and period subsets, at load 93 to 106 (the hunter's clean run was at load 12.9). Preemption is heavy at this load, so the spin control stalls too (5 to 23 over 2 ms at default QoS). Unlinks still stall about 1.5 to 3 times as often (23 to 48), and the stall indices show the claimed count periodicity:\n- flat directory M4: 532, 1075, 2138, 2655, 3183, 3693 (about every 520 unlinks);\n- fan-out .noindex M6: 1054, 2091, 3149, 4281, 5600 (about every 1,050-1,130), matching the hunter's 490-550 and 850-1,060;\n- T1: 248, 1390, 2525, 3691.\nAt utility QoS (M8, M9), stalls rise to 322 to 342, with spins at 135 to 155, which confirms the preemption share under load.\n\nI could not verify the low-load claims (QoS independence when quiet, Spotlight and F_FULLFSYNC elimination) at this load; they are plausible and consistent with ADR-050's own record of 5.2 to 10.8 ms single-unlink kernel stalls. This is root-cause detail for a known owner item (P-13, ADR-050 options A and B; option C is new). It is a SPEC 6 or quality-gates decision with no code defect, so it is non-blocking. The owner is WP-B (Blobs/BlobUnits.swift, BenchStorage.swift)."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-12",
+  "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 still asserts longest <= batchBudget; ADR-055 Open: 8.70 ms at a9e464d",
+  "problem": "S3-B-010: P-13: the longest deletion unit takes 8.7-12.8 ms (one APFS unlink stalls 5-10 ms in the kernel; unit CPU about 1 ms) against batch_ms_max 5 ms, so --perf ends VERIFY: FAIL; owner ruling pending (A: p99 per batch, B: 15 ms) and Stage 5's --full cannot pass without it (NEEDS-HUMAN-REVIEW)",
+  "fix": "P-13 stays the owner's (ADR-050). Record the hunter's root-cause evidence (a kernel stall in one unlink about every 850\u20131,060 unlinks, every 500 in a flat directory, independent of what the store controls) and the confirmer's re-run, as input for the owner. Never edit `BenchStorage.swift`'s P-13 assertion or the gate.",
+  "detail": {
+   "id": "S3-B-010",
+   "kind": "backlog",
+   "location": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249 still asserts longest <= batchBudget; ADR-055 Open: 8.70 ms at a9e464d",
+   "problem": "P-13: the longest deletion unit takes 8.7-12.8 ms (one APFS unlink stalls 5-10 ms in the kernel; unit CPU about 1 ms) against batch_ms_max 5 ms, so --perf ends VERIFY: FAIL; owner ruling pending (A: p99 per batch, B: 15 ms) and Stage 5's --full cannot pass without it (NEEDS-HUMAN-REVIEW)",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-050 (P-13 proposal)",
+    "ADR-052/053/054/055 Assignments (Owner)",
+    "ORCHESTRATION owner questions",
+    "c.md OI-3",
+    "b.md B-9, B-10"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-13",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift:15-21 (refreshPresentEntry) and :43-49 (installSnapshot shares presentTable as the snapshot's entries); Store/AssetStore+Publish.swift:172",
+  "problem": "S3-PERF-05: A .userInitiated publication installs at once. The snapshot's entries is the store's presentTable, shared copy-on-write, and the sink (SnapshotMirror) keeps it. The next publication's refreshPresentEntry therefore copies the whole present table, retaining an id, a URL and an extension per entry, on the store's actor. A run of n user-initiated publications, such as ensureAvailable over a scope, costs O(n squared). Bulk and prefetch publications install at most every snapshotInstallInterval and do not pay this. The cause is inferred from the code; the probe proves the superlinear cost.",
+  "fix": "User-initiated publications copy the present table, so a long run of them is quadratic (10,000: 4.9 s; bulk is linear). Record with the measurement. OPTIONAL fix only if a bounded, low-risk design exists in WP-B's files (for example a small overlay on the snapshot compacted periodically).",
+  "detail": {
+   "id": "S3-PERF-05",
+   "kind": "hunt",
+   "lens": "performance",
+   "location": "Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift:15-21 (refreshPresentEntry) and :43-49 (installSnapshot shares presentTable as the snapshot's entries); Store/AssetStore+Publish.swift:172",
+   "requirements": "R-SYN-10 (ensureAvailable fetches at user-initiated priority); SPEC goal 4 (battery); no SPEC 6 budget, so non-blocking",
+   "problem": "A .userInitiated publication installs at once. The snapshot's entries is the store's presentTable, shared copy-on-write, and the sink (SnapshotMirror) keeps it. The next publication's refreshPresentEntry therefore copies the whole present table, retaining an id, a URL and an extension per entry, on the store's actor. A run of n user-initiated publications, such as ensureAvailable over a scope, costs O(n squared). Bulk and prefetch publications install at most every snapshotInstallInterval and do not pay this. The cause is inferred from the code; the probe proves the superlinear cost.",
+   "evidence": ".build-orchestrator/s3-probes/performance/S3-PERF-05-S3PerfPublishProbe.swift, output in S3-PERF-05-output.txt. Release, load 12 rising: 'S3-PERF publish scaling: user-initiated [(key: 2500, value: 1.315904465), (key: 5000, value: 3.9373557310000002), (key: 10000, value: 10.667697384)] s (10,000 / 5,000 = 2.709355748582728); bulk [(key: 2500, value: 1.058472739), (key: 5000, value: 2.155753501), (key: 10000, value: 2.324882279)] s'. Failing line: 'S3PerfPublishProbe.swift:29:9: Expectation failed: userRatio <= ratioMax'.",
+   "repro": "cp S3-PERF-05-S3PerfPublishProbe.swift <wt>/Tests/ZTronAssetKitBenchmarks/; swift test -c release -Xswiftc -enable-testing --scratch-path <scratch> --filter userInitiatedPublicationScaling",
+   "fix": "Make a user-initiated install O(changes) instead of O(present). Give AssetSnapshot a shared, rarely rebuilt base table plus a small overlay of the entries changed since the base. Lookup reads the overlay first, which stays O(1). Rebuild the base off the hot path when the overlay passes about sqrt(n) entries. Alternatively, double-buffer the present table using ack.retired, which the store already receives back. Keep the 'installed before publish returns' contract.",
+   "confirmer": {
+    "id": "S3-PERF-05",
+    "verdict": "confirmed",
+    "blocking": false,
+    "wp": "b",
+    "reason": "Reproduced in release at load 63.8 to 70.3. The probe failed at S3PerfPublishProbe.swift:29. User-initiated runs: 2.5k 0.51 s, 5k 1.72 s, 10k 4.92 s, a 10k/5k ratio of 2.86. Bulk: ratio 2.11.\n\nThe hunter inferred the cause from code. I tested it with a control sink that acknowledges without retaining the snapshot, so presentTable is uniquely referenced again after install. User-initiated publications then scaled linearly (0.42, 1.07, 2.14 s, ratio 2.00), against 2.75 with the retaining sink in the same run. The copy-on-write copy of the shared presentTable (AssetStore+Snapshot.swift:15-21 and :43-49; ScriptedSnapshotSink and SnapshotMirror keep `current`) is the cause.\n\nThe per-publication cost at 10,000 is about 0.5 to 1 ms, so there is no C2 breach. No SPEC 6 budget applies, and the P-4 ratio is borrowed for the probe. DECISIONS.md already lists 'WP-B's present-table copy' under the Stage 3 hardening item (1) at maxEntries; the quadratic cost over a run of publications is the new angle. Non-blocking. The owner is WP-B."
+   }
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "recorded, not asserted, in Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift; SPEC's reference scale is 10,000",
+  "problem": "S3-B-011: Actor stretches at maxEntries (100,000) beyond the 10 ms C2 rule: records copy-on-write under a live snapshot about 9.6 ms, present-table copy, startGrace about 39 ms, reaper queue about 23 ms, freeSpace sums, blob-table rehash; eviction and purge(.all) 22-44 ms, 25-30 % worse under load",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-011",
+   "kind": "backlog",
+   "location": "recorded, not asserted, in Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift; SPEC's reference scale is 10,000",
+   "problem": "Actor stretches at maxEntries (100,000) beyond the 10 ms C2 rule: records copy-on-write under a live snapshot about 9.6 ms, present-table copy, startGrace about 39 ms, reaper queue about 23 ms, freeSpace sums, blob-table rehash; eviction and purge(.all) 22-44 ms, 25-30 % worse under load",
+   "category": "performance-limit",
+   "sources": [
+    "ADR-052 Assignments (Stage 3 hardening (1), C-22/OI-9)",
+    "l3-rulings.md R4 and OI-9",
+    "c.md C-22, OI-9",
+    "l3-close8-verify-c.json [6],[14]"
+   ],
+   "proposed": "fix"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "not reproduced on demand (f.md F-25)",
+  "problem": "S3-B-015: FreeSpace.pendingReclaim counts doomed bytes for which nextDeadline() schedules nothing (seen once after an apply that threw: pendingReclaim 300, nextDeadline nil); the engine works around it with a fresh read",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-015",
+   "kind": "backlog",
+   "location": "not reproduced on demand (f.md F-25)",
+   "problem": "FreeSpace.pendingReclaim counts doomed bytes for which nextDeadline() schedules nothing (seen once after an apply that threw: pendingReclaim 300, nextDeadline nil); the engine works around it with a fresh read",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-053 Assignments (routed to Stage 3)",
+    "f.md F-25"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+References.swift:76 unchanged",
+  "problem": "S3-B-016: gainReferenceInPlace copies the blob table per publication in debug and TSan builds; whether release builds copy it is unchecked",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-016",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Store/AssetStore+References.swift:76 unchanged",
+   "problem": "gainReferenceInPlace copies the blob table per publication in debug and TSan builds; whether release builds copy it is unchecked",
+   "category": "unproven-suspicion",
+   "sources": [
+    "l4-rulings.md L4-R24(6)",
+    "ADR-053 Assignments"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "documented limits of IndexCommitStateSpaceTests",
+  "problem": "S3-B-018: B-33's index state-space enumeration omits bit rot after load, faults combined with crashes beyond the volume scripts and forged headers with unordered names; forged states keep launchEpoch at the source generation, so rot lowering the newest parsed generation below a committed one is not modelled",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-018",
+   "kind": "backlog",
+   "location": "documented limits of IndexCommitStateSpaceTests",
+   "problem": "B-33's index state-space enumeration omits bit rot after load, faults combined with crashes beyond the volume scripts and forged headers with unordered names; forged states keep launchEpoch at the source generation, so rot lowering the newest parsed generation below a committed one is not modelled",
+   "category": "unproven-suspicion",
+   "sources": [
+    "ADR-050 (Not verified)",
+    "l2-close5-remaining-b.json [4]",
+    "b.md B-33"
+   ],
+   "proposed": "test"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:259-266 per the finding; recorded, no code change ruled",
+  "problem": "S3-B-019: Double fault inside one commit unit (index.bin moves to index.prev but reports EIO, and the confirming stat fails too) leaves the ledger believing index.bin holds the committed generation; no harm found (isAbsent treats a failed stat as present)",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-019",
+   "kind": "backlog",
+   "location": "Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:259-266 per the finding; recorded, no code change ruled",
+   "problem": "Double fault inside one commit unit (index.bin moves to index.prev but reports EIO, and the confirming stat fails too) leaves the ledger believing index.bin holds the committed generation; no harm found (isAbsent treats a failed stat as present)",
+   "category": "unproven-suspicion",
+   "sources": [
+    "l2-close5-remaining-b.json [5]",
+    "b.md B-28 cycle-5 amendment"
+   ],
+   "proposed": "ADR-record"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "OpenReport.degraded suffices (ruling)",
+  "problem": "S3-B-020: WP-B options declined: B-34's relaxation for an unreadable index.prev beside a valid index.bin, and B-5's exposing the read-only state on OpenReport",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-020",
+   "kind": "backlog",
+   "location": "OpenReport.degraded suffices (ruling)",
+   "problem": "WP-B options declined: B-34's relaxation for an unreadable index.prev beside a valid index.bin, and B-5's exposing the read-only state on OpenReport",
+   "category": "accepted-deviation",
+   "sources": [
+    "ADR-050 Ratified decisions (B-34, B-5)",
+    "b.md B-5, B-34"
+   ],
+   "proposed": "none"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "no device run exists",
+  "problem": "S3-B-021: F_BARRIERFSYNC / F_FULLFSYNC semantics and cost, file protection on a device, iOS 15 runtime behaviour, and P-5/P-13 on a quiet host",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-021",
+   "kind": "backlog",
+   "location": "no device run exists",
+   "problem": "F_BARRIERFSYNC / F_FULLFSYNC semantics and cost, file protection on a device, iOS 15 runtime behaviour, and P-5/P-13 on a quiet host",
+   "category": "device-only",
+   "sources": [
+    "ADR-050 (Not verified)",
+    "b.md Not verified here",
+    "ARCHITECTURE \u00a714"
+   ],
+   "proposed": "device-plan"
+  }
+ },
+ {
+  "blocking": false,
+  "area": "ADR-RECORD S3B-14",
+  "location": "fake and test wrapper only",
+  "problem": "S3-B-022: A real rename(2) that takes effect and still reports failure, I/O errors from lstat/pread on an index file, LiveFileSystem catch paths APFS in the repository cannot provoke, and how long a real volume keeps a killed process's rename undoable (B-36) are modelled only by the fake",
+  "fix": "Record: re-measure S3-B-011's maxEntries (100,000) stretches if cheap (beyond SPEC's 10,000 reference scale; a chunked `startGrace` is OPTIONAL if simple); try to reproduce S3-B-015 and measure S3-B-016 in release; the rest are recorded limits or device items for Stage 5.",
+  "detail": {
+   "id": "S3-B-022",
+   "kind": "backlog",
+   "location": "fake and test wrapper only",
+   "problem": "A real rename(2) that takes effect and still reports failure, I/O errors from lstat/pread on an index file, LiveFileSystem catch paths APFS in the repository cannot provoke, and how long a real volume keeps a killed process's rename undoable (B-36) are modelled only by the fake",
+   "category": "device-only",
+   "sources": [
+    "ADR-050 (Not verified)",
+    "b.md B-33, B-34, B-36"
+   ],
+   "proposed": "device-plan"
+  }
+ }
+]

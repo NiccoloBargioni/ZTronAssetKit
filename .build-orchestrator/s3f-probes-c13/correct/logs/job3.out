@@ -1,0 +1,13 @@
+ios build exit 0
+2026-10-31 12:20:41.989 xcodebuild[4333:25042652] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+SIM START 12:20:57 { 16.51 12.33 19.91 }
+sim exit 0
+SIM END 12:32:28 { 585.33 483.74 290.34 }
+	/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c13-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_12-21-05-+0100.xcresult
+
+** TEST SUCCEEDED **
+
+Testing started
+bundle .build-verify-s3f-c13-correct/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_12-21-05-+0100.xcresult
+summary exit 0
+JOB3 DONE

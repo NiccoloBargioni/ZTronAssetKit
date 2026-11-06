@@ -1,0 +1,18 @@
+22:56:28 mac rep30 start load { 2.27 5.03 19.27 }
+22:57:10 mac rep30 exit 0 load { 2.66 4.78 18.53 }
+22:57:13 mac sep1 exit 0 load { 3.08 4.83 18.46 }
+22:57:16 mac sep2 exit 0 load { 3.08 4.83 18.46 }
+22:57:18 mac sep3 exit 0 load { 3.00 4.78 18.37 }
+22:57:21 mac sep4 exit 0 load { 3.00 4.78 18.37 }
+22:57:24 mac sep5 exit 0 load { 2.92 4.74 18.27 }
+22:57:27 mac sep6 exit 0 load { 2.92 4.74 18.27 }
+22:57:30 mac sep7 exit 0 load { 2.84 4.69 18.18 }
+22:57:33 mac sep8 exit 0 load { 2.85 4.66 18.09 }
+22:57:35 mac sep9 exit 0 load { 2.85 4.66 18.09 }
+22:57:38 mac sep10 exit 0 load { 2.79 4.62 17.99 }
+22:57:38 mac done load { 2.79 4.62 17.99 }
+22:59:52 sim waiting for lock load { 2.18 3.78 15.76 }
+22:59:52 sim lock taken load { 2.18 3.78 15.76 }
+23:01:09 sim rep30 exit 65 load { 51.95 22.41 22.02 }
+23:01:09 sim lock released load { 51.95 22.41 22.02 }
+23:01:09 sim done load { 51.95 22.41 22.02 }

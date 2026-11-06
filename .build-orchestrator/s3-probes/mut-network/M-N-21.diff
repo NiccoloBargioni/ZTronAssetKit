@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Policy/RequestFactory.swift b/Sources/ZTronAssetTransport/Policy/RequestFactory.swift
+index 1cf4454..fcd6719 100644
+--- a/Sources/ZTronAssetTransport/Policy/RequestFactory.swift
++++ b/Sources/ZTronAssetTransport/Policy/RequestFactory.swift
+@@ -36,7 +36,7 @@ struct RequestFactory: Sendable {
+         if let resume = job.resume {
+             // Our own partial continues with Range + If-Range (ADR-019); the validator came from our sidecar, the
+             // key from the current configuration, so a resumed request never carries a stale key (TR1-5).
+-            request.setValue("bytes=\(resume.offset)-", forHTTPHeaderField: "Range")
++            request.setValue("bytes=\(resume.offset + 1)-", forHTTPHeaderField: "Range")
+             switch resume.validator {
+             case .strongETag(let tag):
+                 request.setValue(tag.rawValue, forHTTPHeaderField: "If-Range")

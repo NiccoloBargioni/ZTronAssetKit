@@ -1,0 +1,17 @@
+::: STEP harness
+::: OK   harness
+::: STEP toolchain
+::: OK   toolchain
+::: STEP build-debug
+::: OK   build-debug
+::: STEP tests
+✔ Test run with 151 tests in 16 suites passed after 5.476 seconds.
+✔ Test run with 495 tests in 53 suites passed after 240.484 seconds.
+✔ Test run with 459 tests in 60 suites passed after 154.867 seconds.
+✔ Test run with 84 tests in 18 suites passed after 185.973 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.825 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.363 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.426 seconds.
+::: OK   tests
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS

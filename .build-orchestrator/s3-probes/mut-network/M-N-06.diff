@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift b/Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift
+index 9bb2ead..fb6f014 100644
+--- a/Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift
++++ b/Sources/ZTronAssetModel/Manifest/Decoding/ManifestRules.swift
+@@ -298,7 +298,7 @@ enum ManifestRules {
+     /// Whether `utf8[start..<end]` is `..`, also spelled with percent-encoded dots (`%2e`, `%2E`).
+     private static func isParentSegment(_ utf8: UnsafeRawBufferPointer, from start: Int, to end: Int) -> Bool {
+         // `..` is 2 bytes; with both dots encoded it is 6.
+-        guard end - start >= 2, end - start <= 6 else {
++        guard end - start >= 3, end - start <= 6 else {
+             return false
+         }
+         var dots = 0

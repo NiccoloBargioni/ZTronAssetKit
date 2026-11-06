@@ -1,0 +1,63 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+[9 / 13] ZTronAssetSync
+[11 / 14] ZTronAssetSync
+[12 / 13] ZTronAssetCompatibilityTests-product
+[14 / 14] ZTronAssetCompatibilityTests-product
+[15 / 16] ZTronAssetKitBenchmarks-product
+[18 / 19] ZTronAssetKitTests-product
+[20 / 20] ZTronAssetModelTests-product
+[21 / 22] ZTronAssetSyncTests-product
+[23 / 23] ZTronAssetSyncTests-product
+[24 / 24] ZTronAssetKitTests-product
+Build complete! (6,20 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine failure paths" started.
+◇ Test "R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded" started.
+◇ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" started.
+✘ Test "R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded" recorded an issue at EngineProbeChainTests.swift:148:9: Expectation failed: probing.readmitted == 1
+↳ one parked job was re-admitted for the probe: 3
+↳ probing.readmitted == 1 → false
+↳   probing.readmitted → 3
+✘ Test "R-SYN-5: the breaker's parked order follows a parked job's rank as interests join and leave and stays bounded" failed after 0.081 seconds with 1 issue.
+↳ /// The breaker's parked order follows a parked job's rank as interests join and leave it, and stays bounded
+↳ /// (S3-B-063): an ambiguous 403 opens the authentication breaker and three prefetch members park behind it; 70 more
+↳ /// prefetch groups join the second member (each join pushes its place again), which compacts the order back to its
+↳ /// bound; a user-initiated group joins the third member, raising its rank, and is released again, lowering it. At the
+↳ /// cooldown's end the first member in the pump's order (prefetch rank, oldest ticket) is the one re-admitted for the
+↳ /// probe, not the third member's stale user-initiated place.
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" recorded an issue at EngineProbeChainTests.swift:91:9: Expectation failed: readmitted == count - slots
+↳ each parked member is re-admitted once over the chain of 60 exits: 1830
+↳ readmitted == count - slots → false
+↳   readmitted → 1830
+↳   count - slots → 60
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" recorded an issue at EngineProbeChainTests.swift:92:9: Expectation failed: seen.mostQueued <= 1
+↳ at most one member waits in the queue for the probe: 60
+↳ seen.mostQueued <= 1 → false
+↳   seen.mostQueued → 60
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" recorded an issue at EngineProbeChainTests.swift:93:9: Expectation failed: seen.mostWorking <= 2
+↳ at most the probe and the next member work: 60
+↳ seen.mostWorking <= 2 → false
+↳   seen.mostWorking → 60
+✘ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" failed after 0.548 seconds with 3 issues.
+↳ /// A chain of half-open probes that each end without a verdict re-admits one parked job per probe exit, the first in
+↳ /// the pump's order, not every job the breaker parked (L4-R22; Stage 3, S3-B-063): an ambiguous 403 opens the
+↳ /// authentication breaker under a prefetch group while three other members are in flight, and the pump parks every
+↳ /// queued member behind it; every member then answers 404, and the clock reaches the cooldown's end. Each parked member
+↳ /// probes in turn. Re-admitting every parked job at each exit, for the pump to park all but the next probe again in the
+↳ /// free slots, made the chain's work quadratic in the parked jobs (10,000 parked: about 161 s of actor work in total).
+↳ /// The re-admission work is counted (`circuitReadmissions`): each parked member is re-queued once over the whole chain,
+↳ /// one per exit. The condition observer, which runs at every notification of every turn, never sees more than one
+↳ /// member queued, nor more than one queued and one downloading; the members probe in the pump's order, each once, and
+↳ /// the chain ends with every member failed and nothing parked.
+✘ Suite "Engine failure paths" failed after 0.549 seconds with 4 issues.
+↳ /// Failure paths of ARCHITECTURE §7.6 and §7.7, reconcile-time job changes (T21, T22), the manifest deadline,
+↳ /// launch reconciliation and a store that cannot open.
+✘ Test run with 2 tests in 1 suite failed after 0.549 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

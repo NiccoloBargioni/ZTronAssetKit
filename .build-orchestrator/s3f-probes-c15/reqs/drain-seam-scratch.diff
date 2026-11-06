@@ -1,0 +1,50 @@
+--- Sources/ZTronAssetSync/Engine/EngineState.swift	2026-10-31 17:05:42
++++ .build-verify-s3f-c15-reqs/p/Sources/ZTronAssetSync/Engine/EngineState.swift	2026-10-31 19:27:11
+@@ -119,6 +119,10 @@
+     var drainingAfterFollow = false
+     /// A later turn is scheduled to continue the drain of `eventsAfterFollow`.
+     var drainFollowUpScheduled = false
++    /// Scratch seam (verifier probe only, never committed): holds the drain's follow-up turns.
++    var drainFollowUpsHeld = false
++    /// Scratch seam: a held drain follow-up waits for `releaseDrainFollowUps()`.
++    var drainFollowUpWaiting = false
+     /// The jobs a system interest (launch re-attachment, healing) was added to, so a run's release of re-attachments
+     /// visits them, not the whole table (C2, Stage 3, S3-PERF-02). A member whose job lost its system interests is pruned
+     /// by that visit; `removeJob` drops it.
+--- Sources/ZTronAssetSync/Engine/EngineFollow.swift	2026-10-31 17:09:37
++++ .build-verify-s3f-c15-reqs/p/Sources/ZTronAssetSync/Engine/EngineFollow.swift	2026-10-31 19:27:11
+@@ -342,6 +342,12 @@
+ 
+     /// The scheduled continuation of `drainEventsAfterFollow`.
+     private func drainFollowUp() {
++        if self.state.drainFollowUpsHeld {
++            // Scratch seam (verifier probe only): the waiting events stay waiting until the release runs this turn.
++            self.state.drainFollowUpWaiting = true
++            self.notifyObservers()
++            return
++        }
+         self.state.drainFollowUpScheduled = false
+         guard self.isRunning else {
+             return
+@@ -743,6 +749,21 @@
+         self.notifyObservers()
+     }
+ 
++    /// Scratch seam (verifier probe only): holds the drain's next follow-up turn.
++    func holdDrainFollowUps() {
++        self.state.drainFollowUpsHeld = true
++    }
++
++    /// Scratch seam (verifier probe only): runs a held drain follow-up in this turn.
++    func releaseDrainFollowUps() {
++        self.state.drainFollowUpsHeld = false
++        guard self.state.drainFollowUpWaiting else {
++            return
++        }
++        self.state.drainFollowUpWaiting = false
++        self.drainFollowUp()
++    }
++
+     /// Test seam: the next follow-up turns keep their visits owed until `releaseFollowFollowUps()`, so a test reads the
+     /// engine between two follow turns, which no production path can order.
+     func holdFollowFollowUps() {

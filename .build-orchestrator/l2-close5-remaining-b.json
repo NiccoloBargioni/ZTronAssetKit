@@ -1,0 +1,66 @@
+[
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "test failure mode: event-driven waits from L1 test support still ignore cancellation (residual hang path after item 3)",
+  "location": "Sources/ZTronAssetTestSupport/SteppedBlockingExecutor.swift:93-101 (waitForHeldUnits suspends on a CheckedContinuation that cancellation never resumes); ManualTimeSource.waitForSleepers is the same; 52 call sites in Tests/ZTronAssetStorageTests/Core",
+  "problem": "Item 3 is done for every polling loop: CorePoll.until is the only `while true { ... await Task.yield() }` left in Tests/ZTronAssetStorageTests/Core, and the other yields are in bounded enumeration loops. A regression that never parks a unit or a sleeper still leaves the test suspended after its time limit, so the run never exits. The fixer recorded this in B-38 ('Not changed (L1 test support, for the orchestrator and WP-H)'), and it reports that a first version of the staging test hung this way. These files are WP-H's, outside WP-B's ownership and outside item 3's literal scope.",
+  "fix": "WP-H/orchestrator: in waitForHeldUnits and waitForSleepers, register the waiter inside withTaskCancellationHandler and remove and resume it on cancellation, then record an Issue. Alternatively, WP-B can replace its waitForHeldUnits calls with CorePoll.until over `heldUnits`, as the new StagingSinkTests already do."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "TSan time-limit headroom (environment; the cost of this cycle's 5.6x larger enumeration)",
+  "location": "Tests/ZTronAssetStorageTests/Core/StoreSweepTests.swift:12 and Tests/ZTronAssetStorageTests/Core/LiveFileSystemTests.swift:48 (1-minute limits); Tests/ZTronAssetStorageTests/Core/IndexCommitStateSpaceTests.swift:222-228 (main suite, 169 serialized rows)",
+  "problem": "The TSan run passed with 287 tests in 239.763 s and 0 ThreadSanitizer reports. Load was about 12, with another verifier running at the same time. The main enumeration alone took 239.73 s for 169 rows. Pre-existing tests with 1-minute limits that ran beside it took 30.2 s (R-SYN-8 sweep) and 29.1 s (R-STO-6 live file system), about 2x headroom. The R-NET-5 apply-fence tests took 33.3 s against 2-minute limits. This is not a failure, but the window in which other suites compete with the enumeration is now about 1.5x the cycle-4 total.",
+  "fix": "No WP-B change is needed. Orchestrator: run the TSan step on a quiet machine, as already recorded in B-33 amendment 5 and the cycle-5 dispositions."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "P-5 not re-measured after the commit-unit and benchmark change",
+  "location": "Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift (the header read was removed); Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:84-107 (the benchmark now folds IndexCommitLedger, so step 4 renames on every commit after the first)",
+  "problem": "Each commit now does one 64-byte header read less. In the benchmark it also does one more rename (index.bin to index.prev) on every commit after the first, as production does. Neither effect on P-5 was measured, because benchmarks are excluded from this cycle. The ADR's 'Not verified here' section records this.",
+  "fix": "Orchestrator: include P-5 ordered and durable in the quiet-machine --perf run after the merge."
+ },
+ {
+  "lens": "reqs",
+  "blocking": false,
+  "area": "B-36 cycle-5 amendment branch unexercised in WP-B",
+  "location": "Sources/ZTronAssetStorage/Store/AssetStore+Open.swift:108 (`if self.state.core.commits.lastAttemptAt == nil`)",
+  "problem": "The else path, a commit attempted before open()'s barrier, cannot run in WP-B because runLegacyPhaseOne is a stub. The test for it is deferred to WP-C, as recorded in B-36's cycle-5 amendment. I checked that a failed open resets `state = StoreState()`, so a retried open never inherits a stale lastAttemptAt.",
+  "fix": "WP-C: when phase 1 lands, add the test recorded in B-36: a commit before the barrier with a promotion pending and a failed root sync, then a successful barrier. Assert that the surviving generation is not counted and that committedFile names a file that holds the counted generation."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "State-space enumeration: forged headers and I-5 (test precision, information)",
+  "location": "Tests/ZTronAssetStorageTests/Core/IndexCommitStateSpaceTests.swift:447-452 (IndexSpace.encoded sets launchEpoch = generation) and :1103 (checkSeed requires header.launchEpoch == forgery.source); docs/adr-drafts/b.md:228 (B-33 amendment 6)",
+  "problem": "Each forged state keeps the source generation in the launchEpoch field, so after the rot nextGeneration = 1 + max(named, launchEpoch) is still above the source generation. The I-5/I-d check over forged states therefore passes because of launchEpoch. In a real file, launchEpoch is the epoch of the launch that wrote it and is usually below the file's generation, so rot in the generation field can lower the next launch epoch to a generation that was already committed. My probe B shows this: index.bin generation 5 flips to name 4, and lifetime 3 opens with epoch 5 and commits generation 5 again. The review already accepted this reuse as an unavoidable effect of rot. The amendment's sentence 'which the main suite checks for every forged state' overstates what the suite checks.",
+  "fix": "Doc precision in B-33 amendment 6: the forged states keep launchEpoch at the source generation, so they do not model rot that lowers the newest parsed generation below a committed one; that case reuses an epoch (accepted). Optionally add forged variants with launchEpoch below the source (for example 1) and assert the accepted reuse explicitly."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "Carried committed file vs the disk under a double fault (robustness, no harm found)",
+  "location": "Sources/ZTronAssetStorage/Index/IndexCommitUnit.swift:259-266 (isAbsent treats a failed stat as present, so follow/undo are skipped) and :317 (the ENOSPC fallback sees index.bin absent but keeps the claim); docs/adr-drafts/b.md:170-173 and :224 (I-b carried-file invariant)",
+  "problem": "Two faults in one unit leave the store believing index.bin holds the committed generation after index.bin has moved: step 4 (index.bin -> index.prev) takes effect but reports EIO, and the stat that should detect this also fails with EIO. My probe D shows it: after unit 0 the ledger is '10@current' while index.bin is absent and index.prev holds 10. It stays that way through two failing full-volume units. The ADR's statement that committedFile names the file holding the committed generation, which the harness checks as I-b after every attempt, does not hold here. No harm follows. Step 4 and the ENOSPC fallback stat index.bin again before acting, so index.prev was kept, and the next replaceCurrent drops the claim. The single-event enumeration does not reach this state.",
+  "fix": "No code change needed. Optionally word B-28's cycle-5 amendment as 'the name the store last saw hold it; each decision stats index.bin again before acting'. Or make writeTemporary take committedFile inout and drop .current when its stat finds index.bin absent, so the claim matches the disk after every attempt the unit can observe."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "Test hangs: continuation-based waits in L1 test support still ignore cancellation (for the orchestrator and WP-H)",
+  "location": "Sources/ZTronAssetTestSupport/SteppedBlockingExecutor.swift:93-101 (waitForHeldUnits) and Sources/ZTronAssetTestSupport/ManualTimeSource.swift:186-196 (waitForSleepers); 58 call sites under Tests/ZTronAssetStorageTests",
+  "problem": "Task item 3 is done for every yield-polling loop. CorePoll now ends at the time limit; I confirmed this with my own probe. These two helpers, however, suspend on a checked continuation that cancellation never resumes. A WP-B regression that never parks a unit or a sleeper would still hang the run after the test's time limit instead of failing it. The fixer recorded this in B-38 as out of WP-B's ownership.",
+  "fix": "The L1 owner (WP-H) wraps both waits in withTaskCancellationHandler and, on cancellation, resumes the waiter and records an issue. That stays outside WP-B's files."
+ },
+ {
+  "lens": "correct",
+  "blocking": false,
+  "area": "Process (P3): one new rule shipped before its test",
+  "location": "commit 3c6787b (IndexCommitUnit.swift:249-252, a vanished committed index.bin drops the claim) and commit 231a121 (its test vanishedCommittedFile)",
+  "problem": "The main defect follows failing test first: 680178c holds only tests (the enumeration and the probe-(c) regression), and the fix 3c6787b comes after it. The vanished-index.bin rule is part of that fix, but its test was committed after it (231a121), so the history does not show that test failing first. The ADR says it fails against a mutant of that line.",
+  "fix": "No code change. In later cycles, commit pinning tests for new rules before the code they pin, or say in the commit message that the test was checked against a mutant."
+ }
+]

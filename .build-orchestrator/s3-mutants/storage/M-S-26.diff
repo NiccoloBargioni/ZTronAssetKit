@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift b/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift
+index 6b47c7f..439bcee 100644
+--- a/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift
++++ b/Sources/ZTronAssetStorage/Store/AssetStore+Snapshot.swift
+@@ -105,7 +105,7 @@ extension AssetStore {
+             guard var record = self.state.core.records[id] else {
+                 continue
+             }
+-            let clamped = min(stamp, now)
++            let clamped = stamp
+             if clamped > record.lastAccess {
+                 record.lastAccess = clamped
+                 self.state.core.records[id] = record

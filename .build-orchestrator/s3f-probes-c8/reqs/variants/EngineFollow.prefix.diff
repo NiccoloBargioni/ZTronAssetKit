@@ -1,0 +1,33 @@
+--- variants/EngineFollow.head.swift	2026-10-30 08:43:27
++++ variants/EngineFollow.prefix.swift	2026-10-30 08:43:27
+@@ -108,24 +108,21 @@
+     /// job's content is not that id's (F-20: never `.notFound` while the asset is listed; PROBE-W4). An id the copy does
+     /// not list is not counted: a waiter joined from the store's newer manifest (`EngineManifest.join`) holds one
+     /// legitimately, and the follow would end its interest `.notFound`; a dropped id's interest gets the failure's own
+-    /// answer instead of the follow's `.notFound`, which no rule forbids. One lookup in the copy and one key comparison
+-    /// per id of the job (`sameTransfer` against the job's own entry, whose transfer is the job's), no transfer
+-    /// formatted: a space sweep checks every job it would judge while a follow is owed (`followSweptHolders`), and a
+-    /// formatted transfer costs about 0.75 µs in release, 7.5 ms at SPEC §6's 10,000.
++    /// answer instead of the follow's `.notFound`, which no rule forbids.
+     func holdsMovedID(_ job: Job) -> Bool {
+         guard self.followOwed else {
+             return false
+         }
+         return job.assets.contains { asset in
+-            self.state.applied.entry(for: asset).map { !SyncEngine.sameTransfer($0, job.entry) } ?? false
++            self.state.applied.entry(for: asset).map { $0.transferID != job.transfer } ?? false
+         }
+     }
+ 
+     /// Brings the follow's visit of `transfer` forward to the moment its job is about to answer its interests with a
+-    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`) or to be judged by a space sweep
+-    /// (`sweepSpaceParked`, which follows every job it would judge before it orders them): the moved ids' interests
+-    /// follow their new content first (T22), exactly as the visit would have moved them before the failure arrived, and
+-    /// only the ids the copy still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
++    /// failure (`resolveAll`, `countFailedAttempt`, `spaceFailed`, a space sweep's park) or to be re-queued by a space
++    /// sweep (`sweepSpaceParked`): the moved ids' interests follow their new content
++    /// first (T22), exactly as the visit would have moved them before the failure arrived, and only the ids the copy
++    /// still maps to this content receive it. A job some of whose ids moved keeps the others; the follow's later visit
+     /// finds nothing to move. Returns `true` when the job (this epoch of it) is gone, superseded: nothing is left to
+     /// answer. A pump is scheduled for the new content's jobs, since some callers do not pump afterwards.
+     func followBeforeActing(_ transfer: TransferID) -> Bool {

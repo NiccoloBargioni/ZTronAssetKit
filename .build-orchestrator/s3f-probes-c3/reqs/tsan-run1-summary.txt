@@ -1,0 +1,2 @@
+✘ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" recorded an issue at EngineSync1LivenessTests.swift:175:6: Time limit was exceeded: 180.000 seconds
+✘ Test run with 404 tests in 52 suites failed after 194.175 seconds with 1 issue.

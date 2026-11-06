@@ -1,0 +1,5 @@
+run 09:53, load avg 33.44 (probes); 09:58, load avg 17.54 (confirmations); worktree detached at s3-base b5796ba
+✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" recorded an issue at S3ConcurrencyProbeTests.swift:55:9: Expectation failed: calls.sorted() == ["first", "second"]
+↳ each handler UIKit handed over runs once: ["second"]
+↳   calls.sorted() → ["second"]
+✘ Test "R-NET-3: a second background-events handler for one identifier never drops the first one uncalled" failed after 0.001 seconds with 1 issue.

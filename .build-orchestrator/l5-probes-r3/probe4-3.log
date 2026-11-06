@@ -1,0 +1,24 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 4] ZTronAssetStorageTests-product
+Build complete! (0,47 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Verifier probes r3" started.
+◇ Test "PROBE-4: an assetAvailable of the replacement during the reopen's tail reaches the consumer" started.
+PROBE-4 control: the direct subscriber of the replacement saw assetAvailable(x): true
+PROBE-4 generation=1 subscribersWhileParked=0 resolved=d07f55593172fe9148e868999d778bdfb8499c81112e5739e7a6c43957cdd405.png purge=success(ZTronAssetModel.PurgeResult(bytesFreed: 300, bytesDeferred: 0, assetsRemoved: 1)) assetAvailable(x) received=false events=["clientStarted(generation: 1)", "syncStarted(run-1, ZTronAssetModel.SyncT", "conditionsChanged(ZTronAssetModel.Device", "snapshotChanged(generation: 2)", "syncFinished(run-1, ZTronAssetModel.Sync", "snapshotChanged(generation: 3)", "conditionsChanged(ZTronAssetModel.Device", "syncStarted(run-1, ZTronAssetModel.SyncT", "syncFinished(run-1, ZTronAssetModel.Sync", "snapshotChanged(generation: 3)", "clientShutDown"]
+✘ Test "PROBE-4: an assetAvailable of the replacement during the reopen's tail reaches the consumer" recorded an issue at VerifierProbesR3.swift:210:9: Expectation failed: available
+↳ the replacement's assetAvailable(x) never reached the consumer
+↳ available → <not evaluated>
+✘ Test "PROBE-4: an assetAvailable of the replacement during the reopen's tail reaches the consumer" failed after 0.012 seconds with 1 issue.
+↳ /// PROBE-4: a terminal `assetAvailable` of the replacement, for a resolve that runs on it while the reopen task is
+↳ /// still re-registering prefetch groups (parked at the shipped `registrationAnswered` seam point), never reaches a
+↳ /// consumer that held `client.events` throughout.
+✘ Suite "Verifier probes r3" failed after 0.012 seconds with 1 issue.
+↳ /// Verifier probes (round 3, correctness lens). Scratch only: never committed.
+✘ Test run with 1 test in 1 suite failed after 0.013 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitTests (Swift Testing)
+exit=1

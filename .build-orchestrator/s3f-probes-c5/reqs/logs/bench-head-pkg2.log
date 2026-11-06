@@ -1,0 +1,12 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 5.636708 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.598291, 5.764333, 5.636708]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 6.534 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.827625, 6.534, 6.502125]
+✔ Test "R-SYN-11: a reclaim of space during an owed follow under a 10,000-member prefetch group, re-queueing and parking its members, holds the engine's actor at most C2's 10 ms per turn" passed after 7.209 seconds.
+✔ Suite "SyncBenchmarks" passed after 7.209 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 7.209 seconds.
+✔ Test run with 1 test in 2 suites passed after 7.209 seconds.

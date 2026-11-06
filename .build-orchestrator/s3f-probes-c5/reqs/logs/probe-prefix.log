@@ -1,0 +1,105 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC4CorrectBench2" started.
+◇ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+◇ Test case passing 1 argument mode → changed=false direct=true groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=true groups=1 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; turns ms ["3.28", "3.53", "3.81", "4.08"]; ["awaiting 10000->9483, insufficient 512, jobs 10000->10000", "awaiting 8971->8459, insufficient 1536, jobs 10000->10000", "awaiting 7947->7435, insufficient 2560, jobs 10000->10000", "awaiting 6923->6411, insufficient 3584, jobs 10000->10000"]
+◇ Test case passing 1 argument mode → changed=true direct=true groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=true groups=1 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; turns ms ["10.19", "9.04", "8.36", "7.86"]; ["awaiting 10000->8976, insufficient 2, jobs 10000->10000", "awaiting 7952->6928, insufficient 2, jobs 10000->10000", "awaiting 5904->4880, insufficient 2, jobs 10000->10000", "awaiting 3856->2832, insufficient 2, jobs 10000->10000"]
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=true groups=1 at VerifyC4CorrectBench.swift:204:13: Expectation failed: (ms.first ?? .infinity) <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=true groups=1: first reclaim sweep turn 10.18575 ms over C2's 10 ms
+↳ (ms.first ?? .infinity) <= 10.0 → false
+↳   (ms.first ?? .infinity) → 10.18575
+◇ Test case passing 1 argument mode → changed=false direct=true groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=true groups=1 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; turns ms ["3.32", "3.46", "3.77", "4.12"]; ["awaiting 10000->9483, insufficient 512, jobs 10000->10000", "awaiting 8971->8459, insufficient 1536, jobs 10000->10000", "awaiting 7947->7435, insufficient 2560, jobs 10000->10000", "awaiting 6923->6411, insufficient 3584, jobs 10000->10000"]
+◇ Test case passing 1 argument mode → changed=true direct=true groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=true groups=1 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; turns ms ["9.87", "8.95", "8.28", "7.83"]; ["awaiting 10000->8976, insufficient 2, jobs 10000->10000", "awaiting 7952->6928, insufficient 2, jobs 10000->10000", "awaiting 5904->4880, insufficient 2, jobs 10000->10000", "awaiting 3856->2832, insufficient 2, jobs 10000->10000"]
+◇ Test case passing 1 argument mode → changed=false direct=false groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=false groups=1 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; heartbeat longest wait 6.67 ms; after: spaceParked 9995, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0
+◇ Test case passing 1 argument mode → changed=true direct=false groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=false groups=1 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; heartbeat longest wait 12.45 ms; after: spaceParked 256, holding moved ids 0, jobs 10000, followOwed true, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=false groups=1 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=false groups=1: heartbeat longest wait 12.451666 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 12.451666
+◇ Test case passing 1 argument mode → changed=false direct=false groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=false groups=1 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; heartbeat longest wait 7.71 ms; after: spaceParked 9995, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0
+◇ Test case passing 1 argument mode → changed=true direct=false groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=false groups=1 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; heartbeat longest wait 11.06 ms; after: spaceParked 256, holding moved ids 0, jobs 10000, followOwed true, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=false groups=1 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=false groups=1: heartbeat longest wait 11.057458 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 11.057458
+◇ Test case passing 1 argument mode → changed=false direct=false groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=false groups=1 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; heartbeat longest wait 6.34 ms; after: spaceParked 9995, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0
+◇ Test case passing 1 argument mode → changed=true direct=false groups=1 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=false groups=1 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; heartbeat longest wait 10.61 ms; after: spaceParked 256, holding moved ids 0, jobs 10000, followOwed true, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=false groups=1 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=false groups=1: heartbeat longest wait 10.611 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 10.611
+◇ Test case passing 1 argument mode → changed=false direct=true groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=true groups=2 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; turns ms ["3.40", "3.67", "3.92", "4.34"]; ["awaiting 10000->9483, insufficient 512, jobs 10000->10000", "awaiting 8971->8459, insufficient 1536, jobs 10000->10000", "awaiting 7947->7435, insufficient 2560, jobs 10000->10000", "awaiting 6923->6411, insufficient 3584, jobs 10000->10000"]
+◇ Test case passing 1 argument mode → changed=true direct=true groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=true groups=2 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; turns ms ["13.99", "13.77", "13.36", "11.56"]; ["awaiting 10000->8976, insufficient 2, jobs 10000->10000", "awaiting 7952->6928, insufficient 2, jobs 10000->10000", "awaiting 5904->4880, insufficient 2, jobs 10000->10000", "awaiting 3856->2832, insufficient 2, jobs 10000->10000"]
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=true groups=2 at VerifyC4CorrectBench.swift:204:13: Expectation failed: (ms.first ?? .infinity) <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=true groups=2: first reclaim sweep turn 13.992625 ms over C2's 10 ms
+↳ (ms.first ?? .infinity) <= 10.0 → false
+↳   (ms.first ?? .infinity) → 13.992625
+◇ Test case passing 1 argument mode → changed=false direct=true groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=true groups=2 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; turns ms ["5.79", "5.57", "5.38", "4.99"]; ["awaiting 10000->9483, insufficient 512, jobs 10000->10000", "awaiting 8971->8459, insufficient 1536, jobs 10000->10000", "awaiting 7947->7435, insufficient 2560, jobs 10000->10000", "awaiting 6923->6411, insufficient 3584, jobs 10000->10000"]
+◇ Test case passing 1 argument mode → changed=true direct=true groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=true groups=2 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; turns ms ["16.41", "16.72", "14.38", "15.84"]; ["awaiting 10000->8976, insufficient 2, jobs 10000->10000", "awaiting 7952->6928, insufficient 2, jobs 10000->10000", "awaiting 5904->4880, insufficient 2, jobs 10000->10000", "awaiting 3856->2832, insufficient 2, jobs 10000->10000"]
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=true groups=2 at VerifyC4CorrectBench.swift:204:13: Expectation failed: (ms.first ?? .infinity) <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=true groups=2: first reclaim sweep turn 16.406167 ms over C2's 10 ms
+↳ (ms.first ?? .infinity) <= 10.0 → false
+↳   (ms.first ?? .infinity) → 16.406167
+◇ Test case passing 1 argument mode → changed=false direct=false groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=false groups=2 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; heartbeat longest wait 16.49 ms; after: spaceParked 9995, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=false direct=false groups=2 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=false direct=false groups=2: heartbeat longest wait 16.48575 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 16.48575
+◇ Test case passing 1 argument mode → changed=true direct=false groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=false groups=2 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; heartbeat longest wait 23.73 ms; after: spaceParked 256, holding moved ids 0, jobs 10000, followOwed true, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=false groups=2 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=false groups=2: heartbeat longest wait 23.730416 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 23.730416
+◇ Test case passing 1 argument mode → changed=false direct=false groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=false groups=2 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; heartbeat longest wait 19.42 ms; after: spaceParked 9995, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=false direct=false groups=2 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=false direct=false groups=2: heartbeat longest wait 19.420583 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 19.420583
+◇ Test case passing 1 argument mode → changed=true direct=false groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=false groups=2 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; heartbeat longest wait 30.91 ms; after: spaceParked 256, holding moved ids 0, jobs 10000, followOwed true, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=false groups=2 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=false groups=2: heartbeat longest wait 30.905042 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 30.905042
+◇ Test case passing 1 argument mode → changed=false direct=false groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=false direct=false groups=2 before: spaceParked 10000, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0; heartbeat longest wait 15.13 ms; after: spaceParked 9995, holding moved ids 0, jobs 10000, followOwed false, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=false direct=false groups=2 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=false direct=false groups=2: heartbeat longest wait 15.133792 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 15.133792
+◇ Test case passing 1 argument mode → changed=true direct=false groups=2 to "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" started.
+PROBE-C4-SWEEP2-C2 changed=true direct=false groups=2 before: spaceParked 10000, holding moved ids 9744, jobs 10000, followOwed true, unfollowed 1792; heartbeat longest wait 27.95 ms; after: spaceParked 256, holding moved ids 0, jobs 10000, followOwed true, unfollowed 0
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" recorded an issue with 1 argument mode → changed=true direct=false groups=2 at VerifyC4CorrectBench.swift:214:13: Expectation failed: wait <= 10.0
+↳ PROBE-C4-SWEEP2-C2 changed=true direct=false groups=2: heartbeat longest wait 27.95375 ms over C2's 10 ms
+↳ wait <= 10.0 → false
+↳   wait → 27.95375
+✘ Test "PROBE-C4-SWEEP2-C2: one reclaim sweep turn that re-queues and parks at 10,000, with and without an owed follow" with 20 test cases failed after 24.880 seconds with 12 issues.
+✘ Suite "VerifyC4CorrectBench2" failed after 24.880 seconds with 12 issues.
+↳ /// PROBE-C4-SWEEP2-C2: the reclaim sweep's two acting branches in one turn. 10,000 prefetch members alternating 400 and
+↳ /// 3,000 bytes are parked `awaitingSpace` (100 bytes of room, a pruned 2,000-byte blob pending reclaim). With `changed`,
+↳ /// a forced sync changes every member's content and the follow's follow-ups are held. Then the reclaim: room 2,100 and
+↳ /// nothing pending, so the `.reclaimed` sweep re-queues the 400-byte members and parks the 3,000-byte ones
+↳ /// `insufficientSpace` (512 of each per turn); with an owed follow it first follows each (c8f01ca). `direct`: the post-reap
+↳ /// read is adopted (the figures a real read returns after the reaper freed the 2,000 bytes) and single sweep turns are
+↳ /// timed on the actor; otherwise the clock passes the grace and the alarm's own reap and sweep run under the heartbeat.
+✘ Test run with 1 test in 1 suite failed after 24.880 seconds with 12 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

@@ -1,0 +1,30 @@
+29
+55.0% EngineRegressionCycle3Tests.swift:169 R-INT-3: a present asset is never counted, quarantined or failed by a redundant 
+54.7% EngineFollowTests.swift:142 R-SYN-2: a job held for a manifest catch-up stays held until the follow that may
+54.7% EngineRegressionRound2Tests.swift:495 R-SYN-16: a heal whose re-download fails ends, and the engine forgets it
+54.5% EngineLegacyMigrationTransferTests.swift:1214 R-STO-13: the prior-art files the last migration batch adopted reach the readers
+54.5% EngineSyncTests.swift:107 R-SYN-8: a metadata-only manifest change completes the run and writes the stamp
+54.4% EngineRecoveryTests.swift:219 R-SYN-6: a store failure while a run applies its manifest fails the run with the
+54.2% EngineRegressionCycle3Tests.swift:83 R-SYN-6: a run does not download an asset the store holds present after the engi
+54.0% EngineRegressionCycle18Tests.swift:232 R-SYN-6: a run whose claim parked for space the ledger admits once a job in flig
+54.0% EngineRegressionCycle18Tests.swift:302 R-SYN-6: a run whose claim parked for space loses the room the ledger gained to 
+53.9% EngineConditionsTests.swift:167 R-SYN-5: no transfer starts before a 429's Retry-After elapses on ManualTimeSour
+53.1% EngineSyncTests.swift:133 R-SYN-9: the stamp is stored in the index and written only after a complete run
+53.1% EngineRegressionCycle6Tests.swift:209 R-SYN-11: a job waiting for space that nothing will reclaim is re-checked on a f
+53.1% EngineRegressionCycle7Tests.swift:69 R-SYN-11: a volume that keeps answering ENOSPC while the store holds bytes it ha
+52.8% EngineRegressionTests.swift:133 R-SYN-10: ensureAvailable's apply announces pruned ids and stops their jobs, as 
+52.7% EngineLegacyMigrationTransferTests.swift:797 R-STO-11: shutdown while the migration waits for a job's adoption of the last cl
+52.5% EngineRecoveryTests.swift:175 R-SYN-5: a prefetch blocked by an open breaker starts when the cooldown ends, an
+52.5% EngineRegressionCycle14Tests.swift:20 R-SYN-2: the invariant check accepts a pending run whose gate the clock opened w
+52.4% EngineRegressionCloseOutTests.swift:55 R-SYN-10: ensureAvailable downloads a member that an apply evicted before it thr
+52.3% EngineRunPathTests.swift:88 R-MAN-2: an undecodable manifest fails the run with serverUnavailable and leaves
+52.0% EngineMaintenanceStepTests.swift:114 R-SYN-16: maintenance whose time budget runs out during orphan collection evicts
+51.8% EngineSync1LivenessTests.swift:119 R-SYN-10: ensureAvailable during a bulk sync never fails with storageUnavailable
+51.8% EngineRegressionCycle22Tests.swift:344 R-SYN-6: a run's held manifest probe is let go when its fetch finds the origin t
+51.6% EngineCommandTests.swift:37 R-SYN-9: a launch run starts only when the stamp is missing or the app version c
+51.6% EngineCommandTests.swift:264 R-CLN-4: pins reach the store and a pinned asset is never evicted
+51.5% EngineIdleTests.swift:175 R-SYN-12: clientShutDown is the last event every subscriber receives
+51.5% EngineRegressionCycle19Tests.swift:103 R-SYN-6: a run whose last working claim ends after the breaker's cooldown but be
+50.8% EngineSyncTests.swift:20 R-NET-1: the engine completes a sync against FakeRemoteSource with no network
+50.3% EngineRegressionRound3Tests.swift:201 R-SYN-6: a run does not download an asset another interest committed after its p
+50.3% EngineStoreTests.swift:183 R-CLN-5: every URL handed out stays readable for at least the grace window

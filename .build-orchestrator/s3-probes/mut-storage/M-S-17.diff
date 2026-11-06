@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+index 91bcc60..a38d733 100644
+--- a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
++++ b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+@@ -51,7 +51,7 @@ enum EvictionOrder {
+             guard policy != .essential, !pinned, self.protecting.isEmpty || !self.protecting.contains(id()) else {
+                 return false
+             }
+-            return self.now.timeIntervalSince(lastAccess) >= self.residency
++            return self.now.timeIntervalSince(lastAccess) > self.residency
+         }
+     }
+ 

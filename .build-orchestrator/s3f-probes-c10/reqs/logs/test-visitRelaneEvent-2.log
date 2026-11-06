@@ -1,0 +1,27 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" started.
+✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:170:25: Issue recorded
+↳ C backs off after its 500 (visit-first), not re-queued at once: (state: nil, interests: nil), starts 2
+✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:172:9: Expectation failed: cStarts == 1
+↳ no second attempt before the backoff ends: 2
+↳ cStarts == 1 → false
+↳   cStarts → 2
+✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" with 2 test cases failed after 2.405 seconds with 2 issues.
+↳ /// The follow's own visit of a job whose retry waits is no join: C (1 MB) is the content of zz-a and zz-b, one user
+↳ /// waiter each; v3 moves zz-a while the follow owes C's visit; C's attempt fails with a 500 (a retry). Visited first,
+↳ /// C backs off (`failed(.at)`) and no second attempt starts before the clock passes the backoff. The visit that moved
+↳ /// A's interest off the failed job marked the verdict joined, and the drain re-queued C at once, skipping the backoff
+↳ /// (T20) with nobody joining (PROBE-C9-SPURIOUS-JOIN).
+✘ Suite "Engine follow barrier (F-28)" failed after 2.405 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 2.405 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

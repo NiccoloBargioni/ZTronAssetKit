@@ -1,0 +1,15 @@
+diff --git a/Sources/ZTronAssetKit/Prefetch/Prefetch.swift b/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
+index dc552c5..3684c05 100644
+--- a/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
++++ b/Sources/ZTronAssetKit/Prefetch/Prefetch.swift
+@@ -37,9 +37,7 @@ public final class PrefetchHandle: Sendable {
+         }
+     }
+ 
+-    deinit {
+-        PrefetchHandle.release(self.registration, from: self.registry)
+-    }
++
+ 
+     /// Suspends until the engine registered this handle's interest. Throws `.shutDown` when the client was shut
+     /// down first (R-SYN-15); the handle then holds nothing and `cancel()` is a no-op.

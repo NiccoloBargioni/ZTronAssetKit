@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyJLiveness" started.
+◇ Test "LIVE-J-STREAM: a stream of events during an owed follow settles once the follow is released" started.
+LIVE-J-STREAM release: owed before the refollow followOwed true next 256/2000 scans 0 sweepFollowUp true pumpWaits false spaceParked 3773 jobs 4289; settled 0.011155167 seconds after the release; after: followOwed false next 0/0 scans 0 sweepFollowUp false pumpWaits false spaceParked 2538 jobs 4456; awaitingSpace 0; queued 1914; violations 0
+LIVE-J-STREAM release: owed before the refollow followOwed true next 256/2000 scans 0 sweepFollowUp true pumpWaits false spaceParked 3773 jobs 4289; settled 0.011306083 seconds after the release; after: followOwed false next 0/0 scans 0 sweepFollowUp false pumpWaits false spaceParked 2538 jobs 4456; awaitingSpace 0; queued 1914; violations 0
+✔ Test "LIVE-J-STREAM: a stream of events during an owed follow settles once the follow is released" passed after 0.580 seconds.
+◇ Test "LIVE-J-SHUTDOWN: shutdown while the follow, its deferred events and sweeps are owed answers everything" started.
+LIVE-J-SHUTDOWN: owed before the refollow followOwed true next 256/2000 scans 0 sweepFollowUp true pumpWaits false spaceParked 3773 jobs 4289, at shutdown followOwed true next 256/1232 scans 0 sweepFollowUp true pumpWaits false spaceParked 2539 jobs 4336; answered 160 of 160 waiters; left (waiters: 0, jobs: 0)
+LIVE-J-SHUTDOWN: owed before the refollow followOwed true next 256/2000 scans 0 sweepFollowUp true pumpWaits false spaceParked 3773 jobs 4289, at shutdown followOwed true next 256/1232 scans 0 sweepFollowUp true pumpWaits false spaceParked 2539 jobs 4336; answered 160 of 160 waiters; left (waiters: 0, jobs: 0)
+✔ Test "LIVE-J-SHUTDOWN: shutdown while the follow, its deferred events and sweeps are owed answers everything" passed after 0.533 seconds.
+✔ Suite "VerifyJLiveness" passed after 1.114 seconds.
+✔ Test run with 2 tests in 1 suite passed after 1.114 seconds.

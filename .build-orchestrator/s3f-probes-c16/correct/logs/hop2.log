@@ -1,0 +1,79 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC16Correct" started.
+◇ Test "PROBE-C16C-INTERMEDIATE-HOP" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C16C-INTERMEDIATE-HOP" started.
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst after v3: (owed: false, c: nil, nInterests: Optional(2))
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst after v4: (c: nil, n: nil, m: nil)
+PROBE-C16C-INTERMEDIATE-HOP followVisitedFirst b=failure(ZTronAssetModel.AssetError.notFound) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=0
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C16C-INTERMEDIATE-HOP" started.
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst after v3: (owed: true, c: Optional(ZTronAssetSync.JobState.downloading), nInterests: Optional(1))
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst after v4: (c: nil, n: nil, m: Optional(ZTronAssetSync.JobState.downloading))
+PROBE-C16C-INTERMEDIATE-HOP sweepFollowsFirst b=success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) p=failure(ZTronAssetModel.AssetError.notFound) mStarts=1
+✘ Test "PROBE-C16C-INTERMEDIATE-HOP" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyC16CorrectProbes.swift:838:9: Expectation failed: bResult == .failure(.notFound)
+↳ PROBE-C16C-INTERMEDIATE-HOP: B was on N at its 404 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.notFound) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 48
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "PROBE-C16C-INTERMEDIATE-HOP" with 2 test cases failed after 0.998 seconds with 1 issue.
+↳ /// PROBE-C16C-INTERMEDIATE-HOP. C (zz-b; user waiter B) and N (zz-p; user waiter P) download. v3 moves zz-b onto N's
+↳ /// content. N gets a 404 while v3's follow is owed. v4 moves zz-b on to a third content M before the follow visits C.
+↳ /// Visit-first: v3's visit superseded C and moved B onto N; N's 404 answered P and B `notFound`; v4 moved nobody.
+↳ /// Sweep-first (suspected): every pass compares with the copy as it stands when it runs, so the visit moves B from C
+↳ /// straight to M; N's waiting verdict answers P alone and M's download serves B.
+✘ Suite "VerifyC16Correct" failed after 0.998 seconds with 1 issue.
+↳ /// Scratch probes (s3f close-out verification, cycle 16, correctness lens). Never committed.
+↳ ///
+↳ /// Part 1 re-runs, adapted to cycle 16's names only, every scenario the cycle-15 verifiers reported blocking; every
+↳ /// expectation is the visit-first outcome. Part 2 hunts the classes cycle 16's mechanism (`appliesFollowed`,
+↳ /// `Job.attemptEnd`, `rerouteOnVisit`, `followAfterVerdict`, `verdictAnswers`) may still miss. Each runs in both orders.
+✘ Test run with 1 test in 1 suite failed after 0.998 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

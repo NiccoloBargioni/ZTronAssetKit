@@ -1,0 +1,123 @@
+== quick
+05:21:01 start quick
+ 5:21  up 4 days, 17:44, 2 users, load averages: 10.77 32.83 93.07
+05:28:53 end
+ 5:28  up 4 days, 17:52, 2 users, load averages: 23.35 35.53 71.13
+✔ Test run with 151 tests in 16 suites passed after 1.268 seconds.
+✔ Test run with 408 tests in 52 suites passed after 29.255 seconds.
+✔ Test run with 459 tests in 60 suites passed after 116.052 seconds.
+✔ Test run with 84 tests in 18 suites passed after 100.871 seconds.
+✔ Test run with 85 tests in 11 suites passed after 20.087 seconds.
+✔ Test run with 71 tests in 10 suites passed after 4.972 seconds.
+✔ Test run with 104 tests in 14 suites passed after 1.026 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.471 seconds.
+VERIFY: PASS
+== sync x3 / release
+05:32:06 release-start | 19.09 29.71 61.67
+05:33:19 release-exit 0 | 19.80 27.77 58.25
+05:33:19 sync1-start | 19.80 27.77 58.25
+05:34:28 sync1-exit 0 | 17.58 25.63 55.20
+05:34:28 sync2-start | 17.58 25.63 55.20
+05:34:43 sync2-exit 0 | 16.23 24.93 54.43
+05:34:43 sync3-start | 16.23 24.93 54.43
+05:34:59 sync3-exit 0 | 14.47 23.96 53.40
+05:34:59 tsan-start | 14.47 23.96 53.40
+05:39:53 tsan-exit 0 | 446.05 182.59 107.67
+05:39:53 done | 446.05 182.59 107.67
+✔ Test run with 408 tests in 52 suites passed after 13.358 seconds.
+✔ Test run with 408 tests in 52 suites passed after 13.062 seconds.
+✔ Test run with 408 tests in 52 suites passed after 13.454 seconds.
+== tsan run 1
+✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 190.914 seconds.
+✔ Test run with 408 tests in 52 suites passed after 190.923 seconds.
+05:36:39 21.08 23.00 49.73
+05:36:49 26.34 24.09 49.80
+05:36:59 29.91 24.92 49.80
+05:37:09 32.00 25.53 49.72
+05:37:19 34.21 26.22 49.69
+05:37:29 34.51 26.54 49.53
+05:37:39 34.06 26.72 49.32
+05:37:49 46.78 29.65 50.09
+05:38:00 80.05 37.31 52.57
+05:38:11 119.21 47.06 55.85
+05:38:21 170.76 60.46 60.50
+05:38:31 217.76 74.13 65.35
+05:38:41 268.38 89.73 70.99
+05:38:51 316.83 105.99 76.98
+05:39:01 352.76 120.62 82.51
+05:39:11 384.79 135.14 88.10
+05:39:21 409.83 148.72 93.47
+05:39:31 426.42 160.87 98.43
+05:39:41 438.01 172.10 103.15
+05:39:51 446.05 182.59 107.67
+== tsan run 2
+05:52:58 start
+05:55:03 exit 0
+✔ Test "R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead as jobs" passed after 88.302 seconds.
+✔ Test run with 408 tests in 52 suites passed after 88.308 seconds.
+05:52:58 8.35 79.04 113.52
+05:53:08 7.29 76.49 112.21
+05:53:18 6.62 74.07 110.94
+05:53:28 8.64 72.27 109.87
+05:53:38 11.78 70.84 108.92
+05:53:48 18.52 70.33 108.29
+05:53:58 23.65 69.73 107.64
+05:54:08 27.90 69.13 106.98
+05:54:18 34.07 69.06 106.51
+05:54:28 37.58 68.66 105.93
+05:54:38 37.36 67.61 105.13
+05:54:48 32.53 65.59 103.97
+05:54:58 29.98 63.95 102.94
+== perf
+05:49:28 perf-build-start 42.76 149.97 142.57
+05:51:48 perf-build-exit 0 17.88 98.82 122.90
+05:51:48 perf-start 17.88 98.82 122.90
+05:52:45 perf-exit 0 9.87 82.96 115.49
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 5.867167 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.42925, 5.722833, 5.867167]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 7.699041 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.699041, 11.83825, 6.913291]
+✔ Test run with 21 tests in 2 suites passed after 53.449 seconds.
+05:51:48 17.88 98.82 122.90
+05:51:53 17.09 97.31 122.23
+05:51:58 16.12 95.78 121.54
+05:52:03 14.99 94.22 120.84
+05:52:08 14.03 92.71 120.15
+05:52:13 13.39 91.27 119.48
+05:52:18 12.63 89.82 118.80
+05:52:23 12.02 88.41 118.14
+05:52:28 11.30 86.99 117.46
+05:52:33 10.55 85.58 116.79
+05:52:38 10.03 84.23 116.12
+05:52:43 9.87 82.96 115.49
+== ios
+05:41:00 ios-build-start 424.35 233.44 132.95
+05:41:28 ios-build-exit 0 381.60 238.72 137.77
+== sim
+05:43:13 sim-start 312.11 257.53 156.90
+05:49:14 sim-exit 0 54.09 157.54 145.05
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+shutdown 149
+✔ Test run with 151 tests in 16 suites passed after 8.279 seconds.
+✔ Test run with 408 tests in 52 suites passed after 26.737 seconds.
+✔ Test run with 459 tests in 60 suites passed after 75.908 seconds.
+✔ Test run with 84 tests in 18 suites passed after 94.145 seconds.
+✔ Test run with 85 tests in 11 suites passed after 3.292 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.397 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.403 seconds.
+** TEST SUCCEEDED **
+== xcresult Test-ZTronAssetKit-2026.10.30_05-43-21-+0100.xcresult
+  "failedTests" : 0,
+  "passedTests" : 1362,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "totalTestCount" : 1362
+== coverage
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.63% (1441/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.35% (8115/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 93.98% (9273/9867) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.63% (25777/26675) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.66% max=3.0% OK
+COVERAGE: PASS

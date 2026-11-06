@@ -1,0 +1,65 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 5]
+[2 / 6] ZTronAssetKit
+[3 / 7] ZTronAssetKit
+[9 / 13] ZTronAssetKit
+[11 / 15] ZTronAssetKit
+[14 / 16] ZTronAssetCompatibilityTests-product
+[17 / 18] ZTronAssetCompatibilityTests-product
+[19 / 19] ZTronAssetCompatibilityTests-product
+[20 / 22] ZTronAssetKitBenchmarks-product
+[23 / 24] ZTronAssetKitBenchmarks-product
+[26 / 30] ZTronAssetKitTests-product
+[29 / 33] ZTronAssetKitTests-product
+[36 / 38] ZTronAssetKitTests-product
+[39 / 39] ZTronAssetKit-product
+Build complete! (6,59 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Verifier probes r3" started.
+◇ Test "PROBE-1 control: register after start, then shutdown, leaves nothing" started.
+◇ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" started.
+◇ Test "PROBE-2: a shutdown between the replacement's pressure request and its start leaves no observer" started.
+PROBE-1 before: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=1 observer=true liveObservations=1
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" recorded an issue at VerifierProbesR3.swift:31:9: Expectation failed: after.ownedTasks == 0
+↳ owned tasks after shutdown: 1
+↳ after.ownedTasks == 0 → false
+↳   after.ownedTasks → 1
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" recorded an issue at VerifierProbesR3.swift:32:9: Expectation failed: after.memoryPressureObserverActive == false
+↳ the observer is still active after shutdown
+↳ after.memoryPressureObserverActive == false → false
+↳   after.memoryPressureObserverActive → true
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" recorded an issue at VerifierProbesR3.swift:33:9: Expectation failed: observations == 0
+↳ live pressure observations after shutdown: 1
+↳ observations == 0 → false
+↳   observations → 1
+PROBE-1 after one more event: liveObservations=0 purges=0
+✘ Test "PROBE-1: register before start, then shutdown, leaves no owned task and no pressure observation" failed after 0.004 seconds with 3 issues.
+↳ /// PROBE-1: a purgeable cache registered before the client was started starts the engine's memory-pressure observer
+↳ /// on an engine still in `created`; `shutdown()` then takes the engine's `created` branch, which neither cancels nor
+↳ /// joins owned tasks, so the observer task and its pressure subscription outlive the shutdown (R-SYN-15).
+PROBE-1 control after: lifecycle=shutDown ownedTasks=0 observer=false
+✔ Test "PROBE-1 control: register after start, then shutdown, leaves nothing" passed after 0.011 seconds.
+PROBE-2 generation=1 before shutdown: lifecycle=created ownedTasks=1 observer=true; after: lifecycle=shutDown ownedTasks=1 observer=true liveObservations=1; purge=failure(ZTronAssetModel.AssetError.shutDown)
+✘ Test "PROBE-2: a shutdown between the replacement's pressure request and its start leaves no observer" recorded an issue at VerifierProbesR3.swift:85:9: Expectation failed: after.ownedTasks == 0
+↳ owned tasks after shutdown: 1
+↳ after.ownedTasks == 0 → false
+↳   after.ownedTasks → 1
+✘ Test "PROBE-2: a shutdown between the replacement's pressure request and its start leaves no observer" recorded an issue at VerifierProbesR3.swift:86:9: Expectation failed: observations == 0
+↳ live pressure observations after shutdown: 1
+↳ observations == 0 → false
+↳   observations → 1
+✘ Test "PROBE-2: a shutdown between the replacement's pressure request and its start leaves no observer" failed after 0.060 seconds with 2 issues.
+↳ /// PROBE-2: the reopen applies the recorded pressure request to the replacement while it is still `created`
+↳ /// (`performReopen`, before `next.engine.start()`); a `shutdown()` landing before that start shuts the replacement
+↳ /// down in `created`, and its observer task survives. The probe-only seam point `probeAfterPressure` (scratch copy
+↳ /// only) parks the reopen right after the pressure request was applied, which is where the shipped code goes on to
+↳ /// the start; it changes no logic.
+✘ Suite "Verifier probes r3" failed after 0.060 seconds with 5 issues.
+↳ /// Verifier probes (round 3, correctness lens). Scratch only: never committed.
+✘ Test run with 3 tests in 1 suite failed after 0.061 seconds with 5 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitTests (Swift Testing)
+exit=1

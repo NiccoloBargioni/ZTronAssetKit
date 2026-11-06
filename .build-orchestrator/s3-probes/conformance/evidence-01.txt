@@ -1,0 +1,6 @@
+# S3-CONF-01: crash enumeration of the update scenario on s3-base
+R-STO-5 update powerLossKeepMetadata: 41 crash points enumerated
+R-STO-5 update processKillTornWrite: 41 crash points enumerated
+R-STO-5 update processKill: 41 crash points enumerated
+R-STO-5 update powerLossDropUnsynced: 41 crash points enumerated
+✔ Test run with 1 test in 1 suite passed after 0.298 seconds.

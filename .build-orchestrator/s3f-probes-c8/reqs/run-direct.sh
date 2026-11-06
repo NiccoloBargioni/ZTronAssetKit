@@ -1,0 +1,14 @@
+#!/bin/bash
+# usage: run-direct.sh <scratch> <Target> <log> <swift-testing args...>
+S=$1; T=$2; LOG=$3; shift 3
+WT=/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f
+P=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer
+B=$S/out/Products/Debug/$T.xctest/Contents/MacOS/$T
+H=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper
+export TMPDIR=$WT/.build-verify-s3f-c8-reqs/tmp/ CLANG_MODULE_CACHE_PATH=$WT/.build-verify-s3f-c8-reqs/tmp/mc LLVM_PROFILE_FILE=$WT/.build-verify-s3f-c8-reqs/tmp/prof-%p.profraw
+export DYLD_FRAMEWORK_PATH=$P/Library/Frameworks DYLD_LIBRARY_PATH=$P/usr/lib
+TSANLIB=$S/out/Products/Debug/$T.xctest/Contents/Frameworks/libclang_rt.tsan_osx_dynamic.dylib
+if [ -f "$TSANLIB" ]; then export DYLD_INSERT_LIBRARIES=$TSANLIB; fi
+cd $WT
+$H --test-bundle-path $B $B --testing-library swift-testing "$@" > $LOG 2>&1
+echo "exit $?"

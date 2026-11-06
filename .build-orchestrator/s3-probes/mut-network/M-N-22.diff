@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift b/Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift
+index 1d73cca..fdb9353 100644
+--- a/Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift
++++ b/Sources/ZTronAssetTransport/Session/HTTPResponseReading.swift
+@@ -60,7 +60,7 @@ enum HTTPResponseReading {
+     /// The `If-Range` validator a later attempt may send (RFC 9110 §13.1.5): a strong `ETag`, else `Last-Modified`.
+     /// A weak tag is never a valid `If-Range`.
+     static func resumeValidator(of response: HTTPURLResponse) -> ResumeValidator? {
+-        if let tag = response.value(forHTTPHeaderField: "ETag").flatMap(ETag.init(rawValue:)), !tag.rawValue.hasPrefix("W/") {
++        if let tag = response.value(forHTTPHeaderField: "ETag").flatMap(ETag.init(rawValue:)) {
+             return .strongETag(tag)
+         }
+         if let date = response.value(forHTTPHeaderField: "Last-Modified"), ETag(rawValue: date) != nil {

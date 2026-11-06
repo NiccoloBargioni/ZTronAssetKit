@@ -1,0 +1,12 @@
+diff --git a/Sources/ZTronAssetStorage/Cleanup/StoreLeases.swift b/Sources/ZTronAssetStorage/Cleanup/StoreLeases.swift
+index 39e7de8..bc503f6 100644
+--- a/Sources/ZTronAssetStorage/Cleanup/StoreLeases.swift
++++ b/Sources/ZTronAssetStorage/Cleanup/StoreLeases.swift
+@@ -30,6 +30,7 @@ extension AssetStore {
+     /// Valid in every phase: a lease released after `close()` changes nothing that matters (leases end with the store).
+     package func releaseLease(_ lease: AssetLease) -> MonotonicInstant? {
+         if var holders = self.state.cleanup.leases[lease.blob], holders.removeValue(forKey: lease.token) != nil {
++            holders.removeAll()
+             self.state.cleanup.leases[lease.blob] = holders.isEmpty ? nil : holders
+             if holders.isEmpty {
+                 self.state.cleanup.leasedBytes[lease.blob] = nil

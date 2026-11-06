@@ -1,0 +1,4 @@
+◇ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" started.
+✔ Test "R-SYN-5: a chain of half-open probes ending without a verdict re-admits one parked job per probe exit, in the pump's order, not every job the breaker parked" passed after 9.507 seconds.
+✔ Test run with 404 tests in 52 suites passed after 45.680 seconds.
+exit 0

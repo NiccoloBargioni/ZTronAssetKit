@@ -1,0 +1,103 @@
+MUTANT stampAdmits: build exit 0
+MUTANT stampAdmits run1: ✘ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:64:9: Expectation failed: !nStarted
+MUTANT stampAdmits run1: ✘ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:70:25: Issue recorded
+MUTANT stampAdmits run1: ✘ Test "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:259:13: Expectation failed: atEnd.throttled && !nStarted
+MUTANT stampAdmits run1: ✘ Test "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:268:25: Issue recorded
+MUTANT stampAdmits run1: ✘ Test "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:405:13: Expectation failed: !uStarted && uState != .downloading
+MUTANT stampAdmits run1: ✘ Test "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:414:25: Issue recorded
+MUTANT stampAdmits run1: ✘ Test run with 3 tests in 1 suite failed after 8.865 seconds with 6 issues.
+MUTANT stampAdmits run1: EXIT 1 after 16.1 s
+MUTANT stampAdmits run2: ✘ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:70:25: Issue recorded
+MUTANT stampAdmits run2: ✘ Test "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:259:13: Expectation failed: atEnd.throttled && !nStarted
+MUTANT stampAdmits run2: ✘ Test "R-SYN-5: the new content an owed follow's visit queues starts only under the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:268:25: Issue recorded
+MUTANT stampAdmits run2: ✘ Test "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:405:13: Expectation failed: !uStarted && uState != .downloading
+MUTANT stampAdmits run2: ✘ Test "R-SYN-5: a request during an owed follow starts only while the live breaker admits it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:414:25: Issue recorded
+MUTANT stampAdmits run2: ✘ Test run with 3 tests in 1 suite failed after 8.330 seconds with 5 issues.
+MUTANT stampAdmits run2: EXIT 1 after 12.5 s
+MUTANT stampAdmits: reverted
+MUTANT undecidedBack: build exit 0
+MUTANT undecidedBack run1: ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:123:9: Expectation failed: throttle != nil
+MUTANT undecidedBack run1: ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:127:9: Expectation failed: requestsAfter == requestsBefore
+MUTANT undecidedBack run1: ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:130:25: Issue recorded
+MUTANT undecidedBack run1: ✘ Test run with 1 test in 1 suite failed after 1.700 seconds with 3 issues.
+MUTANT undecidedBack run1: EXIT 1 after 5.0 s
+MUTANT undecidedBack run2: ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:123:9: Expectation failed: throttle != nil
+MUTANT undecidedBack run2: ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:127:9: Expectation failed: requestsAfter == requestsBefore
+MUTANT undecidedBack run2: ✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:130:25: Issue recorded
+MUTANT undecidedBack run2: ✘ Test run with 1 test in 1 suite failed after 1.300 seconds with 3 issues.
+MUTANT undecidedBack run2: EXIT 1 after 3.9 s
+MUTANT undecidedBack: reverted
+MUTANT spaceSweepNow: build exit 0
+MUTANT spaceSweepNow run1: ✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSweepTests.swift:73:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(sBytes
+MUTANT spaceSweepNow run1: ✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSweepTests.swift:76:25: Issue recorded
+MUTANT spaceSweepNow run1: ✘ Test run with 1 test in 1 suite failed after 7.517 seconds with 2 issues.
+MUTANT spaceSweepNow run1: EXIT 1 after 10.8 s
+MUTANT spaceSweepNow run2: ✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSweepTests.swift:73:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(sBytes
+MUTANT spaceSweepNow run2: ✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSweepTests.swift:76:25: Issue recorded
+MUTANT spaceSweepNow run2: ✘ Test run with 1 test in 1 suite failed after 8.022 seconds with 2 issues.
+MUTANT spaceSweepNow run2: EXIT 1 after 10.7 s
+MUTANT spaceSweepNow: reverted
+MUTANT readmitNow: build exit 0
+MUTANT readmitNow run1: ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+MUTANT readmitNow run1: ✘ Test run with 1 test in 1 suite failed after 5.139 seconds with 1 issue.
+MUTANT readmitNow run1: EXIT 1 after 8.6 s
+MUTANT readmitNow run2: ✘ Test "R-SYN-3: a re-admission turn during an owed follow re-queues its jobs behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:92:9: Expectation failed: started.first == n.transferID
+MUTANT readmitNow run2: ✘ Test run with 1 test in 1 suite failed after 4.781 seconds with 1 issue.
+MUTANT readmitNow run2: EXIT 1 after 8.0 s
+MUTANT readmitNow: reverted
+MUTANT retryDueNow: build exit 0
+MUTANT retryDueNow run1: ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:177:9: Expectation failed: after.n == .downloading && after.r == .queued
+MUTANT retryDueNow run1: ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:178:9: Expectation failed: next.first == n.transferID
+MUTANT retryDueNow run1: ✘ Test run with 1 test in 1 suite failed after 2.293 seconds with 2 issues.
+MUTANT retryDueNow run1: EXIT 1 after 5.6 s
+MUTANT retryDueNow run2: ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:177:9: Expectation failed: after.n == .downloading && after.r == .queued
+MUTANT retryDueNow run2: ✘ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReplayTests.swift:178:9: Expectation failed: next.first == n.transferID
+MUTANT retryDueNow run2: ✘ Test run with 1 test in 1 suite failed after 3.502 seconds with 2 issues.
+MUTANT retryDueNow run2: EXIT 1 after 6.2 s
+MUTANT retryDueNow: reverted
+MUTANT retryVerdictNow: build exit 0
+MUTANT retryVerdictNow run1: ✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:170:25: Issue recorded
+MUTANT retryVerdictNow run1: ✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:172:9: Expectation failed: cStarts == 1
+MUTANT retryVerdictNow run1: ✘ Test run with 68 tests in 1 suite failed after 155.355 seconds with 2 issues.
+MUTANT retryVerdictNow run1: EXIT 1 after 161.1 s
+MUTANT retryVerdictNow run2: ✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:170:25: Issue recorded
+MUTANT retryVerdictNow run2: ✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:172:9: Expectation failed: cStarts == 1
+MUTANT retryVerdictNow run2: ✘ Test run with 68 tests in 1 suite failed after 66.809 seconds with 2 issues.
+MUTANT retryVerdictNow run2: EXIT 1 after 69.6 s
+MUTANT retryVerdictNow: reverted
+MUTANT offlineVerdictNow: build exit 0
+MUTANT offlineVerdictNow run1: ✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:626:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT offlineVerdictNow run1: ✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:305:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT offlineVerdictNow run1: ✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:308:9: Expectation failed: c == .failed(.whenOnline)
+MUTANT offlineVerdictNow run1: ✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:359:13: Expectation failed: waits
+MUTANT offlineVerdictNow run1: ✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:364:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT offlineVerdictNow run1: ✘ Test run with 68 tests in 1 suite failed after 71.302 seconds with 5 issues.
+MUTANT offlineVerdictNow run1: EXIT 1 after 74.8 s
+MUTANT offlineVerdictNow run2: ✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:626:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT offlineVerdictNow run2: ✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:305:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT offlineVerdictNow run2: ✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:308:9: Expectation failed: c == .failed(.whenOnline)
+MUTANT offlineVerdictNow run2: ✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:359:13: Expectation failed: waits
+MUTANT offlineVerdictNow run2: ✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:364:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT offlineVerdictNow run2: ✘ Test run with 68 tests in 1 suite failed after 132.652 seconds with 5 issues.
+MUTANT offlineVerdictNow run2: EXIT 1 after 135.9 s
+MUTANT offlineVerdictNow: reverted
+MUTANT throttleVerdictNow: build exit 0
+MUTANT throttleVerdictNow run1: ✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:220:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT throttleVerdictNow run1: ✘ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:427:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT throttleVerdictNow run1: ✘ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:480:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT throttleVerdictNow run1: ✘ Test run with 68 tests in 1 suite failed after 133.691 seconds with 3 issues.
+MUTANT throttleVerdictNow run1: EXIT 1 after 138.1 s
+MUTANT throttleVerdictNow run2: ✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:220:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT throttleVerdictNow run2: ✘ Test "R-SYN-11: a 429 during an owed follow answers only the interests the follow leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:427:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT throttleVerdictNow run2: ✘ Test "R-SYN-11: a 429 during an owed follow does not answer an interest the follow moves onto present content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierVerdictTests.swift:480:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+MUTANT throttleVerdictNow run2: ✘ Test run with 68 tests in 1 suite failed after 135.089 seconds with 3 issues.
+MUTANT throttleVerdictNow run2: EXIT 1 after 138.5 s
+MUTANT throttleVerdictNow: reverted
+MUTANT pauseVerdictNow: build exit 0
+MUTANT pauseVerdictNow run1: ✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:135:9: Expectation failed: nSecond != nil && (wFirst == nil || nSecond! < wFirst!)
+MUTANT pauseVerdictNow run1: ✘ Test run with 68 tests in 1 suite failed after 139.650 seconds with 1 issue.
+MUTANT pauseVerdictNow run1: EXIT 1 after 143.1 s
+MUTANT pauseVerdictNow run2: ✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:135:9: Expectation failed: nSecond != nil && (wFirst == nil || nSecond! < wFirst!)
+MUTANT pauseVerdictNow run2: ✘ Test run with 68 tests in 1 suite failed after 189.066 seconds with 1 issue.
+MUTANT pauseVerdictNow run2: EXIT 1 after 193.4 s
+MUTANT pauseVerdictNow: reverted

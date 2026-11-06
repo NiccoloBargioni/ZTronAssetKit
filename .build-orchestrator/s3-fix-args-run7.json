@@ -1,0 +1,31 @@
+{
+ "bar": "strict",
+ "base": "s3-base",
+ "maxCycle": 30,
+ "simSlots": [
+  {
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E",
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B"
+  }
+ ],
+ "wps": [
+  {
+   "coverageMin": 90,
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c20-issues.json",
+   "focus": "Stage 3 hardening, continued under the narrowed bar (S3-R16, S3-R17) and the rulings S3-R18 to S3-R26: read the end of the rulings file named above before anything else; S3-R26 is this cycle's ruling and decides wherever any other file differs from it. Cycles 1-20 are committed on wp/s3f (HEAD 8e1fb24; see docs/adr-drafts/s3f.md). Cycle 20 fixed 7 of cycle 19's 8 blocking items, and both verifiers confirmed it. Its verifiers left 8 blocking items, listed in the findings file named above with the non-blocking ones; their probes are under /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c20/. S3-R26 adopts two read-only specifications in /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c20-analysis/: integrate-c21.md (items A, B and C: the joins deferred behind a verdict, the move index, the commit window) and integrate-rr21.md (RR-21: the commit's, the drain's and .superseded's re-routes, bounded over turns). Follow S3-R26 item 11's order of work and its red-first rule, and commit each step on its own. S3-R22 item 3 serialises simulator and coverage runs across agents with a lock directory (mkdir .build-orchestrator/sim.lock, removed afterwards). S3-R12 and S3-R13 apply unchanged; never edit Package.swift. S3-R23: the host is shared with other projects' simulator runs; record the load with every timing figure, pin each turn bound with a deterministic test, and take the C2 figure at a 1-minute load of 10 or less (S3-R26 item 11 says what to do when a deciding figure cannot be). The verifiers judge by S3-R16 to S3-R26. Keep docs/adr-drafts/s3f.md's cycle-21 section current step by step (which step is committed, which is in progress, and its next action), so that a fixer resumed after an interruption continues from the worktree HEAD without redoing work.",
+   "fromCycle": 21,
+   "maxCycle": 30,
+   "name": "Stage 3 WP-F (sync engine)",
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "wp": "s3f",
+   "models": {
+    "fix": "opus",
+    "verify": "opus"
+   }
+  }
+ ]
+}
