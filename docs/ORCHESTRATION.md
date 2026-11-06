@@ -218,6 +218,21 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
 
       Then write S3-R28, and launch run 10 for cycle 23.
     - **S3-R28's analysis runs from 10:08:** `wf_d0c26498-063` (task `wka8btw4k`), with 6 agents: f1 (the ENOSPC windows), f2 (the flake) and f3 (the purge), each followed by its review. Reports go to `.build-orchestrator/s3f-c22-analysis/`. If this session compacts or ends first, read that workflow's journal and the six files, then write S3-R28 as S3-R27's item 12 was written: decisions first, then a writer, two checkers and an editor. Run 10's arguments come from run 9's, with `fromCycle: 23`, `findingsFile: s3f-c22-issues.json`, and a focus that names S3-R28 and HEAD `9aa337c`.
+  - **S3-R28's analysis finished at 11:20:** 6 agents, 74 min, 1.79 M subagent tokens, no errors. The reports and reviews are in `.build-orchestrator/s3f-c22-analysis/`.
+    - **f1 (the ENOSPC windows): review UNSOUND** (6 must-fix items). The replay half of f1's route holds: one stamp, written by both ENOSPC ends in the end's own turn before the first await, with clause (f) for replays only. Its join rule does not hold: shapes W-HP, W-AWAY (at both ends), W-DB, W-PD and T-F4 break it. The review asks for the join rule to be re-analysed before it is ruled.
+    - **f2 (the flake): CORRECTED** (3 must-fix items). The test races its own setup: T20's re-queue dispatches an unheld retry that can answer before the shutdown. Route: a probe that forces the interleaving first, then `holdRetry: true` at `EngineFollowBarrierDeferBucketTests.swift:763`, with the assertions unchanged (G3), plus a setup check and doc fixes. About 2 h.
+    - **f3 (the purge): CORRECTED** (4 must-fix items). By estimate, e2-A2.1 to A2.4 alone close none of the six misses. Route C stays in one turn, in stages, each measured before the next:
+      - stage A: A2.1 to A2.3, C-1, C-4, the F-1 clause, C-2 and C-3;
+      - stage B: C-5, the table rebuilt in sorted order;
+      - stage C: A2.4's table order, after the A7 order audit.
+
+      Estimated at 5–12 ms after the sorted stages, and 19–28 h of fixer work. e2-B′ (slices) needs its own review first, and is 30–50 h.
+    - **Decisions for S3-R28** (orchestrator, 11:25):
+      1. Rule f1's replay half now, as f1 review "must add" 1 says. Have the join rule re-analysed (f1b, with its own review) while cycle 23 starts. Append the join rule to S3-R28 between fixer runs. Its shapes (W-HP, W-AWAY at both ends, W-DB, W-PD and T-F4's lazy twin) run in step 0 in both orders, 2 rounds each; each red one is blocking (1(a)).
+      2. Adopt f2's route as its review corrects it.
+      3. Adopt route C, stages A to C, as f3's review corrects it. e2-B′ is not authorised. A miss after the last stage is blocking.
+      4. Cycle 23 also carries S3-R27's unfinished steps 5 to 8. The fixer works over several runs: when a fixer run returns with steps left, stop the workflow before the verifiers get far, then relaunch "continue cycle 23 from HEAD". Each new fixer run reads the rulings file at its start, so an appended ruling is picked up. Agents keep command output short, and the verifiers run lens 3 (repeat runs, TSan, the iOS suite, the benchmarks) first.
+      5. Write S3-R28 as item 12 was written: these decisions, then a writer, a fidelity checker, a consistency checker and an editor.
     - **Plan:** let the cycle-22 verifiers finish. When they land, stop run 9 once its cycle-23 fixer starts, as was done with run 8, because run 9's focus describes cycle 22. Then run one read-only analysis for S3-R28: e2-B re-specified with its review's corrections, an alternative that stays in one turn for the k = 4 shapes, and any new finding that needs a route. Then write S3-R28 and launch run 10 for cycle 23. Cycle 23 continues S3-R27's unfinished steps: e2-A2.1 to A2.4, steps 5 to 8, and the open lines.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
