@@ -181,25 +181,36 @@ extension EngineFollowBarrierTests {
 
     // MARK: T-A3: the shutdown resumes the owed answers with their values
 
-    /// T-A3 (A3): ten user waiters' answers owed, the follow-ups held, and the engine shuts down after `turns` of them
+    /// T-A3 (A3): `count` user waiters' answers owed, the follow-ups held, and the engine shuts down after `turns` of them
     /// (none: between the commit and its first follow-up; one, which resumed the four oldest: between two). The
     /// shutdown's drain resumes each answer still owed with the value the commit gave it, and none resumed before again,
     /// so every caller gets C's bytes, not `.shutDown`. A drain that drops them leaves their callers suspended until the
-    /// time limit; one that drains from the table's start resumes the four twice.
+    /// time limit; one that drains from the table's start resumes the four twice. At 600, more answers are owed than a
+    /// shutdown turn takes (`shutdownStepsPerTurn`, 512), so `settle` resumes them in two slices, with nothing else to
+    /// free (Stage 3 close-out cycle 22, ruling S3-R27 item 6; d4 §3.5). `turns` and `count` are one argument, since a
+    /// test takes at most two argument collections.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-15: a shutdown while a commit's answers are owed answers the callers still owed with the commit's answers (T-A3)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, [0, 1])
-    func shutdownAnswersTheOwedCallersWithTheCommitsAnswers(_ visit: LaneDropVisit, turns: Int) async throws {
-        let t = try await self.owedAnswersSetUp(visit, seed: 2_028_531 + UInt64(turns), count: 10)
+    @Test("R-SYN-15: a shutdown while a commit's answers are owed answers the callers still owed with the commit's answers (T-A3)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, [(turns: 0, count: 10), (turns: 1, count: 10), (turns: 0, count: 600), (turns: 1, count: 600)])
+    func shutdownAnswersTheOwedCallersWithTheCommitsAnswers(_ visit: LaneDropVisit, _ owing: (turns: Int, count: Int)) async throws {
+        let turns = owing.turns
+        let count = owing.count
+        let t = try await self.owedAnswersSetUp(visit, seed: 2_028_531 + UInt64(turns), count: count)
         let engine = t.engine
         for _ in 0..<turns {
             await Self.runOneAnswerTurn(engine)
         }
         let owed = await engine.readForTests { Self.owedAnswersLeft($0) }
-        try #require(owed.left == 10 - 4 * turns && owed.scheduled, "setup: \(turns) follow-ups resumed four answers each, and the next is scheduled: \(owed)")
+        try #require(owed.left == count - 4 * turns && owed.scheduled, "setup: \(turns) follow-ups resumed four answers each, and the next is scheduled: \(owed)")
+        let left = await engine.readForTests { e in (waiters: e.state.waiters.count, jobs: e.state.jobs.count) }
+        try #require(left.waiters == 0 && left.jobs == 0, "setup: no waiter or job is left for the shutdown to free: \(left)")
         await Self.finishHeld(t.s)
         let drained = await engine.readForTests { e in e.state.owedAnswers.isEmpty && e.state.owedAnswersHead == 0 && e.state.answerFollowUp == nil }
         #expect(drained, "the shutdown's drain empties the owed answers")
-        #expect(await Self.owedAnswerBytes(t) == Array(repeating: 16, count: 10), "every caller gets C's bytes, not the shutdown")
+        if count == 600 {
+            let slices = await engine.readForTests { $0.state.shutdownSlices }
+            #expect(slices == [512, 88 - 4 * turns], "the shutdown resumes the owed answers a turn's worth a slice: \(slices)")
+        }
+        #expect(await Self.owedAnswerBytes(t) == Array(repeating: 16, count: count), "every caller gets C's bytes, not the shutdown")
     }
 
     // MARK: T-A2: a withdrawal while an answer is owed
