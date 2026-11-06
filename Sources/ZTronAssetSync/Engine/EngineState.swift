@@ -1086,6 +1086,42 @@ struct Job {
         return off
     }
 
+    /// Withdraws in place what a purge removes from the job (`SyncEngine.withdrawPurged`): from each non-user interest
+    /// other than a waiter's, in ascending token order, its ids `isPurged` names. An interest left with none is removed
+    /// (`setInterest`), the job's lane read before each removal; one left with some loses them (`subtractAssets`). One
+    /// access to the job does it all, as `takeOff` does, where the walk looked the job up and copied it once for each
+    /// interest it removed (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.4). The order is the walk's
+    /// before: a job a claim keeps holds the lane before the last removal (`heldLane`), so removing in another order
+    /// would change it (e2 review must-fix 6). `isPurged` runs inside the caller's access to the job, so it reads nothing
+    /// of the engine's state. Returns the interests it withdrew ids from, ascending, with the ids, for the drops the walk
+    /// makes after the access; the tokens removed; the lanes before the first and before the last removal; and whether
+    /// the job was left with no interest.
+    mutating func withdrawPurged(_ isPurged: (AssetID) -> Bool) -> JobWithdrawal {
+        var off = JobWithdrawal()
+        let purged = self.assets.filter(isPurged)
+        guard !purged.isEmpty else {
+            return off
+        }
+        for (token, interest) in self.interests.sorted(by: { $0.key < $1.key }) where interest.lane < .userInitiated && interest.kind != .waiter {
+            let withdrawn = interest.assets.intersection(purged)
+            guard !withdrawn.isEmpty else {
+                continue
+            }
+            off.withdrawn.append(WithdrawnInterest(token: token, kind: interest.kind, assets: withdrawn))
+            if withdrawn.count == interest.assets.count {
+                let before = self.lane
+                off.laneBeforeLast = before
+                off.laneBeforeFirst = off.laneBeforeFirst ?? before
+                off.removed.append(token)
+                self.setInterest(nil, for: token)
+            } else {
+                self.subtractAssets(withdrawn, for: token)
+            }
+        }
+        off.emptied = self.interests.isEmpty
+        return off
+    }
+
     /// Test seam (the invariant oracle): forgets `asset`'s holders in the index, its interests unchanged, the state the
     /// index's clause reports (I1).
     mutating func forgetIndexForTests(_ asset: AssetID) {
@@ -1118,6 +1154,32 @@ struct JobTakeOff {
     var laneBeforeLast: AssetPriority?
     /// The held ids an interest held.
     var ids = 0
+}
+
+/// What `Job.withdrawPurged(_:)` withdrew from a job.
+struct JobWithdrawal {
+    /// The interests it withdrew ids from, in ascending token order.
+    var withdrawn: [WithdrawnInterest] = []
+    /// The tokens whose interests it removed, ascending.
+    var removed: [InterestToken] = []
+    /// The job's lane before the first removal (`nil` without one): a job left with interests is re-laned from it.
+    var laneBeforeFirst: AssetPriority?
+    /// The job's lane before the last removal (`nil` without one): a job left with none that a claim keeps holds it
+    /// (`Job.heldLane`).
+    var laneBeforeLast: AssetPriority?
+    /// Whether the job was left with no interest.
+    var emptied = false
+}
+
+/// An interest a purge withdrew ids from (`Job.withdrawPurged(_:)`): what the walk needs, after the access, to drop
+/// its group's members or forget its heals.
+struct WithdrawnInterest {
+    /// Its token.
+    let token: InterestToken
+    /// Its kind.
+    let kind: InterestKind
+    /// The ids it lost.
+    let assets: Set<AssetID>
 }
 
 /// How many of a job's interests ask for each lane, and how many of its user-initiated ones are single requests (no

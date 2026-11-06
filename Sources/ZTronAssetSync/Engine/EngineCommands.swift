@@ -1013,37 +1013,45 @@ extension SyncEngine {
         }
         self.withdrawPurgedJoins(isPurged)
         for transfer in self.state.jobs.keys.sorted() {
-            guard let job = self.state.jobs[transfer] else {
+            // One access to the job removes its purged interests, in ascending token order (`Job.withdrawPurged`); the
+            // writes they imply follow it (S3-R27 item 12.3, e2-A1.4, with item 1's exclusivity rule).
+            guard let off = self.state.jobs[transfer]?.withdrawPurged(isPurged) else {
                 continue
             }
-            let purged = job.assets.filter(isPurged)
-            guard !purged.isEmpty else {
-                continue
-            }
-            for (token, interest) in job.interests.sorted(by: { $0.key < $1.key }) where interest.lane < .userInitiated && interest.kind != .waiter {
-                let withdrawn = interest.assets.intersection(purged)
-                guard !withdrawn.isEmpty else {
-                    continue
-                }
-                // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of
-                // a purged id is forgotten. In the set's order: the lane filter never withdraws an `.ensure` interest
-                // (always user-initiated), so no drop resumes anything, and the order is unobservable (e2-A1.3).
-                for asset in withdrawn {
+            // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of a
+            // purged id is forgotten. In the set's order: the lane filter never withdraws an `.ensure` interest (always
+            // user-initiated), so no drop resumes anything, and the order is unobservable (e2-A1.3).
+            for interest in off.withdrawn {
+                for asset in interest.assets {
                     switch interest.kind {
                     case .prefetch, .ensure:
-                        self.dropGroupMember(token, asset: asset, from: transfer)
+                        self.dropGroupMember(interest.token, asset: asset, from: transfer)
                     case .system:
                         self.state.heals[asset] = nil
                     case .run, .waiter:
                         break
                     }
                 }
-                if withdrawn.count == interest.assets.count {
-                    self.removeInterest(token, from: transfer)
-                } else {
-                    self.state.jobs[transfer]?.subtractAssets(withdrawn, for: token)
-                }
             }
+            guard let before = off.laneBeforeFirst, let last = off.laneBeforeLast else {
+                continue
+            }
+            // What `dropInterest` did after each removal, once for them all (`settleRemoval`), as `takeOffMovedBefore`
+            // does: only the last removal can leave the job empty, removals never raise a lane, and a non-user lane falls
+            // at most once (prefetch to bulk), so one re-lane from the lane before the first removal does what each
+            // removal's re-lane did (re-queue, re-prioritise, pause), and observers are notified once, at the job's end
+            // (the audit before e2-A1.4: no purge suite waits for a state inside one job's removals).
+            if let run = self.state.run?.token, off.removed.contains(run) {
+                self.state.run?.held.remove(transfer)
+            }
+            if off.emptied, before != last {
+                // The removals before the last left the job interests and lowered its lane, from `before` to `last`:
+                // their re-lane came before the last removal retired the job or a claim kept it at `last`, and one
+                // settle alone would skip it (`EnginePurgeWithdrawalTests`).
+                self.state.jobs[transfer]?.heldLane = last
+                self.relane(transfer, from: before)
+            }
+            self.settleRemoval(transfer, before: before, last: last)
         }
     }
 
