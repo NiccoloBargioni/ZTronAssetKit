@@ -6930,10 +6930,11 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    404 resolution's turn marks, behaviour-free); `06c9ddf` (`commitReannounceTurns`, red); `5f7db46` (a1, a2, a3 and c3,
    with T-A-1, T-A-2, T-A-3 and `commitFailedArmTurns`). `waitersStalledSubscriber` is 6.38 ms after the step, so c1 is
    not taken; `manyGroups` is 7.80 ms, so c6 is not taken. The figures and the kills are under step 3 below.
-4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): **in progress**. Committed:
+4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): **committed, e2-A2 in part**. Committed:
    `1ccf796` (the purge's turn marks, behaviour-free); `e174f81` (the purge cases, red); `170c376` (e2-A1.1);
-   `4c572fb` (e2-A1.2); `0500e6c` (e2-A1.3). The audit before e2-A1.4 is recorded. Next: e2-A1.4. The figures are
-   under step 4 below.
+   `4c572fb` (e2-A1.2); `0500e6c` (e2-A1.3); `1c684cf` (e2-A1.4); `6ae763d` (e2-A1.5); `332b6cc` (e2-A1.6);
+   `03c3504` (e2-A1.7); `2abddd1` (e2-A2.5). After e2-A1 six cases close and six miss, so e2-A2 is triggered; e2-A2.1 to
+   e2-A2.4 were not made in this cycle (budget). The figures, the records and the kills are under step 4 below.
 5. Item 3, in its sub-steps: not started.
 6. Item 4: not started.
 7. Item 5's remaining kills (d4 review's steps 6 to 12), its default-tuning probe, e1-R1's and e2's kills: not started.
@@ -7451,6 +7452,76 @@ The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
   reverses `integrate-rr21.md` R15's sort (`s3f-c20-analysis/integrate-rr21.md:239`) and S3-R26 answer 7's "the purge
   arm that removes items and sorts the removed subset" (item 12.3's reversals). Restoring a sort is Equivalent (cost
   only).
+- **e2-A1.4** (`1c684cf`). `Job.withdrawPurged` removes, in one access to the job, each purged non-user interest other
+  than a waiter's, in ascending token order, the lane read before each removal: an interest whose every id is purged
+  goes whole, another loses the purged ids (`subtractAssets`). It returns what it took (`JobWithdrawal`: each interest's
+  withdrawn ids, the tokens removed whole, the lanes before the first and before the last removal, and whether the job
+  was left with no interest). The walk then drops the members, forgets the heals, takes the job out of the run's `held`
+  and settles it once, after the access and in the order the one-at-a-time walk wrote them (item 1's exclusivity rule).
+  The order across jobs (the sorted keys) and within a job (ascending tokens) is kept (e2 review must-fix 6).
+  - **One settle, and the re-lane before the last removal** (a deviation from the letter of "then one `settleRemoval`",
+    made to keep the behaviour). Removed one at a time, the removals before the last re-laned the job whenever they
+    lowered its lane (`dropInterest`'s `settleRemoval`, `relane(from:)`): its transfer's priority change, or a queued
+    job's fresh ticket at the new lane. One settle of a job the purge empties would skip that re-lane: the transport would
+    see the cancellation without the priority change before it, and a claim-held job would keep its earlier place. The
+    walk keeps it (`EngineCommands.swift:1051`): when the job was emptied and its lane before
+    the last removal differs from its lane before the first, it holds the former (`heldLane`) and re-lanes the job from
+    the latter, then settles. A job left with interests is re-laned once, from its lane before the first removal:
+    removals never raise a lane, and a non-user lane falls at most once (prefetch to bulk), so the one re-lane does what
+    the removals' re-lanes did.
+  - **Its tests** (`EnginePurgeWithdrawalTests`, green before and after; each on a transfer the fake source holds, so a
+    priority change and a cancellation reach its control log): `purgeRemovesInAscendingTokenOrder` (e2 review must-fix
+    6's case: t1 `.bulk`, t2 `.prefetch`; a claim keeps the job at `.prefetch`; no control);
+    `purgeThatEmptiesAJobKeepsItsEarlierRelane(claimed:)` (t1 `.prefetch`, t2 `.bulk`: kept at `.bulk` after
+    `[.setPriority(.bulk)]`, or retired after `[.setPriority(.bulk), .cancel]`); `purgeThatLeavesInterestsRelanesOnce`
+    (one `.setPriority(.bulk)`). The reversed-order mutant and the settle's mutants are step 7's.
+  - **A residual (UNCONFIRMED), outside item 12.3.** `takeOffMovedBefore`'s one settle
+    (`EngineFollow.swift:614`) has the same shape for a job its
+    take-off empties: a queued job (an ENOSPC's job that a user's request re-queued during its free-space read, T20)
+    whose earlier removals lowered its lane, kept by a claim, would keep its earlier ticket where removals one at a time
+    re-queued it at the lower lane. No test builds that state. It is recorded for the ruling, not changed.
+- **e2-A1.5** (`6ae763d`). The `.all` fast path, the one branch item 12.3 authorises in e2-A1 (amending item 2's and
+  item 11.3's "branch-free"; e2 review must-fix 7). Under `.all`, `Job.withdrawPurged(_:all:)` withdraws each such
+  interest whole, with no filter of the job's ids and no intersection; the walk reads `request == .all` once, before it.
+  T-A-SCOPE (`scopePurgeWithdrawsOnlyItsIDs`): x and y share one content, held by one prefetch group's interest; a
+  `.scope` purge of x leaves the interest y, y pending at the job, and the job its lane and transfer. Its kills (the
+  path always taken; `Job.withdrawPurged`'s partial arm forced) are step 7's. Never taken is Equivalent (cost only,
+  S3-R19 item 2). The suite's setup now waits until each group's interest holds every member it registered.
+- **e2-A1.6** (`332b6cc`). d2's A3 and A3′: `Group.dropMember(_:waitingFor:)` checks that the member still waits for the
+  transfer, drops it, and takes a settled ensure group's completion, in one access to the group and one hash
+  (`Dictionary.index(forKey:)`, `Values.subscript(position:)`'s getter and `Dictionary.remove(at:)`: the macOS 27.0
+  and iOS 27.0 SDKs' `Swift.swiftinterface`, lines 7807, 8050-8053 and 7908-7909 in both, read this cycle; item 3's C7).
+  `dropGroupMember` resumes the completion after the access. Its five callers gain it: the purge's job walk, owed arm
+  and joins (`EngineCommands.swift:1032`, `EngineCommands.swift:1111`,
+  `EngineCommands.swift:1138`; e2 §3's `:1025`, `:1073` and `:1108` on `d5b2ab9`),
+  `reroute` and `answerPresent`. Item 3's sub-step 4 reuses it.
+  - **The nil line (d2 review M1; item 3's M1 obligation): recorded as structural.** `dropMember`'s first guard
+    (`EngineState.swift:1382`) returns `nil` when the member is not
+    pending, or is pending at another transfer. Each caller names the transfer at which the token's interest, waiting
+    join or owed re-route for the member is held: the job walk and `answerPresentMembers`
+    (`EnginePresence.swift:365`, through `answerPresent`'s `from:`) the job whose interest
+    they remove; `reroute` the job its callers took the interest from (`old`); the owed arm the batch's `from`, where
+    `owedRerouteViolations` requires the member pending (`EngineCommands.swift:2164`);
+    the join arm the join's transfer, set as the member's pending before the join was queued (`reroute`,
+    `EngineDispatch.swift:1235`; `registerGroup`,
+    `EngineDispatch.swift:245`). A member's pending is set where its interest is added
+    or moved (those two lines and `EngineCommands.swift:340`) and
+    cleared where the interest leaves, in the same turn (`deliver`'s callers: `resolve` with `dropInterest`,
+    `resolveAll` with `removeAllInterests`, `countFailedAttempt` with `setInterest(nil, for:)`; and `dropGroupMember`'s
+    callers). No invariant clause checks the interest-to-pending direction (the clause at
+    `EngineCommands.swift:1884` checks pending to interest), so this is an
+    argument, not a check. The old guard's line (`EngineJobs.swift:659-660` on `d5b2ab9`) was at count 0 in cycle 21's
+    second gate run (d2 review M1's table); the new line's count on the final HEAD is under step 8.
+  - The ensure guard moves with it (`kind == .ensure`, `isSettled`, the continuation still held). No mutant of it was
+    run at its old line, so none is re-run; it is reached by every purge drop (a prefetch group).
+- **e2-A1.7** (`03c3504`). `settleRemoval` keeps the lane and names the claim's content in one access
+  (`Job.holdIfUnwanted`), and `retire` reads the job's state and attempt in place (`Job.retirement`, mutating only so
+  the read takes the table's in-place access): through the table's getter each copied the job. `ClaimKey(job:)` reads
+  the entry's checksum and the transfer only, so building it after `heldLane` is set changes nothing. The in-place
+  access is a write access to the table: where `retire` returns without a removal (a verifying or committing job), it
+  would copy the table only while a caller still iterated it, and no loop over `jobs` retires or settles (the loops in
+  `EnginePresence.swift`, `EngineFollow.swift` and `EngineFailures.swift`, and the introspection and invariant walks,
+  read only).
 - **Figures after each part** (item 12.5.13; release with `-enable-testing`, best of 3; `purgeWhileOwedTurns` and
   `purgeJoinsTurns` through `.build-s3f/c22/tools/part-measure.sh`, which builds, runs `wt-bench.sh` and then
   `probe-parts.sh`; PROBE-C21-PURGE-PARTS on a copy of the commit with the probe's seams, `.build-s3f/c22/probe/<tag>.log`,
@@ -7462,11 +7533,15 @@ The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
 | `170c376` e2-A1.1 | 8.38, 8.30, 8.26 | 8.26 | 3.72 | 7.88, 7.96, 7.93 | 3.09 to 2.92 | (not run) | |
 | `4c572fb` e2-A1.2 | 8.38, 8.16, 8.18 | 8.16 | 2.34 to 2.23 | 8.05, 8.56, 8.10 | 3.48 to 3.36 | 6.56, 6.75 | 2.23 |
 | `0500e6c` e2-A1.3 | 5.02, 4.94, 4.97 | 4.94 | 3.94 | 4.19, 4.21, 4.15 | 3.43 | 6.28, 6.49 | 3.70 |
+| `1c684cf` e2-A1.4 | 7.76, 5.09, 5.12 | 5.09 | 3.11 | 4.27, 4.21, 4.18 | 4.88 | (not run) | |
+| `6ae763d` e2-A1.5 | 4.81, 5.00, 5.02 | 4.81 | 2.71 | 4.42, 4.24, 4.19 | 4.46 | (not run) | |
+| `332b6cc` e2-A1.6 | 5.05, 4.84, 4.87 | 4.84 | 3.07 | 2.95, 3.02, 2.94 | 3.13 | (not run) | |
+| `03c3504` e2-A1.7 | 4.87, 4.87, 5.02 | 4.87 | 3.22 | 2.89, 2.87, 2.92 | 5.42 | 4.99, 5.20 | 9.84 |
 
   e2-A1.2 left the probe's walk where e2-A1.1 left it: with every item removed, the copied batch kept none, so its copy
   was cheap; the sort of 10,000 removed items was the walk's largest share, and e2-A1.3 halved the walk. Each part
-  passed `verify.sh --quick` (`VERIFY: PASS`; the Sync bundle's 700 tests), the release build with warnings as errors,
-  and the unsafe and docs gates (0 escapes; 1281 of 1281) before its commit.
+  passed `verify.sh --quick` (`VERIFY: PASS`; the Sync bundle's 700 tests, 703 from e2-A1.4, 704 from e2-A1.5), the
+  release build with warnings as errors, and the unsafe and docs gates (0 escapes; 1281 of 1281) before its commit.
 - **The audit before e2-A1.4** (item 12.5.15). e2-A1.4 leaves one `settleRemoval`, so one `notifyObservers`, per job
   where today each interest the walk removes whole notifies. The states it no longer shows are inside one job's
   removals: some of its withdrawn interests removed, the rest not yet. Every `.purge(` of the Sync suites (sixteen calls
@@ -7488,6 +7563,51 @@ The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
   Every other wait is registered after the purge returned (the call is awaited first), and `EngineModelTests` reads its
   invariants in turns of their own (`idleViolations`). No predicate depends on a state inside one job's removals, so no
   `notifyObservers` call is kept for one. The benchmarks' waits (`jobs.isEmpty` and the like) are monotone in the walk.
+- **Every purge case after e2-A1** (item 12.5.13; `03c3504`, release with `-enable-testing`;
+  `.build-s3f/c22/each/a17-*.log`). The decision rule (item 1's) closes six cases and leaves six red, so e2-A2 is
+  triggered:
+
+| Case | Heartbeat, three runs, ms | Best | The purge's turn, best | 1-minute loads | On `e174f81` (red), best | Verdict |
+|---|---|---|---|---|---|---|
+| `purgeWhileOwedTurns` | 4.87, 4.87, 5.02 | 4.87 | (no mark) | 3.22 | 9.48 | closed |
+| `purgeTurns(.oneGroup)` | 34.14, 33.97, 35.00 | 33.97 | 33.96 | 3.20 | 45.57 | **miss** |
+| `purgeTurns(.oneMemberGroups)` | 35.39, 38.70, 38.31 | 35.39 | 35.38 | 3.20 to 2.90 | 47.07 | **miss** |
+| `purgeTurns(.oneGroupScope)` | 39.18, 38.05, 37.55 | 37.55 | 37.54 | 2.90 to 2.99 | 48.38 | **miss** |
+| `purgeTurns(.sharedJob)` | 4.75, 4.67, 4.61 | 4.61 | 4.61 | 2.99 | 10.85 | closed |
+| `purgeTurns(.sharedJobFourGroups)` | 17.90, 18.01, 17.83 | 17.83 | 17.83 | 2.99 | 39.12 | **miss** |
+| `purgeTurns(.fourGroups)` | 59.79, 59.47, 59.86 | 59.47 | 59.46 | 2.99 to 2.92 | 119.00 | **miss** |
+| `purgeTurns(.retryJobs)` | 622.86, 571.12, 581.72 | 571.12 | 571.11 | 2.92 to 2.72 | 589.83 | **miss** |
+| `purgeTurns(.userWaiters)` | 6.96, 7.17, 6.78 | 6.78 | 6.78 | 2.72 | 8.62 | closed |
+| `purgeTurns(.ensures)` | 7.10, 6.78, 7.74 | 6.78 | 6.77 | 2.72 to 17.32 (the host's load rose after the last run) | 8.17 | closed |
+| `purgeJoinsTurns(.bucket)` | 4.99, 5.00, 5.26 | 4.99 | 4.98 | 9.84 | 9.88 | closed |
+| `purgeJoinsTurns(.queue)` | 5.25, 5.44, 5.20 | 5.20 | 5.19 | 9.84 | 8.72 | closed |
+
+  The probe's walk of the events fell from 9.09 to 2.87 ms best across e2-A1, most of it at e2-A1.3 (the sort) and
+  e2-A1.6 (the group's one access). e2 §3 estimated (i) at 33 to 41 ms after A1; it measured 33.97. The retry shape is
+  unchanged: its turn is the heap's one pass per retired job (e2 §2.4), which e2-A2.5 takes.
+- **e2-A2.5** (`2abddd1`). Inside the walk, `removeJob` leaves a retired job's `.retry` deadline to the walk
+  (`EngineState.retiredRetries`: an empty set from before the job walk to its end, `nil` otherwise), which takes them
+  all out of the heap in one `removeAll(where:)` pass (`DeadlineHeap.swift:79-81`) and then notifies the observers once
+  more, since the walk's last notification still counted them (`EngineIntrospection.scheduledDeadlines`). Outside a walk
+  each removal takes its own deadline out, as before. `purgeTakesItsRetiredJobsRetryDeadlinesOut` pins both sides with
+  no clock driven (a driver would advance the time to y's retry, and fire a deadline of x's left on the heap): a
+  `.scope` purge of x takes x's deadline out and leaves y's, and the release of y's group then takes y's out. The
+  benchmark's purge cases assert that no `.retry` deadline is left (`PurgeRun.retriesAfter`; the ruling's "the retry
+  case asserts that no `.retry` entry is left"). The test's first form drove the clock and failed (`afterPurge.y`: the
+  driver had started y's retry); it was fixed before the commit.
+- **e2-A2.1 to e2-A2.4: not made in cycle 22** (e2-A2.6 is dropped: A5's audit was not done). The cycle's remaining
+  budget went to the step-8 gate run. What A2.1 needs is recorded for the next fixer:
+  - `Set.remove` and `Dictionary.removeValue(forKey:)` hash before they probe, even in an empty collection (the macOS
+    27.0 and iOS 27.0 SDKs' `Swift.swiftinterface`, the same lines in both: `Set.remove` 21147-21149, `_Variant.remove`
+    22111-22123, `_NativeSet.find` 16351-16353; `Dictionary`'s `_Variant.removeValue(forKey:)` 9125, its `find` 9137).
+  - The indexes `removeJob` clears whose stale entry an invariant clause reports: `spaceParked` (the ledger's
+    parked-for-space equality), `laneParked`, `circuitParked` and `throttleParked` (the gates' equalities), `failedJobs`
+    (its equality), `edgeOwed` (a subset of the failed), `originOwed` (a subset of the origin-parked),
+    `verdictsAfterFollow` ("jobs whose failure verdict waits for a follow are not failed"). With no such clause:
+    `unfollowed` and `systemHeld` (each checked in one direction only), the run's `held` (one direction), and
+    `spaceAdmitted` (none); A2.1's negation kills need one added for each.
+  - A guard per collection kind (a `Set` and a `Dictionary` helper that return early when empty) would make A2.1 two
+    branches rather than one per index.
 
 ## Items
 
