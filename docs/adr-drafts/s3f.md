@@ -7964,14 +7964,15 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
   2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: **done** (17:26 to
      17:29, on a snapshot of `f38dd8c`): each of the seven fails 2/2 in each order that reaches it, by assertions only.
      Recorded with run 12's seven commits and its e1 runs under "Point 6" below. Within point 6's 0.5-1 h.
-  3. Point 6, the records: **in progress** (from 17:30). Committed: d5's pin (S3-R27 item 7; green 2/2 in both orders,
+  3. Point 6, the records: **done** (17:30 to 18:25). Committed: d5's pin (S3-R27 item 7; green 2/2 in both orders,
      17:42) and 12.5.18's 12.1 doc at `BenchSyncCycle21.swift:156-159`, with the mutant-run record (`3a551f4`); the
      ownership record (`79e1e0b`); reqs #10's stale records, the 12.x records, item 7's classification, item 5's
      `followedLane` record, item 8 and item 9's rows (`6c830b8`; under "Point 6: the records"); the sections for point
      2 (with f3c's open shapes and N25's three brought up to f3c's review) and point 4 (the whole class), and RR-25
-     (`5672c6d`); the "Proposed document changes" of cycles 21 to 23 (reqs #5; the commit after `5672c6d`). Next: the
-     findings' states and "Not verified (cycle 23)".
-  4. Point 7, the close: not started.
+     (`5672c6d`); the "Proposed document changes" of cycles 21 to 23 (reqs #5; `ab82a5a`); the 21 findings' states
+     (the table below), the named findings' last column, the cycle-23 entry of "Not verified here" and A-T-SD's
+     evidence note (the commit after `ab82a5a`). Within the records' 3-6 h.
+  4. Point 7, the close: next, on the HEAD after these records.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
   `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
   `486ee2a`, `8b252f2`, `06880a8`, `9e9a500`). It made no mutant run for the five and recorded none of the seven here;
@@ -7993,6 +7994,32 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
      `9aa337c`). The mutant runs for run 12's committed tests are point 6's.
   5. Step 7 (the records and the close): point 6 and point 7.
 
+**The 21 findings at the final HEAD** (the close ruling's point 6). Each state is one of the ruling's: closed, with its
+commit and evidence; a known miss (N25, or point 2); a known risk (point 4); item 7's disposition; to be closed by
+point 8's verification; or open, recorded under this ruling. Figures and hours are as the analyses give them; every
+hour figure is an estimate. A finding's number is its lens's (`.build-orchestrator/s3f-c22-issues.json`, on
+`9aa337c`).
+
+| Finding | State at the final HEAD | Figure | Route and hours | Record |
+|---|---|---|---|---|
+| correct #1: PROBE-C22C-TS-DRAIN-JOIN (an ENOSPC window) | a known risk (point 4, the whole class) | the orders' answers differ: visited first `failed(insufficientSpace(…))` and one start, swept first `ok(100000 B)` and two; 2/2 on `9aa337c` | route Q, after an independent check of 3-5 h, 44-67 h (`f1c-review.md` §3, §9); not taken | "Known residual correctness risks" |
+| correct #2: PROBE-C22C-APPLY-IN-READ (an ENOSPC window) | a known risk (point 4, the whole class) | the orders' answers differ; 2/2 on `9aa337c` | route Q, as for correct #1 | "Known residual correctness risks" |
+| correct #3: A-T-SD's flake (S3-R16 1(d)) | to be closed by point 8's verification: fixed in `03c4e59` (test only); the orchestrator records the verification's result for row 3 in ADR-057 | f2-R1 red 2/2 on `9aa337c`; on `03c4e59`'s tree green in both orders, and 30 host iterations per argument with 0 issues | none left | "Step 1"; "Not verified here", cycle 23 |
+| correct #4, reqs #1: the six purge misses | a known miss (point 2): red and reported, the accepted FAIL's cause with P-13 (point 3) | 17.82 to 64.00 ms over the four measured sets, `fourGroups` the worst (61.09 to 64.00 ms); the close's set under "Gate evidence (cycle 23)" | route C, 19-28 h, then item 3b, 17-26.5 h: 36-54.5 h; not taken | "Known misses of C2's 10 ms limit", entry 1 |
+| correct #5, reqs #2: APM's answer turn; item 4's k = 2 and k = 4 shapes | a known miss (point 2) for APM's turn; unproven for item 4's shapes | APM (PROBE-C21-APM on `9aa337c`, load 9.85 to 8.65): groups 11.10 ms, users 13.93 ms, one group 9.37 ms; item 4's shapes unmeasured, 9-10 ms at k ≥ 4 by estimate (UNCONFIRMED) | d2's route (a) with B1: not estimated (cycle 22's lump for S3-R27 items 1 to 3 was 10-15 h); A1, and A2 if taken: not estimated | the same section, entries 4 and 5 |
+| correct #6, reqs #4: changed lines no test reaches | open, recorded under this ruling (point 6, "What stays open") | the purge predicate's three `return true` lines, `.all`'s and the unlisted-id answers under `.evictable` and `.scope` (`EngineCommands.swift:1001`, `:1004`, `:1009` at `9aa337c`; `:1025`, `:1028`, `:1033` at HEAD) | not estimated | "Point 6: run 12's work and the mutant runs", "Not run, and open" |
+| correct #7, reqs #3: the survivors and kills | closed for run 12's five kill tests and `p2-after-verdict-replay-rule` (`mut-k23`: each mutant fails 2/2 in each order that reaches it, by assertions), and for e1-P1's other side (`64f276d`, 2/2); open, recorded under this ruling: r2b, b22-no-run-owner, p2-after-verdict-true, e1-R1's kill table, `i5-pin-fold` (T-E2), ps-write-always's swept-first side and the default-tuning probe | seven mutants killed (`.build-s3f/c23/mut-k23.txt`, on a snapshot of `f38dd8c`) | the open ones: not estimated | "Point 6: run 12's work and the mutant runs" |
+| correct #8: P-13 | item 7's disposition: WP-B's (S3-R26 item 10); WP-F edits nothing for it | the verifier's run: a longest unit of 8.818 ms against a 5.0 ms budget a batch; the close's figure under "Gate evidence (cycle 23)" | WP-B's | the named findings below |
+| correct #9: item 4's in-letter shapes unmeasured | unproven, recorded with point 2's entry 5 | unmeasured | A1, and A2 if taken: not estimated | "Known misses of C2's 10 ms limit", entry 5 |
+| correct #10: the fixer's residuals, not probed | item 7's disposition: no action | none | none | as the draft records them |
+| reqs #5: the step-8 records | closed: `3a551f4`, `79e1e0b`, `6c830b8`, `5672c6d`, `ab82a5a` and the commit after it | none | none | "Point 6: the records" |
+| reqs #6: 11.6's false record | closed: `79e1e0b` (the eight bench files under 11.6 as amended; the false rows corrected in place) | none | none | "Authorised edits outside WP-F" |
+| reqs #7: the verification gap (lens 3) | to be closed by point 8's verification, lens 3's heavy checks first; the orchestrator records the result in ADR-057 | none | none | point 8 |
+| reqs #8: `publishAllMatchesOnePublishPerEvent`'s hang guard | closed: `29dfb12` (`.timeLimit(.minutes(1))`; green in 0.063 s, `s6/guard-run.log`) | none | none | "Point 6: run 12's work and the mutant runs" |
+| reqs #9: the ownership wording | closed: `79e1e0b` | none | none | "Authorised edits outside WP-F" |
+| reqs #10: stale records | closed: `3a551f4` (the bench doc comment, 12.1) and `6c830b8` | none | none | "Point 6: the records" |
+| reqs #11: C2 margins and load-only figures | to be closed by point 8's verification (its benchmarks run re-measures the load-only cases); the close's margin list is under "Gate evidence (cycle 23)" | `commitTwoTokensTurns` 9.02 ms at a load of 5.88 (cycle 22), on the margin list | none | point 8 |
+
 ### Appended items (S3-R28 item 6)
 
 - Item 1c (appended 15:33, before run 11): taken at step 1, run 11's first step (15:36). Step 0's ENOSPC shapes and
@@ -8012,18 +8039,21 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
 
 | Finding | Goes to | Where it stands |
 |---|---|---|
-| correct #1 and #2 (blocking at `9aa337c`): the ENOSPC windows, PROBE-C22C-TS-DRAIN-JOIN and PROBE-C22C-APPLY-IN-READ | item 1c | known residual correctness risks by the owner's ruling, not blocking in cycle 23; recorded below, no code change |
-| correct #3 (blocking): the flake in `shutdownClearsTheJoinsBehindAVerdict(.followVisitedFirst)` | item 2 | step 1: **fixed** (`03c4e59`) |
-| correct #4 and reqs #1 (blocking): the purge's six misses | item 3 | step 2: open (waits for item 3b and the owner's decision on the C2 work) |
-| correct #5 and reqs #2 (blocking): `answerPresentMembers`' answer turn; the k = 2 and k = 4 shapes | item 4 (S3-R27's steps 5 and 6) | steps 4 and 5: open |
-| correct #6 and #7, reqs #3 and #4 (blocking): the survivors, the kills, the three unreached lines | item 4 (S3-R27's step 7) | step 6: open |
-| reqs #5 and #6 (blocking): the records; 11.6's record | item 4 (the records) | step 7: open |
-| reqs #7 (blocking): the verification gap | item 6 | the verifiers' order (lens 3's heavy checks first) |
-| reqs #8, #9 and #10 (not blocking): the hang guard, the ownership wording, stale records | item 4 | steps 6 and 7: open |
+| correct #1 and #2 (blocking at `9aa337c`): the ENOSPC windows, PROBE-C22C-TS-DRAIN-JOIN and PROBE-C22C-APPLY-IN-READ | item 1c | a known risk by the owner's rulings (item 1c; the close ruling's point 4, the whole class), not blocking; recorded under "Known residual correctness risks", no code change |
+| correct #3 (blocking): the flake in `shutdownClearsTheJoinsBehindAVerdict(.followVisitedFirst)` | item 2 | step 1: **fixed** (`03c4e59`); to be closed by point 8's verification |
+| correct #4 and reqs #1 (blocking): the purge's six misses | item 3 | a known miss by the close ruling's point 2: red and reported, the accepted FAIL's cause with P-13 (point 3); steps 2 and 3 not taken (point 1) |
+| correct #5 and reqs #2 (blocking): `answerPresentMembers`' answer turn; the k = 2 and k = 4 shapes | item 4 (S3-R27's steps 5 and 6) | APM's turn a known miss, item 4's shapes unproven (point 2); steps 4 and 5 not taken (point 1) |
+| correct #6 and #7, reqs #3 and #4 (blocking): the survivors, the kills, the three unreached lines | item 4 (S3-R27's step 7) | run 12's five kill tests and `p2-after-verdict-replay-rule` kill their mutants (`mut-k23`); the rest of step 6, the three unreached lines among it, stays open under the close ruling (point 6, "What stays open") |
+| reqs #5 and #6 (blocking): the records; 11.6's record | item 4 (the records) | closed: the records (`3a551f4`, `79e1e0b`, `6c830b8`, `5672c6d`, `ab82a5a` and the commit after it); 11.6's record in `79e1e0b` |
+| reqs #7 (blocking): the verification gap | item 6 | to be closed by point 8's verification (lens 3's heavy checks first) |
+| reqs #8, #9 and #10 (not blocking): the hang guard, the ownership wording, stale records | item 4 | closed: #8 `29dfb12`, #9 `79e1e0b`, #10 `3a551f4` and `6c830b8` |
 | correct #8 (not blocking): P-13 | item 5's close | WP-B's (S3-R26 item 10); WP-F edits nothing for it |
-| correct #9 (not blocking): the in-letter shapes unmeasured | item 4 (S3-R27's step 6) | step 5: open |
+| correct #9 (not blocking): the in-letter shapes unmeasured | item 4 (S3-R27's step 6) | unproven, with point 2's entry 5; step 5 not taken (point 1) |
 | correct #10 (not blocking): the fixer's residuals, not probed | no action | as the draft records them |
-| reqs #11 (not blocking): C2 margins and load-only figures | item 6 | the quiet-load runs; `commitTwoTokensTurns` stays on the margin list |
+| reqs #11 (not blocking): C2 margins and load-only figures | item 6 | to be closed by point 8's benchmarks run; the close's margin list is under "Gate evidence (cycle 23)", and `commitTwoTokensTurns` stays on it |
+
+The last column was brought up to the close ruling in run 13 (cycle 23); the states, with figures and hours, are in the
+table under "Status (resume here)".
 
 ### Step 1: item 2, the flake in A-T-SD (correct #3)
 
@@ -8091,7 +8121,9 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
   - These 30 iterations are a regression check only. The unfixed test passed 8/8 alone, so 30 green iterations cannot
     tell the two apart (review should-fix 8). The evidence is f2-R1, the construction and the bundle runs.
   - The simulator's 30 iterations (under `sim.lock`) and the Sync bundle runs with their load samples are under "Gate
-    evidence (cycle 23)".
+    evidence (cycle 23)". (Corrected in cycle 23, run 13: the close ruling's point 7 leaves the iOS Simulator suite and
+    A-T-SD's 30 simulator iterations to the verifiers' heavy checks; the close's Sync bundle runs are under "Gate
+    evidence (cycle 23)".)
 - **T20 is re-checked at every later commit** (item 2, "The order"). A-T-SD's set-up check runs in every Sync bundle, so
   a failure of it at a later commit is a T20 regression: fix the code, not the test (f2 review "must add" 1).
 
@@ -8517,7 +8549,7 @@ show them, so the owner has not ruled on them. Both are estimates, UNCONFIRMED:
   15-60 ms more per 10,000 gate reads, at an unmeasured 0.5-2 µs a build, which the benches' fake hides (it holds a
   `let`; `f3c-open-shapes.md:159-160`, its review :102). It reaches beyond the failed-user rows: every per-job gate
   read pays it, `blockCleared` among them (`EngineJobs.swift:936`; review "must add" 3). It is under "Not verified
-  (cycle 23)", because no bench figure includes it.
+  here", cycle 23, because no bench figure includes it.
 
 **N25's three** (S3-R28 item 3, N25): the first three rows of `f3b-review.md` §7 (§7's rows 4 and 5 are row 3 above).
 Their figures after route C and item 3b's merge are estimates (`f3b-review.md` §7), brought up to f3c's review
@@ -11853,3 +11885,24 @@ again: `eca67b8` changes no `Sources` or benchmark file.
   `purgeTurns(.ensures)`'s load rose above 10 during each run of it, cause not measured. Step 7's mutant run ran beside
   the first run's stages after the benchmarks. The C2 figures are this host's only (no device run). `other-wp:b`
   (P-13) is not WP-F's.
+- Cycle 23 (S3-R28, and from 17:12 the owner's close ruling, option (e)). Row 3's fix (`03c4e59`, correct #3) rests on
+  f2-R1's red, its construction and this host's runs; it is not verified until point 8's verification confirms it, and
+  the orchestrator records that result in ADR-057. The iOS Simulator suite and A-T-SD's 30 simulator iterations are left
+  to the verifiers' heavy checks (point 7). Point 8's verification does not re-open point 2's known misses, point 4's
+  known risks or the work point 1 leaves open; whatever it does not reach is added here. The ENOSPC class is a known
+  residual correctness risk (point 4): correct #1 and #2 are measured, and W-AWAY, W-DB, the two W-JOIN-HOP shapes, the
+  former step-0 shapes and `f1c-review.md` §6's shapes are suspected by code reading only, UNCONFIRMED (under "Known
+  residual correctness risks"). Of the known misses of C2's 10 ms limit, only the six purge cases and APM's turn are
+  measured (APM's by a scratch probe); N7's five, f3b-review §7's two variants, route A §9's third shape and N25's three
+  are estimates, and item 4's k = 2 and k = 4 shapes are unmeasured (under "Known misses of C2's 10 ms limit"). f3c's
+  open shapes are estimates, UNCONFIRMED: the heap scans are unmeasured, and no bench figure includes the production
+  cost of `originID` (three builds a gate read, each parsing its URL over HTTP). `releaseRerouteHolds` (R12) has no
+  figure, and the argument that would bound it by the jobs downloading is unfinished: paused jobs and the other start
+  paths are not checked ("Point 6: the records", item 8). d5's audit of the held-turn readers is an analysis, with one
+  premise pinned by a test (`3a551f4`). Not run, and open: p2-after-verdict-true, e1-R1's kill table, `i5-pin-fold`'s
+  re-run (T-E2), r2b, b22-no-run-owner, ps-write-always's swept-first side, item 5's default-tuning probe and the three
+  unreached lines (`EngineCommands.swift:1025`, `:1028`, `:1033` at HEAD). RR-25 (the swept-first backoff, S3-R16 item
+  2) is recorded, not probed. Whether an app's `OSLogStore` read returns S1's line, which `OSLogSink` writes at
+  `OSLogType.info`, is not checked: the unified log's retention of `.info` messages is not verified here (C7,
+  UNVERIFIED); the tests read the injected `LogSink`. The close's runs and what they did not cover are under "Gate
+  evidence (cycle 23)". The C2 figures are this host's only (no device run). `other-wp:b` (P-13) is not WP-F's.
