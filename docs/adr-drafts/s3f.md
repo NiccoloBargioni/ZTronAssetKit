@@ -7027,7 +7027,7 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
 | correct #4 and reqs #5 (blocking): `answerPresentMembers`' answer turn | item 3 | step 5: not started (open) |
 | correct #5, reqs #6 and reqs #12: PROBE-C21-HOLDERS; two stalled subscribers | item 12.1 (outside the bar, by the owner's ruling of 5 Nov; recorded); k ≤ 4 stays with item 4 | steps 6 and 8: not made (open) |
 | correct #6, reqs #7 and reqs #8 (blocking): the survivors; the unreached lines | items 5 and 6 | steps 2 and 7: step 2's made; d4 review's steps 6 to 12 not run (open) |
-| reqs #1 (blocking): ownership of the bench files | item 11.6 | recorded under "Authorised edits outside WP-F" |
+| reqs #1 (blocking): ownership of the bench files | item 11.6 | not recorded in cycle 22, though this row said so (cycle 22's reqs #6); recorded in cycle 23 under "Authorised edits outside WP-F", with 11.6's first condition as S3-R28 item 4 amends it |
 | reqs #3 (blocking): `commitTurns(.manyGroups)` | item 11.7 | steps 3 and 5 (closes: 7.72 ms in the gate run; c6 not taken) |
 | reqs #9: no cycle-21 "Proposed document changes" | records | step 8: not written (open) |
 | reqs #10: item 5's reaching test (`s3f.md:5072`) | item 12.5.9's records | step 8: not written (open) |
@@ -8728,7 +8728,35 @@ S3F-13's; the R-SYN-15 order and S1-09's halves, part of S3-B-070, are S3F-14's)
 
 ## Authorised edits outside WP-F
 
-None, in any cycle (cycle 4 changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `EngineFollow.swift`, tests under
+**The eight benchmark files** (S3-R27 item 11.6, with its first condition as S3-R28 item 4 amends it; cycle 21's reqs
+#1, cycle 22's reqs #6 and #9; corrected in cycle 23, run 13). They are under `Tests/ZTronAssetKitBenchmarks/`, outside
+the WP-F paths of ARCHITECTURE §1.2, and 11.6 authorises them as WP-F's, with any new `BenchSync*.swift` file a later
+cycle adds (cycle 23 adds none). Its conditions, as amended: each file holds only `SyncBenchmarks` and `SyncBench`
+extensions and the helper types they use, declared in that file; no helper type's name collides with another work
+package's; no file edits another work package's benchmark file. No code is moved. The ARCHITECTURE §1.2 addition is
+proposed under "Proposed document changes", cycle 23 (S3-R6).
+
+| File | First commit | Helper types declared in it |
+|---|---|---|
+| `BenchSyncCycle21.swift` | `1645233` (cycle 21) | `DeferBehindShape`, `DeferBehindRun`, `ManyMovesRun`, `PartialMoveRun`, `IndexCostRun`, `CommitShape`, `CommitRun`, `HeldPublicationBench`, `CommitTurnClock` |
+| `BenchSyncJoinChains.swift` | `7876a28` (cycle 21) | `JoinChainRun` |
+| `BenchSyncReroutePins.swift` | `f4f35bd` (cycle 21) | none |
+| `BenchSyncRerouteTakeOff.swift` | `c99d82a` (cycle 21) | `TakeOffDrainRun` |
+| `BenchSyncReroutes.swift` | `94795ca` (cycle 21) | `CommitRerouteShape`, `CommitRerouteBenchRun` |
+| `BenchSyncWaitersBound.swift` | `06d5e40` (cycle 21) | none |
+| `BenchSyncCycle22.swift` | `06c9ddf` (cycle 22) | `ReannounceRun` |
+| `BenchSyncCycle22Purge.swift` | `e174f81` (cycle 22) | `PurgeShape`, `PurgeRun`, `PurgeJoinsAt`, `PurgeJoinsRun` |
+
+The check (run 13, on `3a551f4`): each file's top-level declarations are these types and extensions of
+`ZTronAssetKitBenchmarks.SyncBenchmarks` and `SyncBench`; each type name is declared in exactly one file under
+`Sources/` and `Tests/` (`grep -rlE "(struct|enum|class|actor|typealias|protocol) <name>\b" Sources Tests`); and
+`git diff --name-only s3-base...HEAD`, outside `Sources/ZTronAssetSync/` and `Tests/ZTronAssetSyncTests/`, lists only
+`Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, the eight files and this draft. Before cycle 23 this section said
+"None, in any cycle" and listed none of them, while cycle 22's named findings said 11.6's record was here (cycle 22's
+reqs #6).
+
+Nothing else, in any cycle (cycle 4 changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `EngineFollow.swift`,
+tests under
 `Tests/ZTronAssetSyncTests/Engine/`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift` and this draft; cycle 5 changed
 `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `Tests/ZTronAssetSyncTests/Engine/EngineFollowTests.swift`,
 `EngineSync1LivenessTests.swift` (a doc comment), `Tests/ZTronAssetKitBenchmarks/BenchSync.swift` and this draft; cycle 6
@@ -8751,9 +8779,10 @@ changed `Sources/ZTronAssetSync/Engine/EngineJobs.swift`, `Tests/ZTronAssetSyncT
 `EngineOriginGate.swift`, `EnginePresence.swift`, `EngineReadmission.swift`, `EngineShutdown.swift`, `EngineState.swift`,
 `EngineTimers.swift`, `Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierTests.swift`,
 `EngineFollowBarrierVerdictTests.swift`, the new `EngineFollowBarrierClassTests.swift`, `EngineFollowBarrierApplyTests.swift`,
-`EngineFollowBarrierSurvivorTests.swift` and this draft). Every changed file is WP-F's (ARCHITECTURE §1.2): `Sources/ZTronAssetSync/**`,
-`Tests/ZTronAssetSyncTests/**`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift`, and this draft. No contract signature
-changed (`followApplied(from:)` moved between WP-F files with its signature; `supersede(_:settling:)` gained a defaulted
+`EngineFollowBarrierSurvivorTests.swift` and this draft). Every changed file is WP-F's: by ARCHITECTURE §1.2,
+`Sources/ZTronAssetSync/**`, `Tests/ZTronAssetSyncTests/**`, `Tests/ZTronAssetKitBenchmarks/BenchSync.swift` and this
+draft; by 11.6 as amended, the eight benchmark files above (cycles 21 and 22). No contract signature changed
+(`followApplied(from:)` moved between WP-F files with its signature; `supersede(_:settling:)` gained a defaulted
 internal parameter; in cycle 10 `park(_:reason:)` and `failFast(_:reason:only:)` gained defaulted internal parameters,
 `answeredAt:` and `at:`, and the test seams `holdReleaseFollowUps()` / `resumeReleaseFollowUps()` are internal; in cycle
 11 `park` and `failFast` gained a defaulted internal `answerEnd:`, `endClaim` lost `private`, `resumeReleases`,
@@ -9346,6 +9375,16 @@ Cycle 22 adds (S3-R27; the rest of the cycle's records come with its step 8):
   filters. The engine relies on it: when the locations are as many as the binding's ids, `publishTerminal` announces
   every id of the binding its job still holds without looking up a location (c3)." If the store ever returned another
   key, c3 would announce an unbound id, and only T-ORDER's `sweepFollowsFirst` case would catch it.
+
+Cycle 23 adds (S3-R28 and the owner's close ruling):
+
+- **§1.2, the L4 row (WP-F)** (S3-R27 item 11.6, its first condition as S3-R28 item 4 amends it; S3-R6): in the
+  benchmarks column, after `BenchSync.swift` (…), add "and `BenchSyncCycle21.swift`, `BenchSyncJoinChains.swift`,
+  `BenchSyncReroutePins.swift`, `BenchSyncRerouteTakeOff.swift`, `BenchSyncReroutes.swift`, `BenchSyncWaitersBound.swift`,
+  `BenchSyncCycle22.swift` and `BenchSyncCycle22Purge.swift` (Stage 3, cycles 21 and 22): each holds only
+  `SyncBenchmarks` and `SyncBench` extensions and the helper types they use, declared in that file; no helper type's
+  name collides with another work package's, and no file edits another work package's benchmark file." The files and
+  their helper types are listed under "Authorised edits outside WP-F".
 
 ## Gate evidence (cycle 1)
 
