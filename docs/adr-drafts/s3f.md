@@ -6916,11 +6916,11 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    `.build-s3f/c22/snap0` (`git archive d5b2ab9`, its seams applied by `.build-s3f/c22/tools/snap-seams.py`, its cases in
    `snap0/Tests/ZTronAssetKitBenchmarks/BenchSyncCycle22.swift`) is kept for the later steps' comparisons. Item 3's and
    item 4's 'before' figures are taken at the start of steps 5 and 6 (the deviation below).
-1. Item 12.2 (correct #1), then the unnamed blocking findings of class S3-R16 1(a) to 1(d): **in progress**. Committed:
+1. Item 12.2 (correct #1), then the unnamed blocking findings of class S3-R16 1(a) to 1(d): **committed**. Committed:
    `b603475` (T-E1, T-E3 and T-E4, red); `5ad245d` (e1-R1, with rr21-T8b's and the PIN-END invariants test's changes,
    T-E2 and T-E5; the regression controls green in both orders); `34b299c` (e1-PS, red) and `b4eebb1` (its fix);
    `94aa4b5` (e1-P1, red), `b83112c` (its seam, behaviour-free), `9005651` (its bound and other side, red) and `58e2c1c`
-   (its fix); `f7c993f` (e1-P2, red) and `75b9e45` (its fix). Next: the probes e1-P3 and e1-PR. No unnamed 1(a) to 1(d) finding exists: every blocking finding of
+   (its fix); `f7c993f` (e1-P2, red) and `75b9e45` (its fix); `a83f54e` (e1-P3, holds) and `2b33c73` (e1-PR, holds). No unnamed 1(a) to 1(d) finding exists: every blocking finding of
    the file is named by S3-R27 (the mapping below).
 2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): not started.
 3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
@@ -7170,6 +7170,39 @@ owe): rr21-T8b as changed, T-E1 to T-E5, and the regression controls of 12.5.7 (
   visit (the other side). Y's request count is recorded, not asserted: the re-queue's fresh attempt that visit-first
   made before K is not made behind the barrier (the red run read Y started once swept first). e1-P1's residual (2)
   applies to this visit as to the follow's.
+- **e1-P3: holds** (`a83f54e`). Two sides, each in both orders, recording the job's state where it is read and
+  asserting visit-first's answers only (no `#require` on the state). Shape A:
+  `edgeBetweenAnENOENTRequeueAndTheOwedMoveKeepsTheVisitFirstAnswers` (`EngineFollowBarrierRequeueEdgeTests.swift`),
+  `barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued`'s setup with the network dropping and returning
+  (`EngineRegressionCycle10Tests.offline`, then `DeviceConditions.unrestricted`) once T's drained publication fails
+  ENOENT. rr21-T8b: `owedReroutePinnedToARequeuedJobKeepsThePin` gains an `edge` argument (its `false` case is the test
+  as it was; one-to-one change: the arguments `LaneDropVisit.allCases` become `LaneDropVisit.allCases, [false, true]`,
+  and the replay assertion's message carries X's state at the replay), whose drop and return come after K0 and before
+  O's commit. A temporary print (removed before the commit; `.build-s3f/c22/e1-p3-probe.log`, `e1-p3-order.log`) read:
+  Shape A swept first, "at the move T queued at epoch 8, move owed true, 2 events waiting" (the elements apply at once
+  and their decisions about jobs wait for the drain, which comes after the follow's turns, so no replay can come
+  between the re-queue and the move in this shape); visited first, T was already publishing its fresh attempt
+  ("verifying at epoch 8, move owed false"); A and X got T's 100,000 bytes in both orders, T started twice. rr21-T8b
+  swept first with the edge: the waiting events at X's re-queue were "[conditions(edge: false), conditions(edge:
+  true), reroutes(…)]", so the drain replayed both elements' decisions between the re-queue and the batch, and X at
+  the replay was "queued at epoch 6", the pin's epoch, in every case; the pin held (X held zz-a1…zz-a3 and zz-x) and
+  the answers were rr21-T8b's (K 16, V2 18, W1…W3 20). No park at the same epoch: only the pump parks a queued job,
+  and no pump runs behind the barrier, as e1 §3 read. The move's `.queued` arm keeps its dependency on that, now tested
+  by these two cases. On `a83f54e` the two tests and Shape A's own pass (`.build-s3f/c22/e1-p3-run.log`).
+- **e1-PR: holds** (`2b33c73`). `owedReroutePinnedToARequeuedJobDroppedBeforeTheReplayKeepsTheVisitFirstAnswers`
+  (`EngineFollowBarrierRequeueRemovalTests.swift`, `sweepFollowsFirst` only, as the ruling says): rr21-T8b's setup with
+  V2, X's only interest, withdrawn behind the barrier after K0 and before O's commit, so its removal waits ahead of the
+  batch (the setup requires it first at X's re-queue). It was built at the first attempt. A temporary print (removed;
+  `.build-s3f/c22/e1-pr-probe.log`) read: "X at the replay queued at epoch 6 holding [zz-x], after it downloading at
+  epoch 8 holding [zz-a1, zz-a2, zz-a3] (pin epoch 6); X's content requested 2 times, W's 1": the drain turn that
+  replays the batch replays the removal first (a removal does not end a drain batch), which drops X, and the kept pin
+  joins a new job of X's content at epoch 8, whose commit under K1's copy re-routes the ids to W's content. Answers: K
+  16 bytes, V2 its cancellation, W1…W3 20 bytes each, visit-first's (whose commit joined the ids to X publishing, and
+  X's fresh attempt carried them); X's content is requested twice in both. e1's UNCONFIRMED claim is confirmed for
+  this shape.
+
+The Sync bundle on `75b9e45` (693 tests) covers every source change of step 1; e1-P3 and e1-PR changed tests only and
+were run as listed. No probe of step 1 is open.
 
 ## Items
 
