@@ -199,6 +199,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - Step 8's records, and item 9's rows.
       - `EngineCommands.swift:1004` and `:1009` are reached by no test (1(e)).
     - **Usage at 08:46: weekly 49 %** (0.74 points an hour since 02:00).
+    - The watcher for both cycle-22 verifiers (`watch_journal.py <run 9's journal> 1 3`) runs as task `bb79dr0hq`.
     - **Plan:** let the cycle-22 verifiers finish. When they land, stop run 9 once its cycle-23 fixer starts, as was done with run 8, because run 9's focus describes cycle 22. Then run one read-only analysis for S3-R28: e2-B re-specified with its review's corrections, an alternative that stays in one turn for the k = 4 shapes, and any new finding that needs a route. Then write S3-R28 and launch run 10 for cycle 23. Cycle 23 continues S3-R27's unfinished steps: e2-A2.1 to A2.4, steps 5 to 8, and the open lines.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
