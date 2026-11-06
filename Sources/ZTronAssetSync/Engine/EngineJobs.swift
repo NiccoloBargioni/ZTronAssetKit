@@ -278,18 +278,19 @@ extension SyncEngine {
     }
 
     /// Whether a re-lane of `job`, failed with its verdict not yet deferred, comes from an input that met the attempt
-    /// still running on a visit-first engine (`relane`): the follow's own visit or move for an apply before the end
-    /// (`inFollowVisit`; the applies followed then, `AttemptEnd.failedAfter` or `Job.transferSpaceEnd`), or, outside a
-    /// visit, the drain's replay of an event that arrived before the publication's end (the replay's decision instant,
-    /// `EngineState.reading`, against `AttemptEnd.stamped`; Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-P1).
-    /// A visit's reading is the instant of the apply it belongs to, so it is dated by the applies, as before. The drain's
-    /// visit after a verdict (`visitingAfterVerdict`) stands for visits at the applies since that verdict, not for the
-    /// verdict's arrival, so the replay's instant does not date it either.
+    /// still running on a visit-first engine (`relane`): a visit for an apply before the end, the follow's own or move
+    /// (`inFollowVisit`) or the drain's after a verdict (`visitingAfterVerdict`; the applies followed then,
+    /// `AttemptEnd.failedAfter` or `Job.transferSpaceEnd`), or, outside a visit, the drain's replay of an event that
+    /// arrived before the publication's end (the replay's decision instant, `EngineState.reading`, against
+    /// `AttemptEnd.stamped`; Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-P1). A visit's reading is the instant
+    /// of the apply it belongs to, so it is dated by the applies, as before. The drain's visit after a verdict stands for
+    /// visits at the applies since that verdict deferred, not for the verdict's arrival, so it is dated by the applies
+    /// too: one before the end met the job publishing on a visit-first engine, one since met it failed (cycle 22, e1-P2).
     func metInItsAttempt(_ job: Job) -> Bool {
-        if self.state.inFollowVisit {
+        if self.state.inFollowVisit || self.state.visitingAfterVerdict {
             return self.state.appliesFollowed == (job.attemptEnd?.failedAfter ?? job.transferSpaceEnd)
         }
-        guard !self.state.visitingAfterVerdict, let reading = self.state.reading, let stamped = job.attemptEnd?.stamped else {
+        guard let reading = self.state.reading, let stamped = job.attemptEnd?.stamped else {
             return false
         }
         return reading.serial <= stamped
@@ -352,6 +353,8 @@ extension SyncEngine {
                 // close-out cycle 22, ruling S3-R27 item 12.2's e1-P1). An event that arrived inside the read met the job
                 // failed, as that engine's input did, and skips the backoff (T20). A transfer's ENOSPC records no such
                 // instant (`AttemptEnd.stamped`), so a replay inside its reads is not told apart (cycle 22's residual).
+                // The drain's visit after a verdict (`followAfterVerdict`) moves the ids of the applies since that verdict
+                // deferred, and is dated as the follow's visit is, by the applies followed since the end (cycle 22, e1-P2).
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {
