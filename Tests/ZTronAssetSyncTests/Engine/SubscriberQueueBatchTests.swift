@@ -92,7 +92,7 @@ extension EngineUnitTests {
     /// one `publish` per event leaves another: the same takes, live and peak counts, stored order and moves, and no
     /// hand-off with no pull waiting. Into an empty queue whose pull waits, both hand off the batch's first event only
     /// and keep the rest, asserted on the pull itself.
-    @Test("R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)", arguments: [UInt64(1), 2, 3])
+    @Test("R-SYN-12: publishAll leaves a subscriber queue as one publish per event does, and hands a waiting pull the first event only (S3-R27 item 1, a3)", .timeLimit(.minutes(1)), arguments: [UInt64(1), 2, 3])
     func publishAllMatchesOnePublishPerEvent(seed: UInt64) async {
         var random = SplitMix64(seed: seed)
         var batched = SubscriberQueue()
