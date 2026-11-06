@@ -1011,11 +1011,13 @@ extension SyncEngine {
                 return scope.contains(entry)
             }
         }
+        // A purge of everything takes the jobs' fast path (`Job.withdrawPurged`'s `all`; e2-A1.5).
+        let all = request == .all
         self.withdrawPurgedJoins(isPurged)
         for transfer in self.state.jobs.keys.sorted() {
             // One access to the job removes its purged interests, in ascending token order (`Job.withdrawPurged`); the
             // writes they imply follow it (S3-R27 item 12.3, e2-A1.4, with item 1's exclusivity rule).
-            guard let off = self.state.jobs[transfer]?.withdrawPurged(isPurged) else {
+            guard let off = self.state.jobs[transfer]?.withdrawPurged(isPurged, all: all) else {
                 continue
             }
             // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of a

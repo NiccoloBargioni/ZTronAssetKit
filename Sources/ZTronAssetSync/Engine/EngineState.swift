@@ -1093,17 +1093,19 @@ struct Job {
     /// interest it removed (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.4). The order is the walk's
     /// before: a job a claim keeps holds the lane before the last removal (`heldLane`), so removing in another order
     /// would change it (e2 review must-fix 6). `isPurged` runs inside the caller's access to the job, so it reads nothing
-    /// of the engine's state. Returns the interests it withdrew ids from, ascending, with the ids, for the drops the walk
-    /// makes after the access; the tokens removed; the lanes before the first and before the last removal; and whether
-    /// the job was left with no interest.
-    mutating func withdrawPurged(_ isPurged: (AssetID) -> Bool) -> JobWithdrawal {
+    /// of the engine's state. A purge of everything (`all`) withdraws every id of such an interest, with no filter and no
+    /// intersection: an interest's ids are the job's (e2-A1.5, the one branch ruling S3-R27 item 12.3 authorises in
+    /// e2-A1). Returns the interests it withdrew ids from, ascending, with the ids, for the drops the walk makes after
+    /// the access; the tokens removed; the lanes before the first and before the last removal; and whether the job was
+    /// left with no interest.
+    mutating func withdrawPurged(_ isPurged: (AssetID) -> Bool, all: Bool) -> JobWithdrawal {
         var off = JobWithdrawal()
-        let purged = self.assets.filter(isPurged)
-        guard !purged.isEmpty else {
+        let purged: Set<AssetID> = all ? [] : self.assets.filter(isPurged)
+        guard all || !purged.isEmpty else {
             return off
         }
         for (token, interest) in self.interests.sorted(by: { $0.key < $1.key }) where interest.lane < .userInitiated && interest.kind != .waiter {
-            let withdrawn = interest.assets.intersection(purged)
+            let withdrawn = all ? interest.assets : interest.assets.intersection(purged)
             guard !withdrawn.isEmpty else {
                 continue
             }

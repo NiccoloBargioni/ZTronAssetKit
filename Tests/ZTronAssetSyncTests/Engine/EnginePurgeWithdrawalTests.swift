@@ -23,7 +23,8 @@ struct EnginePurgeWithdrawalTests {
     }
 
     /// x's content in flight, with one group per `lanes` element registered on `members` in that order (so their
-    /// tokens ascend), and, when `claimed`, a third group's pending claim on x, its join held (`recordGroup`).
+    /// tokens ascend), each one's interest holding its members, and, when `claimed`, a third group's pending claim on x,
+    /// its join held (`recordGroup`).
     @available(macOS 15.0, iOS 18.0, *)
     static func setUp(seed: UInt64, members: [[AssetID]], lanes: [AssetPriority], claimed: Bool) async throws -> Setup {
         let bytes = EngineFixture.bytes(seed)
@@ -38,9 +39,9 @@ struct EnginePurgeWithdrawalTests {
             groups.append(try await engine.registerGroup(ids, lane: lane).get())
         }
         try #require(groups == groups.sorted(), "setup: the groups' tokens ascend in registration order")
-        let all = groups
+        let joined = Dictionary(uniqueKeysWithValues: zip(groups, members.map { Set($0) }))
         await engine.awaitCondition { engine in
-            EngineGroupClaimTests.inFlight(job, engine) && all.allSatisfy { engine.state.jobs[job]?.interests[$0] != nil }
+            EngineGroupClaimTests.inFlight(job, engine) && joined.allSatisfy { engine.state.jobs[job]?.interests[$0.key]?.assets == $0.value }
         }
         let claimant = claimed ? await engine.inOneTurn { $0.recordGroup(["x"], lane: .prefetch).token } : nil
         return Setup(harness: harness, job: job, groups: groups, claimant: claimant)
@@ -105,6 +106,27 @@ struct EnginePurgeWithdrawalTests {
             #expect(!after.held && after.lane == nil, "the emptied job is retired")
             #expect(after.controls == [.setPriority(.bulk), .cancel], "the first removal's re-lane, then the retirement's cancellation: \(after.controls)")
         }
+        #expect(after.violations.isEmpty, "\(after.violations)")
+        await Self.finish(s)
+    }
+
+    /// T-A-SCOPE (e2 §3; ruling S3-R27 item 12.3's kill of e2-A1.5's fast path taken always, and of
+    /// `Job.withdrawPurged`'s partial arm): x and y share one content, which a prefetch group of both holds with one
+    /// interest; a `.scope` purge of x withdraws x only. The interest keeps y, and y stays pending; with the fast path
+    /// taken for a scope, the interest would go whole, both members with it, and the job would be retired.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-6: a scope purge of one of two ids that share a content withdraws that id only, so the group keeps the other member and its interest (S3-R27 item 12.3, e2-A1.5's T-A-SCOPE)", .timeLimit(.minutes(1)))
+    func scopePurgeWithdrawsOnlyItsIDs() async throws {
+        let s = try await Self.setUp(seed: 2_031_131, members: [["x", "y"]], lanes: [.prefetch], claimed: false)
+        let after = await Self.purge(["x"], s)
+        let group = s.groups[0]
+        let job = s.job
+        let kept = await s.harness.engine.readForTests { engine in
+            (assets: engine.state.jobs[job]?.interests[group]?.assets, pending: engine.state.groups[group]?.pending)
+        }
+        #expect(kept.assets == ["y"], "the group's interest keeps y: \(String(describing: kept.assets))")
+        #expect(kept.pending == ["y": job], "y stays pending, x is dropped: \(String(describing: kept.pending))")
+        #expect(after.lane == .prefetch && after.controls.isEmpty, "the job keeps its lane and its transfer: \(after.controls)")
         #expect(after.violations.isEmpty, "\(after.violations)")
         await Self.finish(s)
     }
