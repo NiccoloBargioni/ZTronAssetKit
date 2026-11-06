@@ -6920,7 +6920,7 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    `b603475` (T-E1, T-E3 and T-E4, red); `5ad245d` (e1-R1, with rr21-T8b's and the PIN-END invariants test's changes,
    T-E2 and T-E5; the regression controls green in both orders); `34b299c` (e1-PS, red) and `b4eebb1` (its fix);
    `94aa4b5` (e1-P1, red), `b83112c` (its seam, behaviour-free), `9005651` (its bound and other side, red) and `58e2c1c`
-   (its fix). Next: the probes e1-P2, e1-P3 and e1-PR. No unnamed 1(a) to 1(d) finding exists: every blocking finding of
+   (its fix); `f7c993f` (e1-P2, red) and `75b9e45` (its fix). Next: the probes e1-P3 and e1-PR. No unnamed 1(a) to 1(d) finding exists: every blocking finding of
    the file is named by S3-R27 (the mapping below).
 2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): not started.
 3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
@@ -7141,6 +7141,35 @@ owe): rr21-T8b as changed, T-E1 to T-E5, and the regression controls of 12.5.7 (
   (2) The visit's clause dates a visit by the latest apply (cycle 21's count): a visit made after an apply that came
   since the end, of a job owed since an apply before it that mapped the id to X's content, re-queues X, where
   visit-first's visit at that earlier apply met X publishing. Reaching it needs an apply inside the read.
+- **e1-P2: red, fixed.** `EngineFollowBarrierAfterVerdictSpaceTests.swift` (`afterVerdictSpaceRead`): X (zz-x, 18 bytes)
+  and Y (zz-y, 20 bytes) download for the user waiters Vx and Vy at an interactive cap of one attempt, and X's
+  publication is held at its first store unit; v3 makes the follow owe its visits; Y's attempt then ends in
+  `.cancelled(.byClient)`, whose verdict is a re-queue (it answers nobody and counts nothing, so the cap of one attempt,
+  which the ENOSPC's verdict needs to answer, does not answer Vy at Y's own verdict); K maps zz-y to X's content while X
+  publishes (`beforeEnd`, the probe) or inside the held read (`inRead`, its other side); X's placement rename fails
+  ENOSPC and the free-space read is held while the follow's and the drain's turns run. Swept first, K's visit passes Y,
+  whose verdict waits, and the drain gives Y's verdict and its visit after it (`followAfterVerdict`) moves zz-y onto X.
+  Visit-first: (probe) K's visit joined zz-y to X publishing, and the ENOSPC's verdict, at the cap, answered Vx and Vy
+  with the space figures, X requested once; (other side) K's visit met X failed with its verdict to come and re-queued
+  it (T20), and X's fresh attempt served both its 18 bytes. On `58e2c1c` the probe was red swept first
+  (`f7c993f`, the failing test alone; `.build-s3f/c22/e1-p2-red.log`): "X at the drain's end downloading holding
+  [zz-x, zz-y]; Vx failure(notFound), Vy failure(notFound); X started 2 times, Y 1": the visit after Y's verdict joined
+  zz-y onto X failed in its read, T20 re-queued X, the ENOSPC's verdict was skipped, and X's fresh attempt got the 404.
+  Visited first it gave visit-first's answers, and the other side passed in both orders.
+
+  The design. `metInItsAttempt`'s visit branch reads `inFollowVisit || visitingAfterVerdict` (`75b9e45`), and the replay
+  branch loses its `!visitingAfterVerdict` conjunct, which that branch now takes. Options: (a) the count of applies, as
+  for the follow's visit; (b) the replay's instant. (b) is wrong: the visit's reading is the verdict's arrival, before
+  X's end even when the apply that moved the id came after it, so the other side would keep X failed. (a) is the visit's
+  own meaning: it makes the moves of the applies since the verdict deferred (`movesAfterVerdict`), which a visit-first
+  engine made at those applies. `relane`'s comment says it. On `75b9e45` e1-P1's three tests, e1-P2's two, the
+  space-read tests (`InItsRead`, three), `barrierSkipsTheBackoffForAVisitAfterAPublicationsEnd` and the later-verdict
+  test (ten cases) pass in both orders (`.build-s3f/c22/p2-fix-run.log`, 9 tests), and the Sync bundle passed whole:
+  "Test run with 693 tests in 56 suites passed after 357.153 seconds" (`.build-s3f/c22/e1p2-sync.log`; load 2.61 3.44
+  3.74). The kills are step 7's: `|| visitingAfterVerdict` dropped (the probe), the replay's rule or `true` for that
+  visit (the other side). Y's request count is recorded, not asserted: the re-queue's fresh attempt that visit-first
+  made before K is not made behind the barrier (the red run read Y started once swept first). e1-P1's residual (2)
+  applies to this visit as to the follow's.
 
 ## Items
 
