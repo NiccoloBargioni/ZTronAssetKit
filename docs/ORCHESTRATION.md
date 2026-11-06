@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 13:35 CET): run 9 (cycle 22) is stopped. S3-R28's final text is being written with N20 and N21, and items 1b (f1c: the ENOSPC windows, under the owner's strict ruling) and 3b (f3b: the purge cases route C cannot reach) are being analysed; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 14:27 CET): run 9 (cycle 22) is stopped. S3-R28's append text (N21–N23 and item 8, fail fast) is being edited, f1c (item 1b: the ENOSPC windows, under the owner's strict ruling) is being analysed, and item 3b (the merged purge route, N24) is being written while f3c analyses the open purge shapes; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -336,6 +336,26 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - item 8 is fail fast.
     - **One go/no-go signal has already arrived:** f3b's review, partly written at 14:11, says option (i)'s C-2′ breaks R-SYN-3 for a kept claim-held job, and that N9's skip also leaves `queuedAt` and `lastTicket` unchanged. So item 3 now waits for item 3b's check. If item 3b is late, the fixer does steps 4 and 5 before step 2.
     - **`wf_59564fea-9b2` (task `wjd3whg19`) from 14:23:** an editor applies N21–N23 into `s3-r28-append.md`, then one check (`s3-r28-append-review.md`), then a final editor. That file is what gets appended.
+    - **f3b returned at 14:23** (`wf_be142310-4d6`: `f3b-route-a.md`, `f3b-route-b.md`, `f3b-review.md`). Both routes are CORRECTED, and the review chose a merge:
+      - the merge takes route B's structure (B-1, B-2, B-3 with B′, B-5), route A's A-1 in place of B-4, and route A's records;
+      - by estimate it closes N7's five cases, two of them only at route C's stage C. Its core is 17-26.5 h (estimate), on top of route C's 19-28 h;
+      - it corrects option (i): skipping the re-lane of a claim-held job whose lane falls breaks R-SYN-3.
+    - **f3b's review also finds three ungated in-letter shapes** (its §7; all estimates):
+      - failed user jobs with `.retry` deadlines under one to three prefetch groups. If the origin admits a user request, a turn costs about 500 ms (a heap scan per re-admission, derived from s3f:7584 and :7617); otherwise 9-18 ms. That is today's cost too, so item 3b does not add it;
+      - a bulk waiter under three prefetch groups: 9-17 ms;
+      - a prefetch and a bulk group under a third group's pending claim: 10-20 ms;
+      - two variants to measure: `fourGroupJoins` over one-member groups (3-11.5 ms), and three kept interests over one purged (4.5-8.9 ms).
+    - **N24 (14:26) rules item 3b** from the review's points 1 to 12:
+      - item 3b is the merged route;
+      - option (i) narrows C-2 (b) only for a job that C-2 retires in the same step;
+      - the open shapes are gated, and their 'before' figures come in step 0, right after item 1's shapes;
+      - f3c analyses a route for them now: A-6 with an in-place re-admission (3.5-5.5 h, estimate), and an in-place re-queue (2-3 h, estimate). It becomes item 3c if its review finds it sound;
+      - until item 3c is appended, a measured miss among those shapes is a stop under item 8 2(c), reported to the owner.
+    - **`wf_41c9f6c8-57b` (task `wi6v43cfi`) from 14:26:**
+      - a writer drafts item 3b (`s3-r28-item3b.md`) while f3c runs (`f3c-open-shapes.md`);
+      - then a check of item 3b and a review of f3c run in parallel;
+      - then an editor applies the check.
+    - **The fail-fast signal was reported to the owner at 14:27.** Even f3c's candidate routes reach only 7-12 ms for the failed-user shape and 7-11.5 ms for the re-queue shapes (f3b review §7, estimates), which straddles the 10 ms bar. Only table order after an A7-type audit has margin (4.5-8 ms), and no ruling authorises it.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
