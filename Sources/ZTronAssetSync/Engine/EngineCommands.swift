@@ -992,16 +992,22 @@ extension SyncEngine {
     /// stops waiting for the members it no longer has an interest in, a heal of a purged id is forgotten. Behind the
     /// follow barrier the joins of such interests that wait for the follow are withdrawn too (`withdrawPurgedJoins`).
     func withdrawPurged(_ request: PurgeRequest) {
+        // The request is read before the copy, so a purge of `.all` looks nothing up; an id the copy does not list is
+        // purged (S3-R27 item 12.3, e2-A1.1). The copy is a local: the predicate never reads the state through `self`.
+        let applied = self.state.applied
         let isPurged: (AssetID) -> Bool = { asset in
-            guard let entry = self.state.applied.entry(for: asset) else {
-                return true
-            }
             switch request {
             case .all:
                 return true
             case .evictable:
+                guard let entry = applied.entry(for: asset) else {
+                    return true
+                }
                 return entry.policy != .essential
             case .scope(let scope):
+                guard let entry = applied.entry(for: asset) else {
+                    return true
+                }
                 return scope.contains(entry)
             }
         }
