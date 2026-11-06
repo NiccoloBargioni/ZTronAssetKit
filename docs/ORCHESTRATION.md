@@ -291,6 +291,27 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     An adversarial comparative review follows (`f1c-review.md`). Every shape is traced in both orders and both drain timings.
     - Item 1b is written from that review, and checked against step 0's measured table.
     - **At the append,** S3-R28's text takes N21: the owner's ruling, and "f1c runs now".
+  - **Fail fast, adopted at 14:12.** The owner asked at about 14:05: "can we adopt a fail-fast policy? If the cycle is bound to fail let's not wait the 100h". It is ruled as N22, and goes into S3-R28 as item 8. In short:
+    - step 0 measures the riskiest things first (item 1's shapes, then item 3's new cases) and commits each table as it lands;
+    - the fixer has stop conditions:
+      - a route exhausted with its case still red;
+      - later stages that cannot close a case;
+      - a measurement that contradicts its analysis;
+      - a change no ruling authorises;
+      - a part over 1.5 times its estimated hours.
+    - On a stop, the fixer commits `PUT-BACK: item <n>: …` and goes on only with independent work.
+    - **The orchestrator's side:**
+      - Watch `wp/s3f` with `.build-orchestrator/tools/watch_putback.py <worktree> <since> <journal> <seen>`. It exits on a `PUT-BACK` commit or on a new agent result.
+      - Rule each put-back between steps.
+      - Tell the owner at once when a blocking item has no route that a review calls sound.
+      - Never run the two verifiers on a HEAD with a known-open blocker: stop the workflow when the fixer returns, rule, and relaunch the fixer in the same cycle. The verifiers run when the fixer shows every blocker closed.
+      - Have an independent prober attack item 1b's route as soon as it is committed.
+    - Run 10's focus carries it. The owner's preference is saved in the session memory.
+  - **Cycle 23's go/no-go points under fail fast:**
+    - f3b's review, at about 14:30: is there a sound one-turn route for `keptUnderThreeGroups` and `fourGroupJoins`?
+    - f1c's review, at about 16:00: is there a sound route for item 1?
+
+    If either says no, tell the owner then, with the options. For the purge, the options are to authorise e2-B′, or to put those shapes outside the bar. For the ENOSPC windows, they are a structural redesign, or another round of analysis. Run 10 meanwhile does only work that is needed whatever those reviews say.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
