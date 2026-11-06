@@ -1,0 +1,248 @@
+start 15:38:36 head 9aa337c load { 4.64 6.09 5.68 }
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[1 / 1]
+[5 / 69] ZTronAssetModel
+[14 / 78] ZTronAssetModel
+[19 / 85] ZTronAssetModel
+[25 / 104] ZTronAssetStorage
+[26 / 112] ZTronAssetStorage
+[32 / 114] ZTronAssetTransport
+[37 / 114] ZTronAssetStorage
+[38 / 114] ZTronAssetStorage
+[44 / 118] ZTronAssetSync
+[45 / 119] ZTronAssetTestSupport
+[46 / 119] ZTronAssetSync
+[47 / 128] ZTronAssetTestSupport
+[47 / 128] ZTronAssetSync
+[50 / 137] ZTronAssetSync
+[51 / 137] ZTronAssetTestSupport
+[55 / 138] ZTronAssetTestSupport
+[56 / 138] ZTronAssetTestSupport
+[58 / 140] ZTronAssetTestSupport
+[60 / 140] ZTronAssetSync
+[64 / 141] ZTronAssetSync
+[67 / 141] ZTronAssetSync
+[68 / 141] ZTronAssetSync
+[70 / 141] ZTronAssetStorage
+[72 / 141] ZTronAssetAppleHosted
+[77 / 141] ZTronAssetSyncTests-product
+[79 / 150] ZTronAssetAppleHosted
+[83 / 150] ZTronAssetKit
+[85 / 150] ZTronAssetKit
+[88 / 151] ZTronAssetKit
+[89 / 152] ZTronAssetCompatibilityTests-product
+[90 / 151] ZTronAssetKit
+[92 / 151] ZTronAssetAppleHosted
+[93 / 151]
+[96 / 151] ZTronAssetAppleHosted
+[103 / 151] ZTronAssetAppleHosted
+[107 / 151] ZTronAssetTransportTests-product
+[112 / 169] ZTronAssetModelTests-product
+[114 / 178] ZTronAssetAppleHostedTests-product
+[115 / 187] ZTronAssetStorageTests-product
+[116 / 187] ZTronAssetTransportTests-product
+[118 / 187] ZTronAssetTransportTests-product
+[120 / 187] ZTronAssetTransportTests-product
+[124 / 187] ZTronAssetTransportTests-product
+[127 / 187] ZTronAssetStorageTests-product
+[128 / 187] ZTronAssetStorageTests-product
+[129 / 187] ZTronAssetStorageTests-product
+[130 / 187] ZTronAssetStorageTests-product
+[130 / 187] ZTronAssetTransportTests-product
+[132 / 187] ZTronAssetTransportTests-product
+[134 / 187] ZTronAssetTransportTests-product
+[135 / 187] ZTronAssetModelTests-product
+[136 / 187] ZTronAssetModelTests-product
+[136 / 187] ZTronAssetTransportTests-product
+[138 / 187] ZTronAssetModelTests-product
+[139 / 187] ZTronAssetModelTests-product
+[140 / 187] ZTronAssetModelTests-product
+[141 / 187] ZTronAssetModelTests-product
+[142 / 187] ZTronAssetAppleHostedTests-product
+[143 / 187] ZTronAssetAppleHostedTests-product
+[144 / 187] ZTronAssetAppleHostedTests-product
+[145 / 187] ZTronAssetAppleHostedTests-product
+[147 / 187] ZTronAssetAppleHostedTests-product
+[148 / 187] ZTronAssetAppleHostedTests-product
+[149 / 187] ZTronAssetAppleHostedTests-product
+[150 / 187] ZTronAssetModelTests-product
+[152 / 193] ZTronAssetModelTests-product
+[157 / 190] ZTronAssetTransportTests-product
+[158 / 190] ZTronAssetSyncTests-product
+[162 / 193] ZTronAssetKit-product
+[163 / 193] ZTronAssetModelTests-product
+[167 / 203] ZTronAssetKitTests-product
+[171 / 212] ZTronAssetCompatibilityTests-product
+[172 / 220] ZTronAssetCompatibilityTests-product
+[173 / 221] ZTronAssetSyncTests-product
+[174 / 229] ZTronAssetSyncTests-product
+[175 / 229] ZTronAssetSyncTests-product
+[177 / 229] ZTronAssetSyncTests-product
+[178 / 229] ZTronAssetKitTests-product
+[181 / 229] ZTronAssetSyncTests-product
+[182 / 229] ZTronAssetSyncTests-product
+[183 / 229] ZTronAssetSyncTests-product
+[186 / 234] ZTronAssetSyncTests-product
+[192 / 231] ZTronAssetStorageTests-product
+[193 / 231] ZTronAssetStorageTests-product
+[194 / 231] ZTronAssetModelTests-product
+[196 / 233] ZTronAssetKitTests-product
+[198 / 233] ZTronAssetKitTests-product
+[199 / 233] ZTronAssetKitTests-product
+[200 / 235] ZTronAssetKitTests-product
+[202 / 235] ZTronAssetSyncTests-product
+[205 / 235] ZTronAssetKitBenchmarks-product
+[206 / 235] ZTronAssetKitBenchmarks-product
+[208 / 237] ZTronAssetCompatibilityTests-product
+[210 / 237] ZTronAssetCompatibilityTests-product
+[214 / 238] ZTronAssetCompatibilityTests-product
+[214 / 238] ZTronAssetKitTests-product
+[216 / 238] ZTronAssetKitBenchmarks-product
+[217 / 240] ZTronAssetCompatibilityTests-product
+[220 / 240] ZTronAssetAppleHostedTests-product
+[222 / 240] ZTronAssetCompatibilityTests-product
+[223 / 240] ZTronAssetCompatibilityTests-product
+[224 / 240] ZTronAssetAppleHostedTests-product
+[226 / 241] ZTronAssetStorageTests-product
+[229 / 243] ZTronAssetAppleHostedTests-product
+[230 / 243] ZTronAssetKitTests-product
+[231 / 243] ZTronAssetCompatibilityTests-product
+[231 / 243] ZTronAssetSyncTests-product
+[231 / 243] ZTronAssetCompatibilityTests-product
+[231 / 243] ZTronAssetSyncTests-product
+[233 / 243] ZTronAssetCompatibilityTests-product
+[235 / 243] ZTronAssetCompatibilityTests-product
+[239 / 244] ZTronAssetSyncTests-product
+[239 / 243] ZTronAssetKitBenchmarks-product
+[241 / 243] ZTronAssetKitBenchmarks-product
+Build complete! (77,61 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C23-F2R1" started.
+PROBE-C23-F2R1 round 1: after the set-up O failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)) interests 1, O requests 1; after v4 O downloading interests 11, O requests 2; at the end O requests 2; zz-o ok(20 B); members ["ok(20 B)"] x10
+✘ Test "PROBE-C23-F2R1" recorded an issue at ProbeC23F2R1.swift:49:13: Expectation failed: oAnswer == .failure(.shutDown)
+↳ // DBT:781 and DBT:786, unchanged.
+↳ zz-o's waiter is answered shutDown
+↳ oAnswer == .failure(.shutDown) → false
+↳   oAnswer → success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-o
+↳         rawValue → "zz-o"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 20
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.shutDown) → failure(ZTronAssetModel.AssetError.shutDown)
+↳     failure → .shutDown
+✘ Test "PROBE-C23-F2R1" recorded an issue at ProbeC23F2R1.swift:50:13: Expectation failed: answers.allSatisfy { $0 == .failure(.shutDown) }
+↳ every member's waiter is answered shutDown: [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h00, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h01, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h02, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h03, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h04, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h05, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h06, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h07, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h08, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h09, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))]
+↳ answers.allSatisfy { $0 == .failure(.shutDown) } → <not evaluated>
+PROBE-C23-F2R1 round 2: after the set-up O failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)) interests 1, O requests 1; after v4 O downloading interests 11, O requests 1; at the end O requests 2; zz-o ok(20 B); members ["ok(20 B)"] x10
+✘ Test "PROBE-C23-F2R1" recorded an issue at ProbeC23F2R1.swift:49:13: Expectation failed: oAnswer == .failure(.shutDown)
+↳ // DBT:781 and DBT:786, unchanged.
+↳ zz-o's waiter is answered shutDown
+↳ oAnswer == .failure(.shutDown) → false
+↳   oAnswer → success(ZTronAssetModel.AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-o, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-o
+↳         rawValue → "zz-o"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 20
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.shutDown) → failure(ZTronAssetModel.AssetError.shutDown)
+↳     failure → .shutDown
+✘ Test "PROBE-C23-F2R1" recorded an issue at ProbeC23F2R1.swift:50:13: Expectation failed: answers.allSatisfy { $0 == .failure(.shutDown) }
+↳ every member's waiter is answered shutDown: [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h00, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h01, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h02, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h03, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h04, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h05, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h06, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h07, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h08, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h09, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/05/0508161fd9841e59fd61789f7bd49286f82f6a1130dc5b2087f3b6341f45f692.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))]
+↳ answers.allSatisfy { $0 == .failure(.shutDown) } → <not evaluated>
+✘ Test "PROBE-C23-F2R1" failed after 1.146 seconds with 4 issues.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.146 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.146 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+end 15:39:59 load { 53.86 21.38 11.52 }

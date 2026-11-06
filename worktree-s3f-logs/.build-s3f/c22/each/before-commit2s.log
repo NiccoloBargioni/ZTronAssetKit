@@ -1,0 +1,11 @@
+^D◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: a commit that answers 10,000 user waiters with two stalled subscribers, measured once (S3-R26 answer 4)" started.
+R-SYN-11 commitTurns waiters with two stalled subscribers at 10,000 (recorded, not gated): heartbeat [13.995416, 14.250875, 13.777667] ms, best 13.777667 ms; the commit's own turn [13.988958, 14.245, 13.770958] ms, best 13.770958 ms; runs [heartbeat 14.00 ms, turn 13.99 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 7.63 8.09 6.34 -> 7.63 8.09 6.34, heartbeat 14.25 ms, turn 14.24 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 7.63 8.09 6.34 -> 7.63 8.09 6.34, heartbeat 13.78 ms, turn 13.77 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 7.63 8.09 6.34 -> 7.66 8.09 6.35]
+✔ Test "R-SYN-11: a commit that answers 10,000 user waiters with two stalled subscribers, measured once (S3-R26 answer 4)" passed after 2.303 seconds.
+✔ Suite "SyncBenchmarks" passed after 2.303 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 2.304 seconds.
+✔ Test run with 1 test in 2 suites passed after 2.304 seconds.

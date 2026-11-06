@@ -1,0 +1,115 @@
+== HEAD 128fda9 11:46:29
+== quick 11:46:29 { 2.36 3.16 3.51 }
+quick exit 0 11:50:36 { 8.75 9.22 6.40 }
+✔ Test run with 151 tests in 16 suites passed after 0.533 seconds.
+✔ Test run with 483 tests in 53 suites passed after 56.631 seconds.
+✔ Test run with 459 tests in 60 suites passed after 66.668 seconds.
+✔ Test run with 84 tests in 18 suites passed after 63.023 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.143 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.359 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.435 seconds.
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+== HEAD 128fda9 status:  M docs/adr-drafts/s3f.md 
+== coverage 11:50:36
+cov exit 0
+COVERAGE target=ZTronAssetSync           lines= 93.97% (10002/10644) min=90.0 OK
+COVERAGE overall lines=96.57% (26510/27452) min=80.0 OK
+COVERAGE: PASS
+== sync 1 11:50:37 { 8.75 9.22 6.40 }
+sync 1 exit 0 11:52:27
+✔ Test run with 483 tests in 53 suites passed after 55.795 seconds.
+== sync 2 11:52:27 { 11.45 11.32 7.64 }
+sync 2 exit 0 11:53:25
+✔ Test run with 483 tests in 53 suites passed after 55.252 seconds.
+== sync 3 11:53:25 { 6.79 10.08 7.44 }
+sync 3 exit 0 11:54:23
+✔ Test run with 483 tests in 53 suites passed after 56.098 seconds.
+== release 11:54:23 { 8.23 10.10 7.62 }
+release exit 0 11:54:56
+Build complete! (31,79 s)
+0
+== gates 11:54:56
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+gates exit 0
+== done 11:54:56 { 10.29 10.39 7.82 }
+== loop HEAD 128fda9 11:54:56 { 10.29 10.39 7.82 }
+xargs: command line cannot be assembled, too long
+== loop done 11:54:56
+.build-s3f/c13-loop.sh: line 14: 93944 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+sort: No such file or directory
+grep: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c13/loop/run-*.log: No such file or directory
+grep: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c13/loop/run-*.log: No such file or directory
+grep: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c13/loop/run-*.log: No such file or directory
+loop load: mean 10.29 min 10.29 max 10.29 over 1 samples
+== tsan build 11:54:57 { 10.29 10.39 7.82 } HEAD 128fda9
+build exit 0 11:55:35
+Build complete! (37,36 s)
+tsan exit 0 12:00:56 { 3.03 6.62 7.08 }
+✔ Test run with 483 tests in 53 suites passed after 282.674 seconds.
+.build-s3f/c13-tsan.sh: line 17: 94290 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+tsan warnings 0 timelimits 0
+S3-R12 load from 60 s: mean 6.37 min 2.85 max 15.14 over 53 samples
+reported 483 matched-with-guard 427
+ 27.2%    16.31s /1m | R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer of its content
+ 27.1%    16.27s /1m | R-SYN-2: a job held for a manifest catch-up stays held until the follow that may move it has ended
+ 27.0%    16.21s /1m | R-SYN-10: ensureAvailable's apply announces pruned ids and stops their jobs, as a run's apply does
+ 27.0%    16.21s /1m | R-SYN-6: a run does not download an asset the store holds present after the engine dropped its binding ledger
+ 26.9%    16.17s /1m | R-SYN-16: a heal whose re-download fails ends, and the engine forgets it
+guard 1m: 242 tests, max 16.31s (27.2%) R-INT-3: a present asset is never counted, quarantined or failed by a redundant transfer o
+guard 3m: 177 tests, max 40.16s (22.3%) R-SYN-5: one alarm turn of the engine re-queues at most dueDeadlinesPerTurn retries that f
+guard 5m: 7 tests, max 65.69s (21.9%) R-SYN-3: a 100,000-entry plan never materialises more than the pipeline plus the lookahead
+guard 6m: 1 tests, max 61.45s (17.1%) R-SYN-12: a stalled subscriber's backlog never exceeds one slot per progress key and subje
+new tests reported 11 of 11
+new tests max 8.70s of 3m (4.8%) R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits b
+HEAD 128fda9
+== ios build 12:00:57 { 3.03 6.62 7.08 }
+ios build exit 0 12:01:06
+2026-10-31 12:01:01.854 xcodebuild[95629:24979093] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+== sim 12:01:06 { 3.04 6.50 7.04 }
+boot exit 0
+sim exit 0 12:05:56 { 29.97 66.26 40.08 }
+Test Suite 'All tests' passed at 2026-10-31 12:05:53.149.
+Test Suite 'All tests' passed at 2026-10-31 12:05:54.544.
+** TEST SUCCEEDED **
+bundle .build-s3f/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_12-01-13-+0100.xcresult
+      "failedTests" : 0,
+      "passedTests" : 2808,
+      "skippedTests" : 0,
+  "failedTests" : 0,
+  "passedTests" : 1437,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "totalTestCount" : 1437
+shutdown exit 0
+== ios done 12:06:01
+== prebuild 12:06:01 { 27.81 65.21 39.87 } HEAD 128fda9
+prebuild exit 0 12:08:39
+Build complete! (157,52 s)
+== bench 12:08:39 { 19.50 44.43 35.52 }
+bench exit 1 12:14:28 { 3.51 16.98 25.23 }
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.341 seconds with 1 issue.
+✘ Suite "StorageBenchmarks" failed after 9.385 seconds with 1 issue.
+◇ Suite "SyncBenchmarks" started.
+✔ Suite "SyncBenchmarks" passed after 72.189 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 212.391 seconds with 1 issue.
+✘ Test run with 44 tests in 8 suites failed after 212.391 seconds with 1 issue.
+.build-s3f/c13-bench.sh: line 18: 97925 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+bench load: mean 8.13 min 3.43 max 19.50 over 70 samples
+HEAD 128fda9; // swift-tools-version: 6.4
+debug exit 0 warnings 0 errors 0
+Build complete! (45,14 s)
+release exit 0 warnings 0
+Build complete! (30,04 s)
+swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+== all done 12:15:45

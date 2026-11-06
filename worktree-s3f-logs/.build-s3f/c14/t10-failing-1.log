@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" started.
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:686:6: Time limit was exceeded: 180.000 seconds
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:742:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+↳ B is served N, the content v3 maps zz-b to (visit-first): failure(ZTronAssetModel.AssetError.cancelled)
+↳ (try? bResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-INT-3: a retried publication of a job an owed follow passed after its apply serves a moved id its new content (F-28)" with 2 test cases failed after 192.002 seconds with 2 issues.
+↳ /// A retried publication of a job the follow passed after its apply serves the moved id its new content, and a later
+↳ /// apply's follow that passes the job's next publication answers as a visit-first engine's: C (100 kB, the content of
+↳ /// zz-a, zz-b and zz-c, a user waiter each) publishes after v3's apply, which moves zz-b to N (16 bytes); behind the
+↳ /// barrier the follow passes C while it verifies. C's verification read then fails (EIO), a transient error the
+↳ /// interactive policy retries. Visited first, B was moved onto N at the apply and served N; C's retry downloaded
+↳ /// bytes that fail their checksum, and v4, applied while that second publication verified, moved zz-c to N2 (24
+↳ /// bytes): its follow passed C, publishing, so A and zz-c's user were answered `integrityFailure`. Behind the barrier,
+↳ /// left to C's retry, B rode it and was answered C's failure; and a pass's mark kept from the first publication
+↳ /// would move zz-c onto N2 at the second failure, which a visit-first engine never did (`Job.passedPublishing`).
+✘ Suite "Engine follow barrier (F-28)" failed after 192.002 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 192.002 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

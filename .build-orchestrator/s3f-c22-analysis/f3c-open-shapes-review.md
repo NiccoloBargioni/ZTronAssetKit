@@ -1,6 +1,6 @@
 # f3c review: the open in-letter purge shapes (independent reader, P4)
 
-Read-only at `9aa337c` (`.worktrees/s3f`). Paths are under `Sources/ZTronAssetSync/Engine/` unless named, and "rulings :n" is `s3-rulings-s3f.md`. I wrote neither f3c nor anything it rests on. Nothing was built, run or measured: every figure is an estimate unless it is marked derived (G2).
+Read-only. The worktree (`.worktrees/s3f`) is at `4b38eb4`, whose sources and cited tests equal `9aa337c`'s: since then only 03c4e59 edits a test, `EngineFollowBarrierDeferBucketTests.swift`. So every path:line holds at `9aa337c`. Paths are under `Sources/ZTronAssetSync/Engine/` unless named, and "rulings :n" is `s3-rulings-s3f.md`. I wrote neither f3c nor anything it rests on. Nothing was built, run or measured: every figure is an estimate unless it is marked derived (G2).
 - **Process:** one early read-only `grep` (for `struct CircuitBreaker`) ran after a `cd` into the worktree, against the task's rule. It wrote nothing. Every other command used absolute paths.
 
 ## Verdict: CORRECTED
@@ -38,7 +38,7 @@ Read-only at `9aa337c` (`.worktrees/s3f`). Paths are under `Sources/ZTronAssetSy
    - OS-6 is not a lever, so its row, its 1-1.5 h and its share of N22 2(b) go. OS-4 then moves only the failed-user rows, and the re-queue rows reach 3.0-8.2 and 3.5-8.4 at stage C with OS-3 alone.
    - OS-2's and OS-3's compaction check follows A2.2's rule, not a check after every push. "The compaction points are unchanged" does not describe the base.
 2. **The base is the re-open's HEAD, not `9aa337c`.**
-   - The route comes after route C and item 3b (§0). So the four cases' 'before' figures and the pins ("must say" 6: "green on `9aa337c`") are taken on the HEAD the re-open starts from; N12 rules cycle 23 only.
+   - The route comes after route C and item 3b (§0). So the four cases' 'before' figures and the pins ("must say" 6: "green on `9aa337c`") are taken on the HEAD the re-open starts from; N12 rules cycle 23 only. The s3f worktree is already past `9aa337c` (03c4e59 changes a test).
    - T-OS5 adds fields to T-B1, which will be a committed test by then. Say that this strengthens it (G3), or make T-OS5 a new test with T-B1's set-up.
 3. **The stage rule is circular, and it ignores the likely base.**
    - "Must say" 5 runs stage C on figures taken "after stage B", but stage B runs only "whenever stage C does".
@@ -48,7 +48,7 @@ Read-only at `9aa337c` (`.worktrees/s3f`). Paths are under `Sources/ZTronAssetSy
    - In table order, a failed user job's gate read can come before or after a retirement whose abandon frees the half-open probe (`EngineJobs.swift:456`, `EngineFailures.swift:1044`, `EngineSupport.swift:421-425`). So which jobs T20 re-admits, and which one probes, can differ from visit-first's sorted order.
    - That is at least a backoff difference (S3-R16 item 2), and the answers must be shown equal: A7's audit names it, and T-OS6 runs at stage C in both orders. A different answer is blocking (S3-R16 1(a)).
 5. **Three kills do not kill as written (G4; S3-R16 1(e)).**
-   - **"`heldLane` written after the kind" survives J-Cc.** An emptied job with no `heldLane` reads `.bulk` anyway (`EngineState.swift:908`), and `last` is always `.bulk` when `before ≠ last`. Take the kind from `last`, so the mutant does not exist, or build a stale `.prefetch` `heldLane`.
+   - **"`heldLane` written after the kind" survives J-Cc.** An emptied job with no `heldLane` reads `.bulk` anyway (`EngineState.swift:908`), and `last` is always `.bulk` when `before ≠ last` (`EngineCommands.swift:1043-1046`). Take the kind from `last`, so the mutant does not exist, or build a stale `.prefetch` `heldLane`. Nothing clears it (the only writes are `EngineState.swift:1102` and `EngineCommands.swift:1055`), so a job a claim kept at `.prefetch` can carry one when it is joined again (prefetch, then bulk) and purged.
    - **T-OS1's edge-owed job cannot exist with "a few jobs".** The edge's own turn re-queues up to 512 (`EngineConditions.swift:126-135`, `EngineReadmission.swift:101`, `:163-171`). Use 513 or more transient failures and purge before the follow-up, as `EngineRegressionCycle17Tests.swift:214-269` does, or cite that test for the guard.
    - **T-OS4's `.failed(.untilEntryChanges)` user job** exists only inside the store reads after a 404 or an integrity failure (`EngineFailures.swift:139-145`, `:490-494`). Hold that read in the test. Otherwise leave the disposition to today's settle, by pass 1's tag, so that OS-2 has no copy of the test to kill.
 
@@ -62,7 +62,7 @@ Read-only at `9aa337c` (`.worktrees/s3f`). Paths are under `Sources/ZTronAssetSy
    - Otherwise, price the getter: 1.7-2.4 ms, f3c's own figure.
 3. **Timeouts never feed the breaker.** `.timedOut` is `.neutral` (`EngineFailures.swift:222-233`), and a closed breaker ignores it (`EngineSupport.swift:486-487`).
    - So failedUserRetries needs no threshold care.
-   - failedUserRefused needs a named way to open the breaker: a manifest 403 with an empty body (`EngineSupport.swift:468-471`), or a 429.
+   - failedUserRefused needs a named way to make the gate refuse once the jobs have failed. One is a manifest 403 that is not XML, which opens the breaker at once (`ZTronAssetModel/Errors/TransferError.swift:127-135`, `EngineManifest.swift:296-297`, `EngineSupport.swift:468-471`). The other is a 429.
 4. **`purgeTurn` takes no visit order** (`Tests/ZTronAssetKitBenchmarks/BenchSyncCycle22Purge.swift:15-31`, `:186`). The bench cases run once, not "in both orders like its other cases".
 5. **`scheduledDeadlines` is a count** (`EngineSupport.swift:58`).
    - T-OS1 asserts `retryScheduled` false for each job instead (`Tests/ZTronAssetSyncTests/Engine/EngineSync1LivenessTests.swift:12-18`).

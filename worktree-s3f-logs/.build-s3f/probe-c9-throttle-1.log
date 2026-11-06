@@ -1,0 +1,23 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "PROBE-C9-THROTTLE" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "PROBE-C9-THROTTLE" started.
+PROBE-C9-THROTTLE followVisitedFirst afterFailure: (owed: false, c: nil)
+PROBE-C9-THROTTLE followVisitedFirst aResult: success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/65/6504aa1adf9897f7ed5c903d71feece396a149cc63be1a24aa21bd3f520fe482.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)) bResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "PROBE-C9-THROTTLE" started.
+PROBE-C9-THROTTLE sweepFollowsFirst afterFailure: (owed: true, c: Optional((ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.nextRun), 2)))
+PROBE-C9-THROTTLE sweepFollowsFirst aResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))) bResult: failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+✘ Test "PROBE-C9-THROTTLE" recorded an issue with 1 argument visit → .sweepFollowsFirst at ZZProbeC9Throttle.swift:48:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ PROBE-C9-THROTTLE: A, moved to N, is served from N, not answered with C's throttle (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "PROBE-C9-THROTTLE" with 2 test cases failed after 0.649 seconds with 1 issue.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.649 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.650 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

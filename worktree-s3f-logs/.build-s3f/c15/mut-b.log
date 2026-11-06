@@ -1,0 +1,54 @@
+MUTANT passedNotUnfollowed: build exit 0
+MUTANT passedNotUnfollowed run 1: ✘ Test run with 92 tests in 2 suites failed after 89.434 seconds with 4 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:791:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:791:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierApplyTests.swift:103:13: Expectation failed: before.owed && before.v == .verifying && before.passed && before.f
+MUTANT passedNotUnfollowed run 2: ✘ Test run with 92 tests in 2 suites failed after 87.014 seconds with 4 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:791:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:791:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierApplyTests.swift:103:13: Expectation failed: before.owed && before.v == .verifying && before.passed && before.f
+MUTANT passedNotUnfollowed: reverted; Sources differ from the worktree: none
+MUTANT laneCountsPassing: build exit 0
+MUTANT laneCountsPassing run 1: ✘ Test run with 92 tests in 2 suites failed after 79.634 seconds with 3 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:176:9: Expectation failed: outcome.throttleAtArrival != nil
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:177:9: Expectation failed: (try? outcome.p.get())?.byteSize == 1_000_000
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+MUTANT laneCountsPassing run 2: ✘ Test run with 92 tests in 2 suites failed after 78.950 seconds with 3 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:176:9: Expectation failed: outcome.throttleAtArrival != nil
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:177:9: Expectation failed: (try? outcome.p.get())?.byteSize == 1_000_000
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+MUTANT laneCountsPassing: reverted; Sources differ from the worktree: none
+MUTANT laneSkipsPassing: build exit 0
+MUTANT laneSkipsPassing run 1: ✘ Test run with 92 tests in 2 suites failed after 78.661 seconds with 4 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:125:9: Expectation failed: outcome.throttleAtArrival == nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:125:9: Expectation failed: outcome.throttleAtArrival == nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+MUTANT laneSkipsPassing run 2: ✘ Test run with 92 tests in 2 suites failed after 81.922 seconds with 4 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:125:9: Expectation failed: outcome.throttleAtArrival == nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .userInitiated at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:125:9: Expectation failed: outcome.throttleAtArrival == nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, wLane → .prefetch at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+MUTANT laneSkipsPassing: reverted; Sources differ from the worktree: none
+MUTANT laneFallbackHeld: build exit 0
+MUTANT laneFallbackHeld run 1: ✘ Test run with 92 tests in 2 suites failed after 81.030 seconds with 2 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:60:9: Expectation failed: throttleAtArrival == nil
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:61:9: Expectation failed: (try? dResult.get())?.byteSize == 16
+MUTANT laneFallbackHeld run 2: ✘ Test run with 92 tests in 2 suites failed after 78.492 seconds with 2 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:60:9: Expectation failed: throttleAtArrival == nil
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLaneTests.swift:61:9: Expectation failed: (try? dResult.get())?.byteSize == 16
+MUTANT laneFallbackHeld: reverted; Sources differ from the worktree: none
+MUTANT publishRerouteNone: build exit 0
+MUTANT publishRerouteNone run 1: ✘ Test run with 92 tests in 2 suites failed after 250.011 seconds with 21 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:686:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:696:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+MUTANT publishRerouteNone run 2: ✘ Test run with 92 tests in 2 suites failed after 249.775 seconds with 21 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:686:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:696:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+MUTANT publishRerouteNone: reverted; Sources differ from the worktree: none

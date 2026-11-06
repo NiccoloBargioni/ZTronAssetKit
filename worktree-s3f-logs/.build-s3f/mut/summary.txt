@@ -1,0 +1,38 @@
+MUTANT noCarry: build exit 0
+MUTANT noCarry run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.701 seconds with 1 issue.
+    ✘ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)"
+MUTANT noCarry run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.826 seconds with 1 issue.
+    ✘ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)"
+MUTANT noCarry: reverted, git diff --stat Sources/ = ''
+MUTANT noReroute: build exit 0
+MUTANT noReroute run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.716 seconds with 1 issue.
+    ✘ Test "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)"
+MUTANT noReroute run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.790 seconds with 1 issue.
+    ✘ Test "R-SYN-11: a request during an owed follow is re-routed at its replay when a later apply moved its id (F-28)"
+MUTANT noReroute: reverted, git diff --stat Sources/ = ''
+MUTANT noFlagPump: build exit 0
+MUTANT noFlagPump run 1: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 1.064 seconds with 1 issue.
+    ✘ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)"
+MUTANT noFlagPump run 2: exit 1 :: ✘ Test run with 1 test in 1 suite failed after 0.684 seconds with 1 issue.
+    ✘ Test "R-SYN-2: a slot freed during an owed follow is filled in the follow's last turn, which moved nothing (F-28)"
+MUTANT noFlagPump: reverted, git diff --stat Sources/ = ''
+MUTANT relaneNoDefer: build exit 0
+MUTANT relaneNoDefer run 1: exit 1 :: ✘ Test run with 45 tests in 1 suite failed after 37.067 seconds with 7 issues.
+    ✘ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)"
+    ✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)"
+    ✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)"
+    ✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)"
+    ✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)"
+MUTANT relaneNoDefer run 2: exit 1 :: ✘ Test run with 45 tests in 1 suite failed after 38.154 seconds with 7 issues.
+    ✘ Test "R-SYN-11: a user request made after a failure whose verdict waits for the follow is served by a new job, as visit-first (F-28)"
+    ✘ Test "R-SYN-11: an attempt that fails offline during an owed follow answers only the interests the follow leaves it (F-28)"
+    ✘ Test "R-SYN-13: a network edge that meets an offline failure whose verdict waits for the follow retries it after the verdict (F-28)"
+    ✘ Test "R-SYN-5: the follow's visit of a job whose retry waits for the follow keeps the retry's backoff (F-28)"
+    ✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)"
+MUTANT relaneNoDefer: reverted, git diff --stat Sources/ = ''
+MUTANT throttleAtNow: build exit 0
+MUTANT throttleAtNow run 1: exit 1 :: ✘ Test run with 45 tests in 1 suite failed after 35.091 seconds with 1 issue.
+    ✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)"
+MUTANT throttleAtNow run 2: exit 1 :: ✘ Test run with 45 tests in 1 suite failed after 32.841 seconds with 1 issue.
+    ✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)"
+MUTANT throttleAtNow: reverted, git diff --stat Sources/ = ''

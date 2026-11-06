@@ -1,0 +1,222 @@
+{
+ "slotIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineJobs.swift",
+    "        if let stamp = self.state.reading, stamp.freeSlots.admit(job.lane) {",
+    "        if let stamp = self.state.reading {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "slotLaneBlind": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        lane == .userInitiated ? self.user : self.nonUser",
+    "        self.nonUser",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "purgeJoinsKept": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "        self.withdrawPurgedJoins(isPurged)\n",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "purgeJoinMemberKept": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "                    self.dropGroupMember(join.token, asset: join.asset, from: transfer)\n",
+    "                    break\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "purgeJoinHealKept": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "                case .system:\n                    self.state.heals[join.asset] = nil\n",
+    "                case .system:\n                    break\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "withdrawnJoinRegistered": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "                if !join.withdrawn {",
+    "                if true {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "otherJobsWalkDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "        if lane != .userInitiated, self.followOwed {",
+    "        if false, self.followOwed {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "joinsWalkDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "        if lane != .userInitiated {\n            for event in self.state.eventsAfterFollow {",
+    "        if false {\n            for event in self.state.eventsAfterFollow {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "withdrawalsIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "                withdrawn.insert(token)\n",
+    "                _ = token\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passedAtApplyVisited": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        if job.passedPublishing != .publishingAtApply, self.holdsIDListedElsewhere(job) {",
+    "        if self.holdsIDListedElsewhere(job) {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "verdictVisitDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            _ = self.visit(transfer, at: nil)\n (in followedForVerdict)",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passedNotMoved": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineJobs.swift",
+    "            moved = self.followPassedPublication(transfer)",
+    "            moved = false",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "publishedBoundary": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "                if job.publishingSince >= apply {",
+    "                if job.publishingSince > apply {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passedMarkKept": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        self.state.jobs[transfer]?.passedPublishing = nil\n",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "movedNoPump": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineJobs.swift",
+    "        if moved {\n            self.pump()\n        }\n    }",
+    "    }",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "appliesNotCounted": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "        self.state.appliesFollowed += 1\n",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "placeStampsIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "        if let stamp = self.state.placeStamps[transfer], let until =",
+    "        if false, let stamp = self.state.placeStamps[transfer], let until =",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "stampParkLive": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "answeredAt: stamp.at, answerEnd: end",
+    "(dropped)",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "breakerInvariantDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "return \"nothing will re-admit ... breaker parked while it is closed\"",
+    "return nil",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "stampBreakerBack": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "stamp throttle refusal only",
+    "cycle 13's throttle and breaker refusal",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ }
+}

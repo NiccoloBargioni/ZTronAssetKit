@@ -1,0 +1,244 @@
+{
+ "passesFailedFalse": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            return self.state.verdictsAfterFollow[job.transfer]?.published == true\n",
+    "            return false\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passesFailedTrue": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            return self.state.verdictsAfterFollow[job.transfer]?.published == true\n",
+    "            return true\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "publishOwedDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "job.rerouteOnPass = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []",
+    "job.rerouteOnPass = job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer }",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "publishRerouteNone": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "job.rerouteOnPass = self.followOwed ? job.assets.filter { self.state.applied.entry(for: $0)?.transferID != transfer } : []",
+    "job.rerouteOnPass = []",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "startClearDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineDispatch.swift",
+    "        job.rerouteOnPass = nil\n",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passAll": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "let passed = moved.subtracting(job.rerouteOnPass ?? [])",
+    "let passed = moved",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passNone": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "let passed = moved.subtracting(job.rerouteOnPass ?? [])",
+    "let passed = Set<AssetID>()",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "passedNotUnfollowed": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            if !passed.isEmpty {\n                self.state.unfollowed.insert(transfer)\n            }\n",
+    "",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneCountsPassing": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "(!passes || other.rerouteOnPass?.contains($0) == true)",
+    "(passes || true)",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneSkipsPassing": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "(!passes || other.rerouteOnPass?.contains($0) == true)",
+    "!passes",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneFallbackHeld": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "        return lane ?? job.lane\n    }",
+    "        return lane ?? job.heldLane ?? .bulk\n    }",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneOwnWithdrawnIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "for (token, interest) in job.interests where !withdrawn.contains(token) && (!visited || interest.assets.contains(where: here)) {",
+    "for (_, interest) in job.interests where (!visited || interest.assets.contains(where: here)) {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneOwnVisitedIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "for (token, interest) in job.interests where !withdrawn.contains(token) && (!visited || interest.assets.contains(where: here)) {",
+    "for (token, interest) in job.interests where !withdrawn.contains(token) && (visited || true) {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJobsWithdrawnIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "for (token, interest) in other.interests where !withdrawn.contains(token) && interest.assets",
+    "for (_, interest) in other.interests where interest.assets",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJobsWalkAlways": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "        if lane != .userInitiated, self.followOwed {\n",
+    "        if lane != .userInitiated {\n",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJoinWithdrawnFlagIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "guard case .join(let join) = event, !join.withdrawn, !withdrawn.contains(join.token) else {",
+    "guard case .join(let join) = event, !withdrawn.contains(join.token) else {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJoinTokenWithdrawnIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "guard case .join(let join) = event, !join.withdrawn, !withdrawn.contains(join.token) else {",
+    "guard case .join(let join) = event, !join.withdrawn else {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJoinTargetIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "guard let target, SyncEngine.sameTransfer(target, job.entry), self.stillWants(join) else {",
+    "guard let _ = target, self.stillWants(join) else {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJoinStillWantsIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "guard let target, SyncEngine.sameTransfer(target, job.entry), self.stillWants(join) else {",
+    "guard let target, SyncEngine.sameTransfer(target, job.entry) else {",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "laneJoinListedTargetIgnored": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFailures.swift",
+    "let target = join.listed && !(listed.map { SyncEngine.sameTransfer($0, join.entry) } ?? false) ? listed : join.entry",
+    "let target = join.listed && listed == nil ? listed : join.entry",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "spaceFailureEpochDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineFollow.swift",
+    "            guard self.state.jobs[transfer]?.epoch == epoch else {\n                return\n            }\n            self.decideSpaceFailure",
+    "            self.decideSpaceFailure",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ },
+ "breakerExclusionDropped": {
+  "edits": [
+   [
+    "Sources/ZTronAssetSync/Engine/EngineCommands.swift",
+    "        guard !readmissionWaits else {\n            return nil\n        }\n        return \"nothing will re-admit the",
+    "        return \"nothing will re-admit the",
+    1
+   ]
+  ],
+  "filter": "EngineFollowBarrier|probeSupersededFreesSlot"
+ }
+}

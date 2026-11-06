@@ -1,0 +1,81 @@
+::: RUN 1
+Building for debugging...
+[Computing dependencies]
+[1 / 1]
+[2 / 21] ZTronAssetSync
+[4 / 23] ZTronAssetSync
+[9 / 27] ZTronAssetSync
+[14 / 19] ZTronAssetCompatibilityTests-product
+[22 / 24] ZTronAssetSyncTests-product
+Build complete! (1,55 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+✘ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:136:9: Expectation failed: after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty
+↳ no progress key of X's ids is left: (emitted: [ZTronAssetSync.EventSlot.transfer(zz-p1)], trailing: [ZTronAssetSync.EventSlot.transfer(zz-p1)], heap: 1, queued: [ZTronAssetSync.EventSlot.transfer(zz-p1)])
+↳ after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty → false
+↳   after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 → false
+↳   after.queued.isEmpty → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+✘ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:136:9: Expectation failed: after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty
+↳ no progress key of X's ids is left: (emitted: [ZTronAssetSync.EventSlot.transfer(zz-p1)], trailing: [ZTronAssetSync.EventSlot.transfer(zz-p1)], heap: 1, queued: [ZTronAssetSync.EventSlot.transfer(zz-p1)])
+↳ after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty → false
+↳   after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 → false
+↳   after.queued.isEmpty → <not evaluated>
+✘ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" with 2 test cases failed after 0.862 seconds with 2 issues.
+↳ /// X holds zz-p1, zz-p2 and zz-p3 for three user waiters, a subscriber reads nothing, and two progress elements
+↳ /// arrive within one `progressInterval`: the first is published for the job's least id, the second waits as that
+↳ /// key's trailing emission, with its flush in the heap. v3 is applied (its follow owed in `sweepFollowsFirst`), and
+↳ /// X commits. The progress gate's clauses hold at every step, and after the commit no `.transfer` key of the three ids
+↳ /// is left in `lastEmitted`, `trailing`, the heap or the subscriber's queue: `removeJob` retires the one key that has
+↳ /// an entry, and skips the two that have none.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.862 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.862 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 1 exit 1
+::: RUN 2
+Building for debugging...
+[Computing dependencies]
+[1 / 1]
+Build complete! (0,53 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+✘ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:136:9: Expectation failed: after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty
+↳ no progress key of X's ids is left: (emitted: [ZTronAssetSync.EventSlot.transfer(zz-p1)], trailing: [ZTronAssetSync.EventSlot.transfer(zz-p1)], heap: 1, queued: [ZTronAssetSync.EventSlot.transfer(zz-p1)])
+↳ after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty → false
+↳   after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 → false
+↳   after.queued.isEmpty → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" started.
+✘ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:136:9: Expectation failed: after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty
+↳ no progress key of X's ids is left: (emitted: [ZTronAssetSync.EventSlot.transfer(zz-p1)], trailing: [ZTronAssetSync.EventSlot.transfer(zz-p1)], heap: 1, queued: [ZTronAssetSync.EventSlot.transfer(zz-p1)])
+↳ after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 && after.queued.isEmpty → false
+↳   after.emitted.isEmpty && after.trailing.isEmpty && after.heap == 0 → false
+↳   after.queued.isEmpty → <not evaluated>
+✘ Test "R-SYN-12: a commit retires every progress key of its ids, and nothing is left of them (step C4)" with 2 test cases failed after 0.852 seconds with 2 issues.
+↳ /// X holds zz-p1, zz-p2 and zz-p3 for three user waiters, a subscriber reads nothing, and two progress elements
+↳ /// arrive within one `progressInterval`: the first is published for the job's least id, the second waits as that
+↳ /// key's trailing emission, with its flush in the heap. v3 is applied (its follow owed in `sweepFollowsFirst`), and
+↳ /// X commits. The progress gate's clauses hold at every step, and after the commit no `.transfer` key of the three ids
+↳ /// is left in `lastEmitted`, `trailing`, the heap or the subscriber's queue: `removeJob` retires the one key that has
+↳ /// an entry, and skips the two that have none.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.852 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.852 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 2 exit 1

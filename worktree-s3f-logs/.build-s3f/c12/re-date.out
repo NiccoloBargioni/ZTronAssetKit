@@ -1,0 +1,15 @@
+5203ccb build exit 0
+✘ Test "PROBE-C11R-RE-PENDING-RUN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyREProbe.swift:25:6: Time limit was exceeded: 60.000 seconds
+DBGW sightings=[(4, 0)] violations=[]
+✘ Test run with 1 test in 1 suite failed after 64.062 seconds with 2 issues.
+✘ Test "PROBE-C11R-RE-PENDING-RUN" recorded an issue with 1 argument visit → .sweepFollowsFirst at VerifyREProbe.swift:25:6: Time limit was exceeded: 60.000 seconds
+DBGW sightings=[(4, 0)] violations=[]
+✘ Test run with 1 test in 1 suite failed after 64.084 seconds with 2 issues.
+40ecd95 build exit 0
+✘ Test "PROBE-C11R-RE-PENDING-RUN" recorded an issue with 1 argument visit → .sweepFollowsFirst at REProbe40.swift:57:6: Time limit was exceeded: 60.000 seconds
+DBGW sightings=[(4, 0)] violations=[]
+✘ Test run with 1 test in 1 suite failed after 64.061 seconds with 2 issues.
+✘ Test "PROBE-C11R-RE-PENDING-RUN" recorded an issue with 1 argument visit → .sweepFollowsFirst at REProbe40.swift:57:6: Time limit was exceeded: 60.000 seconds
+DBGW sightings=[(4, 0)] violations=[]
+✘ Test run with 1 test in 1 suite failed after 64.061 seconds with 2 issues.
+DONE

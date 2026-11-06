@@ -1,0 +1,31 @@
+{
+  "bar": "strict",
+  "base": "s3-base",
+  "maxCycle": 30,
+  "simSlots": [
+    {
+      "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E",
+      "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+      "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B"
+    }
+  ],
+  "wps": [
+    {
+      "coverageMin": 90,
+      "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c22-issues.json",
+      "focus": "Stage 3 hardening, continued under the narrowed bar (S3-R16, S3-R17) and the rulings S3-R18 to S3-R28: read the end of the rulings file named above before anything else; S3-R28 is this cycle's ruling. The owner wants WP-F ended as soon as possible: do what S3-R28 and its appended items require, and nothing beyond them. By the owner's ruling (S3-R28 item 3, N25), three purge shapes are known misses of the 10 ms limit and are out of cycle 23; record them in the draft as item 3 says. S3-R27 and the earlier rulings apply wherever S3-R28 does not change them, and S3-R28 decides wherever any other file differs from it. Cycles 1-22 are committed on wp/s3f (HEAD 9aa337c; see docs/adr-drafts/s3f.md). Cycle 22 implemented S3-R27 (d5b2ab9..9aa337c, 44 commits) and closed with blocking items, which S3-R28 routes. Its verifiers' findings, blocking and non-blocking, are in the findings file named above (cited as 'reqs #n' and 'correct #n'); their probes are under /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c22/. S3-R28 adopts parts of the read-only analyses in /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c22-analysis/ (f1-enospc-windows.md, f2-flake.md and f3-purge-route.md, each with its review), as its items say; S3-R28's header says which parts bind. By the owner's ruling (S3-R28 item 1c, appended after S3-R28), the ENOSPC windows (correct #1 and #2) are known residual correctness risks: item 1's step-0 shapes and item 1b are withdrawn, and item 1c says what the draft records. A route for the purge cases that route C does not reach may still be appended as S3-R28 'item 3b', and the owner is deciding whether the remaining C2 work stays; the appended 'S3-R28, order for run 12' sets this run's order: first the work that does not depend on the C2 ruling, then the C2 work as the owner rules. At the start of every step, re-read the end of the rulings file for items appended since, and take each at the first step that starts after it is appended (S3-R28 item 6). Do not change metInItsAttempt, Job.transferSpaceEnd, AttemptEnd.stamped, or how any join or replay is dated (item 1c). Run 11 committed step 1 and the records and ended at its working budget at 247e85b (verify --quick PASS on HEAD); read its status list in the draft's cycle-23 section, and reuse its files under .build-s3f/c23/ (bench0, probes, tools/gates23.sh). Read narrowly to save context: S3-R28 (from line 1278 of the rulings file to its end) and the draft's cycle-23 section; open earlier rulings or draft sections only where those cite them. Follow S3-R28's order of work and its red-first rule (red against 9aa337c), and commit each step on its own. Fail fast (S3-R28 item 8): measure first and riskiest first; check item 8's stop conditions at the end of every part and measurement; on a stop, commit the evidence and a status-list commit whose subject starts 'PUT-BACK: item <n>: ', go on only with work that does not depend on it, and return if none is left. This cycle may take several fixer runs, because each agent has a working budget of a few hours of heavy tool output. At the start of a run, read the cycle-23 section of docs/adr-drafts/s3f.md: if it lists committed steps, continue cycle 23 from the worktree HEAD without redoing them. Keep that section current step by step (which step is committed, which is in progress, its next action, and the mapping of the verifiers' findings to S3-R28's items). Keep command output short: send build, test and benchmark output to a log file under .build-s3f/c23/ and read back only the summary lines. S3-R22 item 3 serialises simulator and coverage runs across agents with a lock directory (mkdir .build-orchestrator/sim.lock, removed afterwards). S3-R12 and S3-R13 apply unchanged; never edit Package.swift. S3-R23: the host is shared with other projects' simulator runs; record the load with every timing figure, pin each turn bound with a deterministic test, and take the C2 figure at a 1-minute load of 10 or less (S3-R27's 'How a C2 figure is read in cycle 22' says how a figure is read, and S3-R26 item 11 what to do when a deciding figure cannot be taken at a quiet load). The verifiers judge by S3-R16 to S3-R28, and run lens 3's heavy checks first (Sync x3, TSan, the iOS build and Simulator suite, the benchmarks and the mutants), then the rest. The weekly usage limit may cut this cycle off: commit every finished step as you go, so that a cut-off loses no finished work. Do not delete .build-s3f/c21/ or .build-s3f/c22/ (earlier cycles' probes and mutation tools, which S3-R27 and S3-R28 cite).",
+      "fromCycle": 23,
+      "maxCycle": 30,
+      "name": "Stage 3 WP-F (sync engine)",
+      "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+      "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+      "target": "ZTronAssetSync",
+      "testTarget": "ZTronAssetSyncTests",
+      "wp": "s3f",
+      "models": {
+        "fix": "opus",
+        "verify": "opus"
+      }
+    }
+  ]
+}

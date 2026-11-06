@@ -1,0 +1,173 @@
+import Foundation
+import Testing
+import ZTronAssetModel
+import ZTronAssetStorage
+import ZTronAssetTestSupport
+import ZTronAssetTransport
+
+@testable import ZTronAssetSync
+
+// Scratch measurement for the cycle-17 draft (never committed): every member of a 10,000-member group moves onto O's
+// content in one apply while O's attempt ends behind the barrier (`bringInbound` in the 404's turn), and the same
+// shape's follow turns without the 404 (the pre-existing join cost per visit).
+extension ZTronAssetKitBenchmarks {
+    @Suite("ScratchC17")
+    struct ScratchC17 {
+        @Test("SCRATCH-C17-CONCENTRATION", .timeLimit(.minutes(10)))
+        @available(macOS 15.0, iOS 18.0, *)
+        func concentration() async throws {
+            for count in [1_000, 10_000, 10_000, 10_000] {
+                let run = try await ScratchC17Bench.run(members: count, fail: true)
+                print("SCRATCH-C17 404 members \(count): \(run)")
+            }
+            for count in [10_000, 10_000] {
+                let run = try await ScratchC17Bench.run(members: count, fail: false)
+                print("SCRATCH-C17 follow members \(count): \(run)")
+            }
+            #expect(Bool(true) == true)
+        }
+    }
+}
+
+struct ScratchC17Run: CustomStringConvertible {
+    var wait: Double = 0
+    var jobsBefore = 0
+    var owedBefore = false
+    var idsBefore = 0
+    var idsAfter = 0
+    var waitsAfter = false
+    var turns: [Double] = []
+
+    var description: String {
+        let sorted = self.turns.sorted()
+        let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
+        return "wait \(self.wait) ms; jobs \(self.jobsBefore), owed \(self.owedBefore), O ids \(self.idsBefore) -> \(self.idsAfter), verdict waits \(self.waitsAfter); follow turns \(self.turns.count), max \(sorted.last ?? 0) ms, median \(median) ms, first five \(Array(self.turns.prefix(5)))"
+    }
+}
+
+enum ScratchC17Bench {
+    @available(macOS 15.0, iOS 18.0, *)
+    static func run(members count: Int, fail: Bool) async throws -> ScratchC17Run {
+        let time = ManualTimeSource()
+        let source = FakeRemoteSource()
+        let conditions = FakeDeviceConditionsSource()
+        let capacity = StoragePolicy().reserveFreeBytes + (32 << 20)
+        let fileSystem = FakeFileSystem(
+            disk: DiskImage(),
+            time: time,
+            configuration: FakeFileSystemConfiguration(importantCapacity: capacity, opportunisticCapacity: capacity)
+        )
+        let environment = AssetEnvironment(
+            fileSystem: fileSystem,
+            metadataExecutor: InlineBlockingExecutor(),
+            bulkExecutor: InlineBlockingExecutor(),
+            time: time,
+            random: SeededRandom(seed: 0x12),
+            conditions: conditions,
+            remoteSources: FakeRemoteSourceFactory(source: source),
+            appVersion: FakeAppVersionSource(),
+            legacyDefaults: FakeLegacyDefaults()
+        )
+        let configuration = StoreConfiguration(
+            location: .applicationSupport,
+            policy: StoragePolicy(minimumResidency: 0, deletionGrace: 60),
+            legacy: LegacyMigrationPolicy(enabled: false),
+            limits: ManifestLimits(),
+            commitMinimumInterval: 0,
+            snapshotInstallInterval: 0
+        )
+        let store = AssetStore(configuration: configuration, environment: StoreEnvironment(environment: environment, snapshotSink: ScriptedSnapshotSink()))
+        let engine = SyncEngine(store: store, environment: environment, configuration: SyncBench.configuration(tuning: SyncTuning()))
+        let xBytes = Data(repeating: 0x78, count: 2_000)
+        let x = SyncBench.entry("x", xBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData([x]), etag: ETag(rawValue: "\"v1\""))])
+        await source.script(x.transferID, [.stage(xBytes)])
+        _ = try await engine.start().get()
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the setup sync did not complete")
+        }
+        let oBytes = Data(repeating: 0x6F, count: 16)
+        let o = SyncBench.entry("o", oBytes, policy: .onDemand)
+        let old = (0..<count).map { index in
+            SyncBench.entry(String(format: "s%05d", index), GeneratedPayload.bytes(seed: 0x21_000 + UInt64(index), offset: 0, length: index % 2 == 0 ? 400 : 3_000), policy: .onDemand)
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(old + [o]), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the pruning sync did not complete")
+        }
+        try await store.flush(.ordered)
+        try await SyncBench.leaveRoom(100, store: store, fileSystem: fileSystem, ballast: "ballast")
+        await engine.refreshFreeSpace()
+        await source.script(o.transferID, [.hold, .fail(.permanentMissing(httpStatus: 404))])
+        let waiter = Task { await engine.awaitAsset(o.identifier, lane: .userInitiated) }
+        while !Task.isCancelled, !(await SyncBench.isRunning(engine, o.transferID)) {
+            await Task.yield()
+        }
+        guard case .success = await engine.registerGroup(old.map(\.identifier), lane: .prefetch) else {
+            throw SyncBenchError.incomplete("the prefetch group was refused")
+        }
+        while !Task.isCancelled, !(await SyncBench.othersAwaitingSpace(engine, count: count, besides: o.transferID)) {
+            await Task.yield()
+        }
+        // v3 maps every member to O's content.
+        let v3 = (0..<count).map { index in
+            SyncBench.entry(String(format: "s%05d", index), oBytes, policy: .onDemand)
+        }
+        await source.scriptManifest([.fetched(SyncBench.manifestData(v3 + [o]), etag: ETag(rawValue: "\"v3\""))])
+        await engine.holdFollowFollowUps()
+        let sync = Task { await engine.sync(.force) }
+        while !Task.isCancelled, !(await SyncBench.followWaiting(engine)) {
+            await Task.yield()
+        }
+        var result = ScratchC17Run()
+        let before = await SyncBench.inbound(engine, o.transferID)
+        result.jobsBefore = before.jobs
+        result.owedBefore = before.owed
+        result.idsBefore = before.ids
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        if fail {
+            result.wait = try await SyncBench.longestWait(on: engine) {
+                await source.release(o.transferID, with: .progress(received: 0, expected: nil))
+                while !Task.isCancelled, !(await SyncBench.verdictWaits(engine, o.transferID)) {
+                    await Task.yield()
+                }
+            }
+            let after = await SyncBench.inbound(engine, o.transferID)
+            result.idsAfter = after.ids
+            result.waitsAfter = after.waits
+        } else {
+            while await ScratchC17Bench.owed(engine) {
+                let span = await ScratchC17Bench.releaseOneTurn(engine)
+                result.turns.append(span)
+                while !Task.isCancelled, await ScratchC17Bench.turnPending(engine) {
+                    await Task.yield()
+                }
+            }
+            result.idsAfter = await SyncBench.inbound(engine, o.transferID).ids
+        }
+        await engine.releaseFollowFollowUps()
+        await engine.shutdown()
+        _ = await sync.value
+        _ = await waiter.value
+        return result
+    }
+
+    static func owed(_ engine: isolated SyncEngine) -> Bool {
+        engine.followOwed
+    }
+
+    static func turnPending(_ engine: isolated SyncEngine) -> Bool {
+        engine.followOwed && !engine.state.followFollowUpWaiting
+    }
+
+    /// Runs the held follow turn in this turn, timed, and holds the next one.
+    @available(macOS 15.0, iOS 18.0, *)
+    static func releaseOneTurn(_ engine: isolated SyncEngine) -> Double {
+        let clock = ContinuousClock()
+        let start = clock.now
+        engine.releaseFollowFollowUps()
+        let span = clock.now - start
+        engine.holdFollowFollowUps()
+        return SyncBench.milliseconds(span)
+    }
+}

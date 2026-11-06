@@ -1,0 +1,132 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 11] ZTronAssetSyncTests-product
+[2 / 44] ZTronAssetModel
+[11 / 53] ZTronAssetModel
+[17 / 61] ZTronAssetTransport
+[25 / 88] ZTronAssetStorage
+[34 / 92] ZTronAssetTransport
+[37 / 92] ZTronAssetTransport
+[42 / 92] ZTronAssetTransport
+[45 / 94] ZTronAssetStorage
+[50 / 98] ZTronAssetTestSupport
+[50 / 98] ZTronAssetAppleHosted
+[55 / 107] ZTronAssetTestSupport
+[57 / 107] ZTronAssetTestSupport
+[59 / 116] ZTronAssetTestSupport
+[64 / 116] ZTronAssetTestSupport
+[66 / 118] ZTronAssetTestSupport
+[72 / 126] ZTronAssetSync
+[77 / 126] ZTronAssetStorage
+[80 / 129] ZTronAssetKit
+[84 / 129] ZTronAssetAppleHosted
+[86 / 138] ZTronAssetKit
+[87 / 138] ZTronAssetKit
+[92 / 140] ZTronAssetKit
+[97 / 143] ZTronAssetAppleHosted
+[100 / 150] ZTronAssetTransport
+[108 / 150] ZTronAssetAppleHosted
+[112 / 150] ZTronAssetSync
+[118 / 168] ZTronAssetTransportTests-product
+[120 / 186] ZTronAssetStorageTests-product
+[121 / 186] ZTronAssetTransportTests-product
+[125 / 186] ZTronAssetSync
+[127 / 186] ZTronAssetTransportTests-product
+[129 / 186] ZTronAssetTransportTests-product
+[130 / 187] ZTronAssetTransportTests-product
+[132 / 187] ZTronAssetTransportTests-product
+[134 / 189] ZTronAssetStorageTests-product
+[135 / 189] ZTronAssetStorageTests-product
+[138 / 189] ZTronAssetTransportTests-product
+[139 / 189] ZTronAssetModelTests-product
+[139 / 189] ZTronAssetStorageTests-product
+[141 / 189] ZTronAssetModelTests-product
+[141 / 189] ZTronAssetStorageTests-product
+[144 / 189] ZTronAssetModelTests-product
+[146 / 189] ZTronAssetModelTests-product
+[147 / 189] ZTronAssetAppleHostedTests-product
+[148 / 189] ZTronAssetAppleHostedTests-product
+[149 / 189] ZTronAssetModelTests-product
+[151 / 189] ZTronAssetAppleHostedTests-product
+[152 / 189] ZTronAssetAppleHostedTests-product
+[154 / 189] ZTronAssetAppleHostedTests-product
+[156 / 190] ZTronAssetTransportTests-product
+[159 / 192] ZTronAssetStorageTests-product
+[163 / 194] ZTronAssetAppleHostedTests-product
+[172 / 196] ZTronAssetKitBenchmarks-product
+[174 / 197] ZTronAssetStorageTests-product
+[180 / 215] ZTronAssetModelTests-product
+[183 / 233] ZTronAssetSyncTests-product
+[184 / 233] ZTronAssetSyncTests-product
+[186 / 233] ZTronAssetSyncTests-product
+[187 / 233] ZTronAssetSyncTests-product
+[189 / 233] ZTronAssetSyncTests-product
+[190 / 233] ZTronAssetSyncTests-product
+[193 / 233] ZTronAssetSyncTests-product
+[195 / 235] ZTronAssetSyncTests-product
+[198 / 235] ZTronAssetSyncTests-product
+[199 / 235] ZTronAssetStorageTests-product
+[202 / 237] ZTronAssetKitTests-product
+[204 / 237] ZTronAssetKitTests-product
+[206 / 238] ZTronAssetKitBenchmarks-product
+[208 / 238] ZTronAssetKitTests-product
+[213 / 241] ZTronAssetSyncTests-product
+[215 / 241] ZTronAssetKitBenchmarks-product
+[217 / 243] ZTronAssetCompatibilityTests-product
+[219 / 243] ZTronAssetCompatibilityTests-product
+[224 / 244] ZTronAssetCompatibilityTests-product
+[226 / 246] ZTronAssetAppleHostedTests-product
+[227 / 246] ZTronAssetCompatibilityTests-product
+[230 / 247] ZTronAssetAppleHostedTests-product
+[232 / 247] ZTronAssetAppleHostedTests-product
+[238 / 250] ZTronAssetModelTests-product
+[239 / 250] ZTronAssetAppleHostedTests-product
+[241 / 251] ZTronAssetCompatibilityTests-product
+[243 / 251] ZTronAssetCompatibilityTests-product
+[245 / 252] ZTronAssetKitBenchmarks-product
+[249 / 252] ZTronAssetKitBenchmarks-product
+[251 / 253] ZTronAssetSyncTests-product
+[253 / 254] ZTronAssetStorageTests-product
+Build complete! (32,76 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:186:9: Expectation failed: groups.allSatisfy { $0.pending == 0 && !$0.suspended }
+↳ the visit dropped zz-e2 and resumed the ensure: [(pending: 1, suspended: true)]
+↳ groups.allSatisfy { $0.pending == 0 && !$0.suspended } → <not evaluated>
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:159:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:189:9: Expectation failed: report?.total == 1 && report?.present == 1 && report?.missing == 0 && report?.failed == 0
+↳ the ensure answers zz-e1 present, zz-e2 out of scope: failure(ZTronAssetModel.AssetError.cancelled)
+↳ report?.total == 1 && report?.present == 1 && report?.missing == 0 && report?.failed == 0 → false
+↳   report?.total == 1 && report?.present == 1 && report?.missing == 0 → false
+↳   report?.failed == 0 → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:186:9: Expectation failed: groups.allSatisfy { $0.pending == 0 && !$0.suspended }
+↳ the visit dropped zz-e2 and resumed the ensure: [(pending: 1, suspended: true)]
+↳ groups.allSatisfy { $0.pending == 0 && !$0.suspended } → <not evaluated>
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:159:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:189:9: Expectation failed: report?.total == 1 && report?.present == 1 && report?.missing == 0 && report?.failed == 0
+↳ the ensure answers zz-e1 present, zz-e2 out of scope: failure(ZTronAssetModel.AssetError.cancelled)
+↳ report?.total == 1 && report?.present == 1 && report?.missing == 0 && report?.failed == 0 → false
+↳   report?.total == 1 && report?.present == 1 && report?.missing == 0 → false
+↳   report?.failed == 0 → <not evaluated>
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" with 2 test cases failed after 128.057 seconds with 6 issues.
+↳ /// An `ensureAvailable` group waits for zz-e1 (committed) and zz-e2 (E2, held downloading); v3 drops zz-e2 from the
+↳ /// manifest (T21). The follow's visit of E2 drops the member from the group (`reroute`, `dropGroupMember`), which
+↳ /// settles the group and resumes the ensure, with the same answer in both orders. The group is read once the follow
+↳ /// and its drain are over, so a member left pending fails at once; a caller left suspended fails at the time limit.
+◇ Test "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+✔ Test "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" with 2 test cases passed after 0.796 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 128.854 seconds with 6 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 128.854 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,40 @@
+::: RUN 1
+Building for debugging...
+[Computing dependencies]
+[2 / 22] ZTronAssetSync
+[4 / 24] ZTronAssetSync
+[7 / 27] ZTronAssetSync
+[14 / 18] ZTronAssetCompatibilityTests-product
+[22 / 24] ZTronAssetSyncTests-product
+Build complete! (1,53 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" started.
+✘ Test "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRunClaimTests.swift:199:9: Expectation failed: report?.fetched == 1
+↳ the run fetches zz-a with content j's next attempt (visit-first): .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 2, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4200, unchangedCount: 1, fetchBytes: 16, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-b, error: ZTronAssetModel.AssetError.notFound, failureClass: ZTronAssetModel.FailureClass.notFound)]))
+↳ report?.fetched == 1 → false
+↳   report?.fetched → 0
+↳     some → 0
+↳     some → 1
+✘ Test "R-SYN-11: a run's claim the drain takes off a waiting verdict's job is fetched after the verdict, as visited first (F-28)" with 2 test cases failed after 1.131 seconds with 1 issue.
+↳ /// A forced sync's run claims zz-a and zz-b, both of content j (job J), held downloading. v3 maps zz-a to content k
+↳ /// while the follow is owed, and J's attempt then gets a 404: its verdict waits, with zz-a among the ids a
+↳ /// visit-first engine's visit had moved off J before it (`AttemptEnd.movedBefore`). v4 maps zz-a back to content j.
+↳ /// The drain takes zz-a off J before the verdict and re-routes it after (`takeOffMovedBefore`,
+↳ /// `rerouteMovedBefore`), and the verdict's run check falls between the two, with the barrier read down (found
+↳ /// while fixing candidate 2, whose `recordRunOutcome` change keeps zz-a's claim on J through the verdict). Visited
+↳ /// first, v3's visit moved the claim to K, J's 404 failed zz-b, and v4's visit moved the claim back to a new job of
+↳ /// content j, which fetched it.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.131 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.132 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 1 exit 1

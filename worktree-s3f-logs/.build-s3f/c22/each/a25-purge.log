@@ -1,0 +1,77 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+◇ Test case passing 1 argument shape → .oneGroup to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns oneGroup at 10,000: heartbeat [36.139583, 36.314209, 36.356084] ms, best 36.139583 ms (budget 10.0 ms best); the purge's first turn [36.128625, 36.30725, 36.342458] ms, best 36.128625 ms; runs [heartbeat 36.14 ms, turn 36.13 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 9.09 10.49 9.80 -> 9.09 10.49 9.80, heartbeat 36.31 ms, turn 36.31 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 9.09 10.49 9.80 -> 9.09 10.49 9.80, heartbeat 36.36 ms, turn 36.34 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 9.09 10.49 9.80 -> 8.52 10.35 9.75]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .oneGroup at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [36.139583, 36.314209, 36.356084]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 36.139583
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .oneMemberGroups to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns oneMemberGroups at 10,000: heartbeat [39.648125, 37.1675, 38.693917] ms, best 37.1675 ms (budget 10.0 ms best); the purge's first turn [39.639209, 37.161417, 38.682792] ms, best 37.161417 ms; runs [heartbeat 39.65 ms, turn 39.64 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 8.52 10.35 9.75 -> 7.08 9.94 9.62, heartbeat 37.17 ms, turn 37.16 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 7.08 9.94 9.62 -> 5.81 9.47 9.46, heartbeat 38.69 ms, turn 38.68 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 5.81 9.47 9.46 -> 4.90 9.02 9.29]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .oneMemberGroups at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [39.648125, 37.1675, 38.693917]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 37.1675
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .oneGroupScope to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns oneGroupScope at 10,000: heartbeat [39.90225, 40.251208, 39.5905] ms, best 39.5905 ms (budget 10.0 ms best); the purge's first turn [39.89625, 40.245625, 39.584584] ms, best 39.584584 ms; runs [heartbeat 39.90 ms, turn 39.90 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29, heartbeat 40.25 ms, turn 40.25 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29, heartbeat 39.59 ms, turn 39.58 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .oneGroupScope at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [39.90225, 40.251208, 39.5905]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 39.5905
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .sharedJob to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns sharedJob at 10,000: heartbeat [4.631209, 4.64575, 5.113667] ms, best 4.631209 ms (budget 10.0 ms best); the purge's first turn [4.629166, 4.640834, 5.109708] ms, best 4.629166 ms; runs [heartbeat 4.63 ms, turn 4.63 ms; jobs 1 (ids 10000, interests 1, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29, heartbeat 4.65 ms, turn 4.64 ms; jobs 1 (ids 10000, interests 1, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29, heartbeat 5.11 ms, turn 5.11 ms; jobs 1 (ids 10000, interests 1, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29]
+◇ Test case passing 1 argument shape → .sharedJobFourGroups to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns sharedJobFourGroups at 10,000: heartbeat [18.0045, 18.00575, 17.850417] ms, best 17.850417 ms (budget 10.0 ms best); the purge's first turn [18.00325, 18.003167, 17.848667] ms, best 17.848667 ms; runs [heartbeat 18.00 ms, turn 18.00 ms; jobs 1 (ids 10000, interests 4, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29, heartbeat 18.01 ms, turn 18.00 ms; jobs 1 (ids 10000, interests 4, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.90 9.02 9.29, heartbeat 17.85 ms, turn 17.85 ms; jobs 1 (ids 10000, interests 4, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.90 9.02 9.29 -> 4.59 8.89 9.25]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .sharedJobFourGroups at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [18.0045, 18.00575, 17.850417]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 17.850417
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .fourGroups to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns fourGroups at 10,000: heartbeat [61.554208, 61.08725, 61.492041] ms, best 61.08725 ms (budget 10.0 ms best); the purge's first turn [61.543834, 61.0785, 61.481083] ms, best 61.0785 ms; runs [heartbeat 61.55 ms, turn 61.54 ms; jobs 10000 (ids 10000, interests 40000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.59 8.89 9.25 -> 4.59 8.89 9.25, heartbeat 61.09 ms, turn 61.08 ms; jobs 10000 (ids 10000, interests 40000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.59 8.89 9.25 -> 4.38 8.77 9.20, heartbeat 61.49 ms, turn 61.48 ms; jobs 10000 (ids 10000, interests 40000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 4.38 8.77 9.20 -> 4.38 8.77 9.20]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .fourGroups at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [61.554208, 61.08725, 61.492041]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 61.08725
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .retryJobs to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns retryJobs at 10,000: heartbeat [36.945875, 36.242625, 36.316042] ms, best 36.242625 ms (budget 10.0 ms best); the purge's first turn [36.943584, 36.233791, 36.307833] ms, best 36.233791 ms; runs [heartbeat 36.95 ms, turn 36.94 ms; jobs 10000 (ids 10000, interests 10000, retrying 10000) -> 0, retry deadlines left 0; purged true; violations []; load 4.38 8.77 9.20 -> 3.70 8.19 8.97, heartbeat 36.24 ms, turn 36.23 ms; jobs 10000 (ids 10000, interests 10000, retrying 10000) -> 0, retry deadlines left 0; purged true; violations []; load 3.70 8.19 8.97 -> 3.36 7.74 8.79, heartbeat 36.32 ms, turn 36.31 ms; jobs 10000 (ids 10000, interests 10000, retrying 10000) -> 0, retry deadlines left 0; purged true; violations []; load 3.36 7.74 8.79 -> 3.33 7.38 8.63]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .retryJobs at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ [36.945875, 36.242625, 36.316042]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 36.242625
+↳   Self.c2Budget → 10.0
+◇ Test case passing 1 argument shape → .userWaiters to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns userWaiters at 10,000: heartbeat [7.651375, 6.891125, 6.818625] ms, best 6.818625 ms (budget 10.0 ms best); the purge's first turn [7.638958, 6.876334, 6.809875] ms, best 6.809875 ms; runs [heartbeat 7.65 ms, turn 7.64 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 3.33 7.38 8.63 -> 3.33 7.38 8.63, heartbeat 6.89 ms, turn 6.88 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 3.33 7.38 8.63 -> 3.33 7.38 8.63, heartbeat 6.82 ms, turn 6.81 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 3.33 7.38 8.63 -> 3.33 7.38 8.63]
+◇ Test case passing 1 argument shape → .ensures to "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" started.
+R-CLN-6 purgeTurns ensures at 10,000: heartbeat [6.920375, 8.449167, 8.511375] ms, best 6.920375 ms (budget 10.0 ms best); the purge's first turn [6.914459, 8.448375, 8.491] ms, best 6.914459 ms; runs [heartbeat 6.92 ms, turn 6.91 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 3.33 7.38 8.63 -> 6.99 7.96 8.81, heartbeat 8.45 ms, turn 8.45 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 6.99 7.96 8.81 -> 11.47 8.95 9.14, heartbeat 8.51 ms, turn 8.49 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 11.47 8.95 9.14 -> 14.43 9.80 9.44]
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" with 9 test cases failed after 211.803 seconds with 6 issues.
+✘ Suite "SyncBenchmarks" failed after 211.803 seconds with 6 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+✘ Suite ZTronAssetKitBenchmarks failed after 211.803 seconds with 6 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 1 test in 2 suites failed after 211.803 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

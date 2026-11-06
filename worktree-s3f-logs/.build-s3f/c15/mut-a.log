@@ -1,0 +1,50 @@
+MUTANT passesFailedFalse: build exit 0
+MUTANT passesFailedFalse run 1: ✘ Test run with 92 tests in 2 suites failed after 89.437 seconds with 1 issue.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:301:9: Expectation failed: bResult == .failure(.integrityFailure)
+MUTANT passesFailedFalse run 2: ✘ Test run with 92 tests in 2 suites failed after 86.588 seconds with 1 issue.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierPublicationTests.swift:301:9: Expectation failed: bResult == .failure(.integrityFailure)
+MUTANT passesFailedFalse: reverted; Sources differ from the worktree: none
+MUTANT passesFailedTrue: build exit 0
+MUTANT passesFailedTrue run 1: ✘ Test run with 92 tests in 2 suites failed after 80.047 seconds with 11 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:220:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:430:25: Issue recorded
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:432:9: Expectation failed: after.c?.1 == 1 && after.c?.2 == 1
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:433:9: Expectation failed: cStarts == 1
+MUTANT passesFailedTrue run 2: ✘ Test run with 92 tests in 2 suites failed after 79.307 seconds with 11 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:220:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:430:25: Issue recorded
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:432:9: Expectation failed: after.c?.1 == 1 && after.c?.2 == 1
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:433:9: Expectation failed: cStarts == 1
+MUTANT passesFailedTrue: reverted; Sources differ from the worktree: none
+MUTANT publishOwedDropped: build exit 0
+MUTANT publishOwedDropped run 1: ✔ Test run with 92 tests in 2 suites passed after 78.839 seconds.
+MUTANT publishOwedDropped run 2: ✔ Test run with 92 tests in 2 suites passed after 82.638 seconds.
+MUTANT publishOwedDropped: reverted; Sources differ from the worktree: none
+MUTANT startClearDropped: build exit 0
+MUTANT startClearDropped run 1: ✔ Test run with 92 tests in 2 suites passed after 81.363 seconds.
+MUTANT startClearDropped run 2: ✔ Test run with 92 tests in 2 suites passed after 78.836 seconds.
+MUTANT startClearDropped: reverted; Sources differ from the worktree: none
+MUTANT passAll: build exit 0
+MUTANT passAll run 1: ✘ Test run with 92 tests in 2 suites failed after 250.136 seconds with 17 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:686:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:696:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+MUTANT passAll run 2: ✘ Test run with 92 tests in 2 suites failed after 249.718 seconds with 17 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:686:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:696:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+MUTANT passAll: reverted; Sources differ from the worktree: none
+MUTANT passNone: build exit 0
+MUTANT passNone run 1: ✘ Test run with 92 tests in 2 suites failed after 66.309 seconds with 18 issues.
+    recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:708:9: Expectation failed: bResult == .failure(.integrityFailure)
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:708:9: Expectation failed: bResult == .failure(.integrityFailure)
+    recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:791:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed
+MUTANT passNone run 2: ✘ Test run with 92 tests in 2 suites failed after 77.689 seconds with 18 issues.
+    recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:708:9: Expectation failed: bResult == .failure(.integrityFailure)
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:650:13: Expectation failed: passed.owed && passed.c == .verifying && passed.visited && rerouted
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:708:9: Expectation failed: bResult == .failure(.integrityFailure)
+    recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:791:9: Expectation failed: passedAgain.c == .verifying && passedAgain.holdsC && passedAgain.unfollowed
+MUTANT passNone: reverted; Sources differ from the worktree: none

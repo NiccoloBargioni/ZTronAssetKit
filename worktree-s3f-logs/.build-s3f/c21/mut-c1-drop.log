@@ -1,0 +1,75 @@
+::: RUN 1
+Building for debugging...
+[Computing dependencies]
+[2 / 22] ZTronAssetSync
+[4 / 24] ZTronAssetSync
+[7 / 27] ZTronAssetSync
+[14 / 18] ZTronAssetCompatibilityTests-product
+[22 / 24] ZTronAssetSyncTests-product
+Build complete! (1,57 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+✘ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRunClaimTests.swift:83:9: Expectation failed: report?.fetched == 1 && report?.failures.isEmpty == true
+↳ the run fetches zz-a with T's content (visit-first): .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 1, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4201, unchangedCount: 1, fetchBytes: 20, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-a, error: ZTronAssetModel.AssetError.cancelled, failureClass: ZTronAssetModel.FailureClass.transient)]))
+↳ report?.fetched == 1 && report?.failures.isEmpty == true → false
+↳   report?.fetched == 1 → false
+↳   report?.failures.isEmpty == true → <not evaluated>
+✘ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" with 2 test cases failed after 1.098 seconds with 1 issue.
+↳ /// `critic-defer-bucket.md`'s T-RUN shape (R1, A3): a forced sync's run has its last claim, zz-a, on O (content o),
+↳ /// held downloading; T (zz-t, content t) downloads for a prefetch waiter. v3's follow is then owed, and T's attempt
+↳ /// gets a 404: its verdict waits. v4 maps zz-a to content t: the follow's visit of O re-routes the run's claim onto T
+↳ /// (`reroute`), its join behind T's waiting verdict, and the drain's one batch holds both events. While T's verdict
+↳ /// replays the barrier reads down, and the run check it makes (`checkRunSettled`) finds the claim on a job that does
+↳ /// not hold the run's interest (the orphan pass). A run starts only once a free-space read's sweep has ended an owed
+↳ /// follow (`sweepSpaceParked`), so the run's own first claims never wait behind an earlier verdict; this shape moves
+↳ /// a claim instead. Visited first, T's 404 answered zz-t and ended T before v4, whose visit of O made a new job of
+↳ /// content t for zz-a, which fetched it.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.098 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.098 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 1 exit 1
+::: RUN 2
+Building for debugging...
+[Computing dependencies]
+Build complete! (0,39 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" started.
+✘ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierRunClaimTests.swift:83:9: Expectation failed: report?.fetched == 1 && report?.failures.isEmpty == true
+↳ the run fetches zz-a with T's content (visit-first): .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 1, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4201, unchangedCount: 1, fetchBytes: 20, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-a, error: ZTronAssetModel.AssetError.cancelled, failureClass: ZTronAssetModel.FailureClass.transient)]))
+↳ report?.fetched == 1 && report?.failures.isEmpty == true → false
+↳   report?.fetched == 1 → false
+↳   report?.failures.isEmpty == true → <not evaluated>
+✘ Test "R-SYN-11: a run's claim re-routed behind a waiting verdict is not orphaned when that verdict replays, as visited first (F-28)" with 2 test cases failed after 1.161 seconds with 1 issue.
+↳ /// `critic-defer-bucket.md`'s T-RUN shape (R1, A3): a forced sync's run has its last claim, zz-a, on O (content o),
+↳ /// held downloading; T (zz-t, content t) downloads for a prefetch waiter. v3's follow is then owed, and T's attempt
+↳ /// gets a 404: its verdict waits. v4 maps zz-a to content t: the follow's visit of O re-routes the run's claim onto T
+↳ /// (`reroute`), its join behind T's waiting verdict, and the drain's one batch holds both events. While T's verdict
+↳ /// replays the barrier reads down, and the run check it makes (`checkRunSettled`) finds the claim on a job that does
+↳ /// not hold the run's interest (the orphan pass). A run starts only once a free-space read's sweep has ended an owed
+↳ /// follow (`sweepSpaceParked`), so the run's own first claims never wait behind an earlier verdict; this shape moves
+↳ /// a claim instead. Visited first, T's 404 answered zz-t and ended T before v4, whose visit of O made a new job of
+↳ /// content t for zz-a, which fetched it.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.161 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.161 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 2 exit 1

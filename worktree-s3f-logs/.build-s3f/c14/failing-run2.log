@@ -1,0 +1,196 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" started.
+✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:143:9: Expectation failed: atEnd.n == .downloading
+↳ N starts once the breaker closed (visit-first): blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))
+↳ atEnd.n == .downloading → false
+↳   atEnd.n → .blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))
+↳     some → .blocked(ZTronAssetModel.BlockReason.circuitOpen(ZTronAssetModel.BreakerCause.authentication))
+↳       blocked → .circuitOpen(ZTronAssetModel.BreakerCause.authentication)
+↳         circuitOpen → .authentication
+↳     some → .downloading
+✘ Test "R-SYN-5: new content an owed follow queues behind a half-open breaker starts once the breaker closes (F-28)" with 2 test cases failed after 0.411 seconds with 1 issue.
+↳ /// The new content an owed follow's visit queues behind a half-open breaker starts once the breaker closes: X's 403
+↳ /// opens the breaker (one distinct asset trips it); prefetch members M and K park; at the cooldown's end one of them
+↳ /// probes and holds. v3 moves the parked member's id to N while the follow owes its visits; then the probe commits
+↳ /// and closes the breaker. Visited first, N parked behind the half-open breaker at the apply and the close
+↳ /// re-admitted it. Refused on the breaker of its place's stamp after the close's re-admission had run in the drain,
+↳ /// N parked `circuitOpen` behind a closed breaker that nothing re-admits (the cycle-13 requirements verifier).
+◇ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:208:9: Expectation failed: !after.pending && after.job == nil
+↳ the purge withdrew the group's member (visit-first: no job, the group no longer waits for zz-m): (pending: true, job: Optional(ZTronAssetSync.JobState.downloading))
+↳ !after.pending && after.job == nil → false
+↳   !after.pending → false
+↳   after.job == nil → <not evaluated>
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:209:9: Expectation failed: startsAfter == startsBefore
+↳ no request for the purged zz-m after the purge (visit-first): 0 -> 1
+↳ startsAfter == startsBefore → false
+↳   startsAfter → 1
+↳   startsBefore → 0
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:218:9: Expectation failed: !present
+↳ zz-m stays purged (visit-first)
+↳ !present → <not evaluated>
+↳   present → <not evaluated>
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" with 2 test cases failed after 0.434 seconds with 3 issues.
+↳ /// A purge during an owed follow withdraws a prefetch group's join of a purged id that waits for the follow, as it
+↳ /// withdrew the member's interest of a visit-first engine: W downloads for a user waiter while v3's follow is owed; a
+↳ /// prefetch group registers zz-m (no job), then `purge(.scope([zz-m]))` arrives. Visited first, the group's join
+↳ /// created M, the purge dropped the group's member and its interest, and M was retired; zz-m is not stored. Applied
+↳ /// at once (cycle 13's removal 7), the purge found no job holding the group's interest, and the drain's join created
+↳ /// M again: zz-m was downloaded and stored after the purge returned (the cycle-13 correctness verifier).
+◇ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" started.
+✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:279:9: Expectation failed: (try? kResult.get())?.byteSize == 16
+↳ K's caller is served: K waited behind C's slot and started on the live gates once the throttle ended (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(3.0)))
+↳ (try? kResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:280:9: Expectation failed: kStarts == 1
+↳ K's one request (visit-first): 0
+↳ kStarts == 1 → false
+↳   kStarts → 0
+✘ Test "R-SYN-5: a request waiting for a slot during an owed follow is gated on the live throttle when the slot frees (F-28)" with 2 test cases failed after 0.585 seconds with 2 issues.
+↳ /// A request that waits for the follow while no slot is free is gated on the live throttle when the slot frees, as
+↳ /// a visit-first engine's pump gated it: one slot; C (1 MB, held) downloads for user waiter A. While the follow is
+↳ /// owed, an unknown id's manifest fetch gets a 429 with Retry-After 3 s, so the origin is throttled while C runs;
+↳ /// then a user asks for zz-k (16 bytes, listed). Visited first, K waited in the queue behind C's slot (the pump gates
+↳ /// nothing while no slot is free); the throttle ended, C completed, and the pump started K: K's caller was served.
+↳ /// Refused on its place's stamp (the throttle of the join's arrival) although no slot was free then, K's caller was
+↳ /// answered `serverUnavailable` and K never started (the cycle-13 correctness verifier).
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:331:9: Expectation failed: throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(61000000000ns)
+↳ throttleAtArrival == nil → false
+↳   throttleAtArrival → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:334:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/ef/ef1fb808a5151965ae388c4cade04124778912bac3b56aee3e101a8402b66028.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a moved interest gives its job (F-28)" with 2 test cases failed after 0.569 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane the visits leave the job, counting an interest another job's
+↳ /// visit moves onto it: C (1 MB, zz-b) runs for P, a prefetch waiter; Y (zz-u) runs for U, a user waiter; v3 moves
+↳ /// zz-u onto C's content; C gets a 429 with Retry-After 60 s (above the user lane's 30 s cap). Visited first, Y's
+↳ /// visit moved U onto C, so C was user work at the 429: `Backoff.delay` deferred to the next run, the origin was not
+↳ /// throttled, and C failed: P and U were answered `serverUnavailable(60)`. Read without U's interest, the background
+↳ /// policy throttled the origin for 60 s on arrival and C's retry served P (the cycle-13 correctness verifier).
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:380:9: Expectation failed: throttleAtArrival == nil
+↳ the 429 beyond the user lane's cap throttles nothing (visit-first `.exhausted`): Optional(61000000000ns)
+↳ throttleAtArrival == nil → false
+↳   throttleAtArrival → 61000000000ns
+↳     some → 61000000000ns
+↳       nanoseconds → 61000000000
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:383:25: Issue recorded
+↳ P is answered serverUnavailable with C's deferral to the next run (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/07/07834a9044cf2ea46a7a38404fd0c05bd1c31612da57f5a122902d8a21bcaf4a.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting request's join gives its job (F-28)" with 2 test cases failed after 0.567 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane a request's waiting join gives its job: C (1 MB, zz-b) runs for
+↳ /// P, a prefetch waiter; while v3's follow is owed, U requests zz-b; then C gets a 429 with Retry-After 60 s (above
+↳ /// the user lane's 30 s cap). Visited first, U's request joined C at once, so C was user work at the 429: nothing was
+↳ /// throttled, C failed, and P and U were answered `serverUnavailable(60)`. Read without the waiting join, the
+↳ /// background policy throttled the origin on arrival and C's retry served P.
+◇ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:438:9: Expectation failed: throttleAtArrival != nil
+↳ the 429 throttles the origin for prefetch work (visit-first): nil
+↳ throttleAtArrival != nil → false
+↳   throttleAtArrival → nil
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:439:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+↳ P is served by C's retry once the throttle ends (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? pResult.get())?.byteSize == Int64(cBytes.count) → <not evaluated>
+✘ Test "R-SYN-5: a 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job (F-28)" with 2 test cases failed after 0.570 seconds with 2 issues.
+↳ /// A 429 during an owed follow is decided on the lane a waiting withdrawal leaves its job: C (1 MB, zz-b) runs for P,
+↳ /// a prefetch waiter, and U, a user waiter; while v3's follow is owed, U withdraws; then C gets a 429 with
+↳ /// Retry-After 60 s (above the user lane's 30 s cap, below the background lane's). Visited first, the withdrawal
+↳ /// removed U's interest at once, so C was prefetch work at the 429: the origin was throttled for 60 s and C's retry
+↳ /// served P. Read with U's interest, whose removal waits for the follow, C was user work: nothing was throttled and P
+↳ /// was answered `serverUnavailable(60)`.
+◇ Test "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" started.
+✔ Test "R-INT-3: an integrity failure of a job an owed follow passed after its apply answers a moved id with its new content (F-28)" with 2 test cases passed after 0.862 seconds.
+◇ Test "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" started.
+✘ Test "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:533:9: Expectation failed: (try? bResult.get())?.byteSize == 16
+↳ B is served N, the content v3 maps zz-b to (visit-first): failure(ZTronAssetModel.AssetError.integrityFailure)
+↳ (try? bResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-INT-3: an integrity failure after an owed follow passed its job after the apply answers a moved id with its new content (F-28)" with 2 test cases failed after 0.843 seconds with 1 issue.
+↳ /// As above, with C's bytes failing after the barrier's drain: the follow's visit came after C's publication began
+↳ /// and passed C, and nothing waits any more when the failure arrives. Visited first, B was served N at the apply.
+◇ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" started.
+✘ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:545:9: Expectation failed: bResult == .failure(.integrityFailure)
+↳ B gets C's integrity failure: the follow passed C, publishing, in both orders (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d4/d4777e96fd4dee110560b402a16c770a0b730d93b1e23503de4cbe87cc24ecba.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ bResult == .failure(.integrityFailure) → false
+↳   bResult → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d4/d4777e96fd4dee110560b402a16c770a0b730d93b1e23503de4cbe87cc24ecba.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d4/d4777e96fd4dee110560b402a16c770a0b730d93b1e23503de4cbe87cc24ecba.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d4/d4777e96fd4dee110560b402a16c770a0b730d93b1e23503de4cbe87cc24ecba.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/d4/d4777e96fd4dee110560b402a16c770a0b730d93b1e23503de4cbe87cc24ecba.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 16
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.integrityFailure) → failure(ZTronAssetModel.AssetError.integrityFailure)
+↳     failure → .integrityFailure
+✘ Test "R-INT-3: an integrity failure of a job that published before an owed follow's apply answers as visited first (F-28)" with 2 test cases failed after 0.842 seconds with 1 issue.
+↳ /// A job whose publication began before the apply was passed by a visit-first engine's follow too: C verifies when v3
+↳ /// moves zz-b; its bytes then fail. Visited first, the follow passed C and the failure answered both users
+↳ /// `integrityFailure`. Behind the barrier the failure's verdict waits for the follow; the drain must not visit C, which
+↳ /// a visit-first engine never moved.
+✘ Suite "Engine follow barrier (F-28)" failed after 5.688 seconds with 14 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 9 tests in 1 suite failed after 5.688 seconds with 14 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

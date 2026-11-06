@@ -1,0 +1,92 @@
+== HEAD 32c7ffe 21:43:50
+== quick 21:43:50 { 5.38 5.55 6.45 }
+quick exit 0 21:48:47 { 11.34 15.53 11.47 }
+✔ Test run with 151 tests in 16 suites passed after 0.645 seconds.
+✔ Test run with 460 tests in 53 suites passed after 48.270 seconds.
+✔ Test run with 459 tests in 60 suites passed after 85.195 seconds.
+✔ Test run with 84 tests in 18 suites passed after 65.800 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.804 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.409 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.453 seconds.
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+== HEAD 32c7ffe status: 
+== coverage 21:48:47
+cov exit 0
+COVERAGE target=ZTronAssetSync           lines= 93.11% (9831/10558) min=90.0 OK
+COVERAGE overall lines=96.25% (26341/27366) min=80.0 OK
+COVERAGE: PASS
+== sync 1 21:48:48 { 11.34 15.53 11.47 }
+sync 1 exit 0 21:51:16
+✔ Test run with 460 tests in 53 suites passed after 52.762 seconds.
+== sync 2 21:51:16 { 18.55 19.66 13.97 }
+sync 2 exit 0 21:52:04
+✔ Test run with 460 tests in 53 suites passed after 46.113 seconds.
+== sync 3 21:52:04 { 16.63 19.28 14.17 }
+sync 3 exit 0 21:52:53
+✔ Test run with 460 tests in 53 suites passed after 46.141 seconds.
+== release 21:52:53 { 13.63 18.33 14.13 }
+release exit 0 21:53:27
+Build complete! (33,24 s)
+0
+== gates 21:53:27
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+gates exit 0
+== done 21:53:28 { 9.55 16.80 13.74 }
+== tsan build 21:53:28 { 9.55 16.80 13.74 } HEAD 32c7ffe
+build exit 0 21:54:19
+Build complete! (50,72 s)
+tsan exit 0 21:58:47 { 7.39 20.29 17.30 }
+✔ Test run with 460 tests in 53 suites passed after 228.983 seconds.
+.build-s3f/c11-tsan.sh: line 17: 76163 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+tsan warnings 0 timelimits 0
+S3-R12 load from 60 s: mean 35.22 min 7.34 max 82.93 over 42 samples
+HEAD 32c7ffe
+== ios build 21:58:47 { 7.39 20.29 17.30 }
+ios build exit 0 21:58:58
+2026-10-30 21:58:52.949 xcodebuild[77252:22980139] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+== sim 21:58:58 { 8.79 20.15 17.28 }
+boot exit 0
+sim exit 0 22:06:24 { 37.26 123.83 88.83 }
+Test Suite 'All tests' passed at 2026-10-30 22:06:20.926.
+Test Suite 'All tests' passed at 2026-10-30 22:06:22.563.
+** TEST SUCCEEDED **
+bundle .build-s3f/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.30_21-59-06-+0100.xcresult
+      "failedTests" : 0,
+      "passedTests" : 2762,
+      "skippedTests" : 0,
+  "failedTests" : 0,
+  "passedTests" : 1414,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "totalTestCount" : 1414
+shutdown exit 0
+== ios done 22:06:29
+== prebuild 22:06:29 { 38.12 122.58 88.59 } HEAD 32c7ffe
+prebuild exit 0 22:09:32
+Build complete! (180,04 s)
+== bench 22:09:32 { 16.39 73.60 74.53 }
+bench exit 1 22:15:31 { 4.68 26.17 51.02 }
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.490 seconds with 1 issue.
+✘ Suite "StorageBenchmarks" failed after 9.571 seconds with 1 issue.
+◇ Suite "SyncBenchmarks" started.
+✔ Suite "SyncBenchmarks" passed after 71.140 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 213.959 seconds with 1 issue.
+✘ Test run with 44 tests in 8 suites failed after 213.960 seconds with 1 issue.
+.build-s3f/c11-bench.sh: line 18: 80386 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+bench load: mean 7.83 min 3.91 max 16.39 over 72 samples
+HEAD 32c7ffe; // swift-tools-version: 6.4
+debug exit 0 warnings 0 errors 0
+Build complete! (59,42 s)
+release exit 0 warnings 0
+Build complete! (32,26 s)
+swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+== all done 22:17:05

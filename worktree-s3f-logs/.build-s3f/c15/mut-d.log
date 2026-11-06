@@ -1,0 +1,34 @@
+MUTANT laneJoinTokenWithdrawnIgnored: build exit 0
+MUTANT laneJoinTokenWithdrawnIgnored run 1: ✘ Test run with 92 tests in 2 suites failed after 89.274 seconds with 2 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter at EngineFollowBarrierLaneTests.swift:149:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter at EngineFollowBarrierLaneTests.swift:150:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneJoinTokenWithdrawnIgnored run 2: ✘ Test run with 92 tests in 2 suites failed after 86.023 seconds with 2 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter at EngineFollowBarrierLaneTests.swift:149:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .withdrawnWaiter at EngineFollowBarrierLaneTests.swift:150:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneJoinTokenWithdrawnIgnored: reverted; Sources differ from the worktree: none
+MUTANT laneJoinTargetIgnored: build exit 0
+MUTANT laneJoinTargetIgnored run 1: ✘ Test run with 92 tests in 2 suites failed after 79.097 seconds with 3 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .otherContent at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .otherContent at EngineFollowBarrierLaneTests.swift:149:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .otherContent at EngineFollowBarrierLaneTests.swift:150:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneJoinTargetIgnored run 2: ✘ Test run with 92 tests in 2 suites failed after 79.247 seconds with 3 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .otherContent at EngineFollowBarrierPublicationTests.swift:107:25: Issue recorded
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .otherContent at EngineFollowBarrierLaneTests.swift:149:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .otherContent at EngineFollowBarrierLaneTests.swift:150:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneJoinTargetIgnored: reverted; Sources differ from the worktree: none
+MUTANT laneJoinStillWantsIgnored: build exit 0
+MUTANT laneJoinStillWantsIgnored run 1: ✘ Test run with 92 tests in 2 suites failed after 78.621 seconds with 2 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup at EngineFollowBarrierLaneTests.swift:149:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup at EngineFollowBarrierLaneTests.swift:150:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneJoinStillWantsIgnored run 2: ✘ Test run with 92 tests in 2 suites failed after 82.317 seconds with 2 issues.
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup at EngineFollowBarrierLaneTests.swift:149:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 2 arguments visit → .sweepFollowsFirst, request → .releasedGroup at EngineFollowBarrierLaneTests.swift:150:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneJoinStillWantsIgnored: reverted; Sources differ from the worktree: none
+MUTANT laneJoinListedTargetIgnored: build exit 0
+MUTANT laneJoinListedTargetIgnored run 1: ✔ Test run with 92 tests in 2 suites passed after 81.272 seconds.
+MUTANT laneJoinListedTargetIgnored run 2: ✔ Test run with 92 tests in 2 suites passed after 78.751 seconds.
+MUTANT laneJoinListedTargetIgnored: reverted; Sources differ from the worktree: none
+MUTANT spaceFailureEpochDropped: build exit 0
+MUTANT spaceFailureEpochDropped run 1: ✔ Test run with 92 tests in 2 suites passed after 68.787 seconds.
+MUTANT spaceFailureEpochDropped run 2: ✔ Test run with 92 tests in 2 suites passed after 66.766 seconds.
+MUTANT spaceFailureEpochDropped: reverted; Sources differ from the worktree: none

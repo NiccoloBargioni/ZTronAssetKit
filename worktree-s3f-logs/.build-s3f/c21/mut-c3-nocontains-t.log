@@ -1,0 +1,76 @@
+::: RUN 1
+Building for debugging...
+[Computing dependencies]
+[2 / 22] ZTronAssetSync
+[4 / 24] ZTronAssetSync
+[9 / 27] ZTronAssetSync
+[14 / 19] ZTronAssetKitTests-product
+[20 / 22] ZTronAssetSyncTests-product
+[22 / 24] ZTronAssetSyncTests-product
+Build complete! (1,49 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+✘ Test "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:153:9: Expectation failed: announced == [d.identifier]
+↳ X's commit, under v4's copy, announces zz-d alone: [zz-a, zz-d]
+↳ announced == [d.identifier] → false
+↳   announced → [zz-a, zz-d]
+↳   [d.identifier] → [zz-d]
+✘ Test "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" with 2 test cases failed after 1.104 seconds with 1 issue.
+↳ /// The store can bind an id its job no longer holds, and the commit does not announce it (step C3's
+↳ /// `job.assets.contains`; `integrate-c21.md`'s unconfirmed claim that no reachable shape binds one): zz-a and zz-d
+↳ /// share X's content, each with a user waiter. v4 maps zz-a to Y's content while X downloads; X's publication then
+↳ /// begins, held at its first store unit, and v5 maps zz-a back to X's content, applied by the store while the
+↳ /// engine's side of it waits (`holdNextApplyFollow`). Swept first, the publication's binding holds zz-a, and v4's
+↳ /// owed visit takes zz-a off X before the store binds it (`Job.rerouteOnPass`); the store, which holds v5, then binds
+↳ /// both ids, but the engine's copy is v4, where zz-a is Y's, so X's commit announces zz-d alone, as
+↳ /// `job.assets.sorted()` did before step C3. Visited first, v4's visit took zz-a off X before the publication began,
+↳ /// so the store bound zz-d alone. In both orders v5's follow then answers zz-a's waiter with X's bytes.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.104 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.104 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 1 exit 1
+::: RUN 2
+Building for debugging...
+[Computing dependencies]
+Build complete! (0,39 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" started.
+✘ Test "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:153:9: Expectation failed: announced == [d.identifier]
+↳ X's commit, under v4's copy, announces zz-d alone: [zz-a, zz-d]
+↳ announced == [d.identifier] → false
+↳   announced → [zz-a, zz-d]
+↳   [d.identifier] → [zz-d]
+✘ Test "R-SYN-12: a commit announces no id its job no longer holds, though the store bound it (step C3)" with 2 test cases failed after 1.104 seconds with 1 issue.
+↳ /// The store can bind an id its job no longer holds, and the commit does not announce it (step C3's
+↳ /// `job.assets.contains`; `integrate-c21.md`'s unconfirmed claim that no reachable shape binds one): zz-a and zz-d
+↳ /// share X's content, each with a user waiter. v4 maps zz-a to Y's content while X downloads; X's publication then
+↳ /// begins, held at its first store unit, and v5 maps zz-a back to X's content, applied by the store while the
+↳ /// engine's side of it waits (`holdNextApplyFollow`). Swept first, the publication's binding holds zz-a, and v4's
+↳ /// owed visit takes zz-a off X before the store binds it (`Job.rerouteOnPass`); the store, which holds v5, then binds
+↳ /// both ids, but the engine's copy is v4, where zz-a is Y's, so X's commit announces zz-d alone, as
+↳ /// `job.assets.sorted()` did before step C3. Visited first, v4's visit took zz-a off X before the publication began,
+↳ /// so the store bound zz-d alone. In both orders v5's follow then answers zz-a's waiter with X's bytes.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.104 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.104 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 2 exit 1

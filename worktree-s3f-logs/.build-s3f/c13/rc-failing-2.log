@@ -1,0 +1,28 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" started.
+✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSweepTests.swift:73:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(sBytes.count)
+↳ S, re-admitted by the sweep before V's request, takes the room (visit-first): failure(ZTronAssetModel.AssetError.insufficientSpace(required: 3000000, available: 1500008))
+↳ (try? uResult.get())?.byteSize == Int64(sBytes.count) → <not evaluated>
+✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSweepTests.swift:76:25: Issue recorded
+↳ J, requested after the sweep gave S the room, is answered insufficientSpace (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-j, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/6c/6c00f79df8106aa3eec926d4978726315b063b30655e4c9440176b0608e686ce.png, fileExtension: png, byteSize: 3000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: a reclaim's sweep during an owed follow gives the room to the job it re-admits before a later request (F-28)" with 2 test cases failed after 1.827 seconds with 2 issues.
+↳ /// A reclaim's sweep that re-admits a space-parked job while the follow owes its visits gives it the room before a
+↳ /// request that arrives after the sweep: S (zz-s, 3 MB) waits `awaitingSpace` for a 4 MB pruned blob with 0.5 MB of
+↳ /// room, for U's user waiter. While the follow owes its visits, the grace ends and the reclaim leaves 4.5 MB, room
+↳ /// for S or for J (zz-j, 3 MB), not both; then V asks for J. Visited first, the reclaim's sweep re-admitted S at once:
+↳ /// S took the room and was served, and J, judged beside S's bytes with nothing left to reclaim, answered V
+↳ /// `insufficientSpace`. Behind the barrier the sweep judges only after the drain, so J, replayed in the drain, took
+↳ /// the room first and U was answered `insufficientSpace` instead.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.828 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.828 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

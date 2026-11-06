@@ -1,0 +1,492 @@
+::: RUN 1
+Building for debugging...
+[Computing dependencies]
+[9 / 58] ZTronAssetModel
+[14 / 73] ZTronAssetTransport
+[22 / 69] ZTronAssetTestSupport
+[26 / 53] ZTronAssetSync
+[30 / 59] ZTronAssetKit
+[32 / 54] ZTronAssetSync
+[39 / 43] ZTronAssetKitTests-product
+[47 / 49] ZTronAssetSyncTests-product
+Build complete! (2,01 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .notFoundGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .timeoutGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .notFoundUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .timeoutUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" with 8 test cases failed after 4.845 seconds with 24 issues.
+↳ /// A follow's visit that moves the members onto O's content, whose verdict waits, leaves the queue holding O's verdict
+↳ /// alone after every held follow turn: each join waits behind the verdict in O's bucket (`joinsBehindVerdicts`),
+↳ /// which grows by at most a turn's ids, in arrival order, and the drain places the bucket behind the verdict. Visited
+↳ /// first, the verdict was given at its arrival and v4's visit joined the members at once: every member is served
+↳ /// O's 20 bytes, and a 404 reports zz-o alone failed.
+◇ Test "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+✘ Test "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:356:17: Expectation failed: first.last?.owed == true
+↳ setup: joins wait in O's bucket while the follow is owed: [follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h11", "join zz-h10", "join zz-h09"](13) registered=12 behind=0 buckets=0 violations=[], follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h15", "join zz-h14", "join zz-h13"](17) registered=16 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=["join zz-h19", "join zz-h18", "join zz-h17", "join zz-h16"](20) registered=20 behind=0 buckets=0 violations=[]]
+↳ first.last?.owed == true → false
+↳   first.last?.owed → false
+↳     some → false
+↳     some → true
+✘ Test "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" with 2 test cases failed after 1.053 seconds with 1 issue.
+↳ /// The drain places O's bucket right behind O's verdict, newest first, ahead of a request that waits at the queue's
+↳ /// tail: 20 members, v3's pass past them before v4, and a v4 that changes nothing else, so only v4's pass finds H,
+↳ /// H's visit's rest alone keeps the follow owed, its last turn moves the last four and leaves its drain no ids, and
+↳ /// the drain's first batch gives O's verdict and puts the rest back at the queue's head (`drainEventsAfterFollow`).
+↳ /// zz-x (X's 16 bytes), requested between two follow turns once O's bucket holds joins, waits as a tail join
+↳ /// (`addInterest`). Visited first, the same members and zz-x are served.
+◇ Test "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+✘ Test "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:390:17: Expectation failed: turns.last?.owed == true && turns.last?.behind.isEmpty == false
+↳ setup: joins wait in O's bucket while the follow is owed: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turns.last?.owed == true && turns.last?.behind.isEmpty == false → false
+↳   turns.last?.owed == true → false
+↳   turns.last?.behind.isEmpty == false → <not evaluated>
+✘ Test "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" with 2 test cases failed after 1.195 seconds with 1 issue.
+↳ /// The drain places O's bucket even when it skips O's verdict: a one-member prefetch group wants zz-o, and its release,
+↳ /// once the bucket holds joins, retires O's job, whose verdict the drain then skips (no job at its epoch). The members
+↳ /// join a fresh job of O's content, as visited first, where v4's visit joined them to one after the 404.
+◇ Test "R-SYN-6: only an exit verdict's event names the attempt whose joins wait behind it (F-28)" started.
+✔ Test "R-SYN-6: only an exit verdict's event names the attempt whose joins wait behind it (F-28)" passed after 0.001 seconds.
+◇ Test "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+✘ Test "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:448:17: Expectation failed: turns.last?.owed == true && turns.last?.behind.count == count
+↳ setup: every member's join waits in O's bucket while the follow is owed: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turns.last?.owed == true && turns.last?.behind.count == count → false
+↳   turns.last?.owed == true → false
+↳   turns.last?.behind.count == count → <not evaluated>
+✘ Test "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" with 2 test cases failed after 1.153 seconds with 1 issue.
+↳ /// A purge of the members, while their joins wait in O's bucket, withdraws them there, as it withdraws the waiting
+↳ /// joins of the queue (`withdrawPurgedJoins`): the group stops waiting for them, and the drain joins nothing for
+↳ /// them. A prefetch group wants the members; O times out, and its retry, held until the drain is over, serves zz-o's
+↳ /// waiter. Visited first, the retry had started at the verdict's arrival, v4's visit had joined the members to it at
+↳ /// once, and the purge withdrew the group's interest there. The purge leaves the members in the retry's bound ids
+↳ /// (`Job.assets`; `withdrawPurged` withdraws interests only, as `s3-base`'s `performPurge` did), so a visit-first
+↳ /// engine binds them at the retry's publication, and a swept-first one, whose withdrawn joins join nothing, does
+↳ /// not: that difference is the cycle-21 fixer's observation for the orchestrator (the WP-F draft's cycle 21), not
+↳ /// item A's, and each order's stored set is pinned as it is.
+◇ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, move → .toC to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, move → .stays to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, move → .toC to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, move → .toC at EngineFollowBarrierStaleRerouteTests.swift:31:17: Expectation failed: now.owed
+↳ setup: the follow is still owed (H's visit's join for U waits in O's bucket)
+↳ now.owed → false
+↳   now → (done: false, owed: false)
+↳     done → false
+↳     owed → false
+↳   owed → false
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, move → .stays to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, move → .stays at EngineFollowBarrierStaleRerouteTests.swift:31:17: Expectation failed: now.owed
+↳ setup: the follow is still owed (H's visit's join for U waits in O's bucket)
+↳ now.owed → false
+↳   now → (done: false, owed: false)
+↳     done → false
+↳     owed → false
+↳   owed → false
+✘ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" with 4 test cases failed after 2.281 seconds with 2 issues.
+↳ /// A 429 of C during an owed follow is decided on the lane the joins behind a waiting verdict give C: those that join
+↳ /// C at the drain count, the others do not (`followedLane`). C (1 MB, zz-b) downloads for P, a prefetch waiter; O
+↳ /// (zz-o, 20 bytes) for zz-o's user waiter, timing out while v3's follow is owed, so its verdict waits, its retry held
+↳ /// (visited first it started at the verdict's arrival); H (zz-u's 16 bytes) for U, a user waiter. v4 maps zz-u to O's
+↳ /// content: H's visit's join for U waits in O's bucket. With `.toC`, v5 maps zz-u to C's content: the drain re-routes
+↳ /// U's join there (`replayJoin`). Then C gets a 429 with Retry-After 60 s, above the user lane's 30 s cap. Visited
+↳ /// first, U's interest was on C's job at the 429 with `.toC` (v5's visit moved it from O's retry), so C was user work:
+↳ /// nothing was throttled, C failed, and P and U were answered `serverUnavailable`; with `.stays` it was on O's retry,
+↳ /// C was prefetch work, the origin was throttled, C's retry served P, and O's retry, started before the 429, served U
+↳ /// and zz-o's waiter. Swept first with `.stays`, O's retry starts at the drain, on the live throttle the 429 left, and
+↳ /// U and zz-o's waiter are answered `serverUnavailable` (60 s is above the user lane's cap): the answer for the live
+↳ /// gate at the decision, a difference ruling S3-R17 item 2 makes non-blocking (a residual risk; this test its probe).
+◇ Test "R-SYN-6: the invariants report joins behind a verdict that waits nowhere or past the world history (F-28)" started.
+✘ Test "R-SYN-6: the invariants report joins behind a verdict that waits nowhere or past the world history (F-28)" recorded an issue at EngineFollowBarrierDeferBucketTests.swift:622:13: Expectation failed: turns.last?.owed == true && turns.last?.behind.isEmpty == false && turns.last?.violations.isEmpty == true
+↳ setup: joins wait in O's bucket while the follow is owed: [follow owed=true [passes 2 visits 0 rest false moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turns.last?.owed == true && turns.last?.behind.isEmpty == false && turns.last?.violations.isEmpty == true → false
+↳   turns.last?.owed == true && turns.last?.behind.isEmpty == false → false
+↳   turns.last?.violations.isEmpty == true → <not evaluated>
+✘ Test "R-SYN-6: the invariants report joins behind a verdict that waits nowhere or past the world history (F-28)" failed after 0.555 seconds with 1 issue.
+↳ /// The invariants report a bucket without exactly one waiting event of its verdict, an empty bucket, and a join behind
+↳ /// a verdict whose decision instant is past the world history (`followBarrierViolations`, clauses K1 and K3), each
+↳ /// alone. Moved to an attempt whose verdict waits nowhere, a bucket's joins are also missing from the recount, which
+↳ /// counts them at their verdict's place (K2). Swept first only: the state needs a join behind a waiting verdict.
+◇ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:664:17: Expectation failed: behind > 0
+↳ setup: v4's apply's own turn deferred joins behind O's verdict
+↳ behind > 0 → false
+↳   behind → 0
+✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" with 2 test cases failed after 1.037 seconds with 1 issue.
+↳ /// Shutdown while joins wait behind O's verdict clears every follow table, the buckets included
+↳ /// (`drainEverything`), and answers zz-o's waiter and every member's `shutDown`. O times out; the members are user
+↳ /// waiters. Visited first, the follow had ended and the members waited on O's job for its retry.
+✘ Suite "Engine follow barrier (F-28)" failed after 12.124 seconds with 31 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 8 tests in 1 suite failed after 12.124 seconds with 31 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 1 exit 1
+::: RUN 2
+Building for debugging...
+[Computing dependencies]
+Build complete! (0,38 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .notFoundGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .timeoutGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .notFoundUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, shape → .timeoutUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutGroup at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .notFoundUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers to "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" started.
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:315:17: Expectation failed: turn.queue == ["O"]
+↳ after every held follow turn the queue holds O's verdict alone: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.queue == ["O"] → false
+↳   turn.queue → ["O", "join zz-h09", "join zz-h08", "join zz-h07", "join zz-h06", "join zz-h05", "join zz-h04", "join zz-h03", "join zz-h02", "join zz-h01", "join zz-h00"]
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, shape → .timeoutUsers at EngineFollowBarrierDeferBucketTests.swift:316:17: Expectation failed: turn.behind.count == turn.registered && turn.buckets == 1
+↳ every waiting join waits in O's bucket: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turn.behind.count == turn.registered && turn.buckets == 1 → false
+↳   turn.behind.count == turn.registered → false
+↳   turn.buckets == 1 → <not evaluated>
+✘ Test "R-SYN-6: the joins a follow defers behind a waiting exit verdict wait outside the queue, a turn's ids at a time (C2, F-28)" with 8 test cases failed after 4.770 seconds with 24 issues.
+↳ /// A follow's visit that moves the members onto O's content, whose verdict waits, leaves the queue holding O's verdict
+↳ /// alone after every held follow turn: each join waits behind the verdict in O's bucket (`joinsBehindVerdicts`),
+↳ /// which grows by at most a turn's ids, in arrival order, and the drain places the bucket behind the verdict. Visited
+↳ /// first, the verdict was given at its arrival and v4's visit joined the members at once: every member is served
+↳ /// O's 20 bytes, and a 404 reports zz-o alone failed.
+◇ Test "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" started.
+✘ Test "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:356:17: Expectation failed: first.last?.owed == true
+↳ setup: joins wait in O's bucket while the follow is owed: [follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h11", "join zz-h10", "join zz-h09"](13) registered=12 behind=0 buckets=0 violations=[], follow owed=true [passes 0 visits 0 rest true moves false] queue=["O", "join zz-h15", "join zz-h14", "join zz-h13"](17) registered=16 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=["join zz-h19", "join zz-h18", "join zz-h17", "join zz-h16"](20) registered=20 behind=0 buckets=0 violations=[]]
+↳ first.last?.owed == true → false
+↳   first.last?.owed → false
+↳     some → false
+↳     some → true
+✘ Test "R-SYN-6: the drain places the joins behind a verdict right behind it, newest first, ahead of a later request (F-28)" with 2 test cases failed after 1.045 seconds with 1 issue.
+↳ /// The drain places O's bucket right behind O's verdict, newest first, ahead of a request that waits at the queue's
+↳ /// tail: 20 members, v3's pass past them before v4, and a v4 that changes nothing else, so only v4's pass finds H,
+↳ /// H's visit's rest alone keeps the follow owed, its last turn moves the last four and leaves its drain no ids, and
+↳ /// the drain's first batch gives O's verdict and puts the rest back at the queue's head (`drainEventsAfterFollow`).
+↳ /// zz-x (X's 16 bytes), requested between two follow turns once O's bucket holds joins, waits as a tail join
+↳ /// (`addInterest`). Visited first, the same members and zz-x are served.
+◇ Test "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" started.
+✘ Test "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:390:17: Expectation failed: turns.last?.owed == true && turns.last?.behind.isEmpty == false
+↳ setup: joins wait in O's bucket while the follow is owed: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turns.last?.owed == true && turns.last?.behind.isEmpty == false → false
+↳   turns.last?.owed == true → false
+↳   turns.last?.behind.isEmpty == false → <not evaluated>
+✘ Test "R-SYN-6: the joins behind a verdict the drain skips still join the content (F-28)" with 2 test cases failed after 1.174 seconds with 1 issue.
+↳ /// The drain places O's bucket even when it skips O's verdict: a one-member prefetch group wants zz-o, and its release,
+↳ /// once the bucket holds joins, retires O's job, whose verdict the drain then skips (no job at its epoch). The members
+↳ /// join a fresh job of O's content, as visited first, where v4's visit joined them to one after the 404.
+◇ Test "R-SYN-6: only an exit verdict's event names the attempt whose joins wait behind it (F-28)" started.
+✔ Test "R-SYN-6: only an exit verdict's event names the attempt whose joins wait behind it (F-28)" passed after 0.001 seconds.
+◇ Test "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" started.
+✘ Test "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:448:17: Expectation failed: turns.last?.owed == true && turns.last?.behind.count == count
+↳ setup: every member's join waits in O's bucket while the follow is owed: [follow owed=true [passes 2 visits 0 rest true moves false] queue=["O", "join zz-h03", "join zz-h02", "join zz-h01"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest true moves false] queue=["O", "join zz-h07", "join zz-h06", "join zz-h05"](9) registered=8 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h09", "join zz-h08", "join zz-h07"](11) registered=10 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turns.last?.owed == true && turns.last?.behind.count == count → false
+↳   turns.last?.owed == true → false
+↳   turns.last?.behind.count == count → <not evaluated>
+✘ Test "R-SYN-6: a purge withdraws the joins that wait behind a verdict (F-28)" with 2 test cases failed after 1.153 seconds with 1 issue.
+↳ /// A purge of the members, while their joins wait in O's bucket, withdraws them there, as it withdraws the waiting
+↳ /// joins of the queue (`withdrawPurgedJoins`): the group stops waiting for them, and the drain joins nothing for
+↳ /// them. A prefetch group wants the members; O times out, and its retry, held until the drain is over, serves zz-o's
+↳ /// waiter. Visited first, the retry had started at the verdict's arrival, v4's visit had joined the members to it at
+↳ /// once, and the purge withdrew the group's interest there. The purge leaves the members in the retry's bound ids
+↳ /// (`Job.assets`; `withdrawPurged` withdraws interests only, as `s3-base`'s `performPurge` did), so a visit-first
+↳ /// engine binds them at the retry's publication, and a swept-first one, whose withdrawn joins join nothing, does
+↳ /// not: that difference is the cycle-21 fixer's observation for the orchestrator (the WP-F draft's cycle 21), not
+↳ /// item A's, and each order's stored set is pinned as it is.
+◇ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, move → .toC to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, move → .stays to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, move → .toC to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, move → .toC at EngineFollowBarrierStaleRerouteTests.swift:31:17: Expectation failed: now.owed
+↳ setup: the follow is still owed (H's visit's join for U waits in O's bucket)
+↳ now.owed → false
+↳   now → (done: false, owed: false)
+↳     done → false
+↳     owed → false
+↳   owed → false
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, move → .stays to "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, move → .stays at EngineFollowBarrierStaleRerouteTests.swift:31:17: Expectation failed: now.owed
+↳ setup: the follow is still owed (H's visit's join for U waits in O's bucket)
+↳ now.owed → false
+↳   now → (done: false, owed: false)
+↳     done → false
+↳     owed → false
+↳   owed → false
+✘ Test "R-SYN-5: a 429 during an owed follow counts the joins behind a waiting verdict that join its content, and no other (F-28)" with 4 test cases failed after 2.280 seconds with 2 issues.
+↳ /// A 429 of C during an owed follow is decided on the lane the joins behind a waiting verdict give C: those that join
+↳ /// C at the drain count, the others do not (`followedLane`). C (1 MB, zz-b) downloads for P, a prefetch waiter; O
+↳ /// (zz-o, 20 bytes) for zz-o's user waiter, timing out while v3's follow is owed, so its verdict waits, its retry held
+↳ /// (visited first it started at the verdict's arrival); H (zz-u's 16 bytes) for U, a user waiter. v4 maps zz-u to O's
+↳ /// content: H's visit's join for U waits in O's bucket. With `.toC`, v5 maps zz-u to C's content: the drain re-routes
+↳ /// U's join there (`replayJoin`). Then C gets a 429 with Retry-After 60 s, above the user lane's 30 s cap. Visited
+↳ /// first, U's interest was on C's job at the 429 with `.toC` (v5's visit moved it from O's retry), so C was user work:
+↳ /// nothing was throttled, C failed, and P and U were answered `serverUnavailable`; with `.stays` it was on O's retry,
+↳ /// C was prefetch work, the origin was throttled, C's retry served P, and O's retry, started before the 429, served U
+↳ /// and zz-o's waiter. Swept first with `.stays`, O's retry starts at the drain, on the live throttle the 429 left, and
+↳ /// U and zz-o's waiter are answered `serverUnavailable` (60 s is above the user lane's cap): the answer for the live
+↳ /// gate at the decision, a difference ruling S3-R17 item 2 makes non-blocking (a residual risk; this test its probe).
+◇ Test "R-SYN-6: the invariants report joins behind a verdict that waits nowhere or past the world history (F-28)" started.
+✘ Test "R-SYN-6: the invariants report joins behind a verdict that waits nowhere or past the world history (F-28)" recorded an issue at EngineFollowBarrierDeferBucketTests.swift:622:13: Expectation failed: turns.last?.owed == true && turns.last?.behind.isEmpty == false && turns.last?.violations.isEmpty == true
+↳ setup: joins wait in O's bucket while the follow is owed: [follow owed=true [passes 2 visits 0 rest false moves false] queue=["O", "join zz-h03", "join zz-h01", "join zz-h02"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h03", "join zz-h01", "join zz-h02"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=true [passes 1 visits 0 rest false moves false] queue=["O", "join zz-h03", "join zz-h01", "join zz-h02"](5) registered=4 behind=0 buckets=0 violations=[], follow owed=false [passes 0 visits 0 rest false moves false] queue=[](0) registered=0 behind=0 buckets=0 violations=[]]
+↳ turns.last?.owed == true && turns.last?.behind.isEmpty == false && turns.last?.violations.isEmpty == true → false
+↳   turns.last?.owed == true && turns.last?.behind.isEmpty == false → false
+↳   turns.last?.violations.isEmpty == true → <not evaluated>
+✘ Test "R-SYN-6: the invariants report joins behind a verdict that waits nowhere or past the world history (F-28)" failed after 0.561 seconds with 1 issue.
+↳ /// The invariants report a bucket without exactly one waiting event of its verdict, an empty bucket, and a join behind
+↳ /// a verdict whose decision instant is past the world history (`followBarrierViolations`, clauses K1 and K3), each
+↳ /// alone. Moved to an attempt whose verdict waits nowhere, a bucket's joins are also missing from the recount, which
+↳ /// counts them at their verdict's place (K2). Swept first only: the state needs a join behind a waiting verdict.
+◇ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierDeferBucketTests.swift:664:17: Expectation failed: behind > 0
+↳ setup: v4's apply's own turn deferred joins behind O's verdict
+↳ behind > 0 → false
+↳   behind → 0
+✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" with 2 test cases failed after 1.034 seconds with 1 issue.
+↳ /// Shutdown while joins wait behind O's verdict clears every follow table, the buckets included
+↳ /// (`drainEverything`), and answers zz-o's waiter and every member's `shutDown`. O times out; the members are user
+↳ /// waiters. Visited first, the follow had ended and the members waited on O's job for its retry.
+✘ Suite "Engine follow barrier (F-28)" failed after 12.020 seconds with 31 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 8 tests in 1 suite failed after 12.020 seconds with 31 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 2 exit 1

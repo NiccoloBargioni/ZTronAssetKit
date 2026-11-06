@@ -1,0 +1,37 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 12] ZTronAssetSyncTests-product
+[2 / 21] ZTronAssetSync
+[4 / 23] ZTronAssetSync
+Build complete! (0,90 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+SWIFT TASK CONTINUATION MISUSE: ensureTask(_:scope:) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:160:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:192:13: Expectation failed: released
+↳ the resumed ensure released its group
+↳ released → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+SWIFT TASK CONTINUATION MISUSE: ensureTask(_:scope:) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:160:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:192:13: Expectation failed: released
+↳ the resumed ensure released its group
+↳ released → <not evaluated>
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" with 2 test cases failed after 127.999 seconds with 4 issues.
+↳ /// An `ensureAvailable` group waits for zz-e1 (committed) and zz-e2 (E2, held downloading); v3 drops zz-e2 from the
+↳ /// manifest (T21). The follow's visit of E2 drops the member from the group (`reroute`, `dropGroupMember`), which
+↳ /// settles the group and resumes the ensure, with the same answer in both orders. The group is read once the follow
+↳ /// and its drain are over, so a member left pending fails at once; a caller left suspended keeps its group, and the
+↳ /// wait for its release ends at the time limit.
+✘ Suite "Engine follow barrier (F-28)" failed after 127.999 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 128.000 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

@@ -1,0 +1,48 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 21] ZTronAssetKit
+[2 / 21] ZTronAssetSync
+[4 / 23] ZTronAssetSync
+Build complete! (0,89 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:225:9: Expectation failed: whileWaiting.isEmpty
+↳ ["group 7 member zz-m without an interest"]
+↳ whileWaiting.isEmpty → false
+↳   whileWaiting → ["group 7 member zz-m without an interest"]
+↳   isEmpty → false
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierAnswerTests.swift:235:9: Expectation failed: !after.pending && after.job == nil
+↳ the purge withdrew the group's member (visit-first: no job, the group no longer waits for zz-m): (pending: true, job: nil)
+↳ !after.pending && after.job == nil → false
+↳   !after.pending → false
+↳   after.job == nil → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" started.
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:225:9: Expectation failed: whileWaiting.isEmpty
+↳ ["group 7 member zz-m without an interest"]
+↳ whileWaiting.isEmpty → false
+↳   whileWaiting → ["group 7 member zz-m without an interest"]
+↳   isEmpty → false
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:235:9: Expectation failed: !after.pending && after.job == nil
+↳ the purge withdrew the group's member (visit-first: no job, the group no longer waits for zz-m): (pending: true, job: nil)
+↳ !after.pending && after.job == nil → false
+↳   !after.pending → false
+↳   after.job == nil → <not evaluated>
+✘ Test "R-CLN-6: a purge during an owed follow withdraws a group's waiting join of a purged id (F-28)" with 2 test cases failed after 0.441 seconds with 4 issues.
+↳ /// A purge during an owed follow withdraws a prefetch group's join of a purged id that waits for the follow, as it
+↳ /// withdrew the member's interest of a visit-first engine: W downloads for a user waiter while v3's follow is owed; a
+↳ /// prefetch group registers zz-m (no job), then `purge(.scope([zz-m]))` arrives. Visited first, the group's join
+↳ /// created M, the purge dropped the group's member and its interest, and M was retired; zz-m is not stored. Applied
+↳ /// at once (cycle 13's removal 7), the purge found no job holding the group's interest, and the drain's join created
+↳ /// M again: zz-m was downloaded and stored after the purge returned (the cycle-13 correctness verifier).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.441 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.441 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

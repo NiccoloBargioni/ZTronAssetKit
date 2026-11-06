@@ -303,3 +303,27 @@ The append review (`s3-r28-append-review.md`, CORRECTED) and its editor left O1 
   - The archive's copy predated S3-R28 and f1c's review. Snapshot 2 follows now, locally.
 - **Run 11's order** is now `verify.sh --quick` on HEAD, then the record amended on its own commit, then the re-read for the C2 ruling, then step 2.
 - **The orchestrator's own report to the owner at 15:28 was also imprecise** on correct #1 ("arrives while the engine is checking free space"). The owner is told the corrected effect.
+
+## N30 (16:15): run 12's order, while the owner's C2 ruling is pending
+
+- **Run 11** (`wf_e1cbc5ed-f72`) returned at 16:12 at its working budget, with context 85 % full at 15:57.
+  - It made 5 commits, to `247e85b`: step 1 (item 2) test-only; the known-miss and known-risk records, amended to N29; and `verify.sh --quick` PASS on HEAD and on `9aa337c`.
+  - The workflow then started both verifiers. The orchestrator stopped it at 16:13 (item 8's point 5: a HEAD with known-open blocking items is not verified). No lock or process was left, the simulators were shut down, and the worktree was clean.
+- **Run 12's order** (appended as "S3-R28, order for run 12"):
+  - first, S3-R27 step 7's work outside the purge code: the e1 kills, the d4 survivors with the default-tuning probe, and reqs #8's guard;
+  - then the records that no C2 route changes;
+  - then the C2 work, as the owner rules, or, without a ruling, as item 1c's amended point 5.3 says.
+
+  The three unreached purge lines wait for the C2 ruling.
+- **The fixer reads narrowly** (S3-R28 and the draft's cycle-23 section), because run 11 spent most of its context on reading.
+
+## N31 (16:47): the owner's close ruling, option (e)
+
+- **The owner's answers** (about 16:40, to the orchestrator's question form after the options at 16:33):
+  - to "Which way do you want to end WP-F?": "(e) Short close". Its description: "Merge what's on wp/s3f, add the long-purge log line, and run one short independent verification." The message with it said: "Under (e), I'd record any new finding from the verification rather than fix it. Anything that breaks a MUST or hangs would come to you first."
+  - to the red purge benchmarks: "Accept the FAIL" ("The tests stay as written and red, and the misses are reported with their figures. G3 stays intact").
+  - to the ENOSPC class: "Yes, the whole class" ("A different answer between the two visit orders, caused by an event inside the disk-full window, is recorded, not fixed. Broken MUSTs, hangs and flaky tests there still block"). N29's T20 definition applies.
+  - to pushes: "Archive and feature branch", which means pushing `archive/build-orchestrator` snapshots and `feature/asset-kit` as they change, never `main` and never force.
+- **Run 12 was stopped at 16:41** (`wf_ee08701d-249`) at `9e9a500`, after 7 commits from `247e85b`: reqs #8's guard, an e1-P1 kill and five d4-survivor kill tests. Its worktree was clean. No process, lock or booted simulator of set 1 was left. Watcher `bz02zu459` was stopped too.
+- **The close ruling** is drafted as `s3-r28-close-e.md` ("S3-R28, the owner's close ruling"). Two independent checks of it run before it is appended (`wf_1c475778-94c`): fidelity to the owner's answers, and consistency as the fixer and verifiers will read it. Run 13 starts after the append.
+- **Persistence:** snapshot 3 of the archive is made now and pushed, with `feature/asset-kit`.

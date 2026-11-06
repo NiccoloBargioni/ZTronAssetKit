@@ -1,0 +1,92 @@
+== HEAD dcee1cd 01:52:39
+== quick 01:52:39 { 2.66 2.45 2.62 }
+quick exit 0 01:56:40 { 7.97 9.01 5.82 }
+✔ Test run with 151 tests in 16 suites passed after 0.513 seconds.
+✔ Test run with 474 tests in 53 suites passed after 50.075 seconds.
+✔ Test run with 459 tests in 60 suites passed after 66.026 seconds.
+✔ Test run with 84 tests in 18 suites passed after 60.755 seconds.
+✔ Test run with 85 tests in 11 suites passed after 2.305 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.335 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.390 seconds.
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+== HEAD dcee1cd status: 
+== coverage 01:56:40
+cov exit 0
+COVERAGE target=ZTronAssetSync           lines= 93.33% (10069/10789) min=90.0 OK
+COVERAGE overall lines=96.31% (26578/27597) min=80.0 OK
+COVERAGE: PASS
+== sync 1 01:56:41 { 7.97 9.01 5.82 }
+sync 1 exit 0 01:58:24
+✔ Test run with 474 tests in 53 suites passed after 49.407 seconds.
+== sync 2 01:58:24 { 9.56 10.27 6.74 }
+sync 2 exit 0 01:59:15
+✔ Test run with 474 tests in 53 suites passed after 48.578 seconds.
+== sync 3 01:59:15 { 7.26 9.64 6.72 }
+sync 3 exit 0 02:00:07
+✔ Test run with 474 tests in 53 suites passed after 49.321 seconds.
+== release 02:00:07 { 7.70 9.69 6.92 }
+release exit 0 02:00:37
+Build complete! (29,54 s)
+0
+== gates 02:00:37
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+gates exit 0
+== done 02:00:37 { 7.12 9.31 6.88 }
+== tsan build 02:00:37 { 7.12 9.31 6.88 } HEAD dcee1cd
+build exit 0 02:01:17
+Build complete! (38,81 s)
+tsan exit 0 02:06:05 { 3.07 8.19 7.65 }
+✔ Test run with 474 tests in 53 suites passed after 249.427 seconds.
+.build-s3f/c12-tsan.sh: line 17: 53155 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+tsan warnings 0 timelimits 0
+S3-R12 load from 60 s: mean 7.80 min 3.07 max 18.53 over 46 samples
+HEAD dcee1cd
+== ios build 02:06:05 { 3.07 8.19 7.65 }
+ios build exit 0 02:06:14
+2026-10-31 02:06:09.716 xcodebuild[54639:23646751] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+== sim 02:06:14 { 2.97 8.00 7.59 }
+boot exit 0
+sim exit 0 02:10:49 { 24.34 58.16 35.88 }
+Test Suite 'All tests' passed at 2026-10-31 02:10:46.312.
+Test Suite 'All tests' passed at 2026-10-31 02:10:47.653.
+** TEST SUCCEEDED **
+bundle .build-s3f/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.10.31_02-06-20-+0100.xcresult
+      "failedTests" : 0,
+      "passedTests" : 2790,
+      "skippedTests" : 0,
+  "failedTests" : 0,
+  "passedTests" : 1428,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "totalTestCount" : 1428
+shutdown exit 0
+== ios done 02:10:54
+== prebuild 02:10:54 { 53.94 63.74 37.98 } HEAD dcee1cd
+prebuild exit 0 02:13:22
+Build complete! (147,60 s)
+== bench 02:13:22 { 11.96 41.55 33.04 }
+bench exit 1 02:19:14 { 3.60 15.45 23.19 }
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" failed after 2.307 seconds with 1 issue.
+✘ Suite "StorageBenchmarks" failed after 9.036 seconds with 1 issue.
+◇ Suite "SyncBenchmarks" started.
+✔ Suite "SyncBenchmarks" passed after 86.552 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 222.600 seconds with 1 issue.
+✘ Test run with 44 tests in 8 suites failed after 222.600 seconds with 1 issue.
+.build-s3f/c12-bench.sh: line 18: 56798 Terminated: 15          ( while true; do
+    echo "$(date +%s) $(date +%H:%M:%S) $(sysctl -n vm.loadavg)" >> $S; sleep 5;
+done )
+bench load: mean 5.42 min 2.95 max 11.96 over 71 samples
+HEAD dcee1cd; // swift-tools-version: 6.4
+debug exit 0 warnings 0 errors 0
+Build complete! (45,63 s)
+release exit 0 warnings 0
+Build complete! (29,09 s)
+swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+== all done 02:20:31

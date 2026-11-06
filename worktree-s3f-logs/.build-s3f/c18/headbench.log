@@ -1,0 +1,121 @@
+Building for production...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[119 / 265]
+[120 / 266] ZTronAssetModel
+[131 / 304]
+[139 / 304]
+[141 / 304]
+[145 / 304]
+[148 / 304]
+[154 / 304]
+[155 / 304]
+[156 / 304]
+[157 / 304]
+[159 / 304] ZTronAssetModel
+[168 / 307] ZTronAssetTransport
+[178 / 316]
+[180 / 316] ZTronAssetAppleHosted
+[186 / 316] ZTronAssetTransport
+[192 / 316] ZTronAssetStorage
+[200 / 318] ZTronAssetTestSupport
+[204 / 320] ZTronAssetTestSupport
+[222 / 324] ZTronAssetTransportTests-product
+[227 / 330]
+[232 / 330] ZTronAssetSync
+[242 / 332] ZTronAssetKit
+[244 / 333] ZTronAssetSyncTests-product
+[246 / 334] ZTronAssetKit
+[260 / 336] ZTronAssetKit-product
+[262 / 337] ZTronAssetKitBenchmarks-product
+[267 / 340] ZTronAssetKit-product
+[270 / 340] ZTronAssetAppleHostedTests-product
+[274 / 340] ZTronAssetAppleHostedTests-product
+[277 / 340] ZTronAssetTransportTests-product
+[282 / 340] ZTronAssetTransportTests-product
+[284 / 340] ZTronAssetTransportTests-product
+[286 / 340] ZTronAssetModelTests-product
+[291 / 340] ZTronAssetModelTests-product
+[293 / 340] ZTronAssetModelTests-product
+[295 / 340] ZTronAssetCompatibilityTests-product
+[300 / 340] ZTronAssetCompatibilityTests-product
+[302 / 340] ZTronAssetCompatibilityTests-product
+[304 / 340] ZTronAssetKitTests-product
+[309 / 340] ZTronAssetKitTests-product
+[311 / 340] ZTronAssetKitTests-product
+[313 / 340] ZTronAssetKitBenchmarks-product
+[318 / 340] ZTronAssetKitBenchmarks-product
+[320 / 340] ZTronAssetKitBenchmarks-product
+[322 / 340] ZTronAssetStorageTests-product
+[327 / 340] ZTronAssetStorageTests-product
+[329 / 340] ZTronAssetStorageTests-product
+[331 / 340] ZTronAssetSyncTests-product
+[336 / 340] ZTronAssetSyncTests-product
+[338 / 340] ZTronAssetSyncTests-product
+Build complete! (160,37 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose attempt ends in a 404 hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, a 404 whose verdict waits: longest actor wait [393.914125, 394.760833, 394.207] ms, best 393.914125 ms; longest held turn [0.0, 0.0, 0.0] ms (budget 10.0 ms best); runs [wait 393.914125 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits true; 0 held turns, longest 0.0 ms, median 0.0 ms, wait 394.760833 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits true; 0 held turns, longest 0.0 ms, median 0.0 ms, wait 394.207 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits true; 0 held turns, longest 0.0 ms, median 0.0 ms]
+✘ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose attempt ends in a 404 hold the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:675:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ a 404 whose verdict waits: [393.914125, 394.760833, 394.207]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 393.914125
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose attempt ends in a 404 hold the engine's actor at most C2's 10 ms per turn" failed after 4.059 seconds with 1 issue.
+↳ /// C2 of 10,000 ids converging on one content while a follow is owed, when that content's attempt ends in a 404
+↳ /// whose verdict waits (Stage 3 close-out cycle 18, ruling S3-R20; the cycle-17 verifiers'
+↳ /// VERIFY-C17R-CONC-404): the moves of the interests a visit-first engine's visits had already moved onto the
+↳ /// job (`bringInbound`) and the follow's turns after them (`SyncBench.concentration`). The heartbeat's longest
+↳ /// wait from the 404's release until the job holds every id, the follow's held turns released one at a time;
+↳ /// the best of three against C2, after a warm-up.
+◇ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose publication begins hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, a publication: longest actor wait [403.528542, 400.948125, 405.381292] ms, best 400.948125 ms; longest held turn [0.0, 0.0, 0.0] ms (budget 10.0 ms best); runs [wait 403.528542 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits false; 0 held turns, longest 0.0 ms, median 0.0 ms, wait 400.948125 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits false; 0 held turns, longest 0.0 ms, median 0.0 ms, wait 405.381292 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits false; 0 held turns, longest 0.0 ms, median 0.0 ms]
+✘ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose publication begins hold the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:675:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ a publication: [403.528542, 400.948125, 405.381292]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 400.948125
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: 10,000 ids an owed follow moves onto one content whose publication begins hold the engine's actor at most C2's 10 ms per turn" failed after 5.561 seconds with 1 issue.
+↳ /// As `concentrationNotFoundTurns`, when the content's download completes and its publication begins (held at
+↳ /// its first store unit): the heartbeat's longest wait runs from the release until the publication reaches the
+↳ /// store, so it covers the publication's own turns and the moves its binding waits for.
+◇ Test "R-SYN-11: an owed follow's own turns moving 10,000 ids onto one content hold the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 10,000 ids converging on one content during an owed follow, no ending: longest actor wait [17.492042, 17.561958, 17.498542] ms, best 17.492042 ms; longest held turn [17.487292, 17.557209, 17.494417] ms (budget 10.0 ms best); runs [wait 17.492042 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits false; 39 held turns, longest 17.487292 ms, median 9.824291 ms, wait 17.561958 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits false; 39 held turns, longest 17.557209 ms, median 9.926209 ms, wait 17.498542 ms; 9745 jobs, follow owed true, O ids 10001, verdict waits false; 39 held turns, longest 17.494417 ms, median 9.860416 ms]
+✘ Test "R-SYN-11: an owed follow's own turns moving 10,000 ids onto one content hold the engine's actor at most C2's 10 ms per turn" recorded an issue at BenchSync.swift:675:13: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+↳ no ending: [17.492042, 17.561958, 17.498542]
+↳ (waits.min() ?? .infinity) <= Self.c2Budget → false
+↳   (waits.min() ?? .infinity) → 17.492042
+↳   Self.c2Budget → 10.0
+✘ Test "R-SYN-11: an owed follow's own turns moving 10,000 ids onto one content hold the engine's actor at most C2's 10 ms per turn" failed after 4.102 seconds with 1 issue.
+↳ /// As `concentrationNotFoundTurns`, while the content keeps downloading: the follow's own visits move the 10,000
+↳ /// ids, each join onto the one job that grows to hold them (S3-R21 item 1, the cycle-17 verifiers'
+↳ /// VERIFY-C17R-CONC-FOLLOW). Each held turn is also timed inside the actor.
+✘ Suite "SyncBenchmarks" failed after 13.724 seconds with 3 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+✘ Suite ZTronAssetKitBenchmarks failed after 13.724 seconds with 3 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 3 tests in 2 suites failed after 13.724 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+EXIT 1
+ 5:25  up 6 days, 17:48, 3 users, load averages: 10.83 7.70 7.17

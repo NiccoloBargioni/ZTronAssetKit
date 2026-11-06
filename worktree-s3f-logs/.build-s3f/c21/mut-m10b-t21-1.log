@@ -1,0 +1,132 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 12] ZTronAssetSync
+[2 / 44] ZTronAssetModel
+[11 / 53] ZTronAssetModel
+[12 / 53] ZTronAssetModel
+[17 / 61] ZTronAssetTransport
+[25 / 88] ZTronAssetStorage
+[27 / 88] ZTronAssetAppleHosted
+[36 / 92] ZTronAssetStorage
+[40 / 92] ZTronAssetStorage
+[41 / 92] ZTronAssetStorage
+[44 / 94] ZTronAssetStorage
+[49 / 98] ZTronAssetTestSupport
+[49 / 98] ZTronAssetAppleHosted
+[55 / 107] ZTronAssetTestSupport
+[61 / 116] ZTronAssetTestSupport
+[63 / 116] ZTronAssetTestSupport
+[64 / 116] ZTronAssetTestSupport
+[67 / 118] ZTronAssetTestSupport
+[76 / 126] ZTronAssetStorage
+[78 / 126] ZTronAssetSync
+[83 / 129] ZTronAssetKit
+[85 / 129] ZTronAssetAppleHosted
+[87 / 138] ZTronAssetKit
+[91 / 148] ZTronAssetKit
+[96 / 150] ZTronAssetKit
+[102 / 150] ZTronAssetTransport
+[108 / 150] ZTronAssetModelTests-product
+[112 / 150] ZTronAssetKit
+[112 / 151] ZTronAssetTransportTests-product
+[118 / 177] ZTronAssetAppleHostedTests-product
+[119 / 186] ZTronAssetStorageTests-product
+[120 / 186] ZTronAssetAppleHostedTests-product
+[123 / 186] ZTronAssetTransportTests-product
+[124 / 186] ZTronAssetTransportTests-product
+[125 / 186] ZTronAssetTransportTests-product
+[130 / 187] ZTronAssetTransportTests-product
+[131 / 187] ZTronAssetTransportTests-product
+[133 / 189] ZTronAssetStorageTests-product
+[134 / 189] ZTronAssetStorageTests-product
+[134 / 189] ZTronAssetTransportTests-product
+[136 / 189] ZTronAssetTransportTests-product
+[138 / 189] ZTronAssetTransportTests-product
+[139 / 189] ZTronAssetModelTests-product
+[139 / 189] ZTronAssetTransportTests-product
+[141 / 189] ZTronAssetModelTests-product
+[141 / 189] ZTronAssetStorageTests-product
+[143 / 189] ZTronAssetModelTests-product
+[144 / 189] ZTronAssetModelTests-product
+[145 / 189] ZTronAssetModelTests-product
+[146 / 189] ZTronAssetModelTests-product
+[146 / 189] ZTronAssetStorageTests-product
+[148 / 189] ZTronAssetAppleHostedTests-product
+[149 / 189] ZTronAssetAppleHostedTests-product
+[150 / 189] ZTronAssetAppleHostedTests-product
+[151 / 189] ZTronAssetAppleHostedTests-product
+[152 / 189] ZTronAssetAppleHostedTests-product
+[153 / 189] ZTronAssetAppleHostedTests-product
+[154 / 189]
+[156 / 190] ZTronAssetModelTests-product
+[161 / 192] ZTronAssetModelTests-product
+[167 / 194] ZTronAssetKitTests-product
+[169 / 194] ZTronAssetModelTests-product
+[174 / 212] ZTronAssetKitBenchmarks-product
+[176 / 230] ZTronAssetSyncTests-product
+[177 / 230] ZTronAssetSyncTests-product
+[179 / 230] ZTronAssetSyncTests-product
+[180 / 230] ZTronAssetKitTests-product
+[183 / 230] ZTronAssetSyncTests-product
+[184 / 230] ZTronAssetSyncTests-product
+[185 / 230] ZTronAssetSyncTests-product
+[188 / 233] ZTronAssetSyncTests-product
+[191 / 233] ZTronAssetStorageTests-product
+[194 / 234] ZTronAssetStorageTests-product
+[195 / 234] ZTronAssetKitTests-product
+[196 / 234] ZTronAssetModelTests-product
+[198 / 236] ZTronAssetKitTests-product
+[200 / 236] ZTronAssetKitTests-product
+[202 / 237] ZTronAssetKitTests-product
+[203 / 237] ZTronAssetKitTests-product
+[205 / 239] ZTronAssetKitBenchmarks-product
+[208 / 240] ZTronAssetSyncTests-product
+[210 / 240] ZTronAssetKitBenchmarks-product
+[212 / 242] ZTronAssetCompatibilityTests-product
+[216 / 243] ZTronAssetCompatibilityTests-product
+[218 / 243] ZTronAssetCompatibilityTests-product
+[220 / 243] ZTronAssetCompatibilityTests-product
+[222 / 243] ZTronAssetKitTests-product
+[226 / 245] ZTronAssetAppleHostedTests-product
+[229 / 245] ZTronAssetAppleHostedTests-product
+[233 / 249] ZTronAssetStorageTests-product
+[236 / 249] ZTronAssetModelTests-product
+[240 / 250] ZTronAssetAppleHostedTests-product
+[240 / 250] ZTronAssetCompatibilityTests-product
+[240 / 250] ZTronAssetSyncTests-product
+[244 / 250] ZTronAssetCompatibilityTests-product
+[248 / 253] ZTronAssetSyncTests-product
+[248 / 252] ZTronAssetKitBenchmarks-product
+[250 / 252] ZTronAssetKitBenchmarks-product
+Build complete! (32,85 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+SWIFT TASK CONTINUATION MISUSE: ensureTask(_:scope:) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:160:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:192:13: Expectation failed: released
+↳ the resumed ensure released its group
+↳ released → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+SWIFT TASK CONTINUATION MISUSE: ensureTask(_:scope:) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:160:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:192:13: Expectation failed: released
+↳ the resumed ensure released its group
+↳ released → <not evaluated>
+✘ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" with 2 test cases failed after 128.003 seconds with 4 issues.
+↳ /// An `ensureAvailable` group waits for zz-e1 (committed) and zz-e2 (E2, held downloading); v3 drops zz-e2 from the
+↳ /// manifest (T21). The follow's visit of E2 drops the member from the group (`reroute`, `dropGroupMember`), which
+↳ /// settles the group and resumes the ensure, with the same answer in both orders. The group is read once the follow
+↳ /// and its drain are over, so a member left pending fails at once; a caller left suspended keeps its group, and the
+↳ /// wait for its release ends at the time limit.
+✘ Suite "Engine follow barrier (F-28)" failed after 128.003 seconds with 4 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 128.003 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

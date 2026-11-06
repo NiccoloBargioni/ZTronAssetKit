@@ -1,0 +1,42 @@
+Building for debugging...
+[Computing dependencies]
+[1 / 14] ZTronAssetSyncTests-product
+[2 / 21] ZTronAssetSync
+[5 / 24] ZTronAssetSync
+[8 / 28] ZTronAssetSync
+[15 / 20] ZTronAssetCompatibilityTests-product
+[23 / 25] ZTronAssetSyncTests-product
+Build complete! (1,57 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" started.
+✔ Test "R-SYN-7: an ensureAvailable member that leaves the manifest while it downloads is dropped, and the ensure answers (T21, step C10)" with 2 test cases passed after 0.772 seconds.
+◇ Test "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+✘ Test "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:216:9: Expectation failed: outcome.completeReport?.fetched == 0 && outcome.completeReport?.failures.isEmpty == true
+↳ the run settles with nothing fetched and no failure: .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 1, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4200, unchangedCount: 1, fetchBytes: 16, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-r, error: ZTronAssetModel.AssetError.cancelled, failureClass: ZTronAssetModel.FailureClass.transient)]))
+↳ outcome.completeReport?.fetched == 0 && outcome.completeReport?.failures.isEmpty == true → false
+↳   outcome.completeReport?.fetched == 0 → false
+↳   outcome.completeReport?.failures.isEmpty == true → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" started.
+✘ Test "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:216:9: Expectation failed: outcome.completeReport?.fetched == 0 && outcome.completeReport?.failures.isEmpty == true
+↳ the run settles with nothing fetched and no failure: .completeWithFailures(ZTronAssetModel.SyncReport(runID: run-2, trigger: ZTronAssetModel.SyncTrigger.explicit, startedAt: 2023-11-14 22:13:20 +0000, finishedAt: 2023-11-14 22:13:20 +0000, manifestFresh: true, planned: ZTronAssetModel.PlanTotals(fetchCount: 1, fetchUnknownSizeCount: 0, relocationCount: 0, reuseCount: 0, pruneCount: 0, skippedCount: 4200, unchangedCount: 1, fetchBytes: 16, pruneBytes: 0), fetched: 0, reused: 0, relocated: 0, pruned: 0, evicted: 0, failedCount: 1, bytesDownloaded: 0, failures: [ZTronAssetModel.AssetFailure(id: zz-r, error: ZTronAssetModel.AssetError.cancelled, failureClass: ZTronAssetModel.FailureClass.transient)]))
+↳ outcome.completeReport?.fetched == 0 && outcome.completeReport?.failures.isEmpty == true → false
+↳   outcome.completeReport?.fetched == 0 → false
+↳   outcome.completeReport?.failures.isEmpty == true → <not evaluated>
+✘ Test "R-SYN-11: a run's claim on an asset that leaves the manifest while it downloads is released, and the run settles (T21, step C11)" with 2 test cases failed after 0.777 seconds with 2 issues.
+↳ /// A forced sync's run fetches zz-r (R, held downloading); v3 drops zz-r from the manifest (T21). The follow's visit of
+↳ /// R releases the run's claim (`reroute`, `releaseRunClaim`), so the run settles at once with the same report in
+↳ /// both orders; a claim left on R would wait for a job that no longer reports to the run (step C11).
+✘ Suite "Engine follow barrier (F-28)" failed after 1.550 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 1.550 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

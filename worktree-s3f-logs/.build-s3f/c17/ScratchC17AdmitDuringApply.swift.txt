@@ -1,0 +1,56 @@
+import Foundation
+import Testing
+import ZTronAssetModel
+import ZTronAssetStorage
+@testable import ZTronAssetSync
+import ZTronAssetTestSupport
+
+/// Scratch probe (not committed): PROBE-C17-ADMIT-DURING-APPLY. A waiter for zz-u is admitted from a fetched manifest
+/// that lists it while an apply of a manifest that does not list it is in flight; the apply's follow then visits the
+/// waiter's job. Visit-first order only (no barrier is involved).
+extension EngineFollowBarrierTests {
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("scratch: PROBE-C17-ADMIT-DURING-APPLY", .timeLimit(.minutes(3)))
+    func scratchAdmitDuringApply() async throws {
+        let seed: UInt64 = 1_618_202
+        let (s, _) = try await FollowBarrier.setUp(seed: seed, tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = s.engine
+        let xBytes = EngineFixture.bytes(seed + 3, count: 100_000)
+        let x = EngineHarness.onDemand("zz-x", xBytes)
+        let u = EngineHarness.onDemand("zz-u", xBytes)
+        try #require(x.transferID == u.transferID)
+        await s.harness.serveManifest([s.q] + FollowBarrier.fillers(seed + 100) + [x], etag: "v2")
+        _ = try #require(await engine.sync(.force).completeReport)
+        await engine.awaitCondition { $0.state.manifestCatchUps == 0 && !$0.state.storeWorkInFlight }
+        try await s.harness.store.flush(.ordered)
+        await engine.awaitCondition { $0.state.storeDeadline == nil && !$0.state.storeWorkInFlight }
+        await s.harness.source.script(x.transferID, [.hold, .stage(xBytes)])
+        let xWaiter = Task { await engine.awaitAsset(x.identifier, lane: .userInitiated) }
+        await EngineRegressionCycle6Tests.driving([s.time], fence: engine) {
+            await engine.awaitCondition { $0.state.conditions != nil && $0.state.jobs[x.transferID]?.state == .downloading }
+        }
+        // v4 does not list zz-u; the store applies it and the engine's side waits.
+        let v4 = [s.q] + FollowBarrier.fillers(seed + 100) + [x]
+        let manifest = try ValidatedManifest(entries: v4, digest: ContentHash.sha256(of: Data("v4-admit-during-apply-\(seed)".utf8)))
+        await engine.holdNextApplyFollow()
+        let applying = Task { await engine.applyAndFollow(manifest, etag: nil, eviction: nil) }
+        await engine.awaitCondition { $0.applyFollowHeld && $0.state.appliesInFlight == 1 }
+        // U's fetch returns a newer manifest that lists zz-u at X's content.
+        await s.harness.serveManifest(v4 + [u], etag: "v5")
+        let uWaiter = Task { await engine.awaitAsset(u.identifier, lane: .userInitiated) }
+        await engine.awaitCondition { $0.state.jobs[x.transferID]?.assets.contains(u.identifier) == true }
+        await engine.releaseApplyFollow()
+        _ = await applying.value
+        await engine.awaitCondition { !$0.followBarrier && $0.state.manifestCatchUps == 0 && !$0.state.catchUpAfterFailedApply }
+        let after = await engine.readForTests { e in
+            (xHoldsU: e.state.jobs[x.transferID]?.assets.contains(u.identifier) == true, copyListsU: e.state.applied.entry(for: u.identifier) != nil)
+        }
+        let storeListsU = try await s.harness.view().appliedManifest.entry(for: u.identifier) != nil
+        await s.harness.source.release(x.transferID, with: .progress(received: 0, expected: nil))
+        let uResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await uWaiter.value }
+        let xResult = await EngineRegressionCycle6Tests.driving([s.time], fence: engine) { await xWaiter.value }
+        print("PROBE-C17-ADMIT-DURING-APPLY after v4's follow and the catch-up: \(after), storeListsU: \(storeListsU); U: \(uResult); X: \(xResult)")
+        #expect((try? uResult.get())?.byteSize == Int64(xBytes.count), "U: \(uResult)")
+        await Self.finishHeld(s)
+    }
+}

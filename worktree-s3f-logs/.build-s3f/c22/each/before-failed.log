@@ -1,0 +1,11 @@
+^D◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: a 404 that fails 10,000 user waiters with one stalled subscriber holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 commitFailedArmTurns at 10,000: heartbeat [9.776666, 9.099666, 9.125167] ms, best 9.099666 ms (budget 10.0 ms best); the resolution's own turn [9.765916, 9.0935, 9.120125] ms, best 9.0935 ms; runs [heartbeat 9.78 ms, turn 9.77 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 6.88 7.90 6.32 -> 6.88 7.90 6.32, heartbeat 9.10 ms, turn 9.09 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 6.88 7.90 6.32 -> 6.88 7.90 6.32, heartbeat 9.13 ms, turn 9.12 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 6.88 7.90 6.32 -> 6.88 7.90 6.32]
+✔ Test "R-SYN-11: a 404 that fails 10,000 user waiters with one stalled subscriber holds the engine's actor at most C2's 10 ms" passed after 0.797 seconds.
+✔ Suite "SyncBenchmarks" passed after 0.797 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 0.797 seconds.
+✔ Test run with 1 test in 2 suites passed after 0.797 seconds.

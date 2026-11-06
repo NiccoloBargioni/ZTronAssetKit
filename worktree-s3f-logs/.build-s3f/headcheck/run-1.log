@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" started.
+✘ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierApplyTests.swift:125:9: Expectation failed: order.f != nil && order.v != nil && order.f! < order.v!
+↳ F′, created by the older pass's last find, starts before V′, created by the later follow's visit of V (visit-first): (f: Optional(5), v: Optional(4))
+↳ order.f != nil && order.v != nil && order.f! < order.v! → false
+↳   order.f != nil && order.v != nil → true
+↳   order.f! < order.v! → false
+✘ Test "R-SYN-3: a later apply during an owed pass visits the jobs it carries after that pass's finds (F-28)" with 2 test cases failed after 0.677 seconds with 1 issue.
+↳ /// A job a follow passed while it verified waits, at a later apply, for the older pass that is still owed: V (100 KB,
+↳ /// the content of a-v and a-w, one user waiter each) verifies, its publication held at its first store unit, when v3
+↳ /// moves a-v and zz-f (F, downloading for a user waiter). a-v sorts before the 2,100 changed fillers, zz-f after them,
+↳ /// so the follow's first turn passes V (verifying, it stays unfollowed) and its pass stops before zz-f. V's
+↳ /// publication then fails with an I/O error (a retry), and v4 (one more filler changed) is applied. Visited first, the
+↳ /// older follow ended with F's visit, which created F′, and v4's follow visited V and created V′ after it. With the
+↳ /// older pass owed, v4's follow put V ahead of that pass's remaining finds, so V′ was created, and started, before F′
+↳ /// (the cycle-10 draft's analysis of amendment (e) with an incomplete old pass).
+✘ Suite "Engine follow barrier (F-28)" failed after 0.677 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.677 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

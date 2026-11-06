@@ -1,0 +1,84 @@
+::: RUN 1
+Building for debugging...
+[Computing dependencies]
+[2 / 21] ZTronAssetSync
+[4 / 23] ZTronAssetSync
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/Sources/ZTronAssetSync/Engine/EngineJobs.swift:649:29: [1;33mwarning: [1;39mimmutable value 'locations' was never used; consider replacing with '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+ [0;36m647 |[0;0m         let keys = self.state.subscribers.keys.sorted()
+ [0;36m648 |[0;0m         switch outcome {
+ [0;36m649 |[0;0m         case .committed(let locations, let ascending):
+     [0;36m|[0;0m                             `- [1;33mwarning: [1;39mimmutable value 'locations' was never used; consider replacing with '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+ [0;36m650 |[0;0m             for asset in ascending where job.assets.contains(asset) {
+ [0;36m651 |[0;0m                 self.broadcast(.assetAvailable(asset, generation: self.state.generation), to: keys)
+
+[#NoUsage]: <https://docs.swift.org/compiler/documentation/diagnostics/no-usage>
+[9 / 27] ZTronAssetSync
+[14 / 19] ZTronAssetKitTests-product
+[22 / 24] ZTronAssetSyncTests-product
+Build complete! (1,45 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+✘ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:65:9: Expectation failed: announced == bound
+↳ X's commit announces the seven ids the store bound, ascending: [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳ announced == bound → false
+↳   announced → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳   bound → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o6, zz-o7, zz-o8]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+✘ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:65:9: Expectation failed: announced == bound
+↳ X's commit announces the seven ids the store bound, ascending: [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳ announced == bound → false
+↳   announced → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳   bound → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o6, zz-o7, zz-o8]
+✘ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" with 2 test cases failed after 0.855 seconds with 2 issues.
+↳ /// Eight ids share X's content and each has a user waiter; X's publication is held at its first store unit while
+↳ /// v4 maps zz-o5 to Y's content, so the store, which holds v4 when the publication ends, binds the other seven
+↳ /// (`stillBound`), and zz-o5's waiter follows its new content. The commit announces exactly the seven ids it bound,
+↳ /// in ascending order, read from a subscriber that reads nothing.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.855 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.855 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 1 exit 1
+::: RUN 2
+Building for debugging...
+[Computing dependencies]
+Build complete! (0,38 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+✘ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineCommitWindowTests.swift:65:9: Expectation failed: announced == bound
+↳ X's commit announces the seven ids the store bound, ascending: [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳ announced == bound → false
+↳   announced → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳   bound → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o6, zz-o7, zz-o8]
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" started.
+✘ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineCommitWindowTests.swift:65:9: Expectation failed: announced == bound
+↳ X's commit announces the seven ids the store bound, ascending: [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳ announced == bound → false
+↳   announced → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o5, zz-o6, zz-o7, zz-o8]
+↳   bound → [zz-o1, zz-o2, zz-o3, zz-o4, zz-o6, zz-o7, zz-o8]
+✘ Test "R-SYN-12: a commit announces exactly the ids the store bound, in ascending order (step C3)" with 2 test cases failed after 0.856 seconds with 2 issues.
+↳ /// Eight ids share X's content and each has a user waiter; X's publication is held at its first store unit while
+↳ /// v4 maps zz-o5 to Y's content, so the store, which holds v4 when the publication ends, binds the other seven
+↳ /// (`stillBound`), and zz-o5's waiter follows its new content. The commit announces exactly the seven ids it bound,
+↳ /// in ascending order, read from a subscriber that reads nothing.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.856 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.856 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
+::: RUN 2 exit 1

@@ -1,0 +1,140 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:290:25: Issue recorded
+↳ the origin is throttled right after the 429 (visit-first): nil against (throttle: Optional(0.838288067), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" with 2 test cases failed after 0.612 seconds with 1 issue.
+↳ /// A 429 without Retry-After that arrives while the follow owes a visit throttles the origin for the backoff of the
+↳ /// lane the visit leaves its job: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter);
+↳ /// v3 moves zz-a while the follow owes C's visit. C gets a 429 without Retry-After. Visited first, C is prefetch work,
+↳ /// so the throttle is the background policy's first backoff; decided before the visit, it was the interactive
+↳ /// policy's (PROBE-C10-THROTTLE-LANE).
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:56:9: Expectation failed: requestsAfter == requestsBefore
+↳ the throttled origin gets no manifest request (visit-first): 3 -> 4
+↳ requestsAfter == requestsBefore → false
+↳   requestsAfter → 4
+↳   requestsBefore → 3
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:59:25: Issue recorded
+↳ the caller gets the throttle's answer (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin when it arrives, so a manifest fetch after it is refused (F-28)" with 2 test cases failed after 0.619 seconds with 2 issues.
+↳ /// A 429 without Retry-After that arrives while the follow owes a visit throttles the origin at once, so a manifest
+↳ /// fetch made right after it is refused: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch
+↳ /// waiter); v3 moves zz-a while the follow owes C's visit. C gets a 429 without Retry-After; then a user asks for an id
+↳ /// no manifest lists (zz-none), which needs a manifest fetch. Visited first, the 429 throttled the origin for the
+↳ /// backoff of C's followed lane and the fetch was refused without a request. With the throttle waiting for the drain,
+↳ /// the fetch went to the origin and the caller was answered `.notFound` (PROBE-C11-MANIFEST-THROTTLE).
+◇ Test "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" started.
+✘ Test "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:128:25: Issue recorded
+↳ U gets the throttle's fail-fast answer at its request (visit-first serverUnavailable(10)): success(ZTronAssetModel.AssetLocation(id: zz-t, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/76/76d8cd8e87edd239193d53d1c3709cab90278ac4d8e3cea1beefcfbc3efdd93d.png, fileExtension: png, byteSize: 1000000, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: a request during an owed follow is answered on the throttle in force at the request, not one that ended after it (F-28)" with 2 test cases failed after 0.615 seconds with 1 issue.
+↳ /// A request's join that waits for the follow reads the throttle in force at the request, not a throttle's end that
+↳ /// came after it: T (1 MB, zz-t) runs for a prefetch waiter P. Between v3's fetch and its apply, T gets a 429 with
+↳ /// Retry-After 10 s (T throttle-parked, nobody answered). U's user request for zz-t arrives; then 11 s pass, so the
+↳ /// throttle ends. Visited first, U joined T under the 10 s throttle, beyond the user bound, and was answered
+↳ /// `serverUnavailable(10)`. Replayed after the throttle's end, the join found no throttle, T was re-admitted and U
+↳ /// was served (PROBE-C11-JOIN-THROTTLE-END).
+◇ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" started.
+✘ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:195:13: Expectation failed: abs(retryAfter - 300) < 0.5
+↳ U gets the extension's answer at E's 429 (visit-first 300 s): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(301.5)))
+↳ abs(retryAfter - 300) < 0.5 → false
+↳   abs(retryAfter - 300) → 1.5
+✘ Test "R-SYN-11: a request during an owed follow is answered by a later throttle extension's turn, with its wait (F-28)" with 2 test cases failed after 0.613 seconds with 1 issue.
+↳ /// A request's join that waits for the follow reads the throttle in force at the request, not a later 429's
+↳ /// extension, which answers it in its own turn: T (1 MB, zz-t) runs for a prefetch waiter P; E (1 MB, zz-e) runs for
+↳ /// a user waiter. Between v3's fetch and its apply, T gets a 429 with Retry-After 2 s (T throttle-parked, nobody
+↳ /// answered). U's user request for zz-t arrives; 1.5 s later E gets a 429 with Retry-After 300 s. Visited first, U
+↳ /// joined T under the 2 s throttle (within the user bound: no answer), and the extension's fail-fast turn answered U
+↳ /// with 300 s. Replayed at the request's instant against the extended end, U's join was answered with 301.5 s
+↳ /// (PROBE-C11-JOIN-THROTTLE-EXT).
+◇ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" started.
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:257:9: Expectation failed: (try? aResult.get())?.byteSize == 16
+↳ A, moved to N, is served from N, not answered with C's throttle (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? aResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is admitted on the throttle in force at the apply (F-28)" with 2 test cases failed after 0.620 seconds with 1 issue.
+↳ /// The new content a follow's visit queues is admitted on the origin's gates as they stood at the apply, whatever a
+↳ /// 429 set while the visit was owed: C (1 MB) is the content of zz-a and zz-b, one user waiter each; v3 moves zz-a to
+↳ /// N (16 bytes, held once started) while the follow owes C's visit. C's attempt gets a 429 with Retry-After 60 s.
+↳ /// Visited first, the visit created N before the 429 and N started, so A is served from N and the throttle's
+↳ /// fail-fast answers B only. Admitted on the throttle the 429 set, N parked and A was answered
+↳ /// `serverUnavailable(60)` too (PROBE-C9-THROTTLE; R2 accepts the admission's latency, not a different answer).
+◇ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" started.
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:326:25: Issue recorded
+↳ U gets the throttle's fail-fast answer of the apply's instant (visit-first serverUnavailable(10)): success(ZTronAssetModel.AssetLocation(id: zz-u, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/1c/1c8bc5fee459cfcdc695e7e21c1c71c31b4d2dd0ae91204ed4066d44fe9ecaf9.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-11: the new content an owed follow's visit queues is gated on the throttle in force at the apply, though it ended since (F-28)" with 2 test cases failed after 0.613 seconds with 1 issue.
+↳ /// The new content a follow's visit queues is admitted on the throttle in force at the apply, also when that
+↳ /// throttle ended while the visit was owed: T (1 MB, zz-t) downloads for a prefetch member; D (1 MB, content W)
+↳ /// downloads for U's user waiter (zz-u). Between v3's fetch and its apply, T gets a 429 with Retry-After 10 s; v3
+↳ /// moves zz-u to N (16 bytes). Then 11 s pass, so the throttle ends. Visited first, D's visit created N at the apply
+↳ /// under the 10 s throttle: N parked and U was answered `serverUnavailable(10)`. Visited after the throttle's end, N
+↳ /// started and U was served from it (the cycle-11 residual R-D, "a visit reads inputs that arrived after it was
+↳ /// owed").
+◇ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" started.
+✘ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:382:9: Expectation failed: uState == .downloading
+↳ U's job, requested before the breaker opened, runs (visit-first): nil
+↳ uState == .downloading → false
+↳   uState → nil
+↳     some → .downloading
+✘ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:386:9: Expectation failed: (try? uResult.get())?.byteSize == Int64(uBytes.count)
+↳ U is served (visit-first): failure(ZTronAssetModel.AssetError.authRejected(ZTronAssetModel.AuthRejection.confirmed))
+↳ (try? uResult.get())?.byteSize == Int64(uBytes.count) → <not evaluated>
+✘ Test "R-SYN-5: a request during an owed follow is admitted on the breaker as it stood at the request (F-28)" with 2 test cases failed after 0.615 seconds with 2 issues.
+↳ /// A request's job that waits for the follow is admitted on the breaker as it stood at the request: X (100 kB, zz-x)
+↳ /// downloads for a user waiter, and one 403 opens the breaker. While the follow owes its visits, U requests zz-u, then
+↳ /// X's 403 opens the breaker. Visited first, U's job started at the request and U was served. Placed by the drain
+↳ /// and admitted on the breaker the 403 opened, U's job parked and U was answered `authRejected` (the cycle-11
+↳ /// residual R-B: the breaker's refusals are in the class, S3-R15 item 4).
+◇ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" started.
+✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:464:9: Expectation failed: nIndex != nil && wIndex != nil && nIndex! < wIndex!
+↳ N, queued by C's visit at the apply, starts before W (visit-first): n=Optional(4) w=Optional(3)
+↳ nIndex != nil && wIndex != nil && nIndex! < wIndex! → false
+↳   nIndex != nil && wIndex != nil → true
+↳   nIndex! < wIndex! → false
+✘ Test "R-SYN-3: a commit during an owed follow leaves its moved id's re-route to the follow's visit and place (F-28)" with 2 test cases failed after 0.628 seconds with 1 issue.
+↳ /// A commit that arrives while the follow owes the visit of its job's moved id leaves that id's re-route to the
+↳ /// visit, at the follow's place: two slots. C (1 MB, content X) downloads for A's user waiter (zz-a) and B's (zz-b);
+↳ /// H (100 kB) holds the other slot for a user waiter. v3 moves zz-a to N (16 bytes) while the follow owes C's visit.
+↳ /// W's user request (zz-w) then arrives, and C's bytes complete. Visited first, C's visit re-routed A to a new job N
+↳ /// at the apply, queued ahead of W; C's commit freed a slot and N started before W. Re-routed by the commit, A's join
+↳ /// waited behind W's, so W took the freed slot (PROBE-C11-COMMIT-PLACE).
+◇ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" started.
+✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierWorldTests.swift:523:9: Expectation failed: after.n == .downloading && after.r == .queued
+↳ N, created by C's visit before R's request, takes the slot C's commit frees (visit-first): (n: Optional(ZTronAssetSync.JobState.queued), r: Optional(ZTronAssetSync.JobState.downloading))
+↳ after.n == .downloading && after.r == .queued → false
+↳   after.n == .downloading → false
+↳   after.r == .queued → <not evaluated>
+✘ Test "R-SYN-2: the slot a commit frees during an owed follow goes to the job the follow's visit of its moved id creates (F-28)" with 2 test cases failed after 0.625 seconds with 1 issue.
+↳ /// The slot a commit frees while the follow owes the visit of its job's moved id goes to the job that visit
+↳ /// creates: two slots. C (100 kB, content X) downloads for A's user waiter (zz-a) and B's (zz-b); H downloads for a
+↳ /// third user waiter. v3 moves zz-a to N (16 bytes) while the follow owes C's visit. R (zz-r) is then requested for
+↳ /// user work, and C completes. Visited first, C's visit re-routed A to N before R's request, so N took its queue
+↳ /// place first and took the slot C's commit freed; R waited. Re-routed by the commit, A's join waited behind R's,
+↳ /// and R took the slot (PROBE-C11R-COMMIT-REROUTE).
+✘ Suite "Engine follow barrier (F-28)" failed after 5.565 seconds with 11 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 9 tests in 1 suite failed after 5.565 seconds with 11 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

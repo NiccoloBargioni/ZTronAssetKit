@@ -1,0 +1,163 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" started.
+✘ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:53:9: Expectation failed: pauses == 0
+↳ C, raised to the user lane by the owed visit, is not paused by Low Data Mode (visit-first): 1 pause(s)
+↳ pauses == 0 → false
+↳   pauses → 1
+✘ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:64:9: Expectation failed: starts == 1
+↳ C's one attempt, never paused, serves A (visit-first): 2 start(s)
+↳ starts == 1 → false
+↳   starts → 2
+✘ Test "R-SYN-7: Low Data Mode during an owed follow pauses no transfer the follow raises to user work (F-28)" with 2 test cases failed after 0.626 seconds with 2 issues.
+↳ /// Low Data Mode that arrives while the follow owes a visit pauses no transfer the visit raises to user work: C (1 MB,
+↳ /// content X) downloads for a prefetch member P (zz-p); D (content W) downloads for A's user waiter (zz-a). v3 moves
+↳ /// zz-a onto X while the follow owes D's visit; then Low Data Mode arrives. Visited first, D's visit moved A's user
+↳ /// interest onto C, which Low Data Mode does not pause, and C's one attempt serves A. Behind the barrier, C was paused
+↳ /// on its pre-visit prefetch lane and started again (PROBE-C10R-POLICY-PAUSE, PROBE-C10-PAUSE-LANE).
+◇ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" started.
+✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:135:9: Expectation failed: nSecond != nil && (wFirst == nil || nSecond! < wFirst!)
+↳ N, user work again once K's visit moved U2 onto it, resumes first in its queue, ahead of W (visit-first): n=nil w=Optional(3)
+↳ nSecond != nil && (wFirst == nil || nSecond! < wFirst!) → false
+↳   nSecond != nil → false
+↳   (wFirst == nil || nSecond! < wFirst!) → <not evaluated>
+✘ Test "R-SYN-7: a pause that ends during an owed follow resumes on the lane the follow leaves (F-28)" with 2 test cases failed after 0.190 seconds with 1 issue.
+↳ /// A pause that ends while the follow owes a visit is decided on the lane the visits leave: under Low Data Mode N
+↳ /// (content X) downloads for U1's user waiter (b-n1) and a prefetch member (zz-n2), H holds the other of two slots and
+↳ /// W's user request waits in the queue. v3 moves b-n1 away, moves zz-k (K, U2's user waiter, queued) onto X, and changes
+↳ /// 300 prefetch members' contents, so the follow visits N in its first turn and K in its second. N's visit lowers it to
+↳ /// the prefetch lane, which Low Data Mode refuses, so its attempt pauses. Visited first, K's visit raised N to user work
+↳ /// again before the pause ended, so N resumed first in the user queue, ahead of W. With the pause decided between the
+↳ /// two turns, N parked on its policy and K's visit re-queued it behind W.
+◇ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" started.
+✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:206:13: Expectation failed: deadline >= end
+↳ the throttle's alarm is never before the origin's end (D's 300 s): (deadline: Optional(61000000000ns), end: Optional(301000000000ns))
+↳ deadline >= end → false
+↳   deadline → 61000000000ns
+↳     nanoseconds → 61000000000
+↳   end → 301000000000ns
+↳     nanoseconds → 301000000000
+✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:213:13: Expectation failed: abs(retryAfter - 60) < 0.5
+↳ B, answered by C's park, gets the wait C's 429 gave at its instant (visit-first 60 s): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0)))
+↳ abs(retryAfter - 60) < 0.5 → false
+↳   abs(retryAfter - 60) → 240.0
+✘ Test "R-SYN-11: a throttle park decided after the follow answers with its own 429's wait and keeps the origin's alarm (F-28)" with 2 test cases failed after 0.614 seconds with 2 issues.
+↳ /// A 429 whose park waits for the follow answers with the wait its own 429 gave, and leaves the origin's alarm at the
+↳ /// origin's end: C (1 MB) is the content of zz-a and zz-b, one user waiter each (A, B); N (16 bytes, held) and D (1 MB,
+↳ /// held) run for user waiters. v3 moves zz-a onto N's content while the follow owes C's visit. C gets a 429 with
+↳ /// Retry-After 60 s, then D one with Retry-After 300 s, and 10 s pass before the follow ends. Visited first, C's park
+↳ /// answered B with 60 s and the throttle's alarm moved to D's end. With C's park waiting, the drain answered B with
+↳ /// the origin's later end and moved the alarm back to C's (PROBE-C10-THROTTLE-EXTENDED); answered at the drain's
+↳ /// instant, B's wait would be 10 s short.
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:278:13: Expectation failed: abs(throttle - background) < 0.000_001
+↳ the origin's throttle is the backoff of C's prefetch lane (visit-first): (throttle: Optional(0.209572016), background: Optional(0.8382880679433109), interactive: Optional(0.20957201698582772))
+↳ abs(throttle - background) < 0.000_001 → false
+↳   abs(throttle - background) → 0.6287160519433109
+↳   0.000_001 → 1e-06
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin for the backoff of the lane the follow leaves (F-28)" with 2 test cases failed after 0.609 seconds with 1 issue.
+↳ /// A 429 without Retry-After that arrives while the follow owes a visit throttles the origin for the backoff of the
+↳ /// lane the visit leaves its job: C (1 MB) is the content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter);
+↳ /// v3 moves zz-a while the follow owes C's visit. C gets a 429 without Retry-After. Visited first, C is prefetch work,
+↳ /// so the throttle is the background policy's first backoff; decided before the visit, it was the interactive
+↳ /// policy's (PROBE-C10-THROTTLE-LANE).
+◇ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" started.
+✘ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:352:9: Expectation failed: (try? uResult.get())?.byteSize == 16
+↳ U, moved onto Y's present content by the owed visit, is answered from it (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(300.0)))
+↳ (try? uResult.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-11: a throttle's extension during an owed follow answers only the users the follow leaves throttled (F-28)" with 2 test cases failed after 0.636 seconds with 1 issue.
+↳ /// The fail-fast turn a throttle's extension owes the throttle-parked jobs' users waits for the follow: Y (16 bytes,
+↳ /// zz-y) is present; T (1 MB) runs for U (zz-u) and K (zz-k), user waiters both; E (1 MB) runs for a user waiter. v3
+↳ /// moves zz-u onto Y. Between the manifest's fetch and its apply, T gets a 429 with Retry-After 1 s (within the user
+↳ /// wait: nobody is answered); then, while the follow owes T's visit, E gets one with Retry-After 300 s. Visited first,
+↳ /// U was answered from Y and the extension's fail-fast answered K alone. Behind the barrier the extension's turn
+↳ /// answered U too, with the throttle (the cycle-10 residual `answerThrottledUsers`).
+◇ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" started.
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:420:25: Issue recorded
+↳ C keeps its backoff with J's interest (visit-first failed(.at)): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 1)), forNobody: [])
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:422:9: Expectation failed: after.c?.1 == 1 && after.c?.2 == 1
+↳ the failed attempt stays counted and J alone holds C (visit-first): (c: Optional((ZTronAssetSync.JobState.downloading, 0, 1)), forNobody: [])
+↳ after.c?.1 == 1 && after.c?.2 == 1 → false
+↳   after.c?.1 == 1 → false
+↳   after.c?.2 == 1 → <not evaluated>
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:423:9: Expectation failed: cStarts == 1
+↳ no second attempt before the backoff ends (visit-first): 2
+↳ cStarts == 1 → false
+↳   cStarts → 2
+✘ Test "R-SYN-4: a withdrawal during an owed follow is answered at once and applied after the verdict it followed (F-28)" with 2 test cases failed after 0.617 seconds with 3 issues.
+↳ /// A withdrawal made while the follow owes a visit is applied after the answers it would have followed: C (1 MB) is the
+↳ /// content of zz-a (M, a user waiter) and zz-b (P, a prefetch waiter); v3 moves zz-a to a 16-byte content while the
+↳ /// follow owes C's visit. C's attempt fails with a 500 (a retry), then a prefetch request J for zz-b arrives, then P
+↳ /// withdraws. Visited first, C backed off (`failed(.at)`, one attempt counted), J joined it and kept it after P left,
+↳ /// and no second attempt started before the backoff ended. With J's join waiting behind C's verdict and P's withdrawal
+↳ /// applied at once, the visit that moved M left C without an interest: C was retired, and the drain created a fresh
+↳ /// job for J that started at once (PROBE-C10-JOIN-RETIRE). P's caller is answered at once in both orders (R-SYN-4,
+↳ /// R-SYN-10), and no transfer runs for nobody once the follow's events are applied (R-CAR-4).
+◇ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" started.
+✘ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:486:9: Expectation failed: kIndex != nil && zIndex != nil && kIndex! < zIndex!
+↳ K, created by J's visit before Z, starts first (visit-first): k=Optional(3) z=Optional(2)
+↳ kIndex != nil && zIndex != nil && kIndex! < zIndex! → false
+↳   kIndex != nil && zIndex != nil → true
+↳   kIndex! < zIndex! → false
+✘ Test "R-SYN-3: a request during an owed follow joins the job the follow creates, at the follow's place (F-28)" with 2 test cases failed after 0.618 seconds with 1 issue.
+↳ /// A request that arrives while the follow owes a visit joins the job the visit creates, at the place the visit gave
+↳ /// it: one slot, which H's held user transfer takes; J (zz-j) and X (zz-x) are queued prefetch requests. v3 moves zz-j
+↳ /// onto the content of zz-r and zz-x onto a new content Z, and the follow owes both visits; then a prefetch request R
+↳ /// for zz-r arrives. Visited first, J's visit created zz-r's job K, X's visit created Z's after it, and R joined K: K
+↳ /// starts before Z. Behind the barrier R created K, whose place waited for the drain, behind Z's.
+◇ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" started.
+✘ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:550:9: Expectation failed: pIndex != nil && xIndex != nil && pIndex! < xIndex!
+↳ P, queued by C's visit before X, starts first (visit-first): p=Optional(4) x=Optional(3)
+↳ pIndex != nil && xIndex != nil && pIndex! < xIndex! → false
+↳   pIndex != nil && xIndex != nil → true
+↳   pIndex! < xIndex! → false
+✘ Test "R-SYN-3: a re-admission during an owed follow leaves the place the follow's visit gives (F-28)" with 2 test cases failed after 0.684 seconds with 1 issue.
+↳ /// A network edge's re-admissions that arrive while the follow owes a visit are placed as the edge places them
+↳ /// visit-first: two transfer slots; H (user, held) runs; under Low Data Mode P (zz-p) is parked by policy for a
+↳ /// prefetch waiter; C (zz-a) runs for user waiter A; B (zz-b) is queued for user waiter W. v3 moves zz-a onto P's
+↳ /// content and zz-b onto a new content X. Visited first, C's visit raised P to user work and queued it, then B's
+↳ /// visit created X behind it, and the network's turning unrestricted re-admitted nothing: P starts before X. Behind
+↳ /// the barrier the re-admission queued P (its place waiting), the visit placed P and X, and the drain placed P again,
+↳ /// behind X (PROBE-C10-DOUBLE-PLACE).
+◇ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" started.
+✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:615:9: Expectation failed: fSecond != nil && cSecond != nil && fSecond! < cSecond!
+↳ F, re-admitted by the edge ahead of C (same lane, earlier ticket), retries first (visit-first): f=Optional(5) c=Optional(4)
+↳ fSecond != nil && cSecond != nil && fSecond! < cSecond! → false
+↳   fSecond != nil && cSecond != nil → true
+↳   fSecond! < cSecond! → false
+✘ Test "R-SYN-13: an edge during an owed follow re-admits in its own order whatever verdict waits (F-28)" with 2 test cases failed after 0.627 seconds with 1 issue.
+↳ /// A network edge that arrives while the follow owes a visit re-admits the jobs it owes in its own order, whatever
+↳ /// verdict waits: one slot, no preemption. F (zz-f, a prefetch member) failed offline and waits for an edge; C (zz-a,
+↳ /// zz-b) runs for a prefetch member of zz-b and A's user waiter of zz-a, and its ticket is F's successor. v3 moves zz-a
+↳ /// while the follow owes C's visit; C fails offline, then the network drops and returns. Visited first, the edge
+↳ /// re-admitted F, then C (same lane, F's earlier ticket): F's retry starts before C's. Behind the barrier the edge's
+↳ /// event for C, whose verdict waited, came before the re-admission's place for F, so C's retry started first (the
+↳ /// cycle-10 residual "`.edge` events before the same edge's re-admissions").
+✘ Suite "Engine follow barrier (F-28)" failed after 5.225 seconds with 13 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 9 tests in 1 suite failed after 5.225 seconds with 13 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

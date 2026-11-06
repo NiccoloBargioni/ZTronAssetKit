@@ -1,0 +1,28 @@
+MUTANT laneOwnWithdrawnIgnored: build exit 0
+MUTANT laneOwnWithdrawnIgnored run 1: ✘ Test run with 92 tests in 2 suites failed after 88.953 seconds with 2 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:588:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:589:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneOwnWithdrawnIgnored run 2: ✘ Test run with 92 tests in 2 suites failed after 86.220 seconds with 2 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:588:9: Expectation failed: throttleAtArrival != nil
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAnswerTests.swift:589:9: Expectation failed: (try? pResult.get())?.byteSize == Int64(cBytes.count)
+MUTANT laneOwnWithdrawnIgnored: reverted; Sources differ from the worktree: none
+MUTANT laneOwnVisitedIgnored: build exit 0
+MUTANT laneOwnVisitedIgnored run 1: ✘ Test run with 92 tests in 2 suites failed after 80.278 seconds with 2 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:283:13: Expectation failed: abs(throttle - background) < 0.000_001
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:288:13: Expectation failed: abs(throttle - background) < 0.000_001
+MUTANT laneOwnVisitedIgnored run 2: ✘ Test run with 92 tests in 2 suites failed after 78.961 seconds with 2 issues.
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:283:13: Expectation failed: abs(throttle - background) < 0.000_001
+    recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierClassTests.swift:288:13: Expectation failed: abs(throttle - background) < 0.000_001
+MUTANT laneOwnVisitedIgnored: reverted; Sources differ from the worktree: none
+MUTANT laneJobsWithdrawnIgnored: build exit 0
+MUTANT laneJobsWithdrawnIgnored run 1: ✔ Test run with 92 tests in 2 suites passed after 78.480 seconds.
+MUTANT laneJobsWithdrawnIgnored run 2: ✔ Test run with 92 tests in 2 suites passed after 82.697 seconds.
+MUTANT laneJobsWithdrawnIgnored: reverted; Sources differ from the worktree: none
+MUTANT laneJobsWalkAlways: build exit 0
+MUTANT laneJobsWalkAlways run 1: ✔ Test run with 92 tests in 2 suites passed after 81.297 seconds.
+MUTANT laneJobsWalkAlways run 2: ✔ Test run with 92 tests in 2 suites passed after 78.675 seconds.
+MUTANT laneJobsWalkAlways: reverted; Sources differ from the worktree: none
+MUTANT laneJoinWithdrawnFlagIgnored: build exit 0
+MUTANT laneJoinWithdrawnFlagIgnored run 1: ✔ Test run with 92 tests in 2 suites passed after 68.843 seconds.
+MUTANT laneJoinWithdrawnFlagIgnored run 2: ✔ Test run with 92 tests in 2 suites passed after 66.719 seconds.
+MUTANT laneJoinWithdrawnFlagIgnored: reverted; Sources differ from the worktree: none

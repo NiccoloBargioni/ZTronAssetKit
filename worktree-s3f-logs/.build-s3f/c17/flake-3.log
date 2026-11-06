@@ -1,0 +1,8 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" started.
+✔ Test "R-INT-3: a retry downloads with nothing of the publication that failed before it (F-28)" passed after 0.318 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 0.318 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.319 seconds.

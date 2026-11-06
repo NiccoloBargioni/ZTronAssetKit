@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a pending run waits behind an owed follow for the pump its cooldown's re-admissions are owed (F-28, F-41)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a pending run waits behind an owed follow for the pump its cooldown's re-admissions are owed (F-28, F-41)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a pending run waits behind an owed follow for the pump its cooldown's re-admissions are owed (F-28, F-41)" started.
+✘ Test "R-SYN-5: a pending run waits behind an owed follow for the pump its cooldown's re-admissions are owed (F-28, F-41)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierSurvivorTests.swift:76:6: Time limit was exceeded: 60.000 seconds
+DBGE run=nil storeRuns=1 fence=nil breaker=Optional(ZTronAssetSync.CircuitBreaker.State.closed) sleepers=0 next=nil now=239652128466ns
+DBGS phase=open units=1 writing=false commitsInFlight=true drainWaiters=0 keyWaiters=0 unavailable=nil applyGate=ApplyGate(held: false, waiters: [], writing: false, writeWaiters: [])
+✘ Test "R-SYN-5: a pending run waits behind an owed follow for the pump its cooldown's re-admissions are owed (F-28, F-41)" with 2 test cases failed after 64.056 seconds with 1 issue.
+↳ /// A pending run that waits for the breaker does not start behind the barrier while the pump owed to the jobs the
+↳ /// cooldown re-admits waits for the follow: two slots, a breaker that one 403 opens. H (zz-h) downloads for a prefetch
+↳ /// member; X's 403 opens the breaker; a forced sync is refused (a pending run on the breaker); M (zz-m), a prefetch
+↳ /// member, parks behind it. v3 changes the fillers and drops zz-h, so the follow owes H's visit, and the cooldown ends
+↳ /// while it is owed: the re-admission waits for the follow (`.unblock`) and the alarm's pump follow-up runs refused
+↳ /// (`pumpWaitsForFollow`). H's visit then abandons its download, and the breaker's reconsideration of the pending run
+↳ /// (`recordBreaker`) reads that pump as still owed (`dispatchOwed`): the run waits, M probes first and the run starts
+↳ /// after M's verdict (F-41). Visited first, H's visit came before the cooldown's end, which re-admitted M and owed the
+↳ /// pump the run waited for. Without the flag in `dispatchOwed` the abandon started the run behind the barrier, M still
+↳ /// parked (the cycle-3 survivor `noDispatchOwedFlag`).
+✘ Suite "Engine follow barrier (F-28)" failed after 64.056 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 64.056 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

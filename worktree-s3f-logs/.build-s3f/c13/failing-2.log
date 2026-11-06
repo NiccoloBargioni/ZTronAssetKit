@@ -1,0 +1,57 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" started.
+✘ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:64:9: Expectation failed: !nStarted
+↳ no request goes to the throttled origin for N (visit-first: N parks on the live throttle): (throttled: true, n: Optional(ZTronAssetSync.JobState.downloading))
+↳ !nStarted → <not evaluated>
+↳   nStarted → <not evaluated>
+✘ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:70:25: Issue recorded
+↳ A, moved to N while the slot was C's, is answered with the throttle (visit-first serverUnavailable(60)): success(ZTronAssetModel.AssetLocation(id: zz-a, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/88/88918d07469d99a379bc36586cbe5ac72f702bc18c986d80d3115855ba7651b7.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: a place an owed follow's visit gives is admitted on the live throttle, not the apply's (F-28)" with 2 test cases failed after 0.621 seconds with 2 issues.
+↳ /// A place the follow's visit gives behind the barrier is admitted on the live throttle, not on the throttle of the
+↳ /// apply it belongs to: one slot. C (1 MB) downloads for user waiters A (zz-a) and B (zz-b) and holds the slot. v3
+↳ /// moves zz-a to N (16 bytes) while the follow owes C's visit; then C gets a 429 with Retry-After 60 s. Visited
+↳ /// first, N waited at the apply behind C's slot, the 429 throttled the origin and freed the slot, and the pump
+↳ /// refused N on the live throttle: A was answered `serverUnavailable(60)` and N never started. Admitted on the view
+↳ /// of the apply (no throttle then), N's request went to the throttled origin and A was served 16 bytes (the cycle-12
+↳ /// verifiers' PROBE-C12-PLACE-SLOT).
+◇ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" started.
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:123:9: Expectation failed: throttle != nil
+↳ C's 429 throttles the origin on arrival (visit-first)
+↳ throttle != nil → false
+↳   throttle → nil
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:127:9: Expectation failed: requestsAfter == requestsBefore
+↳ the throttled origin gets no manifest request (visit-first): 3 -> 4
+↳ requestsAfter == requestsBefore → false
+↳   requestsAfter → 4
+↳   requestsBefore → 3
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierLiveGateTests.swift:130:25: Issue recorded
+↳ the caller gets the throttle's answer (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+✘ Test "R-SYN-5: a 429 during an owed follow throttles the origin on arrival when the visits move every id of its job (F-28)" with 2 test cases failed after 0.626 seconds with 3 issues.
+↳ /// A 429 throttles its origin when it arrives also when the owed visits move every id its job holds now: D (content
+↳ /// Z) downloads for user waiter WA (zz-a) and C (content X) for user waiter WB (zz-b). v3 maps zz-a to X and zz-b to
+↳ /// Y (16 bytes) while the follow owes D's visit, then C's. C gets a 429 without Retry-After, and a user then asks for
+↳ /// zz-none, which no manifest lists. Visited first, D's visit re-routed WA onto C, so C kept zz-a on the user lane
+↳ /// and its 429 throttled the origin for the interactive backoff: the fetch for zz-none was refused without a request
+↳ /// and its caller answered `serverUnavailable`. Behind the barrier no interest of C kept an id the copy maps to C
+↳ /// (`followedLane` counts only C's own), the 429 left the origin unthrottled until the drain (`.undecided`), and the
+↳ /// fetch went to the throttled origin (the cycle-12 verifiers' PROBE-C12-UNDECIDED-LANE). The throttle's length is
+↳ /// not asserted: which lane's backoff applies is a recorded residual risk (S3-R16 item 2).
+◇ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" started.
+✔ Test "R-SYN-3: a backoff that ends during an owed follow re-queues its job behind the places the owed visits give (F-28)" with 2 test cases passed after 0.635 seconds.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.883 seconds with 5 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 3 tests in 1 suite failed after 1.883 seconds with 5 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

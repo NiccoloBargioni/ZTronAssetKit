@@ -1,0 +1,196 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, when → .afterVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, when → .beforeVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .afterVerdict at EngineFollowBarrierHopTests.swift:93:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_000
+↳ B was on N at C's 404, and v4 moved it back to a fresh job of C's content, which serves it (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? outcome.b.get())?.byteSize == 100_000 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict to "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" started.
+✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, when → .beforeVerdict at EngineFollowBarrierHopTests.swift:93:9: Expectation failed: (try? outcome.b.get())?.byteSize == 100_000
+↳ B was on N at C's 404, and v4 moved it back to a fresh job of C's content, which serves it (visit-first): failure(ZTronAssetModel.AssetError.notFound)
+↳ (try? outcome.b.get())?.byteSize == 100_000 → <not evaluated>
+✘ Test "R-SYN-4: an id an apply maps back to a content whose verdict waits joins it after the verdict (F-28)" with 4 test cases failed after 2.132 seconds with 2 issues.
+↳ /// An id a later apply maps back to the content whose verdict waits joins that content after the verdict, not before
+↳ /// it (`mappedBack`; PROBE-C16C-VERDICT-MAPPED-BACK, `rejoinAfterVerdict`, and the join a visit makes onto a job whose
+↳ /// verdict waits, `addInterest`): visited first, the 404 answered A alone, and B, moved back by v4 after it, was
+↳ /// served by a fresh job of C's content.
+◇ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .published to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .notFound at EngineFollowBarrierHopTests.swift:195:13: Expectation failed: outcome.b == .failure(.notFound)
+↳ B was on N at its 404 (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ outcome.b == .failure(.notFound) → false
+↳   outcome.b → success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳     success → AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)
+↳       id → zz-b
+↳         rawValue → "zz-b"
+↳       url → file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png
+↳         _url → Foundation._SwiftURL
+↳           _parseInfo → Foundation.URLParseInfo
+↳             urlString → "file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/a8/a8a758bb50db3b3806058ffcd0e77f9d60c456e23f63d917f3fd424e41e9efd8.png"
+↳             schemeRange → 0[utf8] ..< 4[utf8]
+↳               some → 0[utf8] ..< 4[utf8]
+↳                 lowerBound → 0[utf8]
+↳                   _rawBits → 4
+↳                 upperBound → 4[utf8]
+↳                   _rawBits → 262148
+↳             userRange → nil
+↳             passwordRange → nil
+↳             hostRange → 7[utf8] ..< 7[utf8]
+↳               some → 7[utf8] ..< 7[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 7[utf8]
+↳                   _rawBits → 458756
+↳             portRange → nil
+↳             pathRange → 7[utf8] ..< 144[utf8]
+↳               some → 7[utf8] ..< 144[utf8]
+↳                 lowerBound → 7[utf8]
+↳                   _rawBits → 458756
+↳                 upperBound → 144[utf8]
+↳                   _rawBits → 9437188
+↳             queryRange → nil
+↳             fragmentRange → nil
+↳             isIPLiteral → false
+↳             didPercentEncodeHost → false
+↳             pathHasFileID → false
+↳             encodedComponents → EncodedComponentSet(rawValue: 0)
+↳               rawValue → 0
+↳           _baseURL → nil
+↳           _encoding → Unicode (UTF-8)
+↳             rawValue → 4
+↳           _isCanonicalFileURL → false
+↳           _nsurlLock → ()
+↳       fileExtension → png
+↳         rawValue → "png"
+↳       byteSize → 48
+↳       integrity → .verified
+↳       isStale → false
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .published to "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" started.
+✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .published at EngineFollowBarrierHopTests.swift:198:13: Expectation failed: (try? outcome.b.get())?.byteSize == 16
+↳ B was on N when it published, and is served N's content (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-b, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/bc/bc90db4bf1c7bf1ea25446635b747742f9b694628a3e3e661969ebf1fc2f2efe.png, fileExtension: png, byteSize: 48, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+↳ (try? outcome.b.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-4: an interest an apply moved onto a content gets the outcome of the attempt that ends there, though a later apply moves it on (F-28)" with 4 test cases failed after 2.054 seconds with 2 issues.
+↳ /// An interest an apply moved onto a content whose attempt then ended while the follow was owed gets that attempt's
+↳ /// outcome, though a later apply moved its id on before the follow visited its old job (`intermediateHop`;
+↳ /// PROBE-C16C-INTERMEDIATE-HOP and -SERVED, `bringInbound`): visited first, B was on N when N's attempt ended.
+◇ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .followVisitedFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retry to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .notFound to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleExhausted to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAtCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+↳ J's 429 throttles the origin on J's own prefetch lane: O's .retryAfterBeyondCap answered B (visit-first)
+↳ outcome.throttled → false
+↳   outcome → VerdictLaneOutcome(before: nil, after: nil, b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0))), p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))))
+↳     before → nil
+↳     after → nil
+↳     b → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(120.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(120.0))
+↳         serverUnavailable → (retryAfter: Optional(120.0))
+↳           retryAfter → 120.0
+↳             some → 120.0
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+↳ J's 429 throttles the origin until its own end only on J's prefetch lane, O's .retryAfterBeyondCap having answered B (visit-first): before nil, after nil
+↳ outcome.throttledByJ == !ending.keepsB → false
+↳   outcome.throttledByJ → false
+↳   !ending.keepsB → true
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .retryAfterBeyondCap at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ P is served J's retry after the throttle: O's .retryAfterBeyondCap answered B (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+↳ J's 429 throttles the origin until its own end only on J's prefetch lane, O's .throttleFailFast having answered B (visit-first): before Optional(11000000000ns), after Optional(11000000000ns)
+↳ outcome.throttledByJ == !ending.keepsB → false
+↳   outcome.throttledByJ → false
+↳   !ending.keepsB → true
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .throttleFailFast at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ P is served J's retry after the throttle: O's .throttleFailFast answered B (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .offline to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+↳ J's 429 throttles the origin on J's own prefetch lane: O's .offline answered B (visit-first)
+↳ outcome.throttled → false
+↳   outcome → VerdictLaneOutcome(before: nil, after: nil, b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.offline), p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))))
+↳     before → nil
+↳     after → nil
+↳     b → failure(ZTronAssetModel.AssetError.offline)
+↳       failure → .offline
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+↳ J's 429 throttles the origin until its own end only on J's prefetch lane, O's .offline having answered B (visit-first): before nil, after nil
+↳ outcome.throttledByJ == !ending.keepsB → false
+↳   outcome.throttledByJ → false
+↳   !ending.keepsB → true
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .offline at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ P is served J's retry after the throttle: O's .offline answered B (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+◇ Test case passing 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace to "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" started.
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:204:13: Expectation failed: outcome.throttled
+↳ J's 429 throttles the origin on J's own prefetch lane: O's .insufficientSpace answered B (visit-first)
+↳ outcome.throttled → false
+↳   outcome → VerdictLaneOutcome(before: nil, after: nil, b: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 500000)), p: Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0))))
+↳     before → nil
+↳     after → nil
+↳     b → failure(ZTronAssetModel.AssetError.insufficientSpace(required: 20000000, available: 500000))
+↳       failure → .insufficientSpace(required: 20000000, available: 500000)
+↳         insufficientSpace → (required: 20000000, available: 500000)
+↳           required → 20000000
+↳           available → 500000
+↳     p → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳       failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳         serverUnavailable → (retryAfter: Optional(60.0))
+↳           retryAfter → 60.0
+↳             some → 60.0
+↳   throttled → false
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:206:9: Expectation failed: outcome.throttledByJ == !ending.keepsB
+↳ J's 429 throttles the origin until its own end only on J's prefetch lane, O's .insufficientSpace having answered B (visit-first): before nil, after nil
+↳ outcome.throttledByJ == !ending.keepsB → false
+↳   outcome.throttledByJ → false
+↳   !ending.keepsB → true
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" recorded an issue with 2 arguments visit → .sweepFollowsFirst, ending → .insufficientSpace at EngineFollowBarrierVerdictLaneTests.swift:211:13: Expectation failed: (try? outcome.p.get())?.byteSize == 16
+↳ P is served J's retry after the throttle: O's .insufficientSpace answered B (visit-first): failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳ (try? outcome.p.get())?.byteSize == 16 → <not evaluated>
+✘ Test "R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after it, not one it answers (F-28)" with 16 test cases failed after 8.709 seconds with 11 issues.
+↳ /// A 429 that arrives while another job's verdict waits with a later apply's moved id reads that id's interest on
+↳ /// its lane when the verdict leaves the job alive, and not when the verdict answers it (`verdictLane`; ruling S3-R19
+↳ /// item 1): visited first, v4's visit moved B onto J from O backing off (a user lane, the 429 throttles nothing and
+↳ /// fails J, answering P), or found B answered by O's 404, 429 beyond the caps, timeout at the cap, `Retry-After`
+↳ /// beyond the cap, throttle's fail-fast, offline fail-fast or ENOSPC fail-fast (a prefetch lane, the 429 throttles
+↳ /// the origin until its own end and J's retry serves P). Cycle 17 adds the last four endings and the assertions on
+↳ /// J's own throttle end and on the answers of B and P.
+✘ Suite "Engine follow barrier (F-28)" failed after 12.896 seconds with 15 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 3 tests in 1 suite failed after 12.896 seconds with 15 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)
