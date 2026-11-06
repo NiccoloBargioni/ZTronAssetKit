@@ -7967,9 +7967,10 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
   3. Point 6, the records: **in progress** (from 17:30). Committed: d5's pin (S3-R27 item 7; green 2/2 in both orders,
      17:42) and 12.5.18's 12.1 doc at `BenchSyncCycle21.swift:156-159`, with the mutant-run record (`3a551f4`); the
      ownership record (`79e1e0b`); reqs #10's stale records, the 12.x records, item 7's classification, item 5's
-     `followedLane` record, item 8 and item 9's rows (the commit after `79e1e0b`; under "Point 6: the records"). Next:
-     the findings' states, the sections for points 2 and 4 with N25's update, the "Proposed document changes" of
-     cycles 21 to 23, and "Not verified".
+     `followedLane` record, item 8 and item 9's rows (`6c830b8`; under "Point 6: the records"); the sections for point
+     2 (with f3c's open shapes and N25's three brought up to f3c's review) and point 4 (the whole class), and RR-25
+     (the commit after `6c830b8`). Next: the findings' states, the "Proposed document changes" of cycles 21 to 23, and
+     "Not verified".
   4. Point 7, the close: not started.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
   `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
@@ -8337,37 +8338,51 @@ what changed and in which cycle.
     and pinned by A-T-SD since `03c4e59`).
   - It qualifies `EngineFollowBarrierTests.swift:1315` ("Shutdown has no visit-first counterpart"): the answers decided
     before a shutdown's first turn do have one, and they may differ in this way.
+- **RR-25. A purge swept first leaves a failed user job its backoff, where visited first the purge re-admits it** (f3c §4,
+  its review's "must add" 6; S3-R16 item 2, a backoff difference; non-blocking). In failedUserRetries swept first,
+  `withdrawPurgedJoins` takes the groups' joins before they reach the job, so it keeps `.failed(.at)` and its `.retry`;
+  visited first, the purge's settle re-admits it (T20). Not probed (T-OS1 and T-OS1w were not built); recorded under
+  "Known misses of C2's 10 ms limit", N25's row 1.
 
 ### Known residual correctness risks (owner ruling 2026-11-06)
 
-By the owner's ruling (S3-R28 item 1c, N28: "Agreed let's document it as known risk"), as item 1c's amendment of
-15:55 (N29) narrows it, correct #1 and #2 are known residual correctness risks, not blocking in cycle 23. Nothing changes in the code for them. `metInItsAttempt`
-(`EngineJobs.swift:289-297`), `Job.transferSpaceEnd`, `AttemptEnd.stamped`, and how any join, visit or replay is
-dated, stay as they are on `9aa337c`. No failing test is committed for them, and item 8's early probe does not run.
+By the owner's rulings, the ENOSPC class is a known residual correctness risk, not blocking: S3-R28 item 1c (N28:
+"Agreed let's document it as known risk"), and the close ruling's point 4 (N31: the whole class). Point 4 replaces, in
+item 1c amended point 1, its lead ("Only correct #1 and #2 are exempt") and its bullets "What is exempt", "Outside the
+exemption" and "Every other answer difference"; its description of correct #1's and #2's shape stays. Nothing changes
+in the code for the class: `metInItsAttempt` (`EngineJobs.swift:289-297`), `relane`'s guard, `Job.transferSpaceEnd`,
+`AttemptEnd.stamped`, and how any join, visit or replay is dated, stay as they are on `9aa337c` (item 1c's freeze). No
+failing test is committed for it, and item 8's early probe does not run.
 
-- **What is exempt** (item 1c as amended at 15:55, N29: only correct #1 and #2, as N25 exempted only its three
-  cases). Correct #1's and #2's answers (S3-R16 1(a)) are recorded here and not reported as blocking. Their shape, by
-  the line that decides it: inside the window and swept first, T20 (`EngineJobs.swift:360-364`) re-queues the job,
-  because `metInItsAttempt` returns false for an input that met the attempt on a visit-first engine, which gives the
-  verdict's answers. In correct #1 the drain replays an event that arrived before a transfer's end (a request, a
-  withdrawal, a pinned batch or a chain), and the replay meets no stamp (`:293-294`); in correct #2 an apply inside
-  the end's read moves the count, so a follow's visit owed since an apply before the end is dated after it
-  (`:290-291`). This holds at either end (`failedAfter ?? transferSpaceEnd`), and a run that differs from the probes
-  only in seeds, sizes, ids or fillers is the same finding. The window's places: a transfer's end at
-  `EngineFailures.swift:196-212`, a publication's end at `EngineDispatch.swift:1259` and `:1298-1301`, the read at
-  `EngineFailures.swift:564-596`. `relane`'s guard (`EngineJobs.swift:327`) is frozen with `metInItsAttempt`.
-  - **Outside the exemption:** the second cause, a re-queue that visit-first makes and swept first never makes before
-    the verdict (W-AWAY, W-DB); any difference after the verdict defers (the late drain, W-JOIN-HOP); a
-    `metInItsAttempt` that returns true where visit-first re-queued. Every other answer difference in or after an
-    ENOSPC window is judged under S3-R16 1(a) as usual, with N21's reading of a visit-first answer that depends on
-    timing, including a shape from item 1's former step-0 list and one a verifier newly finds; the orchestrator takes
-    such a shape to the owner at once (item 8's point 4).
-  - **Suspected by code reading alone (UNCONFIRMED, outside the known risk, not probed in cycle 23):** W-AWAY and W-DB,
-    W-JOIN-HOP at a publication's end and in the late drain (f1b review must-fix 2), and `f1c-review.md` §6's shapes.
-  - **Not covered** (item 1c amended, point 2): S3-R16 1(b) to 1(f) still block, inside the window and after it (a
-    broken MUST or invariant, a hang or a job nothing advances, a flaky test, a survivor or an unreached branch, and
-    every gate). Item 4's e1-PS, e1-P1 and e1-P2 kills run on the code as it stands and block until killed. The
-    exemption covers S3-R16 1(a)'s answers only.
+- **What is exempt** (point 4): the class in the owner's words, an answer that differs between the two visit orders,
+  caused by an event inside an ENOSPC window (S3-R16 1(a)).
+  - The window is item 1c's: from a transfer's or a publication's ENOSPC end to the return of `spaceFailed`'s
+    free-space read (item 1c amended, point 6(b)). Its places: a transfer's end at `EngineFailures.swift:196-212`, a
+    publication's end at `EngineDispatch.swift:1259` and `:1298-1301`, the read at `EngineFailures.swift:564-596`.
+  - N29's T20 test finds its members: "an answer that differs only because T20 (`EngineJobs.swift:360-364`)
+    re-queues a job failed at an ENOSPC end in one order and not the other, before that job's space verdict, given at
+    once or at the follow's end after spaceFailed's deferral (`EngineFailures.swift:573-582`)". Where the test and the
+    owner's words differ, the owner's words decide. A late-drain difference is exempt only when the event that causes
+    it falls inside the window; otherwise it follows point 8, and the orchestrator asks the owner in one line whether
+    it joins the class.
+  - Correct #1's and #2's shape, by the line that decides it (kept from item 1c as amended): inside the window and
+    swept first, T20 re-queues the job, because `metInItsAttempt` returns false for an input that met the attempt on a
+    visit-first engine, which gives the verdict's answers. In correct #1 the drain replays an event that arrived before
+    a transfer's end (a request, a withdrawal, a pinned batch or a chain), and the replay meets no stamp (`:293-294`);
+    in correct #2 an apply inside the end's read moves the count, so a follow's visit owed since an apply before the
+    end is dated after it (`:290-291`). This holds at either end (`failedAfter ?? transferSpaceEnd`), and a run that
+    differs from the probes only in seeds, sizes, ids or fillers is the same finding. `relane`'s guard
+    (`EngineJobs.swift:327`) is frozen with `metInItsAttempt`.
+- **Its members:** correct #1 and #2, measured (below). Suspected by code reading only (UNCONFIRMED, not probed in
+  cycle 23), each a member only if a run shows the difference: W-AWAY and W-DB (a re-queue that visit-first makes and
+  the swept-first engine never makes before the verdict), W-JOIN-HOP at a publication's end, W-JOIN-HOP in the late
+  drain (under the rule above; f1b review must-fix 2), item 1's former step-0 shapes, and `f1c-review.md` §6's shapes.
+- **Such an answer** is recorded here and is not reported as blocking. That includes a shape a verifier newly finds.
+- **Not covered, and still blocking** (point 4, the owner's answer): inside the window, a broken MUST or invariant, a
+  hang or a job that nothing advances, and a flaky test (S3-R16 1(b) to 1(d)); point 8 takes each one to the owner
+  before the merge. 1(e) and 1(f) there, and every finding after the window, follow point 8 like any other finding.
+  Item 4's e1-PS, e1-P1 and e1-P2 kills ran on the code as it stands (under "Point 6: run 12's work and the mutant
+  runs").
 - **Correct #1 (PROBE-C22C-TS-DRAIN-JOIN, seed 2_029_101): a user request made before a transfer's ENOSPC, replayed
   inside the free-space read, re-queues the job.** Deterministic, 2/2 on `9aa337c`. Sources: the findings file
   `.build-orchestrator/s3f-c22-issues.json` (correct #1); the probe in
@@ -8417,8 +8432,9 @@ dated, stay as they are on `9aa337c`. No failing test is committed for them, and
     `VerifyC22CorrectProbes.swift:258`, `:387`; the default is 2, `SyncTuning.swift:44`); both script the second
     attempt to succeed; neither the default cap nor a second ENOSPC is probed.
   - The causes are two (f1 §1, as f1 review must-fix 2 corrects it): a re-lane dated by the wrong clock, and a
-    re-queue that visit-first makes and the swept-first engine never makes before the verdict. Only the first is
-    exempt (above).
+    re-queue that visit-first makes and the swept-first engine never makes before the verdict. Under point 4 both are
+    in the class when the event that causes the difference falls inside the window (above); until cycle 23's close
+    ruling only the first was exempt.
 - **Why it is not fixed.** Independent reviews found the class's analyses UNSOUND four times: f1
   (`f1-enospc-windows-review.md`), f1b (`f1b-join-rule-review.md`), and f1c's routes A and B (`f1c-review.md` §0), all
   under `.build-orchestrator/s3f-c22-analysis/`.
@@ -8436,11 +8452,77 @@ This section feeds ADR-057, and Stage 5's `RESIDUAL-RISKS.md` and `VERIFICATION.
 
 ### Known misses of C2's 10 ms limit (owner ruling 2026-11-06)
 
-By the owner's ruling of 6 Nov (S3-R28 item 3, N25: "leave these three cases out of cycle 23 and record them as known
-misses of the 10 ms limit"), the first three rows of `f3b-review.md` §7 are out of cycle 23. They are not blocking and
-not gated, and no code, test or bench is added for them. §7's rows 4 and 5 stay measured, as variants of item 3b's
-cases, and every other C2 shape stays under S3-R27 12.1's bar. Each shape is at 10,000 ids, with at most 4 interests on
-an id. The figures are "after route C and item 3b's merge" (`f3b-review.md` §7), none measured.
+Two rulings of the owner make these known misses of C2's 10 ms limit: N25 (S3-R28 item 3: "leave these three cases
+out of cycle 23 and record them as known misses of the 10 ms limit") for "N25's three" below, and the close ruling (N31,
+point 2, option (e)) for every other entry. They are recorded and not routed: not blocking, and no code, test or bench
+is added for them. The six gated cases stay as written and red, so `verify.sh --full` ends `VERIFY: FAIL (1 failed:
+benchmarks)` with them and P-13 (WP-B's) as its only causes, the accepted end state (point 3). Each entry gives its
+figure (measured with its loads, an estimate with its base, or "no figure for today"), the route that would close it
+with that route's hours from the analyses, or "not estimated", and the owner's re-open criterion, the same for all:
+**how often the misses happen in the field.** S1's log line (point 5) is the kit's signal for the purge's: a purge's
+first turn above 10 ms writes `long purge turn: <ms> ms, <jobs> jobs, <groups> groups` on `.sync` at `.info`. Every
+shape is at 10,000 ids, with at most 4 interests on an id, unless it says otherwise. All hours are estimates.
+
+**By the close ruling's point 2:**
+
+1. **The six gated purge misses** (correct #4, reqs #1): `purgeTurns(_:)` (`BenchSyncCycle22Purge.swift`), release with
+   `-enable-testing`, heartbeat best of 3, in ms, with the 1-minute loads:
+
+   | Shape | After e2-A2.5 (`2abddd1`; "Cycle 22", step 4) | Step 8's gate run | Its re-run | The cycle-22 verifier (correct #4, 09:33 to 09:46) | Point 7's `--full` |
+   |---|---|---|---|---|---|
+   | `oneGroup` | 36.14 (9.09 to 8.52) | 35.71 (3.31 to 3.20) | 35.98 (6.07 to 5.82) | 36.91 (4.12 to 4.99) | at the close |
+   | `oneMemberGroups` | 37.17 (8.52 to 4.90) | 37.11 (3.20 to 2.70) | 37.38 (5.82 to 4.27) | 38.17 (4.99 to 3.76) | at the close |
+   | `oneGroupScope` | 39.59 (4.90) | 39.74 (2.54 to 2.42) | 39.82 (3.64) | 41.69 (3.76 to 3.61) | at the close |
+   | `sharedJobFourGroups` | 17.85 (4.90 to 4.59) | 17.82 (2.42) | 17.91 (3.64 to 3.83) | 18.70 (3.61) | at the close |
+   | `fourGroups` | 61.09 (4.59 to 4.38) | 62.21 (2.38 to 2.35) | 62.56 (3.83 to 3.68) | 64.00 (3.61 to 3.60) | at the close |
+   | `retryJobs` | 36.24 (4.38 to 3.33) | 36.06 (2.35 to 2.67) | 36.19 (3.79 to 2.98) | 37.59 (3.60 to 3.36) | at the close |
+
+   - *Route:* route C (`f3-purge-route.md`, stages A to C), 19-28 h (`f3-purge-route.md:343`, `:363`), then item 3b's
+     merged route, core 17-26.5 h on top of it (`s3-r28-item3b.md:126-129`): 36-54.5 h together
+     (`end-sooner-options.md`, ledger rows 4 and 6). Neither is taken.
+2. **N7's five, by estimate** (`s3-r28-final.md:125-129`; `end-sooner-options.md` §3.0, R4). `keptUnderThreeGroups` (a
+   user waiter on each id, plus three prefetch groups): 38-48 ms today, 34-39 ms after route C. `fourGroupJoins`
+   (40,000 joins waiting for the follow): 15-22 ms today. `mixedLaneGroups` (24-33 ms), `pendingClaimGroups` (16-18
+   ms) and `oneMemberGroupsFourPerID` (40,000 one-member groups, four on each id; 8-16 ms) are estimated only after
+   route C, which is not taken: no figure for today. None is a committed case (ledger row 5: written in a scratch copy,
+   not built or run).
+   - *Route:* route C with item 3b, whose cases these are, by estimate, two of them only at its stage B or C
+     (`s3-r28-item3b.md:3`): the same 36-54.5 h as row 1.
+3. **f3b-review §7's two variants, and route A §9's third shape.** `fourGroupJoins` over 40,000 one-member groups,
+   3-11.5 ms, and three kept interests over one purged interest (B-2 in place), 4.5-8.9 ms: both after route C and
+   item 3b's merge (`f3b-review.md:148-149`). A prefetch waiter under three groups: 6-10 ms after route C and route A's
+   A-2 (`f3b-route-a.md:173`), 3-5.5 ms with A-3b. No figure for today for any of the three.
+   - *Route:* as row 2; route A's A-2 adds 2.5-4 h (`f3b-route-a.md` §10) on top of route C.
+4. **APM's answer turn** (correct #5, `answerPresentMembers`). PROBE-C21-APM, rebuilt on `9aa337c`, release with
+   `-enable-testing`, in-actor, best of 3, at a 1-minute load of 9.85 to 8.65: groups 11.10 ms and users 13.93 ms
+   (misses), and one group 9.37 ms (at the edge) (`s3-r28-final.md:157`). A scratch probe, not a committed case.
+   - *Route:* d2's route (a) with B1 (S3-R27 item 3): not estimated (cycle 22's lump for S3-R27 items 1 to 3 was 10-15
+     h, `end-sooner-options.md` ledger row 8).
+5. **Item 4's k = 2 and k = 4 shapes** (reqs #2; correct #9): recorded here as unproven, not as a miss. Unmeasured;
+   estimated at 9-10 ms at k ≥ 4, at the edge, not above it (`c21/d3-many-holders.md:25-26`, UNCONFIRMED).
+   - *Route:* A1, and A2 if taken (S3-R27 item 4): not estimated.
+
+**f3c's open shapes are not known misses** (point 2; `f3c-open-shapes.md` §8). The options the owner chose from did not
+show them, so the owner has not ruled on them. Both are estimates, UNCONFIRMED:
+
+- **The heap scans.** `readmit` scans the heap once per failed candidate (`EngineReadmission.swift:165-167`), and so
+  does `removeJob` outside a walk (`EngineJobs.swift:517-520`): 27-55 ms a turn with 5,000-10,000 `.retry` entries, at
+  512 a turn (`f3c-open-shapes.md:163-164`; its review :31). Open, unmeasured, and with no reviewed route; the
+  orchestrator reports them to the owner. Two cases would measure them (f3c's review, "must add" 2): a satisfied edge
+  over 10,000 jobs that failed transiently with `.retry` deadlines (T19), and a release of a 10,000-member group whose
+  jobs are `.failed(.at)`. No bench covers either: the breaker benches fail about five jobs
+  (`BenchSync.swift:1735-1760`).
+- **The production `originID` cost.** In production each gate read builds `originID` three times
+  (`EngineOriginGate.swift:71`, `:74`, `:76`), and HTTP parses its URL on each build (`HTTPRemoteSource.swift:116-118`):
+  15-60 ms more per 10,000 gate reads, at an unmeasured 0.5-2 µs a build, which the benches' fake hides (it holds a
+  `let`; `f3c-open-shapes.md:159-160`, its review :102). It reaches beyond the failed-user rows: every per-job gate
+  read pays it, `blockCleared` among them (`EngineJobs.swift:936`; review "must add" 3). It is under "Not verified
+  (cycle 23)", because no bench figure includes it.
+
+**N25's three** (S3-R28 item 3, N25): the first three rows of `f3b-review.md` §7 (§7's rows 4 and 5 are row 3 above).
+Their figures after route C and item 3b's merge are estimates (`f3b-review.md` §7), brought up to f3c's review
+(`f3c-open-shapes-review.md`, CORRECTED, in `.build-orchestrator/s3f-c22-analysis/` since 15:57; the close ruling's
+point 6); none is measured. Where the review corrects f3c, the review's figure is the one given.
 
 1. **Failed user jobs with `.retry` deadlines, under one to three prefetch groups** (f3c's failedUserRetries and
    failedUserRefused, `f3c-open-shapes.md` §1). Each job is `.failed(.at)` at the user lane (a user waiter), with a
@@ -8450,29 +8532,44 @@ an id. The figures are "after route C and item 3b's merge" (`f3b-review.md` §7)
      path). The derivation: (571.12 − 36.24) ms / 10,000 ≈ 53 µs per heap scan, from `purgeTurns(.retryJobs)`' best
      after e2-A1 (571.12 ms) and after e2-A2.5 (36.24 ms), under "Cycle 22", step 4 (`s3f.md:7584` and `:7617` at
      `9aa337c`). Whether the origin admits depends on the breaker; the timeouts in `retryJobs`
-     (`BenchSyncCycle22Purge.swift:201-204`) leave its jobs `.failed(.at)`. The scan is today's cost too.
+     (`BenchSyncCycle22Purge.swift:201-204`) leave its jobs `.failed(.at)`. The scan is today's cost too. The refused
+     form (the breaker open) is 11.9-22.5 ms after route C and item 3b's merge (f3c §3; its review's "must add" 5). In
+     production both paths cost 15-60 ms more, from the `originID` builds above (`f3c-open-shapes.md:95`).
    - *What would close it:* A-6 (C-1's pass also takes a `.retry` whose job is not `.failed(.at)`, which its firing
      ignores, `EngineTimers.swift:111`) brings it to 11.5-18 ms; an in-place re-admission to 7-12 ms; going lower needs
-     table order, which needs a ruling (`f3b-review.md` §7). f3c estimates its route (OS-1 to OS-3 after item 3b's M-5)
-     at 10.4-21.2 ms, and at stage C with OS-4 to OS-6 at 5.2-10.8 ms for failedUserRetries (its top misses 8.5 ms) and
-     4.1-9.0 ms for failedUserRefused (`f3c-open-shapes.md` §0, §3).
+     table order, which needs a ruling (`f3b-review.md` §7). f3c's route, as its review re-derives it with e2-A2.2 in
+     the base (`f3c-open-shapes-review.md:80-89`; OS-6 is not a lever, its must-fix 1): after OS-1 to OS-3, 9.6-19.6,
+     8.8-18.8 and 6.0-12.7 ms at stages A, B and C for failedUserRetries, and 8.5-17.8, 7.7-17.0 and 4.9-10.9 ms for
+     failedUserRefused; with OS-4 at stage C, 5.2-10.8 ms (its top, 10.8 ms, misses the bar,
+     `f3c-open-shapes-review.md:75`) and 4.1-9.0 ms. f3c's core is 12-18.5 h (`f3c-open-shapes.md` §9), on top of
+     route C and item 3b.
+   - **The swept-first backoff** (f3c §4; its review's "must add" 6), a residual difference under S3-R16 item 2 that
+     f3c does not change: in failedUserRetries swept first, the purge's `withdrawPurgedJoins` takes the groups' joins
+     before they reach the job, so the job is never re-laned and keeps its backoff (`.failed(.at)` with its `.retry`
+     at its epoch); visited first, the joins are on the job, and the purge's settle re-admits it (T20). Its probes,
+     T-OS1 (visited first) and T-OS1w (swept first, both drain timings), were not built (f3c §5). Recorded, not
+     probed, in cycle 23.
 2. **A bulk waiter under three prefetch groups** (f3c's bulkWaiterFalls). A `.queued` job with a bulk waiter and three
    prefetch groups: the purge withdraws the groups, its lane falls to `.bulk`, and `relane` re-queues it
    (`EngineJobs.swift:311-314`, `:563-578`).
-   - *Figure (estimate):* 9-17 ms (route A: 9-14.5 ms; `f3b-review.md` §7).
+   - *Figure (estimate):* 12.9-23.3 ms after route C and item 3b's merge (f3c's review must-fix 1,
+     `f3c-open-shapes-review.md:37`), in place of `f3b-review.md` §7's 9-17 ms (route A: 9-14.5 ms).
    - *What would close it:* an in-place re-queue, 7-11.5 ms; table-order re-queues after an A7-type audit, 4.5-8 ms
-     (`f3b-review.md` §7). f3c: 7.9-16.9 ms after OS-1 to OS-3 (2-3 ms more with a compaction), 3.5-8.4 ms at stage C
-     with OS-4 to OS-6 (4.4-10.4 ms when the purge compacts the queues).
+     (`f3b-review.md` §7). f3c's route, as its review re-derives it: after OS-1 to OS-3, 7.1-15.3, 6.3-14.5 and 3.5-8.4
+     ms at stages A, B and C (2-3 ms more with a compaction; 1.4-2 ms more with OS-5). The set-up order decides the
+     compaction, so a case must fix one order (review should-fix 7).
 3. **A prefetch group and a bulk group, under a third group's pending claim** (f3c's claimHeldFalls). A `.queued` job
    that the purge empties, with `before` (prefetch) ≠ `last` (bulk): `heldLane = last`, then a re-lane, then
    `claimHeld` (`EngineCommands.swift:1051-1058`, `EngineJobs.swift:424-431`).
-   - *Figure (estimate):* 10-20 ms (`f3b-review.md` §7).
-   - *What would close it:* as in row 2; skipping that re-queue breaks R-SYN-3 (`f3b-review.md` must-fix 2). f3c:
-     7.4-16.7 ms after OS-1 to OS-3, 3.0-8.2 ms at stage C with OS-4 to OS-6.
+   - *Figure (estimate):* about 21-34 ms after route C and item 3b's merge (f3c's review should-fix 1,
+     `f3c-open-shapes-review.md:59`: item 3b's point 7 denies C-2′ to a job whose lane falls), in place of
+     `f3b-review.md` §7's 10-20 ms.
+   - *What would close it:* as in row 2; skipping that re-queue breaks R-SYN-3 (`f3b-review.md` must-fix 2). f3c's
+     route, as its review re-derives it: after OS-1 to OS-3, 6.6-15.1, 5.8-14.3 and 3.0-8.2 ms at stages A, B and C.
 
-- f3c's review (`f3c-open-shapes-review.md`, which item 3 names) was not in `.build-orchestrator/s3f-c22-analysis/`
-  when this record was written, so f3c's figures above are its own estimates, unreviewed.
-- **The owner's re-open criterion:** how often each miss happens in the field.
+- Until cycle 23's records, this section said that f3c's review was not in `.build-orchestrator/s3f-c22-analysis/`
+  and that f3c's figures were its own, unreviewed (`s3f.md:8159-8160` at `9e9a500`). The review was there from 15:57;
+  the figures above are the reviewed ones.
 
 ## Items
 
