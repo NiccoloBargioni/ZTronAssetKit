@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 11:25 CET): run 9 (cycle 22) is stopped. S3-R28 is being written and its join rule (f1b) re-analysed; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 12:40 CET): run 9 (cycle 22) is stopped. S3-R28's final text is being written, and items 1b (the join rule) and 3b (the purge cases route C cannot reach) are being analysed; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -247,6 +247,26 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       4. When f1b's review returns, write item 1b from it and append it between fixer runs.
     - **Usage at 11:25: weekly 55 %**, Fable 22 % (4 points since 10:05, with the six analysts running). 1-minute load 2.2.
     - If this session compacts or ends first, read both journals (`~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/subagents/workflows/<run id>/journal.jsonl`) and the files above, then do the "Next" steps.
+  - **S3-R28's draft landed at 12:31:** `wf_a8e115ce-781`, 4 agents, 69 min, 1.04 M subagent tokens, no errors.
+    - Both checks were CORRECTED. The editor applied all 5 must-fix items; the 20 should-fix items were left for a ruling.
+    - The draft is `s3-r28-draft.md`: the ruling is lines 1-183, followed by 18 "For the orchestrator" notes.
+    - **The f1b analysis returned at about 12:21**, by code reading: it covers every shape, with a new step that closes the window at the read's return. Its review has been running since 12:21.
+  - **The orchestrator's rulings on the 18 notes (12:37):** `.build-orchestrator/s3f-c22-analysis/s3-r28-orchestrator-rulings.md`, N1-N19. In short:
+    - N1: every stamp clear stays. A clear whose drop no test can observe is killed on an `invariantViolations()` clause. The verdict's clear comes first in `decideSpaceFailure`, which is safe because both callers check the epoch first (`EngineFailures.swift:570`, `EngineFollow.swift:387`).
+    - N3: clause (b) is not scoped to a stamped job; the code-reading argument is recorded instead.
+    - N7: the fifth in-letter shape is gated, as `oneMemberGroupsFourPerID`. With it, the new purge cases are five.
+    - N8: stages B and C run only if a case that retires jobs is above 8.5 ms.
+    - **N9: f3 review "must add" 6 is answered yes.** The purge may skip the re-lane of a kept `.queued` job whose lane is unchanged; that changes only its place and ticket (S3-R16 items 2 and 3), and a probe must show the answers and start counts unchanged.
+    - **N9 also adds item 3b:** a route for the purge cases route C cannot reach (`keptUnderThreeGroups` 34-39 ms and `fourGroupJoins` 15-22 ms after route C, both estimates). It is appended like item 1b.
+    - N14: `EngineCommands.swift:1001` joins `:1004` and `:1009`, killed by the mutant that answers false.
+    - N17: `.timeLimit` for reqs #8; cycle 23's new bench files are authorised, and 11.6 is amended to allow helper types.
+    - N18: the 17 should-fix items are applied.
+    - N19: the fixer re-reads the rulings file's end at the start of every step.
+  - **Two workflows run from 12:38:**
+    - `wf_b2faa388-4af` (task `wvr1blpvd`) writes the final text: an editor, then two checkers, then a final editor. The text is `s3-r28-final.md`, with `-final-review-*.md` and `-final-changes.md` alongside.
+    - `wf_be142310-4d6` (task `wnolcayft`) is f3b: two analysts, one routing in one turn (`f3b-route-a.md`) and one deferring work to budgeted turns (`f3b-route-b.md`), then a comparative review (`f3b-review.md`).
+    - Run 10's focus now names items 1b and 3b and N19's re-read.
+    - **Next:** rule what the final editor leaves, append `s3-r28-final.md`, and launch run 10. Then write items 1b and 3b from their reviews and append each as soon as it is ready.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
