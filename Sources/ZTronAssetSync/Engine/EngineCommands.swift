@@ -1026,8 +1026,9 @@ extension SyncEngine {
                     continue
                 }
                 // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of
-                // a purged id is forgotten.
-                for asset in withdrawn.sorted() {
+                // a purged id is forgotten. In the set's order: the lane filter never withdraws an `.ensure` interest
+                // (always user-initiated), so no drop resumes anything, and the order is unobservable (e2-A1.3).
+                for asset in withdrawn {
                     switch interest.kind {
                     case .prefetch, .ensure:
                         self.dropGroupMember(token, asset: asset, from: transfer)
@@ -1058,7 +1059,10 @@ extension SyncEngine {
     /// groups' members are dropped in the queue's order (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 2). An owed
     /// re-route of such an interest leaves its batch (`EventAfterFollow.reroutes`), as that engine's purge withdrew the
     /// interest from the job the re-route had joined: its group stops waiting for the member and its heal is forgotten,
-    /// in (id, token) order, as `withdrawPurged` drops them; a batch the purge empties stays queued, and its replay
+    /// in the order the batch's heap gave them up, unsorted, as `withdrawPurged` drops a job's ids in its set's order:
+    /// no drop resumes anything, an `.ensure` interest being user-initiated, so the order is unobservable (Stage 3
+    /// close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.3, which reverses `integrate-rr21.md` R15's sort and S3-R26
+    /// answer 7's sorted subset); a batch the purge empties stays queued, and its replay
     /// counts it done (`continueReroutes`). The walk runs whether or not a join waits: an empty walk costs nothing
     /// (ruling S3-R26 item 1; the early return on no waiting join was removed with it).
     ///
@@ -1083,7 +1087,7 @@ extension SyncEngine {
             case .join(let join):
                 self.withdrawJoinInterest(join)
             case .reroutes(let from, let removed):
-                for item in removed.sorted() {
+                for item in removed {
                     switch item.kind {
                     case .prefetch, .ensure:
                         self.dropGroupMember(item.token, asset: item.asset, from: from)
