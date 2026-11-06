@@ -243,8 +243,9 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Next:**
       1. When the editor returns, rule its "For the orchestrator" items.
       2. Append S3-R28 to `s3-rulings-s3f.md`, keeping a `.before-s3-r28` copy.
-      3. Write `s3-fix-args-run10.json` from run 9's, with `fromCycle: 23`, `findingsFile: …/s3f-c22-issues.json` and a focus naming S3-R28 and HEAD `9aa337c`. Launch run 10.
+      3. Launch run 10 from `.build-orchestrator/s3-fix-args-run10.json`, written at 11:26 from run 9's: `fromCycle: 23`, `findingsFile: …/s3f-c22-issues.json`, and a focus that names S3-R28 and HEAD `9aa337c`, holds the join rule until item 1b is appended, and tells a fixer run to continue from the worktree HEAD when the draft's cycle-23 section lists committed steps. So the same file serves every continuation run.
       4. When f1b's review returns, write item 1b from it and append it between fixer runs.
+    - **Usage at 11:25: weekly 55 %**, Fable 22 % (4 points since 10:05, with the six analysts running). 1-minute load 2.2.
     - If this session compacts or ends first, read both journals (`~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/subagents/workflows/<run id>/journal.jsonl`) and the files above, then do the "Next" steps.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
