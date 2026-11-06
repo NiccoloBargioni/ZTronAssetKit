@@ -498,3 +498,70 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(c.s)
     }
 }
+
+// MARK: d4 §3.10: a verdict between two owing events at an apply (r2c)
+
+/// d4 §3.10 (Stage 3 close-out cycle 23, ruling S3-R28 item 4; S3-R27 item 5): `layerOwedReroutes` reuses the layer it
+/// made for a newer owing event only while no verdict lies between the two (`made.verdicts`): it walks the queue from its
+/// newest event, so an older event behind a verdict needs that verdict's job in its layer's ends.
+extension EngineFollowBarrierTests {
+    /// zz-x (V's, a user waiter) is X's content, which downloads; zz-j is J's content, of its own (22 bytes). K0 maps
+    /// zz-a1…zz-a3 to X's content and O's commit owes their re-routes (A, one batch). X then gets a 429 with Retry-After
+    /// 7,200 s, above both lanes' caps, whose verdict waits behind A; B, a user request for zz-j, waits behind that
+    /// verdict with a chain. K1 maps zz-a1…zz-a3 to Y's content (24 bytes): its layer on A must pin X, failed with its
+    /// verdict to come, though B's layer, made first, does not. Visited first, O's commit re-routed W1…W3 onto X
+    /// downloading, and X's 429 answered them and V `serverUnavailable`; J got its bytes, and Y was never requested.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: an apply's layer on an owed batch pins the job of a verdict that waits between it and a later owing event (F-28, d4 §3.10)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func layerOfAnOwedBatchPinsAVerdictBetweenItAndALaterJoin(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_341
+        let xBytes = EngineFixture.bytes(seed + 5, count: 18)
+        let jBytes = EngineFixture.bytes(seed + 6, count: 22)
+        let yBytes = EngineFixture.bytes(seed + 7, count: 24)
+        let x = EngineHarness.onDemand("zz-x", xBytes)
+        let j = EngineHarness.onDemand("zz-j", jBytes)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x, j])
+        let engine = c.engine
+        let xT = x.transferID
+        let onX = Self.movedOnto(xBytes, c)
+        let onY = Self.movedOnto(yBytes, c)
+        let yT = onY[0].transferID
+        try #require(Set([xT, yT, j.transferID, c.transfer]).count == 4, "setup: X, Y, J and O are four contents")
+        await c.s.harness.source.script(xT, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(7_200))), .fail(.permanentMissing(httpStatus: 404))])
+        await c.s.harness.source.script(j.transferID, [.stage(jBytes)])
+        await c.s.harness.source.script(yT, [.stage(yBytes)])
+        let v = await Self.downloadingWaiter(x, c)
+        let held = try await Self.oweThroughK0(c, k0: [x, j] + onX, visit: visit)
+        await c.s.harness.source.release(xT, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { $0.state.verdictsAfterFollow[xT] != nil }
+        let jID = j.identifier
+        let jWaiter = Task { await engine.awaitAsset(jID, lane: .userInitiated) }
+        await engine.awaitCondition { FollowBarrier.joinWaits($0, j) }
+        let queue = await engine.readForTests { e in
+            e.state.eventsAfterFollow.map { event -> String in
+                switch event {
+                case .reroutes(let batch):
+                    return "batch \(batch.items.count)"
+                case .join(let join):
+                    return "join \(join.asset.rawValue) chained \(join.chain != nil)"
+                default:
+                    return event.verdictKey?.transfer == xT ? "X's verdict" : "other"
+                }
+            }
+        }
+        try #require(queue == ["batch 3", "X's verdict", "join zz-j chained true"], "setup: the batch, then X's verdict, then B's chained join wait: \(queue)")
+        try await Self.applyBehindBatch(c.manifest([x, j] + onY, round: 2), tag: "k1-verdict-between-\(seed)", c)
+        #expect(await Self.pins(xT, c) == [true], "K1's layer on the batch pins X, whose verdict waits between the batch and B")
+        let layer = await Self.finishOwed(c, held: held, others: [v, jWaiter])
+        let yStarts = await Self.starts(yT, c)
+        await Self.finishHeld(c.s)
+        for answer in layer.w + [layer.others[0]] {
+            if case .failure(.serverUnavailable) = answer {
+            } else {
+                Issue.record("W1…W3 ride X and get its 429's answer, as V does (visit-first): \(answer); \(layer)")
+            }
+        }
+        #expect(Self.sizes([layer.k, layer.others[1]]) == [16, 22] && yStarts == 0, "K gets O's bytes, J zz-j's, and Y is never requested (visit-first): \(layer), Y's starts \(yStarts)")
+        #expect(layer.violations.isEmpty, "\(layer.violations.prefix(3))")
+    }
+}
