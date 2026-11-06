@@ -21,9 +21,10 @@ extension EngineFollowBarrierTests {
     }
 
     /// `FollowBarrier.setUp` with a stepped bulk executor, so a test can hold a publication at its first store unit, and
-    /// `network` as the engine's network policy.
+    /// `network` as the engine's network policy; `metadata` is the store's metadata executor, the harness's own when `nil`
+    /// (a stepped one holds a claim or a free-space read).
     @available(macOS 15.0, iOS 18.0, *)
-    static func setUpHeldPublications(seed: UInt64, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy()) async throws -> (setup: FollowBarrier.Setup, bulk: SteppedBlockingExecutor) {
+    static func setUpHeldPublications(seed: UInt64, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy(), metadata: (any BlockingExecutor)? = nil) async throws -> (setup: FollowBarrier.Setup, bulk: SteppedBlockingExecutor) {
         let time = ManualTimeSource()
         let reserve = StoragePolicy().reserveFreeBytes
         let fileSystem = FakeFileSystem(
@@ -32,7 +33,7 @@ extension EngineFollowBarrierTests {
             configuration: FakeFileSystemConfiguration(importantCapacity: reserve + 32_000_000, opportunisticCapacity: reserve + 32_000_000)
         )
         let bulk = SteppedBlockingExecutor(holding: false)
-        let harness = EngineHarness.make(time: time, tuning: tuning, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), network: network, bulk: bulk, fileSystem: fileSystem)
+        let harness = EngineHarness.make(time: time, tuning: tuning, storage: StoragePolicy(minimumResidency: 0, deletionGrace: 60), network: network, metadata: metadata, bulk: bulk, fileSystem: fileSystem)
         let qBytes = EngineFixture.bytes(seed, count: 300)
         let q = EngineFixture.entry("q", qBytes)
         await harness.serveManifest([q])

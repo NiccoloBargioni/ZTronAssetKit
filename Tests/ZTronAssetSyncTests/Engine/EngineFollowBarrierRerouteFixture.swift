@@ -82,10 +82,11 @@ extension EngineFollowBarrierTests {
     /// The engine of an owed commit, before the test holds O's publication: v2 lists zz-o, zz-a1…zz-a<count> (on O's
     /// content) and `extra`; O downloads (held), with K and the moved ids' wanters on its job (the waiters on `lane`, the
     /// group on `groupLane`), under `network`. With `away`, the test's applies list zz-o on that content (site 3); the
-    /// test scripts its download where one is made.
+    /// test scripts its download where one is made. `metadata` is the store's metadata executor
+    /// (`setUpHeldPublications`).
     @available(macOS 15.0, iOS 18.0, *)
-    static func stageOwedCommit(seed: UInt64, moved count: Int = 3, extra: [ManifestEntry] = [], wanters: OwedWanters = .waiters, lane: AssetPriority = .userInitiated, groupLane: AssetPriority = .prefetch, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy(), away: Data? = nil) async throws -> OwedCommit {
-        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed, tuning: tuning, network: network)
+    static func stageOwedCommit(seed: UInt64, moved count: Int = 3, extra: [ManifestEntry] = [], wanters: OwedWanters = .waiters, lane: AssetPriority = .userInitiated, groupLane: AssetPriority = .prefetch, tuning: SyncTuning = SyncTuning(), network: NetworkPolicy = NetworkPolicy(), away: Data? = nil, metadata: (any BlockingExecutor)? = nil) async throws -> OwedCommit {
+        let (s, bulk) = try await Self.setUpHeldPublications(seed: seed, tuning: tuning, network: network, metadata: metadata)
         let engine = s.engine
         await engine.readForTests { $0.state.followIDsPerTurn = Self.owedIDsPerTurn }
         let oBytes = Self.owedOBytes(seed)
