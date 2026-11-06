@@ -7969,8 +7969,8 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
      ownership record (`79e1e0b`); reqs #10's stale records, the 12.x records, item 7's classification, item 5's
      `followedLane` record, item 8 and item 9's rows (`6c830b8`; under "Point 6: the records"); the sections for point
      2 (with f3c's open shapes and N25's three brought up to f3c's review) and point 4 (the whole class), and RR-25
-     (the commit after `6c830b8`). Next: the findings' states, the "Proposed document changes" of cycles 21 to 23, and
-     "Not verified".
+     (`5672c6d`); the "Proposed document changes" of cycles 21 to 23 (reqs #5; the commit after `5672c6d`). Next: the
+     findings' states and "Not verified (cycle 23)".
   4. Point 7, the close: not started.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
   `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
@@ -9614,13 +9614,100 @@ Cycle 20 adds:
   `Job.interestCounts` is settable inside the module, so the counts clause can be exercised. Only `Job`'s mutators
   change it in production code.
 
-Cycle 22 adds (S3-R27; the rest of the cycle's records come with its step 8):
+Cycle 21 adds (S3-R26; written in cycle 23, after cycle 21's reqs #9, under S3-R28 item 4 and the close ruling's point
+6):
+
+- **§7.10, "Follow barrier (F-28)": owed re-routes** (RR-21, `integrate-rr21.md`): add "A commit's or a superseded
+  publication's re-routes that do not fit its turn's ids are owed as one batch (`.reroutes`), which waits behind the
+  follow's events with its decision instant; the drain makes it at most a drain turn's ids a turn
+  (`continueReroutes`), an id with all its tokens. While a re-route is owed every publication waits before it binds
+  (`inboundBlocks`, the global hold) and is resumed in its jobs' order once the last batch is made
+  (`releaseRerouteHolds`). Each batch keeps a layer per copy adopted since it was owed, which pins the jobs publishing
+  at that apply, so an owed re-route follows the copy a visit-first engine's interest met: a job still at its end
+  holds it, and one that committed hands it the copy in force at that commit (`reroutePinCommits`). A listed join that
+  waits behind the barrier carries the same chain (`JoinChain`), and a join behind a waiting verdict or an unlisted
+  one follows the engine's copy." The residual-risk list gains RR-21's residuals, as under "Cycle 21", "Step 8".
+- **§7.10: owed answers** (item C, Phase 2, C12): add "A resolution of more than `answersPerTurn` (512) interests
+  computes every waiter's answer and takes every waiter and every settled ensure out of the state in its own turn, and
+  leaves only the resumes to the answer follow-ups, oldest first, `answersPerTurn` a turn (`owedAnswers`); shutdown
+  resumes the rest with their stored values. Each caller gets the value it got when every resume was made in the
+  commit's turn; only the moment it returns moves (an accepted order, S3-R26 item 10)."
+- **§7.9, "Events and backpressure"** (item C, Phase 1, `a78f913`): add "A commit's terminal events walk the
+  publication's binding in ascending order with no sort (`InterestOutcome.committed(_, ascending:)`, step C3;
+  T-ORDER), and `publishTerminal` sorts the subscribers' keys once for all of them (C8). `removeJob` retires only the
+  keys with a `lastEmitted` entry (C4), which the invariant's progress-gate clauses P1 to P3 check
+  (`progressGateViolations`, C9)."
+- **§10.2:** no new row. Cycle 21's two new `// REENTRANCY:` comments cite RE-S21 (an owned task's hop) and the
+  proposed RE-S43.
+- **§11:** the cycle-21 tests (`8e1fb24..d5b2ab9`), in the new files below and in existing ones (each step's commits
+  are under "Cycle 21"). BenchSync adds the six files authorised by S3-R27 item 11.6: `deferBehindVerdictTurns`,
+  `drainVerdictChainTurns`, `manyMovesTurns`, `partialMoveTurns`, `indexOwnCosts`, `commitTurns` and
+  `commitTwoStalledSubscribersTurns` (`BenchSyncCycle21.swift`); `joinChainTurns` (`BenchSyncJoinChains.swift`);
+  `commitRerouteWaitersTurns`, `supersededUserTurns`, `runSuperseded`, `commitTwoTokensTurns`, `userMovedToBound`,
+  `applyWhileOwedLayers` and `lane429WhileOwed` (`BenchSyncReroutePins.swift`); `movedBeforeDrainWaitersTurns` and
+  `movedBeforeAndAfterTurns` (`BenchSyncRerouteTakeOff.swift`); `commitRerouteDivergentTurns`, `groupMovedToBound`,
+  `groupDelistedAll`, `groupDelistedFit`, `purgeWhileOwedTurns` and `commitFitBoundaryTurns`
+  (`BenchSyncReroutes.swift`); `commitWaitersBoundTurns` (`BenchSyncWaitersBound.swift`).
+- **§1.2:** WP-F's 31 new test files, each a `.swift` file under `Tests/ZTronAssetSyncTests/Engine/`:
+  `EngineCommitWindowTests`, `EngineIDTokensTests`, `EngineOwedAnswersTests`, `MinHeapTests`, and 27 whose names start
+  `EngineFollowBarrier` (written `…` here): `…DeferBucketTests`, `…JoinGapFailureTests`, `…LaterApplyProbeTests`,
+  `…LaterVerdictTests`, `…MoveHoldersTests`, `…MoveIndexTests`, `…RerouteAnnounceTests`, `…RerouteCapturedTests`,
+  `…RerouteCommitTests`, `…RerouteComposeTests`, `…RerouteFixture`, `…RerouteHealTests`, `…RerouteHoldTests`,
+  `…RerouteInvariantTests`, `…RerouteLayerTests`, `…RerouteOwnerTests`, `…ReroutePinEndTests`, `…ReroutePresentTests`,
+  `…RerouteRequeueTests`, `…RerouteRunTests`, `…RerouteSupersedeTests`, `…RerouteTakeOffFixture`,
+  `…RerouteTakeOffShareTests`, `…RerouteTakeOffTests`, `…RunClaimTests`, `…SpaceReadTests` and `…WaitingTargetTests`.
+  The six benchmark files are under cycle 23's §1.2 entry. No new source file.
+- **§14:** the seams `holdAnswerFollowUps()` / `releaseAnswerFollowUps()` (`answerFollowUpsHeld`), which keep the
+  answers owed so a test meets the engine between two answer follow-ups; `EngineState.commitTurnMarksForTests`, told
+  when a commit's turn begins and ends so a benchmark times that one turn; and `EngineState.forgetIndexForTests`, which
+  forgets an asset's holders in the index, the state the invariant's clause I1 reports. No production path sets them.
+
+Cycle 22 adds (S3-R27; the §4.3 entry written in cycle 22, the rest in cycle 23 under S3-R28 item 4 and the close
+ruling's point 6):
 
 - **§4.3, the store's publication** (S3-R27 item 1; d1 review should-fix 4): add "`AssetStore.publish(_:binding:…)`
   returns locations only for ids of `binding`: `bindRecords` writes keys only from its ids, and `stillBound` only
   filters. The engine relies on it: when the locations are as many as the binding's ids, `publishTerminal` announces
   every id of the binding its job still holds without looking up a location (c3)." If the store ever returned another
   key, c3 would announce an unbound id, and only T-ORDER's `sweepFollowsFirst` case would catch it.
+- **§7.10, "Follow barrier (F-28)": the pin's end** (S3-R27 item 12.2; e1-R1, e1-PS): replace cycle 21's "one that
+  committed hands it the copy in force at that commit" with "one that committed, or whose publication the store
+  refused as superseded, hands it the copy in force at that commit or supersede; after an ENOENT re-queue, which keeps
+  the epoch, the pinned ids ride the fresh attempt until the first copy adopted after it (`PinEnd`, kept until the
+  barrier is down or shutdown)."
+- **§7.10: the dating of a re-lane at an ENOSPC end** (e1-P1, e1-P2): add "Inside a follow's visit, or the drain's
+  visit after a verdict, an input is dated by the count of applies; outside one, a replay's reading is dated by its
+  stamp's serial, which meets the attempt when it is at most the end's count (`metInItsAttempt`,
+  `AttemptEnd.stamped`, `WorldStamp.serial`)." The ENOSPC class stays a known residual risk (under "Cycle 23").
+- **§7.10, "Purge (R-CLN-6)": the first turn** (S3-R27 items 2 and 12.3; e2-A1.1 to e2-A1.7, e2-A2.5): after
+  "non-user interests on purged ids withdrawn" add "in the purge's first turn, before the store's await, from the jobs,
+  the groups and the waiting events (`withdrawPurged`): each job in one access (`Job.withdrawPurged`), under `.all`
+  whole and with no lookup, a group's member in one access and one hash (`Group.dropMember(_:waitingFor:)`), and the
+  retired jobs' `.retry` deadlines off the heap in one pass (`EngineState.retiredRetries`)". The purge's six known
+  misses of C2 are under "Cycle 23".
+- **§7.9, "Events and backpressure"** (S3-R27 item 1; d1's route (a) with c3): add "A batch of events reaches each
+  subscriber queue in one access (`broadcastAll`, `SubscriberQueue.publishAll`; a3), and the observers are evaluated
+  once for the batch. A terminal publish hashes once (a1); a queue's slot table grows at most once a batch, and only
+  when `slots.count + n > 2 × slots.capacity` (a2); a commit whose ids are all bound announces them with no lookup
+  (`allBound`, c3)."
+- **§10.2, RE-S24's row** (S3-R27 item 12.3; e2 §1.1; S3-R6): replace "afterwards jobs for purged ids are removed or
+  re-queued (user waiters)" with "the purged ids' non-user interests were withdrawn from jobs, groups and waiting
+  events in the purge's first turn, before the await (`withdrawPurged`; user waiters keep theirs and re-queue);
+  afterwards the bindings learned meanwhile are dropped (L4-R5), and the snapshot and the store's deadline are
+  refreshed". The code makes the withdrawals before the await (`performPurge`), and the row puts them after it. No
+  new `await` in an actor this cycle.
+- **§11:** the cycle-22 tests (`d5b2ab9..9aa337c`; each step's commits are under "Cycle 22"), in the new files below
+  and in existing ones. BenchSync adds `commitReannounceTurns` and `commitFailedArmTurns` (`BenchSyncCycle22.swift`),
+  and `purgeTurns(_:)` over twelve shapes and `purgeJoinsTurns(_:)` at the bucket and the queue
+  (`BenchSyncCycle22Purge.swift`), whose six purge misses are red by the owner's ruling.
+- **§1.2:** WP-F's new test files, under `Tests/ZTronAssetSyncTests/Engine/`: `EngineCommitBatchTests.swift`,
+  `EngineFollowBarrierAfterVerdictSpaceTests.swift`, `EngineFollowBarrierRequeueEdgeTests.swift`,
+  `EngineFollowBarrierRequeueRemovalTests.swift`, `EngineFollowBarrierReroutePinSpaceTests.swift`,
+  `EngineFollowBarrierReroutePinSupersedeTests.swift`, `EngineFollowBarrierVerdictRecordTests.swift`,
+  `EnginePurgeWithdrawalTests.swift` and `SubscriberQueueBatchTests.swift`. The two benchmark files are under cycle
+  23's §1.2 entry. No new source file.
+- **§14:** no new seam. `EngineState.commitTurnMarksForTests` also marks a 404's resolution (`bb42dc1`) and a purge's
+  first turn (`1ccf796`); no production path sets it.
 
 Cycle 23 adds (S3-R28 and the owner's close ruling):
 
@@ -9631,6 +9718,22 @@ Cycle 23 adds (S3-R28 and the owner's close ruling):
   `SyncBenchmarks` and `SyncBench` extensions and the helper types they use, declared in that file; no helper type's
   name collides with another work package's, and no file edits another work package's benchmark file." The files and
   their helper types are listed under "Authorised edits outside WP-F".
+- **§7.10, "Purge (R-CLN-6)"** (S1, the owner's close ruling point 5): add "A purge's first turn that holds the engine's
+  actor longer than C2's 10 ms (`SyncEngine.turnTimeLimit`) writes one `.info` line on `.sync`: `long purge turn: <ms>
+  ms, <jobs> jobs, <groups> groups`, the milliseconds with two decimals and the counts as the turn began. It names no
+  id, hash, URL, path or key. Its text, category, level and threshold are a soft contract: an app counts the purge's
+  long turns through its `LogSink` or `OSLogStore`, the re-open criterion of the purge's known misses." The decision
+  (ADR-057, NEEDS-HUMAN-REVIEW only if S2 to S4 are chosen later) is under "Point 5".
+- **§11, R-OBS-1:** add `EngineLongPurgeTurnLogTests` (`e7cf01a`, red first; green from `f38dd8c`): a first turn of
+  11 ms on the injected clock writes exactly the line, and one of exactly 10 ms writes none.
+- **§11:** the other cycle-23 test changes: A-T-SD's set-up (`03c4e59`: `holdRetry: true`, a visited-first set-up
+  check), d5's pin in `barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued` (`3a551f4`), and run 12's guard and
+  five kill tests (`29dfb12`, `64f276d`, `1b911a1`, `486ee2a`, `8b252f2`, `06880a8`, `9e9a500`). No new benchmark.
+- **§1.2:** WP-F's new test file `Tests/ZTronAssetSyncTests/Engine/EngineLongPurgeTurnLogTests.swift`. No new source
+  file.
+- **§10.2:** no new row: S1 adds no `await`.
+- **`docs/RESIDUAL-RISKS.md` (Stage 5):** RR-24 and RR-25 (under "Residual risks (S3-R16; cycle 23)"), the ENOSPC
+  class as a known residual correctness risk, and the known misses of C2's 10 ms limit (both under "Cycle 23").
 
 ## Gate evidence (cycle 1)
 
