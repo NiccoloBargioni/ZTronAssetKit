@@ -1086,6 +1086,28 @@ struct Job {
         return off
     }
 
+    /// Keeps `lane` as the job's lane (`heldLane`) once it has no interest left, in place, and returns the content a
+    /// claim that keeps it names (`ClaimKey`); `nil`, with nothing changed, while it has interests
+    /// (`SyncEngine.settleRemoval`).
+    mutating func holdIfUnwanted(_ lane: AssetPriority) -> ClaimKey? {
+        guard self.interests.isEmpty else {
+            return nil
+        }
+        self.heldLane = lane
+        return ClaimKey(job: self)
+    }
+
+    /// What `SyncEngine.retire` reads of a job with no interest left: its state and its running attempt; `nil` while it
+    /// has interests. Mutating only so that the engine reads it through the table's in-place access
+    /// (`Dictionary.subscript(_:)`'s `_modify`) rather than its getter, which copies the job: every reference the job
+    /// holds retained and released once per read (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.7).
+    mutating func retirement() -> (state: JobState, active: ActiveAttempt?)? {
+        guard self.interests.isEmpty else {
+            return nil
+        }
+        return (self.state, self.active)
+    }
+
     /// Withdraws in place what a purge removes from the job (`SyncEngine.withdrawPurged`): from each non-user interest
     /// other than a waiter's, in ascending token order, its ids `isPurged` names. An interest left with none is removed
     /// (`setInterest`), the job's lane read before each removal; one left with some loses them (`subtractAssets`). One

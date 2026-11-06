@@ -422,8 +422,9 @@ extension SyncEngine {
     /// removal (`Job.heldLane`), while a claim on its content keeps it, and is retired otherwise; one left with interests
     /// is re-laned from `before`, its lane before the first removal.
     func settleRemoval(_ transfer: TransferID, before: AssetPriority, last: AssetPriority) {
-        if self.state.jobs[transfer]?.interests.isEmpty == true, let key = self.state.jobs[transfer].map(ClaimKey.init(job:)) {
-            self.state.jobs[transfer]?.heldLane = last
+        // One access to the job keeps `last` and names the claim's content (`Job.holdIfUnwanted`): read through the
+        // table's getter, the job was copied twice (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.7).
+        if let key = self.state.jobs[transfer]?.holdIfUnwanted(last) {
             if self.state.claims[key] != nil {
                 // Kept for the claim: its last end retires the job (`dropClaim`).
                 self.state.claimHeld[key] = transfer
@@ -439,7 +440,9 @@ extension SyncEngine {
     /// The one synchronous removal funnel (ARCHITECTURE §7.1): a job with no interest that is not verifying or
     /// committing is removed and its transfer cancelled; out of verifying/committing it is removed when that ends.
     func retire(_ transfer: TransferID) {
-        guard let job = self.state.jobs[transfer], job.interests.isEmpty else {
+        // Read in place (`Job.retirement`), with no copy of the job (Stage 3 close-out cycle 22, S3-R27 item 12.3,
+        // e2-A1.7).
+        guard let job = self.state.jobs[transfer]?.retirement() else {
             return
         }
         switch job.state {
