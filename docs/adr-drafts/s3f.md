@@ -6926,7 +6926,10 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    **committed**. Committed: `99a573d` (r7's removal); `50029e9` (the epoch clause's test, red) and `a798250`
    (`replayVerdict`'s removal with the clause); `7961008` and `17a851a` (b23); `8c5c4c6` (the settle slice); `4ca9044`
    (f7). The kills are recorded under step 2 below.
-3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): **in progress**.
+3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): **committed**. Committed: `bb42dc1` (the
+   404 resolution's turn marks, behaviour-free); `06c9ddf` (`commitReannounceTurns`, red); `5f7db46` (a1, a2, a3 and c3,
+   with T-A-1, T-A-2, T-A-3 and `commitFailedArmTurns`). `waitersStalledSubscriber` is 6.38 ms after the step, so c1 is
+   not taken; `manyGroups` is 7.80 ms, so c6 is not taken. The figures and the kills are under step 3 below.
 4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
 5. Item 3, in its sub-steps: not started.
 6. Item 4: not started.
@@ -7278,6 +7281,127 @@ names (`git archive`, `.build-s3f/c22/snap-*`), 2/2 in its list, and no kill bel
 The Sync bundle on `4ca9044`, step 2's last commit: 697 tests in 56 suites passed (`.build-s3f/c22/s2-sync.log`,
 02:37 to 02:43, 1-minute loads 2.79 and 2.40). Every mutant of this step is disposed of: r7 removed, r6 re-killed,
 the two clauses, b23 ×2, the settle slice and f7 killed; r8 waits for step 7.
+
+### Step 3: item 1, d1's route (a) with c3
+
+Item 10's step 3, with item 11.7's conditional parts (c1, and c6 for `commitTurns(.manyGroups)`).
+
+- **The seam** (`bb42dc1`, behaviour-free). `commitTurnMarksForTests` also marks a 404's resolution, from its
+  `recordFailure` await to the end of `resolveAll` (`EngineFailures.swift`), as step 0's copy did (`snap-seams.py`), so
+  that `commitFailedArmTurns` times the `.failed` arm's turn inside the actor. No production path sets it. The Sync
+  bundle on `bb42dc1`: 697 tests in 56 suites passed (`.build-s3f/c22/seam-sync.log`, 02:44 to 02:50 on 6 Nov, 1-minute
+  loads 2.02 and 2.59).
+- **The red case** (`06c9ddf`, on its own). `commitReannounceTurns` (`BenchSyncCycle22.swift`) is
+  `commitTurn(.waitersStalledSubscriber)` with the stalled queue already holding all 10,000 ids' `assetAvailable` from an
+  earlier commit of the same ids, whose blobs a purge of `.all` removed first (a purge publishes no per-id event, and a
+  stale location would answer the waiters at once). It requires `heldBefore == 10,000` and the commit's setup. On
+  `bb42dc1`: 11.08, 10.88 and 10.79 ms, best 10.79 (in-actor turn best 10.79), at 1-minute loads 9.57 to 8.88: a miss,
+  as on `d5b2ab9` (10.70 ms, step 0; `.build-s3f/c22/each/red3-reannounce.log`). A first run right after the release
+  build read 11.53, 10.96 and 10.71 ms at a load of 18.64 and is not counted.
+- **The step** (`5f7db46`, one commit):
+  - a1: `SubscriberQueue.publish` hashes a terminal slot once. The progress arm comes first
+    (`slot.isProgress, var live = self.slots[slot], …`); then `updateValue` stores the event at the tail and reports
+    `replaced`. `peakLiveCount` is also raised after a move, which changes nothing: only an insert raises the live count.
+  - a2: `publishAll` reserves `slots.count + n` only when `slots.count + n > 2 × slots.capacity` (d1 review M1).
+    `order` is never reserved.
+  - a3: `publishAll(_:from:)` publishes a batch with consecutive sequences and returns at most the first event's
+    hand-off, with the count of moves. `broadcast(_:to:)` is `broadcastAll(CollectionOfOne(event), to:)`, so every
+    publication takes one path. `broadcastAll` resumes the hand-offs after every queue is published, and evaluates the
+    observers once per batch.
+  - c3: `publishTerminal`'s `.committed` arm sets `allBound = locations.count == ascending.count` and filters
+    `(allBound || locations[asset] != nil) && job.assets.contains(asset)` once, into `announced`. Its doc comment names
+    WP-B's contract that `AssetStore.publish` returns locations only for ids of `binding`.
+  - Exclusivity (d1 review should-fix 2): `generation` is captured into a local before any queue's access; the ids are
+    filtered once into `announced`; the events passed are `announced.lazy.map { … }`, with no lazy filter; nothing inside
+    the access reads `self.state`. The `.failed` arm passes `job.assets.sorted().lazy.map { … }` (S3-R26 answer 2).
+  - The one difference (d1 §3): observers are evaluated once per batch, an empty batch included (an `announced` with no
+    id, where no evaluation ran before). Every predicate grepped in cycle 21 is monotone over a batch; that all are is
+    UNCONFIRMED, as d1 says.
+- **Tests** (in `5f7db46`):
+  - T-A-1, `terminalPublishReportsAMoveAndMovesToTheTail` (`SubscriberQueueBatchTests.swift`): `assetAvailable(a)`,
+    `(b)`, then `assetFailed(a)`. The first two report `coalesced == false` and the third `true`; `liveCount` and
+    `peakLiveCount` are 2; the takes are b, then a's `assetFailed`.
+  - T-A-2, `publishAllMatchesOnePublishPerEvent` (seeds 1, 2 and 3): 3,000 seeded batches of 1 to 12 events (terminal
+    events of 24 subjects, their transfers' progress, two runs' progress, the snapshot), with retires and takes between
+    them, through `publishAll` into one queue and one `publish` per event into another. The takes, the live and peak
+    counts, the stored order and the move counts are identical, and no batch hands off. Then a 12-event batch goes into
+    an empty queue whose pull waits, inside that pull's `withCheckedContinuation` (d1 review should-fix 9): both paths
+    hand the pull the batch's first event, keep the rest alike and end the wait. A publication that hands nothing off
+    leaves the test to resume the pull with `nil`, so a mutant fails without a hang.
+  - T-A-3, `commitBatchReachesAWaitingAndAStalledSubscriber` (`EngineCommitBatchTests.swift`, both orders): zz-t1 to
+    zz-t3 share X's content, each with a user waiter. zz-t1 first failed on W's content (v2, a 404), so the stalled
+    subscriber, which reads nothing, holds its `assetFailed` slot (d1 review should-fix 3's example). An earlier commit
+    instead, as first written, left W's stale bytes to answer zz-t1's waiter at once (`isStale: true`, 12 bytes), so X's
+    job never held three interests. X's publication is held while v4 makes the follow owe its visits (swept first) or
+    ends it (visited first). The other subscriber drains its queue, and its pull waits; that is polled, because a waiting
+    pull notifies no observer (the first draft's `awaitCondition` on it ran to its time limit). The four checks: the pull
+    is handed zz-t1's `assetAvailable` and the queue then holds zz-t2's and zz-t3's; the stalled queue holds the three,
+    ascending, zz-t1's moved to its tail; over the commit, `eventsCoalesced` grows by one and `eventsDelivered` by one.
+    Green in both orders (`.build-s3f/c22/ta3-run2.log`).
+  - `commitFailedArmTurns` (BenchSync, gated at C2; d1 review M3): 10,000 user waiters on one job, whose 404
+    `resolveAll(.failed)` resolves at `.userInitiated`, with one stalled subscriber. It met on `d5b2ab9` (9.10 ms, step
+    0), so it lands with the step.
+  - T-ORDER (`commitAnnouncesItsBoundIDsInAscendingOrder`), T-A-1, T-A-2 and the `subscriberQueue*` tests were green on
+    the tree before the commit (`.build-s3f/c22/item1-t1.log`). The Sync bundle on `5f7db46`: 700 tests in 56 suites
+    passed (`.build-s3f/c22/s3-sync.log`, 03:24 to 03:30, 1-minute loads 11.20 and 2.67; it decides no timing). The
+    unsafe gate (0 escapes) and the docs gate (1,281 of 1,281) pass.
+- **Figures after the step** (`5f7db46`, release with `-enable-testing`; `.build-s3f/c22/tools/wt-bench.sh` waits for a
+  1-minute load of 10 or less before each case; logs `.build-s3f/c22/each/after1-*.log`). The four `commitTurns` shapes
+  run in one invocation, whose loads are given.
+
+| Case | Heartbeat, three runs, ms | Best | In-actor turn, best | 1-minute loads | `d5b2ab9` (step 0), best | Reading |
+|---|---|---|---|---|---|---|
+| `commitTurns(.waiters)` | 6.05, 6.02, 6.05 | 6.02 | 6.02 | 9.77 to 7.72 | 7.53 | met |
+| `commitTurns(.waitersStalledSubscriber)` | 7.07, 7.26, 6.38 | 6.38 | 6.37 | 9.77 to 7.72 | 10.78, a miss | met, at or below 8.5 ms |
+| `commitTurns(.groupStalledSubscriber)` | 5.11, 5.14, 4.80 | 4.80 | 4.79 | 9.77 to 7.72 | 8.81 | met |
+| `commitTurns(.manyGroups)` | 7.91, 7.80, 7.83 | 7.80 | 7.80 | 9.77 to 7.72 | 9.58 | met, at or below 8.5 ms |
+| `commitTwoStalledSubscribersTurns` | 7.01, 7.24, 6.90 | 6.90 | 6.90 | 7.72 to 7.26 | 13.78 | recorded (open, for the owner) |
+| `commitReannounceTurns` (gated) | 7.15, 6.93, 6.90 | 6.90 | 6.89 | 7.26 to 6.84 | 10.70, a miss | met |
+| `commitFailedArmTurns` (gated) | 5.92, 6.09, 6.01 | 5.92 | 5.92 | 6.84 to 6.53 | 9.10 | met |
+
+- **The decision rule.** `commitTurns(.waitersStalledSubscriber)`'s heartbeat, best of 3, is 6.38 ms, at or below 8.5
+  ms: item 1 closes, and c1 is not taken (T-C1-1 and its BenchSync row are not built). `commitTurns(.manyGroups)` is
+  7.80 ms, at or below 8.5 ms: c6 is not taken. Both new cases are met. No figure of the item is between 8.5 and 10 ms,
+  so none goes to item 9's margin list. The two-subscriber figure, 6.90 ms, is recorded with its loads and stays "open,
+  for the owner" (S3-R26 answer 4): this measurement neither accepts nor closes it. Route (b) is not started.
+- **The fall is larger than d1's model.** d1's central figure left 1.36 to 1.72 ms per stalled subscriber; the
+  measured difference between the stalled and the plain shape is now 0.36 ms, and the plain shape itself fell 1.51 ms.
+  One evaluation of the observers per batch instead of one per event (10,000 per commit) is a likely share of it; no
+  profile was taken, so the split is UNCONFIRMED. It changes no decision.
+- **PROBE-C22-PUBLISH's four variants** are code variants, measured once, at step 0 (under "Step 0"). After the step
+  `publish` is a1, and the engine's call of `publishAll` is specialized inside the module. They are evidence, not a gate.
+- **Kills** (on `5f7db46`'s snapshot `.build-s3f/c22/snap-s3`; `.build-s3f/c22/tools/mut-s3.py` and `mut-s3.sh`, results in
+  `.build-s3f/c22/mut-s3.txt`). Each is 2/2 in its list, and none came from a hang or a time limit.
+
+| Mutant: original → mutant | Kill | Where |
+|---|---|---|
+| a1-replaced-false: `return (nil, replaced)` → `return (nil, false)` | T-A-1, 2/2 | `SubscriberQueueBatchTests.swift:18`: the move is not reported |
+| a1-replaced-true: `return (nil, replaced)` → `return (nil, true)` | T-A-1, 2/2 | `:17`: a fresh subject is reported as moved |
+| a1-no-isprogress: `if slot.isProgress, var live = self.slots[slot], …` → `if var live = self.slots[slot], …` | T-A-1, 2/2 | `:20` and `:21`: a keeps its first place |
+| a3-no-handoff: the hand-off's `if let` → `_ = published.handOff` | T-A-2, 2/2, each seed | `:142`: the test resumes the pull with `nil`, with no hang |
+| a3-coalesced-never: `coalesced ? 1 : 0` → `coalesced ? 0 : 0` | T-A-3, 2/2, both orders | `EngineCommitBatchTests.swift:96`: the moves do not grow |
+| a3-coalesced-always: → `coalesced ? 1 : 1` | T-A-3, 2/2, both orders | `:96`: six moves for the commit |
+| a3-coalesced-flipped: → `coalesced ? 0 : 1` | T-A-3, 2/2, both orders | `:96`: five moves for the commit |
+| c3-allbound-true: `let allBound = locations.count == ascending.count` → `let allBound = true` | T-ORDER, 2/2, both orders | `EngineCommitWindowTests.swift:65`: the eight ids are announced, zz-o5 included |
+
+The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
+
+- **c3's forced `true` is killed in both orders, not only swept first.** The ruling asks for 2/2 in `sweepFollowsFirst` and
+  for the draft to cite why `followVisitedFirst` cannot reach the state: d1 review's Settled 3 says that the visit took
+  zz-o5 off `job.assets` before the commit. On `5f7db46` that premise does not hold: visited first, the mutant's commit
+  announced zz-o1 to zz-o8 in both runs, so zz-o5 was still in X's `job.assets` at the commit (X was publishing, held at
+  its first store unit, when v4's visit came). Which path keeps it there was not traced (UNCONFIRMED). The kill is
+  stronger than the ruling asks; no reason is cited for a state the observation shows reachable.
+
+- **Equivalent, with the arguments (S3-R19 item 2).**
+  - a2's reservation dropped, or its guard dropped (a reservation every time): either changes only the slot table's
+    capacity. The content, the order, `liveCount`, `peakLiveCount` and `storedOrderCount` are those of the inserts,
+    which do not depend on the capacity. The over-reservation is bounded by the batch's ids, which are subjects (H-9).
+    The BenchSync cases pin the cost.
+  - c3 dropped ("always look up"): when every id is bound, the lookups pass every id, so the filter keeps the same ids.
+    It costs one hash per id.
+- **Records.** The ARCHITECTURE §4.3 proposal for c3's dependency is under "Proposed document changes", "Cycle 22 adds"
+  (S3-R6). `publishTerminal`'s doc comment names it.
 
 ## Items
 
@@ -8292,6 +8416,14 @@ Cycle 20 adds:
   admission (transfer, ticket, queue place, attempt) in the engine's order. No production path sets it.
   `Job.interestCounts` is settable inside the module, so the counts clause can be exercised. Only `Job`'s mutators
   change it in production code.
+
+Cycle 22 adds (S3-R27; the rest of the cycle's records come with its step 8):
+
+- **§4.3, the store's publication** (S3-R27 item 1; d1 review should-fix 4): add "`AssetStore.publish(_:binding:…)`
+  returns locations only for ids of `binding`: `bindRecords` writes keys only from its ids, and `stillBound` only
+  filters. The engine relies on it: when the locations are as many as the binding's ids, `publishTerminal` announces
+  every id of the binding its job still holds without looking up a location (c3)." If the store ever returned another
+  key, c3 would announce an unbound id, and only T-ORDER's `sweepFollowsFirst` case would catch it.
 
 ## Gate evidence (cycle 1)
 
