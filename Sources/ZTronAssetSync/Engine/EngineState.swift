@@ -64,6 +64,11 @@ struct EngineState {
     /// and its deferred verdict record the count at their instant (`Job.attemptEnd`), so a later visit tells an apply a
     /// visit-first engine visited the job at before them from one after (Stage 3 close-out cycle 16, ruling S3-R19 item 1).
     var appliesFollowed: UInt64 = 0
+    /// The decision instants `SyncEngine.worldStamp()` minted, counted over the engine's life: a stamp carries its place
+    /// (`WorldStamp.serial`) and a publication's end the count at its instant (`AttemptEnd.stamped`), so the drain tells an
+    /// event that arrived before that end from one that arrived after, which the clock cannot (Stage 3 close-out cycle 22,
+    /// ruling S3-R27 item 12.2's e1-P1). Never reset: an end recorded under one barrier is read under a later one.
+    var stampsMinted: UInt64 = 0
     /// The follows that ended (`SyncEngine.continueFollow`), counted: a job's re-route set belongs to the follow owed when
     /// it was recorded (`Job.rerouteFor`) and is spent once that follow has ended (cycle 16, PROBE-C15C-STALE-REROUTE).
     var followsEnded: UInt64 = 0

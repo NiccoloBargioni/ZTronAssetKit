@@ -744,7 +744,7 @@ extension EngineFollowBarrierTests {
         let late = await engine.violations { state in
             let views = state.worldHistory.count
             if let first = state.joinsBehindVerdicts[key]?.first {
-                state.joinsBehindVerdicts[key]?[0] = JoinBehindVerdict(join: first.join, stamp: WorldStamp(at: first.stamp.at, view: views))
+                state.joinsBehindVerdicts[key]?[0] = JoinBehindVerdict(join: first.join, stamp: WorldStamp(at: first.stamp.at, view: views, serial: first.stamp.serial))
             }
         }
         #expect(late == ["1 joins wait behind verdicts with decision instants over \(shape.views) views"], "a join whose decision instant is past the world history: \(late)")

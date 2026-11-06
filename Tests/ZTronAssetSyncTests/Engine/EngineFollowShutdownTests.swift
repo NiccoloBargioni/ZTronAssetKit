@@ -81,7 +81,7 @@ extension EngineFollowBarrierTests {
         let view = WorldView(throttle: nil, breaker: nil, conditions: ConditionsSnapshot(conditions: nil, pausedForThermal: false), edgeSerial: 0)
         let waiting: @Sendable (inout EngineState) -> Void = { state in
             state.eventsAfterFollow = [.throttleAnswers]
-            state.eventStamps = [WorldStamp(at: .zero, view: 0)]
+            state.eventStamps = [WorldStamp(at: .zero, view: 0, serial: 1)]
             state.worldHistory = [view]
         }
         let running = await engine.violations { state in

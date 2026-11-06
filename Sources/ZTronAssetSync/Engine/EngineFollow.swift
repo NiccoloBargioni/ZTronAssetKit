@@ -276,8 +276,9 @@ extension SyncEngine {
     // MARK: One view of the world per decision instant (Stage 3 close-out cycle 12, S3-R15 item 1)
 
     /// The decision instant now: the instant and the view of the non-ledger real-world inputs as they stand
-    /// (`WorldView`), appended to `worldHistory` when it differs from the last view. Under a reading (a visit or a
-    /// replay) it is that reading: nothing a visit or a replay decides is an input of its own.
+    /// (`WorldView`), appended to `worldHistory` when it differs from the last view, and the next serial
+    /// (`EngineState.stampsMinted`). Under a reading (a visit or a replay) it is that reading: nothing a visit or a
+    /// replay decides is an input of its own.
     func worldStamp() -> WorldStamp {
         if let reading = self.state.reading {
             return reading
@@ -292,7 +293,8 @@ extension SyncEngine {
         if self.state.worldHistory.last != view {
             self.state.worldHistory.append(view)
         }
-        return WorldStamp(at: self.environment.time.monotonicNow(), view: self.state.worldHistory.count - 1)
+        self.state.stampsMinted += 1
+        return WorldStamp(at: self.environment.time.monotonicNow(), view: self.state.worldHistory.count - 1, serial: self.state.stampsMinted)
     }
 
     /// Runs `body` under the decision instant `stamp` (`EngineState.reading`): `decisionNow()` is its instant, the
@@ -358,7 +360,7 @@ extension SyncEngine {
             return
         }
         self.state.worldHistory.append(view)
-        self.state.reading = WorldStamp(at: stamp.at, view: self.state.worldHistory.count - 1)
+        self.state.reading = WorldStamp(at: stamp.at, view: self.state.worldHistory.count - 1, serial: stamp.serial)
     }
 
     /// Ends the world history once the barrier is down (`EngineState.worldHistory`): no decision reads an older view
@@ -525,7 +527,7 @@ extension SyncEngine {
     /// PROBE-C15C-ENOSPC-PASSED). A mark whose verdict is given at once, with no follow owed, is never read: any visit
     /// after it belongs to a later apply.
     func recordPublicationEnd(_ transfer: TransferID) {
-        let end = AttemptEnd(failedAfter: self.state.appliesFollowed, deferredAfter: nil)
+        let end = AttemptEnd(failedAfter: self.state.appliesFollowed, deferredAfter: nil, stamped: self.state.stampsMinted)
         self.state.jobs[transfer]?.attemptEnd = end
     }
 
@@ -1906,13 +1908,18 @@ struct WorldView: Sendable, Equatable {
     let edgeSerial: UInt64
 }
 
-/// A decision instant while the follow barrier holds: when, and the view of the world then (an index into
-/// `EngineState.worldHistory`).
+/// A decision instant while the follow barrier holds: when, the view of the world then (an index into
+/// `EngineState.worldHistory`), and its place among the instants minted.
 struct WorldStamp: Sendable, Equatable {
     /// The instant.
     let at: MonotonicInstant
     /// The view's index in `EngineState.worldHistory`.
     let view: Int
+    /// The instant's place among those `SyncEngine.worldStamp()` minted (`EngineState.stampsMinted` once it was minted;
+    /// never 0): an event the drain applies arrived before a publication's end when its stamp's serial is at most the
+    /// count the end recorded (`AttemptEnd.stamped`). The clock cannot tell them apart, as many instants share a reading
+    /// of it (Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-P1).
+    let serial: UInt64
 }
 
 /// The lane-wide conditions an event read when it arrived (`WorldView.conditions`).
@@ -1951,6 +1958,12 @@ struct AttemptEnd: Sendable, Equatable {
     /// the job's content had joined the job before the verdict on a visit-first engine, whose visit at the apply that
     /// mapped it there met the job in its attempt (`SyncEngine.joinWaitsForVerdict`; Stage 3 close-out cycle 21).
     var copy: ValidatedManifest?
+    /// The decision instants minted when the attempt's publication ended (`EngineState.stampsMinted`,
+    /// `SyncEngine.recordPublicationEnd`); `nil` for any other end, and once the verdict deferred, which `relane` reads
+    /// first. An event the drain applies with a stamp at most this serial arrived while the job still published, so a
+    /// visit-first engine's input met the job publishing, whose re-lane re-queues nothing (`SyncEngine.relane`; Stage 3
+    /// close-out cycle 22, ruling S3-R27 item 12.2's e1-P1).
+    var stamped: UInt64?
 }
 
 /// A join that waits for the follow (`EventAfterFollow.join`): what `addInterest` was called with.
