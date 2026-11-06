@@ -6918,9 +6918,10 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    item 4's 'before' figures are taken at the start of steps 5 and 6 (the deviation below).
 1. Item 12.2 (correct #1), then the unnamed blocking findings of class S3-R16 1(a) to 1(d): **in progress**. Committed:
    `b603475` (T-E1, T-E3 and T-E4, red); `5ad245d` (e1-R1, with rr21-T8b's and the PIN-END invariants test's changes,
-   T-E2 and T-E5; the regression controls green in both orders); `34b299c` (e1-PS, red) and `b4eebb1` (its fix). Next:
-   the probes e1-P1, e1-P2, e1-P3 and e1-PR. No unnamed 1(a) to 1(d) finding exists: every blocking finding of the file
-   is named by S3-R27 (the mapping below).
+   T-E2 and T-E5; the regression controls green in both orders); `34b299c` (e1-PS, red) and `b4eebb1` (its fix);
+   `94aa4b5` (e1-P1, red), `b83112c` (its seam, behaviour-free), `9005651` (its bound and other side, red) and `58e2c1c`
+   (its fix). Next: the probes e1-P2, e1-P3 and e1-PR. No unnamed 1(a) to 1(d) finding exists: every blocking finding of
+   the file is named by S3-R27 (the mapping below).
 2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): not started.
 3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
 4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
@@ -7089,6 +7090,57 @@ owe): rr21-T8b as changed, T-E1 to T-E5, and the regression controls of 12.5.7 (
   On `b4eebb1` both e1-PS tests and the controls above passed in both orders (25 tests,
   `.build-s3f/c22/ps-fix-run.log`), and the Sync bundle passed whole: "Test run with 688 tests in 56 suites passed after
   354.368 seconds" (`.build-s3f/c22/ps-fix-sync.log`). Its branches' kills are step 7's (12.5.4).
+- **e1-P1: red, fixed.** `EngineFollowBarrierReroutePinSpaceTests.swift` (`pinSpaceRead`) is `pinEnd`'s shape with X's
+  publication failing ENOSPC at an interactive cap of one attempt: K0 maps zz-a1…zz-a3 to X's content, O's commit owes
+  their re-routes, K1 maps them to W's content while X publishes (K1's layer pins X); X's placement rename then fails
+  ENOSPC, and the free-space read that follows is held on the store's metadata executor while the follow's and the
+  drain's turns run. Visit-first: O's commit re-routed W1…W3 onto X publishing, K1's visit passed X, and the ENOSPC's
+  verdict answered V2 and W1…W3 with the space figures; X requested once, W never. A first form on `RacingSource` hung to
+  the time limit (its cancel ends no stream, so a fresh attempt's 404 never came); the committed form runs on the
+  scripted source, through `stageOwedCommit`'s and `setUpHeldPublications`' new `metadata:` parameter. On `b4eebb1` it
+  was red in both orders (`94aa4b5`, the failing test alone; `.build-s3f/c22/e1-p1-red.log`): the drain's replay of the
+  batch joined zz-a1 onto X (failed, its end recorded, its verdict not yet deferred), `relane`'s T20 re-queued X, so
+  zz-a2 and zz-a3 found X off its end with no record and went to W by the engine's copy; X's fresh attempt got the 404
+  ("X at the drain's end failed(untilEntryChanges) holding [zz-a1, zz-x] … W … holding [zz-a2, zz-a3]; X started 2
+  times, W 1"), and V2 and W1…W3 got `.notFound`.
+
+  The design. `relane`'s guard held for the follow's own visit (`inFollowVisit`, dated by the applies followed) and for
+  a verdict already deferred, not for the drain's replays; e1 §3 names both the pin's replay and a user join. Options: (a)
+  add the drain to the visit's clause with the same count of applies; (b) date the replayed event against the end. (a)
+  is smaller but wrong on the other side: an event that arrived inside the read, with no apply since the end, would keep
+  X failed where visit-first's request met X failed and re-queued it (T20, the verdict skipped). The clock cannot tell the
+  two apart (many instants share one reading of it). Chosen: (b). Every stamp `worldStamp()` mints carries its place
+  (`WorldStamp.serial`, `EngineState.stampsMinted`, never reset, so an end kept across barriers is read right), and
+  `recordPublicationEnd` keeps the count at the end (`AttemptEnd.stamped`; `b83112c`, which nothing read yet).
+  `metInItsAttempt(_:)` (`58e2c1c`): inside a visit, the count of applies as before; outside one, a reading with a serial
+  at most `stamped`. Outside a visit only the drain's replays set a reading that can re-lane (`verdictAnswers`' reading
+  computes an answer only), so the drain needs no flag of its own. The drain's visit after a verdict
+  (`visitingAfterVerdict`) is left out: it stands for visits at the applies since that verdict, not for the verdict's
+  arrival (e1-P2 probes it). `relane`'s doc and comment say the rule.
+
+  The other cases (`9005651`, red on `b83112c` in both orders, `.build-s3f/c22/e1p1-red.log`): the bound,
+  `userJoinFromJustBeforeAnENOSPCReplayedInItsReadGetsItsVerdict`, a user request V3 whose join is the last instant
+  minted before X's end (the setup requires `stamped` to equal its serial), expects visit-first's ENOSPC answers for V2,
+  V3 and W1…W3; the other side, `userJoinFromInsideAnENOSPCsReadSkipsItsVerdict`, V3's request made inside the held read,
+  expects T20: X's fresh attempt serves V2 and V3 its 18 bytes, and its commit binds zz-x only, so W1…W3 follow K1's copy
+  to W's 404; X starts twice, W once. Red, the bound failed as e1-P1 did, and the other side hit the 3-minute limit
+  (W1 cancelled, W started twice). One-to-one test changes (WP-F's own tests): the two `WorldStamp(at:view:)` literals,
+  `EngineFollowBarrierDeferBucketTests.swift:747` (now the entry's own serial) and `EngineFollowShutdownTests.swift:84`
+  (serial 1), as the type gained a field.
+
+  On `58e2c1c` the three tests pass in both orders, and the Sync bundle passed whole: "Test run with 691 tests in 56
+  suites passed after 352.741 seconds" (`.build-s3f/c22/e1p1-sync.log`; load 3.65 4.51 4.06). The kills are step 7's:
+  the rule false (e1-P1, the bound), true for any replay (the other side), `<=` as `<` (the bound), the end's count not
+  kept (e1-P1).
+
+  Residuals, not probed (UNCONFIRMED, reported): (1) a transfer's ENOSPC (`Job.transferSpaceEnd`) keeps no `stamped`,
+  so the drain's replay inside its two awaits (the resume point's and the free-space read) of an event that arrived
+  while the job downloaded still re-queues it (T20), where visit-first's input met it downloading. Probe shape:
+  `barrierGivesATransferENOSPCsVerdictAtTheCapAfterTheFollowsJoinInItsRead` with a user join made behind the barrier
+  before the transfer's ENOSPC and the drain released inside the read; visit-first, the ENOSPC's verdict at the cap.
+  (2) The visit's clause dates a visit by the latest apply (cycle 21's count): a visit made after an apply that came
+  since the end, of a job owed since an apply before it that mapped the id to X's content, re-queues X, where
+  visit-first's visit at that earlier apply met X publishing. Reaching it needs an apply inside the read.
 
 ## Items
 
