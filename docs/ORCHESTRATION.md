@@ -525,6 +525,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
          - **P-13's independent verifier: RUNNING.** Workflow `wf_19408ffa-9ba` (task `wi247cjnh`), with three read-only lenses: ruling fidelity, measurement soundness and an adversarial refuter. It reviews `d97e4e7` and both figures, and runs no build.
       5. The mutation re-check of the 11 survivors.
       6. ADR-057 through `.claude/workflows/assetkit-level-docs.js`, carrying the known misses (N25, close point 2), the known risks (point 4), f3c's open shapes, N33's open items, and the accepted FAIL.
+         - **`docs/TRACEABILITY.md` committed first, as `8d86acb` (pushed).** It is the `--full` trace gate's rewrite on `e840b0e`, with new per-requirement counts and no other change. No test, source or SPEC changed after the merge.
+         - **RUNNING (launched 00:28):** workflow `wf_fc587e9e-0a9` (task `wj1w0pp0k`), args `{base: "8d86acb", worktree: "s3docs"}`. Its script is the persisted `assetkit-s3-docs-wf_fc587e9e-0a9.js` in this session's `workflows/scripts/`. It is a Stage 3 variant of `assetkit-level-docs.js`, with no usage gate:
+           - five readers for s3ah, s3b, s3c, s3d and s3g, each with its own `s3-rulings-<k>.md`;
+           - three for `s3f.md`, which is 1.23 MB, too large for one reader: Items, Authorised edits and Not verified (`:8764-9227`, `:11992-`); Proposed document changes (`:9228-9929`); and the close (S3-R28 `:1685-`, N25-N33, cycle 23, the dossier and this checklist);
+           - then one writer in `.worktrees/s3docs` (`wp/s3docs` at `8d86acb`) and an independent verifier, for up to 3 rounds.
+         - **After it:** confirm the writer's acknowledged items, apply the verifier's last notes, and add the post-merge results (3b, item 4's verifier, item 5). Then merge `wp/s3docs` `--no-ff`, re-run `--quick` and `--gates-only` in a clean detached worktree, and tag (item 7).
       7. Tag `s3-merged` (local; never push a tag unless the owner asks). Remove `.worktrees/s3f` and `wp/s3f` only after the merge is pushed (N25); the cited logs are in archive snapshot 3. Never remove `.build-orchestrator/`.
       8. Ask the owner about the uncommitted `Package.swift` before Stage 5's `--full`.
       9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`). The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
