@@ -7869,12 +7869,30 @@ A fixer resumed after an interruption first re-reads the end of the rulings file
 worktree's HEAD with the first step that is not "committed". Each step's results are under its own heading below.
 
 0. Step 0 (item 5 as item 1c amends it: no ENOSPC shapes; `verify.sh --quick` on `9aa337c`, then item 3's five new
-   cases' 'before' figures on a scratch copy of `9aa337c`, then S3-R27 items 3's and 4's): **not started in run 11**.
-   Run 10's `quick0.log` stops inside the tests stage. Item 1c's order put step 1 first.
+   cases' 'before' figures on a scratch copy of `9aa337c`, then S3-R27 items 3's and 4's): **in progress**.
+   - `verify.sh --quick` on `9aa337c`, run 11 (the scratch copy `.build-s3f/c23/snap0`, `git archive 9aa337c`; pre-built
+     outside the lock, the coverage test run under `sim.lock`; `tools/step0-quick.sh`, `step0-quick.log`, `.meta`):
+     `VERIFY: PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines (15:51:23 to 16:01:15; lock taken
+     15:52:39 and released at the end; 1-minute load 2.35 at the start, 40.91 after the pre-build, 6.32 at the end).
+     Tests passed: Transport 151, Sync 706 (`passed after 364.515 seconds`), Storage 459, Model 84, Kit 85,
+     Compatibility 71, AppleHosted 104.
+   - Item 3's five new cases are written (`.build-s3f/c23/probes/BenchSyncCycle23Purge.swift`: `purgeInLetterTurns`
+     over `keptUnderThreeGroups`, `fourGroupJoins`, `mixedLaneGroups`, `pendingClaimGroups` and
+     `oneMemberGroupsFourPerID`), not yet built or run. They are copied, with PROBE-C21-APM (the cycle-22 verifier's
+     `ProbeC21APM-as-run-c22-correct.swift`, for S3-R27 item 3's 'before' figure), into `.build-s3f/c23/bench0`, a
+     benchmarks-only scratch copy of `9aa337c` (its own `Package.swift`, never committed).
+   - **Next action:** in `bench0`, `swift test -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing
+     --filter 'purgeInLetterTurns|ProbeC21APM'` under `sim.lock` at a 1-minute load of 10 or less; commit the five
+     cases' table with loads; then write and measure S3-R27 item 4's k = 2 and k = 4 cases (four figures each, d3's
+     shapes; not written).
+   - Run 10's `quick0.log` stops inside the tests stage; item 1c's order put step 1 first.
 1. Step 1 (item 2, correct #3): **committed**. `03c4e59` (A-T-SD's held retry, its set-up check and the doc fixes),
    then these records. Started 15:36, `03c4e59` at 15:44; the simulator's 30 iterations and the bundle runs are taken
-   with the run's gate runs ("Gate evidence (cycle 23)"). Item 8 2(e): within item 2's estimate (1-1.5 h with shared
-   close runs), no stop.
+   with the run's gate runs. Item 8 2(e): within item 2's estimate (1-1.5 h with shared close runs), no stop.
+   **Not run in run 11** (the run ended at its working budget): the gate set on HEAD (`--quick`, the release build,
+   the gates, coverage, Sync ×3, TSan, the iOS build, the simulator suite with A-T-SD's 30 iterations per argument,
+   the benchmarks). Next action at the close: `.build-s3f/c23/tools/gates23.sh` (written, not run), logs under
+   `.build-s3f/c23/gates/`.
 2. Step 2 (item 3, stage A): **not started**. Item 3 waits for item 3b, which is not appended, and the owner is
    deciding whether the remaining C2 work stays (item 1c).
 3. Step 3 (item 3, stages B and C, each if triggered): not started.
@@ -7890,6 +7908,7 @@ worktree's HEAD with the first step that is not "committed". Each step's results
   item 1b are withdrawn; correct #1 and #2 are recorded under "Known residual correctness risks (owner ruling
   2026-11-06)".
 - Re-read at 15:44, after `03c4e59`: nothing appended after item 1c (the file ends at item 1c's run-11 order).
+- Re-read at 15:50, after the records' commit: nothing appended. Run 11 went on in S3-R28's order (step 0).
 
 ### The named findings (S3-R28 item 7, as item 1c amends it)
 
