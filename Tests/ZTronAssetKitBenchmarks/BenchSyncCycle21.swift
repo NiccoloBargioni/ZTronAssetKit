@@ -154,8 +154,9 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
     }
 
     /// The cost of a second stalled subscriber at a commit of 10,000 user waiters, measured once (ruling S3-R26 item
-    /// 12, answer 4): the reference set has one subscriber, so this figure is recorded, not gated; a miss of C2 at a load
-    /// of 10 or less is reported "open, for the owner". The setup is checked as in `commitTurns`.
+    /// 12, answer 4): the reference set has one subscriber, so this figure is recorded, not gated; a second stalled
+    /// subscriber is outside the bar, by the owner's ruling of 5 Nov; recorded (ruling S3-R27 item 12.1). The setup is
+    /// checked as in `commitTurns`.
     @Test("R-SYN-11: a commit that answers 10,000 user waiters with two stalled subscribers, measured once (S3-R26 answer 4)", .timeLimit(.minutes(10)))
     @available(macOS 15.0, iOS 18.0, *)
     func commitTwoStalledSubscribersTurns() async throws {

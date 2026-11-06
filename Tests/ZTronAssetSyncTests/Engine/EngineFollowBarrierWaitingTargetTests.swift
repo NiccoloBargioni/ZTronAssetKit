@@ -189,8 +189,11 @@ extension EngineFollowBarrierTests {
             try #require(requeued.epoch == move?.epoch && requeued.owed && requeued.onto == 1 && requeued.end, "setup: the ENOENT re-queued T at the move's epoch, its end recorded, and the move is still owed: \(requeued)")
             await Self.runOneFollowTurn(engine)
             let afterTurn = await engine.readForTests { e in
-                (h: e.state.jobs[h]?.assets.sorted(), t: e.state.jobs[tID]?.assets.sorted(), onto: e.state.inboundOnto[tID], owed: e.inboundOwed)
+                (h: e.state.jobs[h]?.assets.sorted(), t: e.state.jobs[tID]?.assets.sorted(), onto: e.state.inboundOnto[tID], owed: e.inboundOwed, barrier: e.followBarrier)
             }
+            // d5's pin (Stage 3 close-out cycle 23, ruling S3-R27 item 7): the reading is safe only while this turn is not the
+            // follow's last; a last turn would drop the barrier, and its pump would start T, whose attempt ends at once.
+            try #require(afterTurn.barrier, "setup: the move's turn is not the follow's last (its passes are owed), so T stays queued: \(afterTurn)")
             #expect(afterTurn.h == nil && afterTurn.t == [t.a.identifier, t.x.identifier], "the turn made the move onto the queued T: zz-x is on T, and H, its only id moved, is gone: \(afterTurn)")
             #expect(afterTurn.onto == nil && !afterTurn.owed, "nothing is owed onto T: \(afterTurn)")
             await engine.readForTests { $0.releaseFollowFollowUps() }

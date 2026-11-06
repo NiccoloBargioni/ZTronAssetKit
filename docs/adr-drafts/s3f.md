@@ -7895,14 +7895,18 @@ note, N31: option (e), a short close; recorded under "Orchestrator rulings (clos
 point 5 (S1, the long-purge log line), then point 6 (the mutant runs for run 12's kill tests, then the records), then
 point 7 (the close); then the two verifiers run once (point 8). Each step's results are under its own heading below.
 
-- **Run 13** (started 17:20 on `9e9a500`, clean worktree; the rulings file re-read at 17:20 ends at the close ruling).
+- **Run 13** (started 17:20 on `9e9a500`, clean worktree; the rulings file, re-read at 17:20 and at each step since,
+  ends at the close ruling, line 1874).
   1. Point 5, S1: **committed**: `e7cf01a` (the test, red: the 11 ms case fails with `lines → []`, 2/2, 17:21, 1-minute
-     load 1.70), then the line, on the commit after it (green 2/2, 17:24). Under "Point 5" below. Started 17:20, done
-     17:30: within S1's 1.5-3 h.
-  2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: **next**. Next action:
-     `tools/mut23s.py` on a snapshot of HEAD with the five survivors' texts (`tools/mut-k23.py`), 2/2 in each order that
-     reaches each branch, logs under `.build-s3f/c23/mut/`.
-  3. Point 6, the records: not started.
+     load 1.70), then the line, `f38dd8c` (green 2/2, 17:24). Under "Point 5" below. Started 17:20, done 17:30: within
+     S1's 1.5-3 h.
+  2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: **done** (17:26 to
+     17:29, on a snapshot of `f38dd8c`): each of the seven fails 2/2 in each order that reaches it, by assertions only.
+     Recorded with run 12's seven commits and its e1 runs under "Point 6" below. Within point 6's 0.5-1 h.
+  3. Point 6, the records: **in progress** (from 17:30). Committed with the mutant-run record: d5's pin (S3-R27 item 7;
+     green 2/2 in both orders, 17:42) and 12.5.18's 12.1 doc at `BenchSyncCycle21.swift:156-159`. Next: the findings'
+     states, the ownership record, the stale records, items 8 and 9, the sections for points 2 and 4, N25's update, the
+     "Proposed document changes" of cycles 21 to 23, and "Not verified".
   4. Point 7, the close: not started.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
   `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
@@ -8046,8 +8050,8 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
   `.timeLimit(.minutes(1))`, `ManualTimeSource` only, `@available(macOS 15.0, iOS 18.0, *)` on each `@Test`). Three
   held prefetch jobs under two groups (a set-up `#require` reads 3 and 2). Through `readForTests` the test sets
   `commitTurnMarksForTests` to a mark that moves the harness clock once, at the first end mark (`TurnEndAdvance`), the
-  seam the benches set (`BenchSyncCycle21.swift:898-900`), and it expects that end mark to be the only one while the seam
-  is set. Then it reads `harness.tap.lines`:
+  seam the benches set (`BenchSyncCycle21.swift:898-900`), and it expects that end mark to be the only one while the
+  seam is set. Then it reads `harness.tap.lines`:
   - moved 11 ms: exactly `[LogLine(category: .sync, level: .info, message: "long purge turn: 11.00 ms, 3 jobs, 2
     groups")]`;
   - moved exactly 10 ms: no line with S1's prefix.
@@ -8071,6 +8075,105 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
     A change of the text breaks such a reader, which is why it is recorded. Whether `.info` lines are kept for an
     `OSLogStore` read is not checked (C7, UNVERIFIED). The line covers every purge shape; APM's answer turn and item 4's
     shapes would each need a site of their own, which the close ruling does not take.
+
+### Point 6: run 12's work and the mutant runs (the close ruling)
+
+Run 12 (`247e85b..9e9a500`, 16:16 to 16:41, stopped by the orchestrator) made seven commits under S3-R28's order for
+run 12 (N30), point 1, and recorded none of them. Run 13 records them here and makes the mutant runs that run 12 did
+not make (point 6). No test is added or changed for them. Scratch files: `.build-s3f/c23/s6/` (run 12's green runs),
+`.build-s3f/c23/mut/` (each mutant's build and run logs), the summaries `.build-s3f/c23/mut-e1.txt` and `mut-k23.txt`,
+and the specifications `.build-s3f/c23/tools/mut-e1.py` and `mut-k23.py`, which `tools/mut23s.py` runs.
+
+- **Reqs #8's guard** (`29dfb12`): `.timeLimit(.minutes(1))` on `publishAllMatchesOnePublishPerEvent(seed:)`
+  (`SubscriberQueueBatchTests.swift:95`), as `SPEC.md:331` asks. It is a guard only, so G3 holds. Its three seeds pass
+  in 0.063 s (`s6/guard-run.log`).
+- **E1-P1's other side** (`64f276d`, S3-R28 item 4). Under reqs #3's `v-e1p1-rule-false`,
+  `userJoinFromInsideAnENOSPCsReadSkipsItsVerdict` failed only by its 180 s time limit, which is no kill: W started
+  twice, and its second attempt had no script. `pinSpaceRead` now scripts a 404 for each attempt a mutant can add (X's
+  third, W's second and third), as S3-R27 item 12.2's serving rule asks. The expectations are unchanged. The three
+  tests pass in both orders, 2/2 (`s6/p1side-run1.log`, `p1side-run2.log`, 3.5 s each). Run 12's `p1-rule-false`
+  (below) fails on start counts and answers, with no time-limit issue in either run.
+- **The five kill tests** (d4 §3.6 to §3.10, with its review's M1 to M3 and should-fix 3; S3-R27 item 5, S3-R28 item
+  4, step 6). Each runs in both `LaneDropVisit` orders, asserts visit-first's answers in both, and was green in both
+  before its kill run (`s6/<name>-run<n>.log`):
+
+  | Commit | Test (`EngineFollowBarrier…Tests.swift`) | Survivor it names | Green runs |
+  |---|---|---|---|
+  | `1b911a1` | `owedRerouteOfAWaiterRemovedAheadCountsForNothing` (RerouteOwner `:366`) | b22-no-waiter-owner | 3 (`b22w-run1` to `run3`) |
+  | `486ee2a` | `waitingJoinPinnedToACommittedJobEndsUnderItsChainAtA429` (ReroutePinEnd `:331`) | p7 and r5 | 3 (`p7-run1` to `run3`) |
+  | `8b252f2` | `waitingUnlistedJoinCountsTowardA429sLane` (Unlisted `:132`) | r8 | 3 (`r8-run1` to `run3`) |
+  | `06880a8` | `barrierContinuesAnOwedMoveInsideItsHoldersPublication` (MoveHolders `:313`) | vy-owed-moves-too | 3 (`vy-run1` to `run3`) |
+  | `9e9a500` | `layerOfAnOwedBatchPinsAVerdictBetweenItAndALaterJoin` (RerouteLayer `:516`) | r2c-made-ignores-verdicts | 2 (`r2c-run1`, `run2`) |
+
+- **Their mutant runs** (run 13; `mut-k23.txt`). `tools/mut23s.py` ran on `git archive` of `f38dd8c`
+  (`.build-s3f/c23/snap-k23`), from 17:26:51 to 17:28:54, at a 1-minute load of 2.98 at the start and 6.15 at the end.
+  The texts are the latest the earlier cycles ran (`mut-k23.py`'s header: b22-no-waiter-owner from
+  `c21/tools/mut-c3.py:91`, vy from `c21/tools/mut-b.py:45`, p7, r5, r8 and r2c from `c22/tools/mut-c4fix.py`, and
+  p2-after-verdict-replay-rule from `c23/tools/mut-e1.py`). Each filter is the kill test alone, so a kill is that
+  test's (S3-R3). The snapshot's diff before the runs and its revert diff after them are both empty. Every mutant fails
+  both runs, by assertions only: no issue is a time limit, and each run takes 0.6 to 2.3 s.
+
+  | Mutant | Line at `f38dd8c` → mutant | Fails in both runs | Orders that fail |
+  |---|---|---|---|
+  | b22-no-waiter-owner | `EngineFailures.swift:858`, `reaches(_:_:)`'s `.waiter` owner check → `guard self.state.waiters[item.token] != nil \|\| true else {` | 7 issues: RerouteOwner `:424`, `:425`, `:429` | swept first, the only order that reaches it |
+  | p7 forget-at-last-batch | `EngineFollow.swift:762`, the countdown → clears `reroutePinCommits` when `reroutesWaiting` reaches 0 | 2 issues: ReroutePinEnd `:371` (J `.notFound`) | both |
+  | r5 lane-engine-copy | `EngineFailures.swift:841`, `(self.joinListing(join) ?? copy)` → `copy` | 2 issues: ReroutePinEnd `:373` | both |
+  | r8 fast-any-join | `EngineFailures.swift:838`, `if join.chain != nil, !here(join.asset)` → `if !here(join.asset)` | 3 issues: Unlisted `:188`, `:192`, `:195` | swept first, the only order that reaches it |
+  | vy owed-moves-too | `EngineMoves.swift:308`, `listing == nil ? …` → `true ? …` | 3 issues: MoveHolders `:371`, `:384`, `:387` | swept first, the only order that reaches it |
+  | r2c made-ignores-verdicts | `EngineFollow.swift:704`, `made.verdicts == verdicts.count` dropped | 10 issues: RerouteLayer `:554` (the pins), `:561`, `:564` | both |
+  | p2-after-verdict-replay-rule | `EngineJobs.swift:290`, `\|\| self.state.visitingAfterVerdict` dropped from the visit branch | 2 issues: AfterVerdictSpace `:171`, `:172` (Vx and Vy get 18 bytes, X starts twice) | swept first, the only order that reaches it |
+
+  Why `followVisitedFirst` cannot reach the four swept-first branches (S3-R26 item 12's answer 1; each test's doc
+  gives the citation): b22's owed waiter item exists only while a removal waits behind the barrier (visited first the
+  interest goes at once, `EngineFollowBarrierRerouteOwnerTests.swift:355-358`); r8's unlisted join waits only behind
+  the barrier (visited first it joins X at once, `EngineFollowBarrierUnlistedTests.swift:124-126`); vy's owed move
+  exists only while the follow is owed (`bringInbound` returns otherwise,
+  `EngineFollowBarrierMoveHoldersTests.swift:306-309`); p2's visit after a verdict is the drain's (`followAfterVerdict`,
+  `EngineFollow.swift:867-874`), and visited first the verdict is given at the cancel
+  (`EngineFollowBarrierAfterVerdictSpaceTests.swift:40-45`).
+
+  So b22-no-waiter-owner, p7, r5, r8, vy and r2c are killed by run 12's tests, and p2-after-verdict-replay-rule by
+  e1-P2's other side. Every test killed what it names.
+- **Run 12's e1 runs** (`mut-e1.txt`, logs in `mut/`), recorded as the logs show them. `tools/mut23s.py` ran on a
+  snapshot of `64f276d` (`.build-s3f/c23/snap-e1`, which holds `64f276d`'s
+  `EngineFollowBarrierReroutePinSpaceTests.swift` and the `EngineFollowBarrierRerouteOwnerTests.swift` from before
+  `1b911a1`), from 16:25:30, at a 1-minute load of 3.58 at the start. The orchestrator stopped run 12 at 16:41, after
+  `p2-after-verdict-replay-rule`'s build.
+
+  | Mutant (`mut-e1.py`) | Fails | Orders that fail |
+  |---|---|---|
+  | ps-write-dropped (`EngineDispatch.swift:1271-1273`, the supersede's `PinEnd(…, keepsEntry: false)` record, dropped) | 2/2, 8 issues each: ReroutePinSupersede `:88`, `:89`, `:100`, `:101` | both |
+  | ps-write-always (`if !self.state.eventsAfterFollow.isEmpty {` → `if true {`) | 3/3, 5 issues each: its filtered run (`run1`: "Test run with 20 tests in 3 suites failed … with 5 issues"; the summary line in `mut-e1.txt` reads a later "passed" line, which an earlier `mut23s.py` took) and two whole Sync-bundle runs (`full1`, `full2`: "706 tests in 57 suites failed … with 5 issues"): EngineRegression `:91` (unparameterised, the invariants), Reach `:38` and RerouteSupersede `:64` (`violations.isEmpty`) | visited first, and the unparameterised test |
+  | ps-literal-requeue (`keepsEntry: false` → `true`) | 2/2, 4 issues each: ReroutePinSupersede `:88`, `:89` | both |
+  | p1-rule-false (`metInItsAttempt`'s replay branch → `return false`) | 2/2, 10 issues each: PinSpace `:154`, `:155`, `:167`, `:168`, `:182`; no time-limit issue | both |
+  | p1-rule-true (→ `return self.state.reading != nil`) | 2/2, 4 issues each: PinSpace `:181`, `:182` | both |
+  | p1-le-as-lt (`reading.serial <= stamped` → `<`) | 2/2, 4 issues each: PinSpace `:167`, `:168` | both |
+  | p1-count-not-kept (the end's count not kept) | 2/2, 8 issues each: PinSpace `:111`, `:154`, `:155`, `:182` | both |
+  | p2-after-verdict-never (`visitingAfterVerdict` answers false) | 2/2, 2 issues each: AfterVerdictSpace `:160`, `:161` | swept first, the only order that reaches it |
+  | p2-after-verdict-replay-rule | built only; its runs are run 13's (above) | — |
+
+  So the e1-PS, e1-P1 and e1-P2 kills that S3-R28 item 4 asks for are made, except p2-after-verdict-true, which was
+  never run. Ps-write-always's kills are visited first only. Its mutated condition is false wherever nothing waits
+  behind the barrier: in every visited-first run, and in a swept-first one with nothing waiting. Whether a swept-first
+  run of these tests reaches that side is not checked, and no swept-first assertion fails, so its swept-first side has
+  no kill in these runs: recorded, and open.
+- **Not run, and open** (point 1 does not take them; point 6's "What stays open"): p2-after-verdict-true; e1-R1's
+  rewritten kill table (the `r1-*` mutants in `mut-e1.py`, 12.2's kill table) and `i5-pin-fold`'s re-run (T-E2);
+  r2b and b22-no-run-owner; item 5's default-tuning probe; and the three unreached lines (`EngineCommands.swift:1001`,
+  `:1004`, `:1009` at `9aa337c`; correct #6, reqs #4).
+- **D5's pin** (S3-R27 item 7; run 12's order point 2). `barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued`
+  (`EngineFollowBarrierWaitingTargetTests.swift`) gains `barrier: e.followBarrier` in `afterTurn` and, before its two
+  `#expect`s, `try #require(afterTurn.barrier, "setup: the move's turn is not the follow's last (its passes are owed),
+  so T stays queued: …")`, as d5 proposed it (`d5-held-readers.md:233-239`). It adds an assertion and removes none
+  (G3), and no `Sources` branch. The reading sits in the swept-first arm only (`if visit == .sweepFollowsFirst`), so the
+  `#require` runs swept first. Green 2/2, both cases (`followVisitedFirst` and `sweepFollowsFirst`) in each run:
+  `.build-s3f/c23/d5/pin-run1.log` and `pin-run2.log` (17:42:21 and 17:42:24, 1.59 s each, 1-minute load 2.24 and
+  2.22), after a build with `-warnings-as-errors` (`d5/build.log`, no diagnostic). The `#require` held, so the reading
+  is not racy and the 1(d) branch of item 7 does not apply.
+- **12.5.18's 12.1 record.** The doc comment at `Tests/ZTronAssetKitBenchmarks/BenchSyncCycle21.swift:156-159` (was
+  `:156-158`) on `commitTwoStalledSubscribersTurns` now says that a second stalled subscriber is "outside the bar, by
+  the owner's ruling of 5 Nov; recorded" (S3-R27 item 12.1), in place of "a miss of C2 at a load of 10 or less is
+  reported "open, for the owner"". It is a comment-only test edit, as point 6 allows.
 
 ### Residual risks (S3-R16; cycle 23)
 
