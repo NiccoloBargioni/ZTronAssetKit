@@ -367,7 +367,8 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
         - it is an orphan branch and is never merged;
         - a test restore of `s3f-c22-analysis/` and `s3-rulings-s3f.md` was byte-identical.
       - **Restore:** `git archive archive/build-orchestrator .build-orchestrator | tar -x -C <repo>`.
-      - The branch is not pushed, because the owner's push word covered only the earlier pushes. A final snapshot follows at the package's close.
+      - **Pushed at 14:46, on the owner's word "Yes, push it":** `git push origin archive/build-orchestrator` created the new branch, with no force. `git ls-remote` shows `765102c`, the same as local. That word covers this branch only.
+      - A secret scan before the push found nothing: no key-like assignment, and every long token was a test or log name. The final snapshot at the package's close goes on top of this one, and needs the owner's word before it is pushed.
       - A re-open dossier, tracked on `feature/asset-kit`, is to be written.
     - **`wf_d70ede79-565` (task `w68e95dvi`) from 14:41,** two tracks, each with an independent check, then a finisher:
       - **the options for ending WP-F sooner** (`end-sooner-options.md`): the ledger of what is still open, with hours; how each C2 purge case is gated (`verify.sh --full` runs the Benchmarks filter, `Scripts/verify.sh:153`, so a gated miss left red fails the final PASS); options (a) to (d) with what each leaves open; a field signal for how often the misses happen. The owner decides any further cut;
