@@ -890,15 +890,13 @@ extension SyncEngine {
     /// had moved off the job before the verdict arrived and that are still on it are not the verdict's: taken off before
     /// it and re-routed after it (`takeOffMovedBefore`, cycle 17), or, when they do not fit the drain turn's ids, owed as
     /// one batch, which this returns for the drain to put back at the queue's head (`chargeTakeOff`, `landTakeOff`; cycle
-    /// 21, `integrate-rr21.md` R7). The guards bind no copy of the job, which the take-off changes in place.
+    /// 21, `integrate-rr21.md` R7). While its record waits, the job is present, failed and at the record's epoch
+    /// (`invariantViolations()`), so the replay checks the record only.
     private func replayVerdict(_ transfer: TransferID, epoch: UInt64, _ verdict: AttemptVerdict) -> EventAfterFollow? {
         guard self.state.verdictsAfterFollow[transfer]?.epoch == epoch else {
             return nil
         }
         self.state.verdictsAfterFollow[transfer] = nil
-        guard self.state.jobs[transfer]?.epoch == epoch, case .failed? = self.state.jobs[transfer]?.state else {
-            return nil
-        }
         let movesAfter = self.state.jobs[transfer].map(self.movesAfterVerdict) ?? false
         let off = self.takeOffMovedBefore(transfer)
         self.state.jobs[transfer]?.attemptEnd = nil

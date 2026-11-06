@@ -2282,6 +2282,10 @@ extension SyncEngine {
         if !unfailed.isEmpty {
             violations.append("\(unfailed.count) jobs whose failure verdict waits for a follow are not failed")
         }
+        let elsewhere = self.state.verdictsAfterFollow.filter { self.state.jobs[$0.key]?.epoch != $0.value.epoch }
+        if !elsewhere.isEmpty {
+            violations.append("\(elsewhere.count) jobs whose failure verdict waits for a follow are at another epoch")
+        }
         // The owed moves onto each job are counted once (`inboundOnto`), and a publication waits only while a move onto or
         // off its job, or its visit's rest, is owed: one that nothing owes is never resumed (Stage 3 close-out cycle 19).
         var onto: [TransferID: Int] = [:]
