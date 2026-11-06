@@ -171,6 +171,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Expected: the weekly limit cuts cycle 22 off, probably inside the fixer. Every finished step is committed on `wp/s3f`, and the cycle resumes after the reset (Thu 12 Nov 03:00).
     - Next: when the fixer returns, check its report against S3-R27 items 1–12, rule its put-backs, and let run 9's verifiers run.
     - Usage at 23:27: weekly **42 %**, Fable 21 %. The two analysis runs for item 12 cost about 7 points (35 % → 42 %). This session's context was at 77 %. If it compacts or ends, resume from this bullet, and do not relaunch run 9 while task `ww9s29wq4` runs.
+  - **Progress at 02:00 on Fri 6 Nov** (weekly **44 %**; 1-minute load 4.9). The fixer has made 14 commits since `d5b2ab9`.
+    - Step 0 is committed. Step 1 is in progress:
+      - e1-R1 landed with T-E1 to T-E5, and the regression controls are green in both orders;
+      - three of the five probes were red, each committed failing and then fixed: e1-PS (a superseded job's pin), e1-P1 (a pinned replay inside an ENOSPC's free-space read) and e1-P2 (a visit after a verdict inside the same read);
+      - next are e1-P3 and e1-PR.
+    - Steps 2 to 8 are not started.
+    - Check at the fixer's report:
+      - e1-P1's fix keeps a failed publication for replays from before its end, with a seam that counts decision instants. That is not the route 12.2 named for e1-P1, `relane`'s guard; the fixer recorded its design (`1b4c2ff`);
+      - the 'before' figures for items 3 and 4 are deferred to steps 5 and 6, a deviation recorded in the draft.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
