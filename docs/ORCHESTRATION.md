@@ -272,13 +272,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - shapes that f1b's window close cannot see (AV-off, W-JOIN-OFF), red on `9aa337c` too;
     - the late drain (the follow released after J's read returns), which no probe has run. W-HP is red there at both ends.
     - Its estimate is 38–59 h for the whole route. The class keeps growing with each analysis: f1's route was 12–18 h, its review's 16–24 h, f1b's 22–33 h. It looks like cycles 5 to 12, which led the owner to narrow the bar (S3-R16).
-  - **N20 (13:10), appended to the orchestrator's rulings:** decision 1's replay half is withdrawn. Nothing in item 1 is ruled for the code now; correct #1 and #2 stay blocking. All of item 1's route becomes item 1b.
+  - **N20 (13:05), appended to the orchestrator's rulings:** decision 1's replay half is withdrawn. Nothing in item 1 is ruled for the code now; correct #1 and #2 stay blocking. All of item 1's route becomes item 1b.
     - Step 0 runs every shape named so far, about 35 of them, in both orders and both drain timings, on `9aa337c`. The results form one table in the draft.
     - Step 1 becomes item 2 alone.
     - f1c (a re-analysis of f1b as its review corrects it, with its own review) is launched once step 0's shape results are committed, unless the owner has classed the window's dating as timing by then.
     - Run 10's focus now says so.
-  - **The final-text workflow is to be stopped** when its first editor returns (watcher `brxs6o7bz`). It is then relaunched with N20 applied first and both checks against N1–N20, from `/private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/scratchpad/s3r28-final2.js`.
-  - **For the owner (asked at about 13:15):** should the dating of a join or request made during an ENOSPC end's free-space read count as timing (S3-R16 item 2) rather than as an answer, as long as SF's answer is one visit-first gives for some arrival order of the same inputs, and the MUSTs and space safety hold? Until the owner rules, the strict bar stands.
+  - **The final-text workflow was stopped at 13:06**, when its first editor returned (228 lines, with 14 points it resolved by the closest reading), just as the two checks started.
+    - **Relaunched at 13:08:** `wf_b2663c1b-767` (task `wwuvza6v2`), from `/private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/scratchpad/s3r28-final2.js`.
+    - It runs an editor that applies N20 (the copy before is `s3-r28-final-pre-n20.md`), then both checks against N1–N20, then a final editor.
+  - **For the owner (asked at 13:06):** should the dating of a join or request made during an ENOSPC end's free-space read count as timing (S3-R16 item 2) rather than as an answer, as long as SF's answer is one visit-first gives for some arrival order of the same inputs, and the MUSTs and space safety hold? Until the owner rules, the strict bar stands.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
