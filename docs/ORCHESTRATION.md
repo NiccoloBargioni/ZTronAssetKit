@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 16:32 CET): run 12 (cycle 23) is running (`wf_ee08701d-249`, launched 16:16) and has committed 3 items up to `1b911a1`. The priced options for ending WP-F sooner are final (`end-sooner-options.md`) and are with the owner, together with the red gated cases, the ENOSPC class and pushes for persistence. Already ruled out of cycle 23: three purge cases as known misses (N25), and correct #1 and #2 as known residual correctness risks (N28, narrowed by N29). The analyses are archived on `archive/build-orchestrator` (snapshot 2 is local only). The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 16:48 CET): the owner chose option (e), a short close (N31). Run 12 is stopped at `9e9a500`. The close ruling (`s3-r28-close-e.md`) is being checked independently (`wf_1c475778-94c`). Next: apply the checks, append the ruling, then launch run 13 (S1, the records, the close), whose two verifiers run once. After that comes the merge and post-convergence, with Stage 5's `--full` FAIL at benchmarks accepted. Snapshot 3 of the archive and `feature/asset-kit` are pushed. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -445,6 +445,28 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Run 12, by 16:31:** three commits on `wp/s3f`, `29dfb12` (reqs #8's guard), `64f276d` (an e1-P1 kill) and `1b911a1` (a 429-lane test).
     - **Weekly: 76 % at 16:31** (75 % at 16:18). 24 points are left until Thu 12 Nov 03:00 CET. Run 12 alone uses about 1.1 points an hour (estimate).
     - **Taken to the owner at 16:32:** the choice among (a), (c), (c′), (d) and (e); the red gated cases (accept the FAIL, or the G3 word); the ENOSPC class; and pushes for persistence.
+    - **The owner ruled at about 16:40 (N31),** choosing from the question form:
+      - **"(e) Short close":** merge what is on `wp/s3f`, add the long-purge log line (S1), and run one short independent verification. New findings are recorded, not fixed. A broken MUST or a hang goes to the owner first.
+      - **"Accept the FAIL":** the six red purge benches stay as written. `--full` ending `VERIFY: FAIL (1 failed: benchmarks)` is WP-F's accepted end state, and G3 holds.
+      - **"Yes, the whole class":** every ENOSPC-window answer difference in N29's T20 class is a known risk. S3-R16 1(b) to 1(f) are not exempt.
+      - **"Archive and feature branch":** push `archive/build-orchestrator` and `feature/asset-kit` as they change, never `main` and never force. This is saved to memory as `owner-push-permission`.
+    - **Run 12 was stopped at 16:41** at `9e9a500`, because (e) cuts the kills it was doing. It made 7 commits from `247e85b`: reqs #8's guard (`29dfb12`), an e1-P1 kill (`64f276d`) and five d4-survivor kill tests (`1b911a1`, `486ee2a`, `8b252f2`, `06880a8`, `9e9a500`). The worktree was clean, and no process, lock or set-1 simulator was left. Watcher `bz02zu459` was stopped as well.
+    - **The close ruling** is drafted as `s3f-c22-analysis/s3-r28-close-e.md`, with 10 points:
+      - what ends;
+      - the known misses, now including APM, item 4 and f3c's shapes;
+      - the accepted FAIL;
+      - the ENOSPC class;
+      - S1;
+      - the records;
+      - the close;
+      - the verification's findings;
+      - run 13's order;
+      - the orchestrator's merge.
+
+      Two independent checks run before the append (`wf_1c475778-94c`, task `w8r0kima1`, from 16:45). Run 13 launches after the append.
+    - **Persistence, done at 16:47-16:48:**
+      - archive snapshot 3, `2d87b7c` (3,037 files): `.build-orchestrator/`, and all 283 files under 3 MB that the draft cites, patterns included. A restore test shows no difference from the live folder. It is pushed (`765102c..2d87b7c`).
+      - `docs/REOPEN-WP-F.md` v1 is committed (`d88f025`), and `feature/asset-kit` is pushed (`a4c59b7..d88f025`; the 17 commits pushed hold only this file and the dossier, and a scan found nothing like a secret).
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
