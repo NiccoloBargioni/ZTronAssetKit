@@ -50,8 +50,8 @@ extension EngineFollowBarrierTests {
     /// X). X's placement then fails ENOSPC; the free-space read that follows is held on the store's metadata executor
     /// while the follow's and the drain's turns run, then released. Visited first, O's commit re-routed W1…W3 onto X
     /// publishing, K1's visit passed X (RR-14), and the ENOSPC's verdict, at the cap, answered V2 and W1…W3 with the space
-    /// figures: X started once, W never. A fresh attempt of X, or one of W, gets a 404, unless V3's request comes inside
-    /// the read (`join`), when X's fresh attempt serves its bytes.
+    /// figures: X started once, W never. A fresh attempt of X, or any attempt of W, gets a 404, unless V3's request comes
+    /// inside the read (`join`), when X's fresh attempt serves its bytes.
     @available(macOS 15.0, iOS 18.0, *)
     static func pinSpaceRead(_ visit: LaneDropVisit, seed: UInt64, join: PinSpaceJoin? = nil) async throws -> PinSpaceRun {
         var run = PinSpaceRun()
@@ -68,8 +68,12 @@ extension EngineFollowBarrierTests {
         let onW = Self.movedOnto(wBytes, c)
         let wT = onW[0].transferID
         try #require(wT != xT && wT != c.transfer, "setup: K1 maps the ids to a content of their own")
-        await c.s.harness.source.script(xT, [.hold, .stage(xBytes), join == .inRead ? .stage(xBytes) : .fail(.permanentMissing(httpStatus: 404))])
-        await c.s.harness.source.script(wT, [.fail(.permanentMissing(httpStatus: 404))])
+        // Each attempt a mutant can add gets a 404 too, so that it fails on the start counts asserted, not on a time limit
+        // (S3-R27 item 12.2's serving rule; S3-R28 item 4: under `metInItsAttempt` false, W started twice and its second
+        // attempt, unscripted, waited for the 180 s limit).
+        let missing = FakeTransferStep.fail(.permanentMissing(httpStatus: 404))
+        await c.s.harness.source.script(xT, [.hold, .stage(xBytes), join == .inRead ? .stage(xBytes) : missing, missing])
+        await c.s.harness.source.script(wT, [missing, missing, missing])
         let v2 = await Self.downloadingWaiter(x, c)
         var held = try await Self.oweThroughK0(c, k0: [x] + onX, publishing: [xT], visit: visit)
         try await Self.applyBehindBatch(c.manifest([x] + onW, round: 2), tag: "k1-pin-space-\(seed)", c)
