@@ -373,7 +373,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **`wf_d70ede79-565` (task `w68e95dvi`) from 14:41,** two tracks, each with an independent check, then a finisher:
       - **the options for ending WP-F sooner** (`end-sooner-options.md`): the ledger of what is still open, with hours; how each C2 purge case is gated (`verify.sh --full` runs the Benchmarks filter, `Scripts/verify.sh:153`, so a gated miss left red fails the final PASS); options (a) to (d) with what each leaves open; a field signal for how often the misses happen. The owner decides any further cut;
       - **the re-open dossier v1** (`docs/REOPEN-WP-F.md`, to be committed on `feature/asset-kit`).
-    - **The append text returned at 15:17** (`wf_59564fea-9b2`: editor, then check, CORRECTED with 3 must-fix items, then finisher). Its leftovers O1 to O6 are ruled as **N26 (15:21)** and applied:
+    - **The append text returned at about 15:18** (`wf_59564fea-9b2`: editor, then check, CORRECTED with 3 must-fix items, then finisher). Its leftovers O1 to O6 are ruled as **N26 (15:21)** and applied:
       - item 8's stop conditions: a start-count-only red is not a stop; (b) reads the upper end of the later savings; a step-0 'before' figure goes to the orchestrator's check; the orchestrator rules any stop that its check or the prober finds; (e) covers parts, stages and steps; a figure at a load above 10 waits for rulings :763;
       - the stale lines from N24 and N25, and N25 as a bullet of its own in item 3;
       - an appended item decides where it differs from items 1 to 8;
@@ -387,6 +387,13 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - Simulator set 1 was shut down, the worktree was clean at `9aa337c`, and there was no `sim.lock`.
       - **Watcher `bi92qw5f9`:** `watch_putback.py .worktrees/s3f 9aa337c <run 10's journal> 0`. It exits on the first `PUT-BACK` commit or on the first agent result.
     - **Usage at 15:23:** weekly **71 %** (66 % at 14:27; three analysis runs and the append ran meanwhile). **Forecast** (estimates): once the analyses end, the fixer alone burns about 1.1 % an hour, so the weekly limit stops run 10 about 20-26 h after launch, around midday to mid-afternoon on Sat 7 Nov. Cycle 23's fixer estimate (more than 55 h before item 1b and item 4) does not fit before the Thu 12 Nov 03:00 reset. The end-sooner options are the lever.
+    - **f1c returned at 15:26** (`wf_8dc737d5-cbc`). The review finds both routes UNSOUND, and proposes a merged route Q, which is unverified:
+      - Q needs an independent check (3-5 h);
+      - it leaves four shapes that block if red, with no route (W-OBO, W-PEND-LATE's tail, W-SUPER, the holder-state approximation);
+      - its hours are 44-67 h, step 0 included (estimates);
+      - every call in the review is by code reading and UNCONFIRMED.
+
+      This is the class's fourth unsound analysis, after f1, f1b and f1c's two routes. **N27 rules a no-go for item 1b until the owner rules.** Under item 8's point 4 the owner is told at once, with two options: record correct #1 and #2 as known residual correctness risks, or check Q first. Run 10 is not stopped, because its step-0 shapes serve either option.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
