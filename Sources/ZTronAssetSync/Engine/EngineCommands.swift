@@ -958,6 +958,11 @@ extension SyncEngine {
 
     // MARK: Purge (R-CLN-6, RE-S24)
 
+    /// C2's limit on one stretch of the cooperative pool, about 10 ms (CLAUDE.md C2): a purge's first turn that holds
+    /// the actor longer writes one line (`logLongPurgeTurn`), the field signal for the purge's known misses of the
+    /// limit (Stage 3 close-out cycle 23, the owner's close ruling S3-R28 point 5).
+    static let turnTimeLimit: TimeInterval = 0.010
+
     /// Bumps the purge epoch before any await of the purge, ends the active run with `failed(.cancelled)`, withdraws
     /// non-user interests on purged ids (user waiters keep theirs and re-queue), then purges in an owned task.
     func performPurge(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
@@ -966,6 +971,10 @@ extension SyncEngine {
             return .failure(error)
         }
         self.state.commitTurnMarksForTests?(false)
+        // The turn's counts as it begins, before the withdrawal removes jobs: both O(1) (C2).
+        let turnBegan = self.environment.time.monotonicNow()
+        let jobsBefore = self.state.jobs.count
+        let groupsBefore = self.state.groups.count
         self.state.purgeEpoch += 1
         // The store clears the stamp before its first await of the purge (R-CLN-6).
         self.state.lastStamp = nil
@@ -974,6 +983,7 @@ extension SyncEngine {
         self.settleRun(.cancelled)
         self.withdrawPurged(request)
         self.state.commitTurnMarksForTests?(true)
+        self.logLongPurgeTurn(since: turnBegan, jobs: jobsBefore, groups: groupsBefore)
         // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
         let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
@@ -986,6 +996,20 @@ extension SyncEngine {
             return .failure(error)
         }
         return .failure(.cancelled)
+    }
+
+    /// Writes one `.info` line on `.sync` when the purge's first turn, begun at `began` on the injected clock (C4),
+    /// held the actor longer than C2's limit (`turnTimeLimit`): its milliseconds, and the job and group counts as it
+    /// began, which tie a long turn to a shape. The line names no id, hash, URL, path or key (R-OBS-1, R-SEC-1); an app
+    /// that adopts the kit reads it through its own `LogSink` or `OSLogStore`, so its text is a soft contract (the
+    /// owner's close ruling S3-R28 point 5).
+    private func logLongPurgeTurn(since began: MonotonicInstant, jobs: Int, groups: Int) {
+        let elapsed = self.environment.time.monotonicNow().seconds(since: began)
+        guard elapsed > Self.turnTimeLimit else {
+            return
+        }
+        let milliseconds = String(format: "%.2f", elapsed * 1_000)
+        self.log.log(.sync, .info, "long purge turn: \(milliseconds) ms, \(jobs) jobs, \(groups) groups")
     }
 
     /// Withdraws the non-user interests a purge of `request` removes (user waiters keep theirs and re-queue): a group

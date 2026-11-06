@@ -7896,11 +7896,12 @@ point 5 (S1, the long-purge log line), then point 6 (the mutant runs for run 12'
 point 7 (the close); then the two verifiers run once (point 8). Each step's results are under its own heading below.
 
 - **Run 13** (started 17:20 on `9e9a500`, clean worktree; the rulings file re-read at 17:20 ends at the close ruling).
-  1. Point 5, S1: **in progress**. The test (`EngineLongPurgeTurnLogTests.swift`, two tests) is committed red first:
-     on `9e9a500`'s code the 11 ms case fails with 1 issue (`lines → []`) and the 10 ms case passes, 2/2
-     (`.build-s3f/c23/s1/red-run1.log`, `red-run2.log`, 17:31, 1-minute load 1.70). **Next action:** the line in
-     `performPurge`'s first turn (`EngineCommands.swift`), the test green 2/2, then S1's record under "Point 5".
-  2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: not started.
+  1. Point 5, S1: **committed**: `e7cf01a` (the test, red: the 11 ms case fails with `lines → []`, 2/2, 17:21, 1-minute
+     load 1.70), then the line, on the commit after it (green 2/2, 17:24). Under "Point 5" below. Started 17:20, done
+     17:30: within S1's 1.5-3 h.
+  2. Point 6, the mutant runs for run 12's five kill tests and `p2-after-verdict-replay-rule`: **next**. Next action:
+     `tools/mut23s.py` on a snapshot of HEAD with the five survivors' texts (`tools/mut-k23.py`), 2/2 in each order that
+     reaches each branch, logs under `.build-s3f/c23/mut/`.
   3. Point 6, the records: not started.
   4. Point 7, the close: not started.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
@@ -8025,6 +8026,51 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
     evidence (cycle 23)".
 - **T20 is re-checked at every later commit** (item 2, "The order"). A-T-SD's set-up check runs in every Sync bundle, so
   a failure of it at a later commit is a T20 regression: fix the code, not the test (f2 review "must add" 1).
+
+### Point 5: S1, the long-purge log line (the close ruling)
+
+- **What.** In `performPurge`'s first turn (`EngineCommands.swift`), right after `commitTurnMarksForTests?(false)`, the
+  turn reads the injected clock (`self.environment.time.monotonicNow()`, as `EngineManifest.swift:140` does) and the
+  counts `state.jobs.count` and `state.groups.count` (O(1), C2), before the withdrawal removes jobs. Right after
+  `?(true)`, before the `await` of `joinEntry`, `logLongPurgeTurn` reads the clock again and takes `seconds(since:)`
+  (`Time.swift:40`). Above `SyncEngine.turnTimeLimit` (0.010 s, documented as C2's limit) it writes one `.info` line on
+  `.sync` through `self.log.log` (as `EngineJobs.swift:1217` does): `long purge turn: <ms> ms, <jobs> jobs, <groups>
+  groups`, the milliseconds with two decimals (`String(format: "%.2f")`, which is not localised).
+- **Limits held.** No id, hash, URL, path or key; no public or package API change (`turnTimeLimit` is internal, the
+  helper private); nothing new awaits or spawns, so no REENTRANCY row (C3); nothing runs on the main thread (C2); the
+  clock is the injected one (C4). The code and the constant are in `Sources/ZTronAssetSync/`.
+- **The benches.** Their engine's clock is a `ManualTimeSource` that does not move inside the turn
+  (`SyncBench.scaleBench`, `BenchSync.swift:1960-1961`), so the line is never written there; the turn gains two clock
+  reads and two counts.
+- **The test** (`EngineLongPurgeTurnLogTests.swift`; S3-R2's rules: display names start with `R-OBS-1`,
+  `.timeLimit(.minutes(1))`, `ManualTimeSource` only, `@available(macOS 15.0, iOS 18.0, *)` on each `@Test`). Three
+  held prefetch jobs under two groups (a set-up `#require` reads 3 and 2). Through `readForTests` the test sets
+  `commitTurnMarksForTests` to a mark that moves the harness clock once, at the first end mark (`TurnEndAdvance`), the
+  seam the benches set (`BenchSyncCycle21.swift:898-900`), and it expects that end mark to be the only one while the seam
+  is set. Then it reads `harness.tap.lines`:
+  - moved 11 ms: exactly `[LogLine(category: .sync, level: .info, message: "long purge turn: 11.00 ms, 3 jobs, 2
+    groups")]`;
+  - moved exactly 10 ms: no line with S1's prefix.
+- **Red first** (`e7cf01a`): on `9e9a500`'s code the 11 ms case fails with 1 issue (`lines → []`) and the 10 ms case
+  passes, 2/2 (`.build-s3f/c23/s1/red-run1.log`, `red-run2.log`, 17:21, 1-minute load 1.70).
+- **Green** (the line's commit): both pass, 2/2 (`.build-s3f/c23/s1/fix-run1.log`, `fix-run2.log`, 17:24, 1-minute
+  load 15.01), after a build with `-warnings-as-errors` (`fix-build.log`, no diagnostic). Each changed line is reached:
+  the 11 ms case writes the line and the 10 ms case takes the guard's return (S3-R25 item 10; the close's coverage run
+  is the check).
+- **Decision: the line is a soft contract** (ADR-057 carries it into `docs/DECISIONS.md` at the merge).
+  - *Context:* the purge's six gated cases and N25's three are known misses of C2's 10 ms by the owner's ruling, and
+    their re-open criterion is how often they happen in the field. No kit signal shows that today
+    (`end-sooner-options.md` §4).
+  - *Options:* S1, one log line, no API change; S2, a `MetricsSnapshot` counter; S3, a `diagnosticReport()` key; S4, a
+    `.purge` signpost interval (each of S2 to S4 a public change, NEEDS-HUMAN-REVIEW); N0, no code (the app counts its
+    own purges).
+  - *Decision:* S1, by the owner's ruling (option (e)). The text `long purge turn: <ms> ms, <jobs> jobs, <groups>
+    groups`, the category `.sync`, the level `.info` and the threshold (above 10 ms) are the contract.
+  - *Consequences:* at a re-open, an app that adopts the kit reads the line through its own `LogSink`
+    (`AssetEnvironment.logSink`) or `OSLogStore`, and counts long purge turns, with the counts that tie each to a shape.
+    A change of the text breaks such a reader, which is why it is recorded. Whether `.info` lines are kept for an
+    `OSLogStore` read is not checked (C7, UNVERIFIED). The line covers every purge shape; APM's answer turn and item 4's
+    shapes would each need a site of their own, which the close ruling does not take.
 
 ### Residual risks (S3-R16; cycle 23)
 
