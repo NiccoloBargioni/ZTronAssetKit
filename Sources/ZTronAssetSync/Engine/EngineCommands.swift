@@ -965,6 +965,7 @@ extension SyncEngine {
         if let error = await self.ensureStarted() {
             return .failure(error)
         }
+        self.state.commitTurnMarksForTests?(false)
         self.state.purgeEpoch += 1
         // The store clears the stamp before its first await of the purge (R-CLN-6).
         self.state.lastStamp = nil
@@ -972,6 +973,7 @@ extension SyncEngine {
         self.dropBindings()
         self.settleRun(.cancelled)
         self.withdrawPurged(request)
+        self.state.commitTurnMarksForTests?(true)
         // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
         let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
             // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
