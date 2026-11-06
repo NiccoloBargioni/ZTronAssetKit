@@ -542,9 +542,11 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            - then one writer in `.worktrees/s3docs` (`wp/s3docs` at `8d86acb`) and an independent verifier, for up to 3 rounds.
          - **After it:** confirm the writer's acknowledged items, apply the verifier's last notes, and add the post-merge results (3b, item 4's verifier, item 5). Then merge `wp/s3docs` `--no-ff`, re-run `--quick` and `--gates-only` in a clean detached worktree, and tag (item 7).
       7. Tag `s3-merged` (local; never push a tag unless the owner asks). Remove `.worktrees/s3f` and `wp/s3f` only after the merge is pushed (N25); the cited logs are in archive snapshot 3. Never remove `.build-orchestrator/`.
+         - **Correction (7 Nov 00:40):** snapshot 3 (`2d87b7c`, 6 Nov 16:47) predates runs 13 and 14. Its 283 cited logs are all from `.worktrees/s3f` and cited before 16:47, so cycle 23's evidence (`.build-s3f/c23/`, the gates logs) is not archived. Nor are the other s3 worktrees' logs or this checklist's `.build-orch/` evidence. Removing any s3 worktree therefore waits until item 10's final snapshot has archived the logs that the drafts, the rulings and this file cite. The tag can come first.
       8. Ask the owner about the uncommitted `Package.swift` before Stage 5's `--full`.
       9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`). The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
+          - The final snapshot's cited-log list covers every path cited in `docs/adr-drafts/s3*.md`, `.build-orchestrator/` and this file, under each `.worktrees/s3*` and `.build-orch/` (`merge-full.log`, `merge-userToBound-rerun1.log`, `merge-P13-quiet.log`, `t64b/`, `sim-merged/` without the xcresult bundle unless small, `mut-recheck/`). Item 7's worktree removals come after it, with a restore test.
       11. Stop the keep-awake `bmt90jpqj`.
     - **Weekly: 86 % at 00:11 on 7 Nov,** 14 points left (reset Thu 12 Nov 03:00 CET). These are estimates for what is left:
       - 3b, the simulator suite: about 30 min, under 0.5 point;
