@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 16:16 CET): run 12 (cycle 23) is running (`wf_ee08701d-249`, launched 16:16), doing the work that does not depend on the C2 ruling first (N30). Run 11 committed step 1 and the records (to `247e85b`). The owner ruled two sets out of cycle 23: three purge cases are known misses (N25), and correct #1 and #2 are known residual correctness risks (N28, narrowed by N29). Pending with the owner: whether the whole ENOSPC class is a known risk, and the C2 decision (the end-sooner options are in their final edit; item 3b waits for it). The analyses are archived on `archive/build-orchestrator` (snapshot 2 is local only). The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 16:32 CET): run 12 (cycle 23) is running (`wf_ee08701d-249`, launched 16:16) and has committed 3 items up to `1b911a1`. The priced options for ending WP-F sooner are final (`end-sooner-options.md`) and are with the owner, together with the red gated cases, the ENOSPC class and pushes for persistence. Already ruled out of cycle 23: three purge cases as known misses (N25), and correct #1 and #2 as known residual correctness risks (N28, narrowed by N29). The analyses are archived on `archive/build-orchestrator` (snapshot 2 is local only). The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -431,6 +431,20 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
         - `readmit` scans the heap once per failed candidate (`EngineReadmission.swift:165-167`), and so does `removeJob` outside a walk (`EngineJobs.swift:517-520`), at 27-55 ms a turn with 5,000-10,000 `.retry` entries. This is in letter and outside N25.
         - A production-only cost: `originID` is parsed on every gate read (`HTTPRemoteSource.swift:116-118`), at 15-60 ms per 10,000 reads, and caching it would change a documented contract (NEEDS-HUMAN-REVIEW).
         - Both feed the owner's C2 decision.
+    - **The end-sooner run returned at about 16:30** (`wf_d70ede79-565`, task `w68e95dvi`):
+      - **`end-sooner-options.md`** (208 lines; the copy before is `-v1.md`) has all 9 must-fix items of its check (`end-sooner-options-review.md`, CORRECTED). The finisher corrected the review's own text in 9 places, and those corrections were not checked again. 6 should-fix items are not applied, and none of them changes an option.
+      - **The options** (all estimates, "now" basis):
+        - (a) keep all the C2 work: 56.5-88 fixer h, about 29-169 points, 2-4 cycles. It does not fit, even at its low end.
+        - (c) drop items 3 and 3b: 20.5-33.5 fixer h plus unestimated rows, 15-77 points, 1-2 cycles.
+        - (c′) (c), with S3-R27 steps 5-6 also known misses.
+        - (d) stop and merge HEAD: 3-6 h of records plus a check, 12-26 points.
+        - (e) (d), plus the S1 log line and one short two-lens verification: 4.5-9 fixer h, 13-33 points.
+        - (b) is merged into (c).
+      - **Gates:** the six purge cases stay red under (c) to (e), so `--full` FAILs at `benchmarks` unless the owner gives the G3 word. A PASS also needs P-13's p99 on the merged head (never measured) and no flake in the 3 runs.
+      - **`docs/REOPEN-WP-F.md`** has its check's 9 must-fix items (138 to 141 lines; `REOPEN-WP-F-v1.md` holds the copy before) and is still untracked. Its finisher lists what the next version must fold in: N26-N30, item 1c's two risks, and the owner's C2 ruling.
+    - **Run 12, by 16:31:** three commits on `wp/s3f`, `29dfb12` (reqs #8's guard), `64f276d` (an e1-P1 kill) and `1b911a1` (a 429-lane test).
+    - **Weekly: 76 % at 16:31** (75 % at 16:18). 24 points are left until Thu 12 Nov 03:00 CET. Run 12 alone uses about 1.1 points an hour (estimate).
+    - **Taken to the owner at 16:32:** the choice among (a), (c), (c′), (d) and (e); the red gated cases (accept the FAIL, or the G3 word); the ENOSPC class; and pushes for persistence.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
