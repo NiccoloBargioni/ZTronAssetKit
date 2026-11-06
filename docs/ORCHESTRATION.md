@@ -267,6 +267,18 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - `wf_be142310-4d6` (task `wnolcayft`) is f3b: two analysts, one routing in one turn (`f3b-route-a.md`) and one deferring work to budgeted turns (`f3b-route-b.md`), then a comparative review (`f3b-review.md`).
     - Run 10's focus now names items 1b and 3b and N19's re-read.
     - **Next:** rule what the final editor leaves, append `s3-r28-final.md`, and launch run 10. Then write items 1b and 3b from their reviews and append each as soon as it is ready.
+  - **f1b's review returned at about 13:00: UNSOUND** (`f1b-join-rule-review.md`; 2 agents, 98 min, 0.42 M subagent tokens). By code reading only, it finds:
+    - two regressions against `9aa337c`. W-PD-back2 comes from f1b's own begin set. **W-JOIN-HOP comes from the replay half ruled at 11:20:** clause (f) dates a replay that hops onto J through a copy adopted since the end as met. At a transfer's end that shape is green today, because there is no stamp there.
+    - shapes that f1b's window close cannot see (AV-off, W-JOIN-OFF), red on `9aa337c` too;
+    - the late drain (the follow released after J's read returns), which no probe has run. W-HP is red there at both ends.
+    - Its estimate is 38–59 h for the whole route. The class keeps growing with each analysis: f1's route was 12–18 h, its review's 16–24 h, f1b's 22–33 h. It looks like cycles 5 to 12, which led the owner to narrow the bar (S3-R16).
+  - **N20 (13:10), appended to the orchestrator's rulings:** decision 1's replay half is withdrawn. Nothing in item 1 is ruled for the code now; correct #1 and #2 stay blocking. All of item 1's route becomes item 1b.
+    - Step 0 runs every shape named so far, about 35 of them, in both orders and both drain timings, on `9aa337c`. The results form one table in the draft.
+    - Step 1 becomes item 2 alone.
+    - f1c (a re-analysis of f1b as its review corrects it, with its own review) is launched once step 0's shape results are committed, unless the owner has classed the window's dating as timing by then.
+    - Run 10's focus now says so.
+  - **The final-text workflow is to be stopped** when its first editor returns (watcher `brxs6o7bz`). It is then relaunched with N20 applied first and both checks against N1–N20, from `/private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/scratchpad/s3r28-final2.js`.
+  - **For the owner (asked at about 13:15):** should the dating of a join or request made during an ENOSPC end's free-space read count as timing (S3-R16 item 2) rather than as an answer, as long as SF's answer is one visit-first gives for some arrival order of the same inputs, and the MUSTs and space safety hold? Until the owner rules, the strict bar stands.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
