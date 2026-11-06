@@ -369,6 +369,9 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - **Restore:** `git archive archive/build-orchestrator .build-orchestrator | tar -x -C <repo>`.
       - The branch is not pushed, because the owner's push word covered only the earlier pushes. A final snapshot follows at the package's close.
       - A re-open dossier, tracked on `feature/asset-kit`, is to be written.
+    - **`wf_d70ede79-565` (task `w68e95dvi`) from 14:45,** two tracks, each with an independent check, then a finisher:
+      - **the options for ending WP-F sooner** (`end-sooner-options.md`): the ledger of what is still open, with hours; how each C2 purge case is gated (`verify.sh --full` runs the Benchmarks filter, `Scripts/verify.sh:153`, so a gated miss left red fails the final PASS); options (a) to (d) with what each leaves open; a field signal for how often the misses happen. The owner decides any further cut;
+      - **the re-open dossier v1** (`docs/REOPEN-WP-F.md`, to be committed on `feature/asset-kit`).
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
