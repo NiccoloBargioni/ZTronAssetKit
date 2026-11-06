@@ -7972,7 +7972,21 @@ point 7 (the close); then the two verifiers run once (point 8). Each step's resu
      (`5672c6d`); the "Proposed document changes" of cycles 21 to 23 (reqs #5; `ab82a5a`); the 21 findings' states
      (the table below), the named findings' last column, the cycle-23 entry of "Not verified here" and A-T-SD's
      evidence note (the commit after `ab82a5a`). Within the records' 3-6 h.
-  4. Point 7, the close: next, on the HEAD after these records.
+  4. Point 7, the close: **done** (18:25 to 19:58, on `450022b`, the records' HEAD; under "Gate evidence (cycle 23)").
+     The last lines:
+     - `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`: `VERIFY: PASS`
+     - `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --gates-only`: `VERIFY: PASS`
+     - `SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --full`: `VERIFY: FAIL (1 failed: benchmarks)`. Its causes,
+       named from the benchmarks log, are the six purge misses and P-13 (WP-B's) only, the six each red at a 1-minute
+       load of 3.70 or less: the accepted end state (point 3). Every other stage passed on its own.
+
+     `sim.lock` was held for the coverage runs. The benchmarks ran at a 1-minute load of mean 4.66 (2.43 to 13.82);
+     the cases measured while it was above 10 were run again alone at 1.75 to 1.88, but `purgeTurns`' two passing
+     shapes; `commitTwoTokensTurns` (8.95 ms) is the margin list's only case below the misses. `docs/TRACEABILITY.md`
+     was restored after `--gates-only` and `--full`. Left to the verifiers' heavy checks (point 7): the iOS Simulator
+     suite and A-T-SD's 30 simulator iterations. The fixer also ran the suite once, outside point 7, because the task's
+     command list asks for it: `result: Passed`, 1,667 tests, 0 failed.
+  5. Next: point 8, the two verifiers' run on this HEAD (lens 3's heavy checks first); it is not the fixer's.
 - **Run 12** (from 16:16; stopped by the orchestrator at 16:41 at `9e9a500`, clean worktree) committed seven commits,
   `29dfb12` to `9e9a500`: reqs #8's guard (`29dfb12`), e1-P1's other side (`64f276d`) and five kill tests (`1b911a1`,
   `486ee2a`, `8b252f2`, `06880a8`, `9e9a500`). It made no mutant run for the five and recorded none of the seven here;
@@ -8005,11 +8019,11 @@ hour figure is an estimate. A finding's number is its lens's (`.build-orchestrat
 | correct #1: PROBE-C22C-TS-DRAIN-JOIN (an ENOSPC window) | a known risk (point 4, the whole class) | the orders' answers differ: visited first `failed(insufficientSpace(…))` and one start, swept first `ok(100000 B)` and two; 2/2 on `9aa337c` | route Q, after an independent check of 3-5 h, 44-67 h (`f1c-review.md` §3, §9); not taken | "Known residual correctness risks" |
 | correct #2: PROBE-C22C-APPLY-IN-READ (an ENOSPC window) | a known risk (point 4, the whole class) | the orders' answers differ; 2/2 on `9aa337c` | route Q, as for correct #1 | "Known residual correctness risks" |
 | correct #3: A-T-SD's flake (S3-R16 1(d)) | to be closed by point 8's verification: fixed in `03c4e59` (test only); the orchestrator records the verification's result for row 3 in ADR-057 | f2-R1 red 2/2 on `9aa337c`; on `03c4e59`'s tree green in both orders, and 30 host iterations per argument with 0 issues | none left | "Step 1"; "Not verified here", cycle 23 |
-| correct #4, reqs #1: the six purge misses | a known miss (point 2): red and reported, the accepted FAIL's cause with P-13 (point 3) | 17.82 to 64.00 ms over the four measured sets, `fourGroups` the worst (61.09 to 64.00 ms); the close's set under "Gate evidence (cycle 23)" | route C, 19-28 h, then item 3b, 17-26.5 h: 36-54.5 h; not taken | "Known misses of C2's 10 ms limit", entry 1 |
+| correct #4, reqs #1: the six purge misses | a known miss (point 2): red and reported, the accepted FAIL's cause with P-13 (point 3) | 17.82 to 64.00 ms over the five measured sets, `fourGroups` the worst (61.09 to 64.00 ms); at the close 18.14 to 62.02 ms, at 1-minute loads of 2.43 to 3.70 ("Gate evidence (cycle 23)") | route C, 19-28 h, then item 3b, 17-26.5 h: 36-54.5 h; not taken | "Known misses of C2's 10 ms limit", entry 1 |
 | correct #5, reqs #2: APM's answer turn; item 4's k = 2 and k = 4 shapes | a known miss (point 2) for APM's turn; unproven for item 4's shapes | APM (PROBE-C21-APM on `9aa337c`, load 9.85 to 8.65): groups 11.10 ms, users 13.93 ms, one group 9.37 ms; item 4's shapes unmeasured, 9-10 ms at k ≥ 4 by estimate (UNCONFIRMED) | d2's route (a) with B1: not estimated (cycle 22's lump for S3-R27 items 1 to 3 was 10-15 h); A1, and A2 if taken: not estimated | the same section, entries 4 and 5 |
 | correct #6, reqs #4: changed lines no test reaches | open, recorded under this ruling (point 6, "What stays open") | the purge predicate's three `return true` lines, `.all`'s and the unlisted-id answers under `.evictable` and `.scope` (`EngineCommands.swift:1001`, `:1004`, `:1009` at `9aa337c`; `:1025`, `:1028`, `:1033` at HEAD) | not estimated | "Point 6: run 12's work and the mutant runs", "Not run, and open" |
 | correct #7, reqs #3: the survivors and kills | closed for run 12's five kill tests and `p2-after-verdict-replay-rule` (`mut-k23`: each mutant fails 2/2 in each order that reaches it, by assertions), and for e1-P1's other side (`64f276d`, 2/2); open, recorded under this ruling: r2b, b22-no-run-owner, p2-after-verdict-true, e1-R1's kill table, `i5-pin-fold` (T-E2), ps-write-always's swept-first side and the default-tuning probe | seven mutants killed (`.build-s3f/c23/mut-k23.txt`, on a snapshot of `f38dd8c`) | the open ones: not estimated | "Point 6: run 12's work and the mutant runs" |
-| correct #8: P-13 | item 7's disposition: WP-B's (S3-R26 item 10); WP-F edits nothing for it | the verifier's run: a longest unit of 8.818 ms against a 5.0 ms budget a batch; the close's figure under "Gate evidence (cycle 23)" | WP-B's | the named findings below |
+| correct #8: P-13 | item 7's disposition: WP-B's (S3-R26 item 10); WP-F edits nothing for it | the verifier's run: a longest unit of 8.818 ms against a 5.0 ms budget a batch; at the close 13.583 ms, in 490 units | WP-B's | the named findings below |
 | correct #9: item 4's in-letter shapes unmeasured | unproven, recorded with point 2's entry 5 | unmeasured | A1, and A2 if taken: not estimated | "Known misses of C2's 10 ms limit", entry 5 |
 | correct #10: the fixer's residuals, not probed | item 7's disposition: no action | none | none | as the draft records them |
 | reqs #5: the step-8 records | closed: `3a551f4`, `79e1e0b`, `6c830b8`, `5672c6d`, `ab82a5a` and the commit after it | none | none | "Point 6: the records" |
@@ -8018,7 +8032,7 @@ hour figure is an estimate. A finding's number is its lens's (`.build-orchestrat
 | reqs #8: `publishAllMatchesOnePublishPerEvent`'s hang guard | closed: `29dfb12` (`.timeLimit(.minutes(1))`; green in 0.063 s, `s6/guard-run.log`) | none | none | "Point 6: run 12's work and the mutant runs" |
 | reqs #9: the ownership wording | closed: `79e1e0b` | none | none | "Authorised edits outside WP-F" |
 | reqs #10: stale records | closed: `3a551f4` (the bench doc comment, 12.1) and `6c830b8` | none | none | "Point 6: the records" |
-| reqs #11: C2 margins and load-only figures | to be closed by point 8's verification (its benchmarks run re-measures the load-only cases); the close's margin list is under "Gate evidence (cycle 23)" | `commitTwoTokensTurns` 9.02 ms at a load of 5.88 (cycle 22), on the margin list | none | point 8 |
+| reqs #11: C2 margins and load-only figures | to be closed by point 8's verification (its benchmarks run re-measures the load-only cases); the close's margin list is under "Gate evidence (cycle 23)" | `commitTwoTokensTurns` 9.02 ms at a load of 5.88 (cycle 22), and 8.95 ms at the close (run again alone, at a load of 1.75 to 1.88): on the margin list | none | point 8 |
 
 ### Appended items (S3-R28 item 6)
 
@@ -8502,12 +8516,12 @@ shape is at 10,000 ids, with at most 4 interests on an id, unless it says otherw
 
    | Shape | After e2-A2.5 (`2abddd1`; "Cycle 22", step 4) | Step 8's gate run | Its re-run | The cycle-22 verifier (correct #4, 09:33 to 09:46) | Point 7's `--full` |
    |---|---|---|---|---|---|
-   | `oneGroup` | 36.14 (9.09 to 8.52) | 35.71 (3.31 to 3.20) | 35.98 (6.07 to 5.82) | 36.91 (4.12 to 4.99) | at the close |
-   | `oneMemberGroups` | 37.17 (8.52 to 4.90) | 37.11 (3.20 to 2.70) | 37.38 (5.82 to 4.27) | 38.17 (4.99 to 3.76) | at the close |
-   | `oneGroupScope` | 39.59 (4.90) | 39.74 (2.54 to 2.42) | 39.82 (3.64) | 41.69 (3.76 to 3.61) | at the close |
-   | `sharedJobFourGroups` | 17.85 (4.90 to 4.59) | 17.82 (2.42) | 17.91 (3.64 to 3.83) | 18.70 (3.61) | at the close |
-   | `fourGroups` | 61.09 (4.59 to 4.38) | 62.21 (2.38 to 2.35) | 62.56 (3.83 to 3.68) | 64.00 (3.61 to 3.60) | at the close |
-   | `retryJobs` | 36.24 (4.38 to 3.33) | 36.06 (2.35 to 2.67) | 36.19 (3.79 to 2.98) | 37.59 (3.60 to 3.36) | at the close |
+   | `oneGroup` | 36.14 (9.09 to 8.52) | 35.71 (3.31 to 3.20) | 35.98 (6.07 to 5.82) | 36.91 (4.12 to 4.99) | 36.54 (3.70) |
+   | `oneMemberGroups` | 37.17 (8.52 to 4.90) | 37.11 (3.20 to 2.70) | 37.38 (5.82 to 4.27) | 38.17 (4.99 to 3.76) | 37.18 (2.99 to 3.70) |
+   | `oneGroupScope` | 39.59 (4.90) | 39.74 (2.54 to 2.42) | 39.82 (3.64) | 41.69 (3.76 to 3.61) | 39.64 (2.91 to 2.99) |
+   | `sharedJobFourGroups` | 17.85 (4.90 to 4.59) | 17.82 (2.42) | 17.91 (3.64 to 3.83) | 18.70 (3.61) | 18.14 (2.91) |
+   | `fourGroups` | 61.09 (4.59 to 4.38) | 62.21 (2.38 to 2.35) | 62.56 (3.83 to 3.68) | 64.00 (3.61 to 3.60) | 62.02 (2.69 to 2.91) |
+   | `retryJobs` | 36.24 (4.38 to 3.33) | 36.06 (2.35 to 2.67) | 36.19 (3.79 to 2.98) | 37.59 (3.60 to 3.36) | 36.30 (2.43 to 2.81) |
 
    - *Route:* route C (`f3-purge-route.md`, stages A to C), 19-28 h (`f3-purge-route.md:343`, `:363`), then item 3b's
      merged route, core 17-26.5 h on top of it (`s3-r28-item3b.md:126-129`): 36-54.5 h together
@@ -9730,7 +9744,7 @@ ruling's point 6):
   new `await` in an actor this cycle.
 - **§11:** the cycle-22 tests (`d5b2ab9..9aa337c`; each step's commits are under "Cycle 22"), in the new files below
   and in existing ones. BenchSync adds `commitReannounceTurns` and `commitFailedArmTurns` (`BenchSyncCycle22.swift`),
-  and `purgeTurns(_:)` over twelve shapes and `purgeJoinsTurns(_:)` at the bucket and the queue
+  and `purgeTurns(_:)` over nine shapes and `purgeJoinsTurns(_:)` at the bucket and the queue
   (`BenchSyncCycle22Purge.swift`), whose six purge misses are red by the owner's ruling.
 - **§1.2:** WP-F's new test files, under `Tests/ZTronAssetSyncTests/Engine/`: `EngineCommitBatchTests.swift`,
   `EngineFollowBarrierAfterVerdictSpaceTests.swift`, `EngineFollowBarrierRequeueEdgeTests.swift`,
@@ -11705,6 +11719,110 @@ again: `eca67b8` changes no `Sources` or benchmark file.
   on this cycle's `Sources` (six times before the kept-interests test and twice with it), and once on the simulator in
   each run.
 
+## Gate evidence (cycle 23)
+
+### The close (the close ruling's point 7), on `450022b`
+
+`.build-s3f/c23/tools/close7.sh`, 18:25:35 to 19:53:55, on the shared 8-core host; logs under `.build-s3f/c23/close/`
+(`start head 450022b dirty 0`, `done dirty 0`; `times.txt` stamps every stage with the three load averages, S3-R23
+item 1). `450022b` holds the final HEAD's code and tests: the commit that quotes these lines changes this draft only,
+as point 7 requires. Each mode's step lines were stamped with the load as they appeared (`<mode>-steps.txt`), the load
+was sampled every 5 s (`<mode>-load.txt`), and each mode's step logs were copied (`<mode>-logs/`); `tools/closesum.py`
+reads them. `sim.lock` was held for the coverage runs: `--quick`, and the whole of `--full`, whose three test runs
+carry coverage.
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** under `sim.lock` (taken 18:25:35 at a 1-minute load
+  of 2.56, released 18:35:13; `quick.log`, `quick-logs/`): `VERIFY: PASS`, `::: SUMMARY mode=--quick
+  steps-failed=0`, 0 `warning:` lines in its step logs. `HARNESS: unchanged since harness-frozen`, `toolchain OK: Swift
+  6.4 >= 6.3`, the debug build `Build complete! (0,46 s)`. Tests (18:25:37 to 18:35:06, after the test build's `Build
+  complete! (63,10 s)`), each `✔ Test run with … passed`: Transport 151, Sync 713 in 58 suites (`after 370.261
+  seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104. The 1-minute load over the tests: mean
+  10.35 (2.31 to 28.17, 113 samples).
+- **`… verify.sh --gates-only`** (18:35:13 to 18:35:18; `gates.log`, `gates-logs/`): `SELFTEST: PASS`; `HARNESS:
+  unchanged since harness-frozen`; `TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1595`, `TRACE: PASS`;
+  `UNSAFE escapes found=0 max=3`, `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0
+  fraction=100.0%`, `DOCS: PASS`; `::: SUMMARY mode=--gates-only steps-failed=0`, `VERIFY: PASS`. The trace step's
+  rewrite of `docs/TRACEABILITY.md` (22 lines changed, `trace-diff-gates.txt`) was restored at once, so the file was
+  not regenerated.
+- **S3-R25 item 10 for S1's lines.** `9aa337c..HEAD` changes `Sources` in `f38dd8c` only: 24 added lines in
+  `EngineCommands.swift`. `tools/covdiff23.py` on a copy of the `--quick` run's bundles and profile (`covcopy/`,
+  `covdiff23.txt`): 0 of them at a zero count. The call (`:986`) and the guard's `return` (`:1009`) ran 1.69k times,
+  and the two lines that write the line (`:1011`, `:1012`) once each, in the 11 ms case. The three unreached lines
+  stay at 0 (`:1025`, `:1028`, `:1033`; open, point 6).
+- **The benchmarks' release build** before `--full` (`bench-prebuild.log`, 18:35:18 to 18:38:44): `Build complete!
+  (205,20 s)`. The benchmark step's own `swift test` still built for 192.26 s inside the step.
+- **`… verify.sh --full`** under `sim.lock` (taken 18:38:44 at a 1-minute load of 5.01, released 19:53:55; `full.log`,
+  `full-logs/`): `VERIFY: FAIL (1 failed: benchmarks)`, `::: SUMMARY mode=--full steps-failed=1`, 0 `warning:` lines
+  in its step logs. Every other step passed on its own (point 3):
+  - `gates-selftest`, `harness` and `toolchain`: `SELFTEST: PASS`, `HARNESS: unchanged since harness-frozen`,
+    `toolchain OK: Swift 6.4 >= 6.3`.
+  - `build-debug` (`Build complete! (6,83 s)`) and `build-release` (`Build complete! (31,93 s)`), both with
+    `-warnings-as-errors`, and `build-ios` (the generic iOS build with `OTHER_SWIFT_FLAGS='-warnings-as-errors'` in
+    `.build-s3f/xcode`, 18:39:25 to 18:39:39): OK.
+  - `tests-run-1-of-3` to `tests-run-3-of-3` (18:39:39 to 19:04:56), each `✔ … passed`: Transport 151, Sync 713 (`after
+    366.844`, `368.002` and `367.089 seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104. The
+    1-minute load over the three: mean 5.87, 5.16 and 6.40 (2.40 to 22.21).
+  - `coverage` over the three runs' merged profile: `ZTronAssetSync lines= 95.05% (12367/13011) min=90.0 OK`; Storage
+    97.40 % (floor 90), Model 99.31 %, Kit 97.83 %, Transport 99.08 %, AppleHosted 99.68 %; overall 96.84 %
+    (28877/29819, floor 80); device-only exclusion 0.59 % (max 3.0 %); `COVERAGE: PASS`.
+  - `tsan` (every bundle but the benchmarks, in `.build-s3f-tsan`, 19:04:58 to 19:40:22), each `✔ … passed`: Transport
+    151, Sync 713 (`after 1741.633 seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104; no
+    `ThreadSanitizer` report in its log. The 1-minute load: mean 6.27 (1.78 to 30.25, 424 samples).
+  - `trace` (`TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1595`, `TRACE: PASS`), `unsafe` (`UNSAFE
+    escapes found=0 max=3`, `UNSAFE: PASS`) and `docs` (`DOCS public declarations=1281 documented=1281 exempt=0
+    fraction=100.0%`, `DOCS: PASS`). The trace step's rewrite of `docs/TRACEABILITY.md` (22 lines,
+    `trace-diff-full.txt`) was restored after the run.
+- **The benchmarks stage** (19:40:22 to 19:53:49; `full-logs/benchmarks.log`; `full-bench-lines.txt` stamps its lines
+  as they reached the log, behind the test process's output buffer).
+  - When: the step's build took `Build complete! (192,26 s)`, and the suites reported `after 611.889 seconds`, so they
+    ran from about 19:43:37 to 19:53:49; SyncBenchmarks from about 19:45:50 (`failed after 476.181 seconds`).
+  - Load (`full-load.txt`): over the suites, mean 4.66 (2.43 to 13.82, 122 samples). The 1-minute load was above 10
+    from 19:41:12 to 19:42:13, during the step's build, and from 19:51:55 to 19:52:50, inside SyncBenchmarks. By the
+    suite's durations, counted back from its end, the second window covers `purgeTurns(.userWaiters)` and
+    `(.ensures)`, then `purgeJoinsTurns`, `joinChainTurns`, `commitRerouteWaitersTurns`, `supersededUserTurns`,
+    `runSuperseded` and `commitTwoTokensTurns` (about 19:52:45). `purgeTurns(.ensures)`'s own load stamps rose from
+    2.43 to 13.04 over its three runs, as in each of cycle 22's runs (cause not measured).
+  - Result: `✘ Test run with 85 tests in 8 suites failed after 611.889 seconds with 7 issues.` The seven are the
+    accepted causes and no other (point 3):
+    - P-13's (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`): a reclaim of 10,000 blobs in
+      0.608 s in 490 units, unit max 13.583 ms against 5.0 ms a batch; WP-B's (`other-wp:b`, S3-R26 item 10).
+    - The six purge misses (`BenchSyncCycle22Purge.swift:32:9`), each at a 1-minute load of 3.70 or less by its own
+      stamps: `purgeTurns(.fourGroups)` [62.17, 62.02, 62.31] ms, best 62.02 (loads 2.69 to 2.91); `.oneGroupScope`
+      [39.93, 39.64, 41.65], best 39.64 (2.91 to 2.99); `.oneMemberGroups` [39.79, 37.18, 37.30], best 37.18 (2.99 to
+      3.70); `.oneGroup` [38.85, 36.54, 37.24], best 36.54 (3.70); `.retryJobs` [36.30, 36.76, 37.83], best 36.30 (2.43
+      to 2.81); `.sharedJobFourGroups` [18.37, 18.28, 18.14], best 18.14 (2.91). Each run left no job, no `.retry`
+      deadline and no invariant violation.
+  - **The second window's cases, run again alone** but `purgeTurns` (`tools/rerun-window.sh`, under `sim.lock` from
+    19:57:30 to 19:57:50, at a 1-minute load of 1.75 to 1.88; `rerun-window.log`, `rerun-load.txt`): `✔ Test run with 6
+    tests in 2 suites passed after 15.290 seconds.` Best: `commitTwoTokensTurns` 8.95 ms ([9.85, 9.18, 8.95]; 8.90 in
+    the stage, at a load above 10), the 511-joins commit (`commitRerouteWaitersTurns`) 7.61, `supersededUserTurns`
+    7.63, `runSuperseded`'s three shapes 7.48, 7.49 and 4.76, `joinChainTurns` 6.35, and `purgeJoinsTurns` 4.77 and
+    5.17. `purgeTurns(.userWaiters)` and `(.ensures)` were not run again: each passed at 6.97 ms best in the stage,
+    `.userWaiters` at a load of 2.43.
+  - **The margin list** (item 9, as the close ruling's point 7 keeps it; best above 8.5 ms at a 1-minute load of 10 or
+    less): the six purge misses (known misses, point 2), and `commitTwoTokensTurns` at 8.95 ms, at the edge (cycle
+    22's 9.02; reqs #11). No other case is above 8.5: the largest are the apply that moves 10,000 ids sharing one
+    content, each with a user-initiated waiter, in its `keep` form (8.32), and the apply that moves 10,000 members
+    sharing one content, each onto a content of its own (7.81); both ran before the second window.
+  - Other figures: `commitTurns(.waiters)` 5.72, `.waitersStalledSubscriber` 6.25, `.groupStalledSubscriber` 4.55,
+    `.manyGroups` 7.75, two stalled subscribers 7.08 (recorded, not gated), `commitReannounceTurns` 6.93,
+    `commitFailedArmTurns` 5.79, `purgeWhileOwedTurns` 5.12. P-11: speedup 3.73 (min 3.0). P-9 p99 15.11 ms (budget
+    50.0, WP-G's). P-4 plan 10,000 11.47 ms (budget 20.0), ratio 2.03 (max 2.5). P-7 resident delta 0.80 MiB for 256
+    MiB and 0.17 MiB for 1,024 MiB (max 48.0). P-14: 0 armed timers, 0 owned tasks, 0 sleepers.
+- **The iOS Simulator suite, once** (`tools/sim7.sh`). It is outside point 7, which leaves the suite and A-T-SD's 30
+  simulator iterations to the verifiers' heavy checks; the task's command list asks for it. `xcodebuild
+  build-for-testing` for `897F9D8D-B10D-4D91-8E22-417A2B9D70AA` in `.build-s3f/xcode-sim` with
+  `OTHER_SWIFT_FLAGS='-warnings-as-errors'` (`sim-build.log`, 19:59:21 to 19:59:59): `** TEST BUILD SUCCEEDED **`. Its
+  4 `warning:` lines are `appintentsmetadataprocessor`'s "Metadata extraction skipped, no AppIntents.framework
+  dependency found", none from the compiler. Then, under `sim.lock` (19:59:59 to 20:09:18), `xcodebuild
+  test-without-building … -skip-testing:ZTronAssetKitBenchmarks` (`sim.log`, `sim.xcresult`): `** TEST EXECUTE
+  SUCCEEDED **`. `xcrun xcresulttool get test-results summary` (`sim-summary.json`): `result: Passed`,
+  `totalTestCount: 1667`, `passedTests: 1667`, `failedTests: 0`, `skippedTests: 0` (the device's 3,386 test runs, 0
+  failed), on `iPhone 18 Pro`, iOS 27.0, from 20:00:07 to 20:09:11. The 1-minute load: mean 53.56 (3.93 to 267.40, 111
+  samples). The simulator is shut down: `simctl shutdown` found it `Shutdown` already (`sim-shutdown.log`).
+- **`git status`** after the close and after the simulator suite (`status-after.txt`; `done dirty 0`, `sim done dirty
+  0`): clean. `docs/TRACEABILITY.md` was restored after `--gates-only` and `--full`, so it was not regenerated.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -11887,22 +12005,25 @@ again: `eca67b8` changes no `Sources` or benchmark file.
   (P-13) is not WP-F's.
 - Cycle 23 (S3-R28, and from 17:12 the owner's close ruling, option (e)). Row 3's fix (`03c4e59`, correct #3) rests on
   f2-R1's red, its construction and this host's runs; it is not verified until point 8's verification confirms it, and
-  the orchestrator records that result in ADR-057. The iOS Simulator suite and A-T-SD's 30 simulator iterations are left
-  to the verifiers' heavy checks (point 7). Point 8's verification does not re-open point 2's known misses, point 4's
-  known risks or the work point 1 leaves open; whatever it does not reach is added here. The ENOSPC class is a known
-  residual correctness risk (point 4): correct #1 and #2 are measured, and W-AWAY, W-DB, the two W-JOIN-HOP shapes, the
-  former step-0 shapes and `f1c-review.md` §6's shapes are suspected by code reading only, UNCONFIRMED (under "Known
-  residual correctness risks"). Of the known misses of C2's 10 ms limit, only the six purge cases and APM's turn are
-  measured (APM's by a scratch probe); N7's five, f3b-review §7's two variants, route A §9's third shape and N25's three
-  are estimates, and item 4's k = 2 and k = 4 shapes are unmeasured (under "Known misses of C2's 10 ms limit"). f3c's
-  open shapes are estimates, UNCONFIRMED: the heap scans are unmeasured, and no bench figure includes the production
-  cost of `originID` (three builds a gate read, each parsing its URL over HTTP). `releaseRerouteHolds` (R12) has no
-  figure, and the argument that would bound it by the jobs downloading is unfinished: paused jobs and the other start
-  paths are not checked ("Point 6: the records", item 8). d5's audit of the held-turn readers is an analysis, with one
-  premise pinned by a test (`3a551f4`). Not run, and open: p2-after-verdict-true, e1-R1's kill table, `i5-pin-fold`'s
-  re-run (T-E2), r2b, b22-no-run-owner, ps-write-always's swept-first side, item 5's default-tuning probe and the three
-  unreached lines (`EngineCommands.swift:1025`, `:1028`, `:1033` at HEAD). RR-25 (the swept-first backoff, S3-R16 item
-  2) is recorded, not probed. Whether an app's `OSLogStore` read returns S1's line, which `OSLogSink` writes at
-  `OSLogType.info`, is not checked: the unified log's retention of `.info` messages is not verified here (C7,
-  UNVERIFIED); the tests read the injected `LogSink`. The close's runs and what they did not cover are under "Gate
-  evidence (cycle 23)". The C2 figures are this host's only (no device run). `other-wp:b` (P-13) is not WP-F's.
+  the orchestrator records that result in ADR-057. Point 7 leaves the iOS Simulator suite and A-T-SD's 30 simulator
+  iterations to the verifiers' heavy checks; the fixer ran the suite once, outside point 7 (1,667 tests passed), and not
+  the 30 iterations. Point 8's verification does not re-open point 2's known misses, point 4's known risks or the work
+  point 1 leaves open; whatever it does not reach is added here. The ENOSPC class is a known residual correctness risk
+  (point 4): correct #1 and #2 are measured, and W-AWAY, W-DB, the two W-JOIN-HOP shapes, the former step-0 shapes and
+  `f1c-review.md` §6's shapes are suspected by code reading only, UNCONFIRMED (under "Known residual correctness
+  risks"). Of the known misses of C2's 10 ms limit, only the six purge cases and APM's turn are measured (APM's by a
+  scratch probe); N7's five, f3b-review §7's two variants, route A §9's third shape and N25's three are estimates, and
+  item 4's k = 2 and k = 4 shapes are unmeasured (under "Known misses of C2's 10 ms limit"). f3c's open shapes are
+  estimates, UNCONFIRMED: the heap scans are unmeasured, and no bench figure includes the production cost of `originID`
+  (three builds a gate read, each parsing its URL over HTTP). `releaseRerouteHolds` (R12) has no figure, and the
+  argument that would bound it by the jobs downloading is unfinished: paused jobs and the other start paths are not
+  checked ("Point 6: the records", item 8). d5's audit of the held-turn readers is an analysis, with one premise pinned
+  by a test (`3a551f4`). Not run, and open: p2-after-verdict-true, e1-R1's kill table, `i5-pin-fold`'s re-run (T-E2),
+  r2b, b22-no-run-owner, ps-write-always's swept-first side, item 5's default-tuning probe and the three unreached lines
+  (`EngineCommands.swift:1025`, `:1028`, `:1033` at HEAD). RR-25 (the swept-first backoff, S3-R16 item 2) is recorded,
+  not probed. Whether an app's `OSLogStore` read returns S1's line, which `OSLogSink` writes at `OSLogType.info`, is not
+  checked: the unified log's retention of `.info` messages is not verified here (C7, UNVERIFIED); the tests read the
+  injected `LogSink`. In the close's benchmarks stage, `purgeTurns(.userWaiters)` and `(.ensures)` ran while the
+  1-minute load was above 10 and were not run again: both passed at 6.97 ms best, and `.ensures`' own load stamps rose
+  from 2.43 to 13.04 over its runs, cause not measured (under "Gate evidence (cycle 23)"). The C2 figures are this
+  host's only (no device run). `other-wp:b` (P-13) is not WP-F's.
