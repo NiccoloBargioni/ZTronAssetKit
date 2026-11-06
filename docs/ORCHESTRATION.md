@@ -526,7 +526,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            - Max 10.51, 9.70 and 8.00 ms, so the old assertion on the maximum would fail.
            - Total 0.58, 0.57 and 0.57 s against 2.0 s.
            - The p99 margin is 2-14 %, which is a residual risk for RESIDUAL-RISKS.md.
-         - **P-13's independent verifier: RUNNING.** Workflow `wf_19408ffa-9ba` (task `wi247cjnh`), with three read-only lenses: ruling fidelity, measurement soundness and an adversarial refuter. It reviews `d97e4e7` and both figures, and runs no build.
+         - **P-13's independent verifier: DONE (00:45). All three lenses PASS_WITH_NOTES, with 0 blocking.** Workflow `wf_19408ffa-9ba` used three read-only lenses: ruling fidelity, measurement soundness and an adversarial refuter. The output is saved as `.build-orchestrator/s3-post-merge/p13-verify-wf_19408ffa-9ba.json`.
+           - **Sorted under point 10 and point 8 (00:47):** nothing goes to the owner. P-13 is inside the accepted FAIL (close point 3), so a red P-13 is not a new cause, and there is no MUST and no hang.
+           - Its items are in `.build-orchestrator/s3-post-merge/docs-followup-items.md` (P1-P8).
+           - **No spare units:** every run on `e840b0e` had exactly the 5 units over 5 ms that a nearest-rank p99 tolerates at n ≈ 520. On this deletion unit, about 30 % of runs would fail the p99, some of them at a quiet load.
+           - **Wrong records, to be fixed in the ADR-057 follow-up round, after `wf_fc587e9e-0a9`:**
+             - ADR-050's premise (`DECISIONS.md:349`, "measured p99 ≈ 1 ms") and its amendment (`:368`): its quiet-run counts, its five-stall rule, its "heavy load" expectation, the omitted S3B-12 rating "marginal … p98 would be robust", and the owner's exact words "List P99" (read as option A);
+             - `ARCHITECTURE.md:836`;
+             - `BlobUnits.swift:155-156` and `:160`;
+             - `BenchStorage.swift:20-21`.
+           - **For the owner, as information and not a re-judgment:** P-13 now passes or fails on the count of APFS unlink stalls in a run. Only the owner can change the percentile or the number.
       5. The mutation re-check of the 11 survivors.
          - **RUNNING (launched 00:36 at a load of 6.62):** background task `bxn0cg0jq`, script `mut-recheck.sh` in the session scratchpad. It covers discovery's 11 survivors (M-S-07, 08, 11 and 20; M-N-09, 12, 14, 16, 20, 22 and 39; diffs in `.build-orchestrator/s3-mutants/`).
            - It mutates one file at a time in `.worktrees/merge-check` at `e840b0e` and runs that target's tests, the way `run_tests` does (Storage, Sync or Transport, scratch `.build-orch-merge`). It restores the file with `git checkout -- <file>`.
