@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 16:48 CET): the owner chose option (e), a short close (N31). Run 12 is stopped at `9e9a500`. The close ruling (`s3-r28-close-e.md`) is being checked independently (`wf_1c475778-94c`). Next: apply the checks, append the ruling, then launch run 13 (S1, the records, the close), whose two verifiers run once. After that comes the merge and post-convergence, with Stage 5's `--full` FAIL at benchmarks accepted. Snapshot 3 of the archive and `feature/asset-kit` are pushed. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 17:14 CET): run 13 (cycle 23's close, option (e)) is running (`wf_c02a97cf-a3e`, from `9e9a500`). It does S1, the mutant runs and records, and the close; then the two verifiers run once (`maxCycle` 23). Watcher `blv0ozsnw`. The close ruling is appended at rulings line 1685 (N31, N32). After the verification: point 8's findings go to the owner where they must, then come the merge, post-convergence, Stage 5 with the accepted benchmarks FAIL, the dossier's final version and the final snapshot. Pushes of `feature/asset-kit` and the archive are allowed as they change. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -467,6 +467,21 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Persistence, done at 16:47-16:48:**
       - archive snapshot 3, `2d87b7c` (3,037 files): `.build-orchestrator/`, and all 283 files under 3 MB that the draft cites, patterns included. A restore test shows no difference from the live folder. It is pushed (`765102c..2d87b7c`).
       - `docs/REOPEN-WP-F.md` v1 is committed (`d88f025`), and `feature/asset-kit` is pushed (`a4c59b7..d88f025`; the 17 commits pushed hold only this file and the dossier, and a scan found nothing like a secret).
+    - **The close ruling's checks returned at about 17:08** (`wf_1c475778-94c`): fidelity CORRECTED (3 must-fix, 14 should-fix) and consistency CORRECTED (10 must-fix, 10 should-fix). All are applied (N32). Where the two differ:
+      - a flaky test goes to the owner only when it is inside the ENOSPC window;
+      - the class is the owner's words, with T20 as the test, and a late-drain difference counts only if its cause is inside the window;
+      - a defect in S1 is reverted, not fixed;
+      - run 13 makes the mutant runs for run 12's five kill tests.
+      - f3c's two open shapes are recorded as open, not as known misses, and are reported to the owner.
+    - **Appended at 17:12** as "S3-R28, the owner's close ruling" (rulings line 1685, 1,874 lines; backup `.before-close-e`; text `s3-r28-close-e-appended.md`, first draft `-v1.md`).
+    - **Run 13 launched at about 17:14:** `wf_c02a97cf-a3e` (task `wswcysot2`), with `.build-orchestrator/s3-fix-args-run13.json`.
+      - Its order: S1 first, then the mutant runs for run 12's tests and the records, then the close.
+      - `maxCycle` is 23, so the two verifiers run once after the fixer and no cycle 24 starts.
+      - **Watcher `blv0ozsnw`** runs from `9e9a500`.
+      - **When the fixer returns:** if the status list shows points 5-7 done, let the verifiers run. If not, stop the workflow before the verifiers and relaunch the fixer from HEAD with the same arguments.
+      - **When the verifiers return:** apply point 8. A broken MUST, a hang, a flaky test inside an ENOSPC window, or a new cause of the `--full` FAIL goes to the owner before the merge. Everything else is recorded. Then come the merge and post-convergence (point 10).
+    - **Weekly: 77 % at 17:13,** with 23 points left. (e) costs 13-33 points (estimate), so the limit may cut the close; it would resume after Thu 12 Nov 03:00.
+    - **The dossier's v2 is folded into its final version at the close** (row 27), so that it is written once with every fact. The list of what it must add is under 16:30 above. ORCHESTRATION.md and the archive carry the state until then.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
