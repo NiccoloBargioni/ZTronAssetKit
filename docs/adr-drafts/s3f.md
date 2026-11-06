@@ -6922,9 +6922,11 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    `94aa4b5` (e1-P1, red), `b83112c` (its seam, behaviour-free), `9005651` (its bound and other side, red) and `58e2c1c`
    (its fix); `f7c993f` (e1-P2, red) and `75b9e45` (its fix); `a83f54e` (e1-P3, holds) and `2b33c73` (e1-PR, holds).
    No unnamed 1(a) to 1(d) finding exists: every blocking finding of the file is named by S3-R27 (the mapping below).
-2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): **in
-   progress**.
-3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
+2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5):
+   **committed**. Committed: `99a573d` (r7's removal); `50029e9` (the epoch clause's test, red) and `a798250`
+   (`replayVerdict`'s removal with the clause); `7961008` and `17a851a` (b23); `8c5c4c6` (the settle slice); `4ca9044`
+   (f7). The kills are recorded under step 2 below.
+3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): **in progress**.
 4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
 5. Item 3, in its sub-steps: not started.
 6. Item 4: not started.
@@ -7204,6 +7206,78 @@ owe): rr21-T8b as changed, T-E1 to T-E5, and the regression controls of 12.5.7 (
 
 The Sync bundle on `75b9e45` (693 tests) covers every source change of step 1; e1-P3 and e1-PR changed tests only and
 were run as listed. No probe of step 1 is open.
+
+### Step 2: item 6's removal and settle slice, item 5's removal and its cheap kills
+
+d4 review's amended order, its steps 1 to 5, one commit each, a red test before its fix where a test fails first. The
+mutant runs use cycle 22's copies of the cycle-21 tools, so `.build-s3f/c21/` stays as it was (item 12.6):
+`.build-s3f/c22/tools/mut22s.py` (`mut21s.py`, logging under `.build-s3f/c22/mut/`), `mut-c4fix.py` (r6's and r8's
+texts rewritten, r7's entry retired) and `mut-s2.py` (this step's mutants). Each runs on a snapshot of the commit it
+names (`git archive`, `.build-s3f/c22/snap-*`), 2/2 in its list, and no kill below came from a hang or a time limit.
+
+- **r7's removal** (`99a573d`; item 5, S3-R19 item 3). `followedLane`'s `atEnd` and its `!atEnd` conjunct are gone, and
+  the comment above `reaches` is d4 review's text. The Sync bundle on `99a573d`: 695 tests in 56 suites passed
+  (`.build-s3f/c22/r7-sync.log`, 02:08 to 02:14 on 6 Nov, 1-minute loads 2.96 and 2.97). The mutant texts, old and
+  new: r6's `if join.chain != nil, !atEnd, !here(join.asset) {` → `if join.chain != nil, !atEnd {` became
+  `if join.chain != nil, !here(join.asset) {` → `if join.chain != nil {`; r8's became the same original →
+  `if !here(join.asset) {`; r7's entry is retired with its branch. **r6, re-run on `99a573d`** in its LANE list
+  (`barrierDecidesA429`): killed 2/2 (34.1 and 36.2 s), each run with cycle 21's four issues at the same places
+  (`EngineFollowBarrierAnswerTests.swift:532` and `:535`, one line lower than in cycle 21;
+  `EngineFollowBarrierLaneTests.swift:271`; `EngineFollowBarrierPublicationTests.swift:107`; `.build-s3f/c22/mut-r6.txt`,
+  1-minute loads 45.15 and 24.84 beside a bundle run, which decides no timing). r8 is killed at step 7, on its rewritten
+  text.
+- **`replayVerdict`'s removal** (item 6). `50029e9` (red): `invariantsReportAWaitingVerdictsJobOutOfStateOrEpoch`
+  (`EngineFollowBarrierVerdictRecordTests.swift`, `sweepFollowsFirst` only, as the ruling says) takes
+  `barrierFailsA429BeyondTheCapsAsOnArrival`'s swept-first state (C's 429 beyond the caps fails its job, whose verdict
+  waits; the setup requires no violation) and reads `violations(after:)` with C's job set `.queued` (the unfailed clause
+  expected, and not the epoch clause), then with its epoch bumped (the epoch clause expected, and not the unfailed one).
+  Before the clause, the second read reported nothing (`[]`; `.build-s3f/c22/vr-red.log`). `a798250`: the second guard
+  is deleted, `replayVerdict`'s last doc sentence is d4 review's text, and the clause
+  `verdictsAfterFollow.filter { self.state.jobs[$0.key]?.epoch != $0.value.epoch }` reports "N jobs whose failure
+  verdict waits for a follow are at another epoch", after the unfailed one. On `a798250` the test and
+  `barrierFailsA429BeyondTheCapsAsOnArrival` pass, and the Sync bundle passed 696 tests (`.build-s3f/c22/vr-sync.log`).
+  On `7961008` (`.build-s3f/c22/mut-s2a.txt`): vr-unfailed-off (`if !unfailed.isEmpty {` → `if !unfailed.isEmpty,
+  unfailed.count < 0 {`) killed 2/2 at `EngineFollowBarrierVerdictRecordTests.swift:43`; vr-epoch-off (the same on
+  `elsewhere`) killed 2/2 at `:45`.
+- **b23** (`7961008` and `17a851a`; item 5, d4 §3.3 with its review's should-fix 5). rr21-T13's arguments
+  `LaneDropVisit.allCases` became `LaneDropVisit.allCases, OwedPurgeWanters.allCases`. One to one: `.waitersAndGroup` is
+  cycle 21's shape, with its expectations and their messages unchanged (the group is required as before, its reads go
+  through `c.group`, and the read of X's job is `replayed.onX`).
+  - `.userGroup`, a user-lane group of zz-o and the ids with no waiter: at the purge the items `["zz-a1 prefetch",
+    "zz-a2 prefetch", "zz-a3 prefetch"]` and the group pending `["zz-a1", "zz-a2", "zz-a3"]`; after the replay X's job
+    holds `prefetch ["zz-a1", "zz-a2", "zz-a3"]`; K gets O's 16 bytes; after X's commit, which the test awaits since no
+    waiter is answered there, the group pends nothing, and a later user request for each id is answered with 18 bytes
+    from the store, X started once.
+  - `.prefetchWaiters`, a prefetch-lane waiter per id with no group: the items `["zz-a1 waiter", "zz-a2 waiter",
+    "zz-a3 waiter"]` are required (b23-no-kind leaks W1 and W2 by design, as the test says); after the replay X's job
+    holds the three waiters and is the only job; W1…W3 get X's 18 bytes and K O's 16.
+  - The first build read the user-lane group before X's commit and failed in both orders (pending all three,
+    `.build-s3f/c22/b23-run1.log`); with the wait, the six cases were green 2/2 (`b23-run2.log`, `b23-run3.log`). The
+    first b23-no-lane run, on `7961008`, showed the predicted differences, but each `.userGroup` case also reached its
+    3-minute limit: a later request for an id X had not stored started X's content again, and the script gave no third
+    attempt. That run was stopped (its own processes) and is not counted; `17a851a` scripts a 404 for each later
+    attempt.
+  - On `4ca9044` (`.build-s3f/c22/mut-s2c.txt`): b23-no-lane killed 2/2 in both orders (items `["zz-a3 prefetch"]`,
+    pending `["zz-a3"]`, X's job `prefetch ["zz-a3"]`, and zz-a1's later request `.notFound`: the content was not
+    stored); b23-no-kind killed 2/2 in both orders at the `#require` (items `["zz-a3 waiter"]`).
+- **The settle slice** (`8c5c4c6`; item 6, d4 §3.5 with its review's should-fix 4). T-A3's `turns` became one argument
+  of four pairs `(turns, count)`, (0, 10), (1, 10), (0, 600) and (1, 600): every cycle-21 case runs at count 10, and
+  `count` replaces the literal 10 at the setup call, the `#require` and the bytes check. A new `#require`: no waiter or
+  job is left to free before the shutdown. At 600 the test asserts `shutdownSlices == [512, 88 - 4 × turns]`; every
+  caller gets C's bytes. The eight cases were green 2/2 (`.build-s3f/c22/ta3-run1.log`, `ta3-run2.log`). settle-slice-off
+  (`if steps == SyncEngine.shutdownStepsPerTurn, steps < 0 {`, in the owed answers' loop only) was killed 2/2 in every
+  count-600 case, with one slice: [600] at `turns: 0` and [596] at `turns: 1`, as the ruling says.
+- **f7** (`4ca9044`; item 5, d4 §3.4 with its review's M4). `commitHoldsNothingForADelistedIDWhileAnApplyIsInFlight`
+  (`EngineFollowBarrierRerouteCapturedTests.swift`): T-R1 with v4 omitting zz-a3, and v5 (the same ids, other fillers)
+  held in flight after the store applied it, from before O's commit until after the read of `heldForManifest`. In both
+  orders the commit took T-R1's path: it owes one batch of three re-routes, holds nothing, and K gets O's 16 bytes, W1
+  and W2 W's 20, W3 `.notFound`, with no violation (green 2/2, `.build-s3f/c22/f7-run1.log`, `f7-run2.log`). f7
+  (`mut-c3fix.py`'s text, with its T1|CAP|LAYER list and this test added to CAP) was killed 2/2 in both orders at
+  `:155`: under the mutant `heldForManifest` held O, and no answer changed. The fallback was not needed.
+
+The Sync bundle on `4ca9044`, step 2's last commit: 697 tests in 56 suites passed (`.build-s3f/c22/s2-sync.log`,
+02:37 to 02:43, 1-minute loads 2.79 and 2.40). Every mutant of this step is disposed of: r7 removed, r6 re-killed,
+the two clauses, b23 ×2, the settle slice and f7 killed; r8 waits for step 7.
 
 ## Items
 
