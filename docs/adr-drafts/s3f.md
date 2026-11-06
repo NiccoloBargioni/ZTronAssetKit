@@ -721,6 +721,10 @@ S3-R13 checked in an export) and S3-R8 (P-13 and the Storage benchmarks stay `ot
   2026-11-06)". Step 0 keeps `verify.sh --quick` and the 'before' figures; run 11 takes step 1 first, then re-reads the
   rulings (the owner is deciding whether the remaining C2 work stays).
 
+  *Item 1c amended (appended 15:55, N29)*: only correct #1 and #2 are exempt, by the line that decides them; the
+  second cause, the late drain and every other answer difference in or after a window are judged under S3-R16 1(a)
+  as usual; 1(b) to 1(f) still block; the record gives point 3's effect; run 11 runs `verify.sh --quick` on HEAD.
+
   Applied in cycle 23: see "Cycle 23" below, whose "Status" list says which step is committed.
 
 ## Cycle 2: the cycle-1 verification findings
@@ -7909,6 +7913,9 @@ worktree's HEAD with the first step that is not "committed". Each step's results
   2026-11-06)".
 - Re-read at 15:44, after `03c4e59`: nothing appended after item 1c (the file ends at item 1c's run-11 order).
 - Re-read at 15:50, after the records' commit: nothing appended. Run 11 went on in S3-R28's order (step 0).
+- Item 1c amended (appended 15:55, N29; read at 16:02, after `be8804a`): taken at once. The known-risk record is
+  amended to it on its own commit (correct #1 and #2 only, point 2's "Not covered", point 3's effect, the UNCONFIRMED
+  suspects), and `verify.sh --quick` runs on HEAD (point 5.1), which replaces step 0's run on `9aa337c`.
 
 ### The named findings (S3-R28 item 7, as item 1c amends it)
 
@@ -8013,21 +8020,34 @@ worktree's HEAD with the first step that is not "committed". Each step's results
 
 ### Known residual correctness risks (owner ruling 2026-11-06)
 
-By the owner's ruling (S3-R28 item 1c, N28: "Agreed let's document it as known risk"), the ENOSPC windows are known
-residual correctness risks, not blocking in cycle 23. Nothing changes in the code for them. `metInItsAttempt`
+By the owner's ruling (S3-R28 item 1c, N28: "Agreed let's document it as known risk"), as item 1c's amendment of
+15:55 (N29) narrows it, correct #1 and #2 are known residual correctness risks, not blocking in cycle 23. Nothing changes in the code for them. `metInItsAttempt`
 (`EngineJobs.swift:289-297`), `Job.transferSpaceEnd`, `AttemptEnd.stamped`, and how any join, visit or replay is
 dated, stay as they are on `9aa337c`. No failing test is committed for them, and item 8's early probe does not run.
 
-- **The class.** The window runs from a transfer's or a publication's ENOSPC end to the return of `spaceFailed`'s
-  free-space read (`EngineFailures.swift:196-212`, `:564-596`). The class is an answer that differs between the two
-  visit orders (`.followVisitedFirst` and `.sweepFollowsFirst`) only because an event inside that window is dated
-  against the window's end.
-  - Its known members are correct #1, correct #2, and the shapes of S3-R28 item 1's step-0 list, which were withdrawn
-    before they ran.
-  - Such an answer (S3-R16 1(a)) is recorded here and not reported as blocking, including one that a verifier newly
-    finds in the class.
-  - Not covered: a broken MUST or invariant, a hang, or a flaky test inside the window (S3-R16 1(b) to 1(d) still
-    block there). A start count or metric that differs stays non-blocking (S3-R16 item 2).
+- **What is exempt** (item 1c as amended at 15:55, N29: only correct #1 and #2, as N25 exempted only its three
+  cases). Correct #1's and #2's answers (S3-R16 1(a)) are recorded here and not reported as blocking. Their shape, by
+  the line that decides it: inside the window and swept first, T20 (`EngineJobs.swift:360-364`) re-queues the job,
+  because `metInItsAttempt` returns false for an input that met the attempt on a visit-first engine, which gives the
+  verdict's answers. In correct #1 the drain replays an event that arrived before a transfer's end (a request, a
+  withdrawal, a pinned batch or a chain), and the replay meets no stamp (`:293-294`); in correct #2 an apply inside
+  the end's read moves the count, so a follow's visit owed since an apply before the end is dated after it
+  (`:290-291`). This holds at either end (`failedAfter ?? transferSpaceEnd`), and a run that differs from the probes
+  only in seeds, sizes, ids or fillers is the same finding. The window's places: a transfer's end at
+  `EngineFailures.swift:196-212`, a publication's end at `EngineDispatch.swift:1259` and `:1298-1301`, the read at
+  `EngineFailures.swift:564-596`. `relane`'s guard (`EngineJobs.swift:327`) is frozen with `metInItsAttempt`.
+  - **Outside the exemption:** the second cause, a re-queue that visit-first makes and swept first never makes before
+    the verdict (W-AWAY, W-DB); any difference after the verdict defers (the late drain, W-JOIN-HOP); a
+    `metInItsAttempt` that returns true where visit-first re-queued. Every other answer difference in or after an
+    ENOSPC window is judged under S3-R16 1(a) as usual, with N21's reading of a visit-first answer that depends on
+    timing, including a shape from item 1's former step-0 list and one a verifier newly finds; the orchestrator takes
+    such a shape to the owner at once (item 8's point 4).
+  - **Suspected by code reading alone (UNCONFIRMED, outside the known risk, not probed in cycle 23):** W-AWAY and W-DB,
+    W-JOIN-HOP at a publication's end and in the late drain (f1b review must-fix 2), and `f1c-review.md` §6's shapes.
+  - **Not covered** (item 1c amended, point 2): S3-R16 1(b) to 1(f) still block, inside the window and after it (a
+    broken MUST or invariant, a hang or a job nothing advances, a flaky test, a survivor or an unreached branch, and
+    every gate). Item 4's e1-PS, e1-P1 and e1-P2 kills run on the code as it stands and block until killed. The
+    exemption covers S3-R16 1(a)'s answers only.
 - **Correct #1 (PROBE-C22C-TS-DRAIN-JOIN, seed 2_029_101): a user request made before a transfer's ENOSPC, replayed
   inside the free-space read, re-queues the job.** Deterministic, 2/2 on `9aa337c`. Sources: the findings file
   `.build-orchestrator/s3f-c22-issues.json` (correct #1); the probe in
@@ -8064,11 +8084,21 @@ dated, stay as they are on `9aa337c`. No failing test is committed for them, and
 
   Visited first, A and X get `failed(insufficientSpace(required: 100000, available: 31318658))`, and T starts once.
   Swept first, A and X get `ok(100000 B)`, and T starts twice.
-- **The user-visible effect.** A download's or a publication's ENOSPC end can overlap a user request or a map apply that
-  arrives during the free-space read. Then the swept-first order re-queues the job (T20) where visit-first gives the
-  `.insufficientSpace` verdict. In both probes the second attempt succeeds, so the app sees an extra attempt instead of
-  the error. The causes are two (f1 §1, as f1 review must-fix 2 corrects it): a re-lane dated by the wrong clock, and a
-  re-queue that visit-first makes and the swept-first engine never makes before the verdict.
+- **The user-visible effect** (item 1c amended, point 3).
+  - *Correct #1:* a user request is made while a download is in flight, and waits behind a map change's owed follow.
+    It is replayed during the free-space read that follows the download's ENOSPC, and is counted as made after the
+    failure.
+  - *Correct #2:* a map change is applied during the free-space read that follows a publication's ENOSPC. It makes
+    the owed move of an earlier map change onto the job count as made after the end.
+  - *In both,* swept first re-queues the job (T20) where visit-first gives the ENOSPC verdict: swept first, the callers
+    get `ok(100000 B)` after a second attempt (A, X and V in correct #1; A and X in correct #2); visit-first answers
+    them `failed(insufficientSpace(required: 100000, …))` after one attempt.
+  - *What the probes do not cover:* both cap interactive retries at one attempt per run (`maxAttemptsPerRun = 1`,
+    `VerifyC22CorrectProbes.swift:258`, `:387`; the default is 2, `SyncTuning.swift:44`); both script the second
+    attempt to succeed; neither the default cap nor a second ENOSPC is probed.
+  - The causes are two (f1 §1, as f1 review must-fix 2 corrects it): a re-lane dated by the wrong clock, and a
+    re-queue that visit-first makes and the swept-first engine never makes before the verdict. Only the first is
+    exempt (above).
 - **Why it is not fixed.** Independent reviews found the class's analyses UNSOUND four times: f1
   (`f1-enospc-windows-review.md`), f1b (`f1b-join-rule-review.md`), and f1c's routes A and B (`f1c-review.md` §0), all
   under `.build-orchestrator/s3f-c22-analysis/`.
@@ -8080,8 +8110,9 @@ dated, stay as they are on `9aa337c`. No failing test is committed for them, and
   backlog (W-HOP-DEFERRED, W-PROMO, W-PEND-LATE's non-ENOSPC twin).
 - **The owner's re-open criterion:** how often it happens in the field.
 
-This section feeds ADR-057, and Stage 5's `RESIDUAL-RISKS.md` and `VERIFICATION.md`. The analyses are kept on the
-pushed branch `archive/build-orchestrator`.
+This section feeds ADR-057, and Stage 5's `RESIDUAL-RISKS.md` and `VERIFICATION.md`. The analyses stay under
+`.build-orchestrator/` and are never deleted; the archive branch takes a new local snapshot of them, which reaches
+`origin` only with the owner's word (N25; item 1c amended, point 4).
 
 ### Known misses of C2's 10 ms limit (owner ruling 2026-11-06)
 
