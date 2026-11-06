@@ -151,53 +151,114 @@ extension EngineFollowBarrierTests {
 
     // MARK: rr21-T13: a purge while re-routes are owed
 
-    /// rr21-T13 and T13-nonpurged at site 1 (`withdrawPurgedJoins`' `.reroutes` arm): zz-a1…zz-a3 have a user waiter
-    /// each and are members of a prefetch group, and zz-a1 heals; K0 maps them to X's content, O's commit owes their
-    /// seven re-routes, and a purge of zz-a1 and zz-a2 arrives before the replay. Visited first, the commit re-routed the
-    /// seven interests to X at once, and the purge withdrew the non-user ones of the purged ids from X: the group stopped
-    /// waiting for zz-a1 and zz-a2, the heal was forgotten, and the user waiters kept theirs. The purge withdraws the
-    /// owed ones alike, at the purge: the batch keeps W1…W3's and the group's zz-a3, which the replay re-routes to X.
+    /// Who wants the moved ids in rr21-T13 (`purgeWithdrawsOwedNonUserReroutesOfPurgedIDs`).
+    enum OwedPurgeWanters: String, Sendable, CaseIterable {
+        /// rr21-T13 as cycle 21 built it: a user waiter each, a prefetch group of zz-o and the ids, and a heal of zz-a1.
+        case waitersAndGroup
+        /// A user-lane group of zz-o and the ids, and no waiter (b23-no-lane's state; d4 §3.3): a purge keeps a user-lane
+        /// interest, as the job arm does.
+        case userGroup
+        /// A prefetch-lane waiter each, and no group (b23-no-kind's state; d4 §3.3): a purge keeps a waiter on any lane.
+        case prefetchWaiters
+    }
+
+    /// rr21-T13 and T13-nonpurged at site 1 (`withdrawPurgedJoins`' `.reroutes` arm): zz-a1…zz-a3 are wanted as `wanters`
+    /// says; K0 maps them to X's content, O's commit owes their re-routes, and a purge of zz-a1 and zz-a2 arrives before
+    /// the replay. Visited first, the commit re-routed the interests to X at once, and the purge withdrew the non-user
+    /// ones of the purged ids from X (`interest.lane < .userInitiated && interest.kind != .waiter`): the prefetch group
+    /// stopped waiting for zz-a1 and zz-a2 and the heal was forgotten, while the user waiters, the user-lane group and
+    /// the prefetch-lane waiters kept theirs. The purge withdraws the owed ones alike, at the purge, and the replay
+    /// re-routes the rest to X. `.userGroup`: the group's ids are stored at X's content, so a later request for each is
+    /// answered from the store (X's later attempt would get a 404). `.prefetchWaiters`: the batch's items are required,
+    /// so that b23-no-kind, which leaves W1 and W2 on no job and in no batch, ends the test instead of hanging it; their
+    /// tasks are leaked then, by design.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func purgeWithdrawsOwedNonUserReroutesOfPurgedIDs(_ visit: LaneDropVisit) async throws {
+    @Test("R-CLN-6: a purge while re-routes are owed withdraws the owed non-user re-routes of purged ids (F-28)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, OwedPurgeWanters.allCases)
+    func purgeWithdrawsOwedNonUserReroutesOfPurgedIDs(_ visit: LaneDropVisit, _ wanters: OwedPurgeWanters) async throws {
         let seed: UInt64 = 2_027_701
-        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, wanters: .waitersAndGroup)
+        let c: OwedCommit
+        switch wanters {
+        case .waitersAndGroup:
+            c = try await Self.stageOwedCommit(seed: seed, moved: 3, wanters: .waitersAndGroup)
+        case .userGroup:
+            c = try await Self.stageOwedCommit(seed: seed, moved: 3, wanters: .group, groupLane: .userInitiated)
+        case .prefetchWaiters:
+            c = try await Self.stageOwedCommit(seed: seed, moved: 3, wanters: .waiters, lane: .prefetch)
+        }
         let engine = c.engine
         let o = c.transfer
         let ids = c.ids
-        let group = try #require(c.group)
-        await engine.readForTests { $0.scheduleHeal(ids[0], at: $0.environment.time.monotonicNow()) }
-        await EngineRegressionCycle6Tests.driving([c.s.time], fence: engine) {
-            await engine.awaitCondition { $0.state.jobs[o]?.interests.values.contains { $0.kind == .system } == true }
+        if wanters != .prefetchWaiters {
+            _ = try #require(c.group, "setup: the group is registered")
+        }
+        if wanters == .waitersAndGroup {
+            await engine.readForTests { $0.scheduleHeal(ids[0], at: $0.environment.time.monotonicNow()) }
+            await EngineRegressionCycle6Tests.driving([c.s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[o]?.interests.values.contains { $0.kind == .system } == true }
+            }
         }
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
         let onX = Self.movedOnto(xBytes, c)
         let x = onX[0].transferID
-        await c.s.harness.source.script(x, [.hold, .stage(xBytes)])
-        let held = try await Self.oweThroughK0(c, k0: onX, items: 7, visit: visit)
+        await c.s.harness.source.script(x, wanters == .userGroup ? [.hold, .stage(xBytes), .fail(.permanentMissing(httpStatus: 404))] : [.hold, .stage(xBytes)])
+        let held = try await Self.oweThroughK0(c, k0: onX, items: wanters == .waitersAndGroup ? 7 : 3, visit: visit)
         let purged = await engine.purge(.scope(.identifiers([ids[0], ids[1]])))
         #expect((try? purged.get()) != nil, "setup: the purge completes: \(purged)")
         let atPurge = await engine.readForTests { e in
             (
                 items: Self.owedBatches(e).flatMap { $0.items.elements.map { "\($0.asset.rawValue) \($0.kind)" } }.sorted(),
-                pending: e.state.groups[group]?.pending.keys.map(\.rawValue).sorted() ?? [],
+                pending: c.group.flatMap { e.state.groups[$0]?.pending.keys.map(\.rawValue).sorted() } ?? [],
                 heal: e.state.heals[ids[0]] == nil
             )
         }
-        #expect(atPurge.items == ["zz-a1 waiter", "zz-a2 waiter", "zz-a3 prefetch", "zz-a3 waiter"], "the purge withdraws the group's and the heal's owed re-routes of zz-a1 and zz-a2 (visit-first): \(atPurge.items)")
-        #expect(atPurge.pending == ["zz-a3"], "the group stops waiting for zz-a1 and zz-a2 (visit-first): \(atPurge.pending)")
-        #expect(atPurge.heal, "the heal of zz-a1 is forgotten (visit-first)")
-        let turns = await Self.releaseOwedTurns(c)
-        let onXJob = await engine.readForTests { e in
-            e.state.jobs[x].map { job in job.interests.values.map { "\($0.kind) \($0.assets.map(\.rawValue).sorted())" }.sorted() } ?? []
+        switch wanters {
+        case .waitersAndGroup:
+            #expect(atPurge.items == ["zz-a1 waiter", "zz-a2 waiter", "zz-a3 prefetch", "zz-a3 waiter"], "the purge withdraws the group's and the heal's owed re-routes of zz-a1 and zz-a2 (visit-first): \(atPurge.items)")
+            #expect(atPurge.pending == ["zz-a3"], "the group stops waiting for zz-a1 and zz-a2 (visit-first): \(atPurge.pending)")
+            #expect(atPurge.heal, "the heal of zz-a1 is forgotten (visit-first)")
+        case .userGroup:
+            #expect(atPurge.items == ["zz-a1 prefetch", "zz-a2 prefetch", "zz-a3 prefetch"], "the purge keeps the user-lane group's owed re-routes (visit-first): \(atPurge.items)")
+            #expect(atPurge.pending == ["zz-a1", "zz-a2", "zz-a3"], "the user-lane group still waits for every moved id (visit-first): \(atPurge.pending)")
+        case .prefetchWaiters:
+            try #require(atPurge.items == ["zz-a1 waiter", "zz-a2 waiter", "zz-a3 waiter"], "the purge keeps the prefetch-lane waiters' owed re-routes (visit-first): \(atPurge.items)")
         }
-        #expect(onXJob == ["prefetch [\"zz-a3\"]", "waiter [\"zz-a1\"]", "waiter [\"zz-a2\"]", "waiter [\"zz-a3\"]"], "the replay brings W1…W3 and the group's zz-a3 to X, and no interest of a purged id but the waiters' (visit-first): \(onXJob)")
+        let turns = await Self.releaseOwedTurns(c)
+        let replayed = await engine.readForTests { e in
+            (
+                onX: e.state.jobs[x].map { job in job.interests.values.map { "\($0.kind) \($0.assets.map(\.rawValue).sorted())" }.sorted() } ?? [],
+                jobs: e.state.jobs.keys.map { $0 == x ? "X" : "\($0)" }.sorted()
+            )
+        }
+        switch wanters {
+        case .waitersAndGroup:
+            #expect(replayed.onX == ["prefetch [\"zz-a3\"]", "waiter [\"zz-a1\"]", "waiter [\"zz-a2\"]", "waiter [\"zz-a3\"]"], "the replay brings W1…W3 and the group's zz-a3 to X, and no interest of a purged id but the waiters' (visit-first): \(replayed.onX)")
+        case .userGroup:
+            #expect(replayed.onX == ["prefetch [\"zz-a1\", \"zz-a2\", \"zz-a3\"]"], "the replay brings the user-lane group's three ids to X (visit-first): \(replayed.onX)")
+        case .prefetchWaiters:
+            #expect(replayed.onX == ["waiter [\"zz-a1\"]", "waiter [\"zz-a2\"]", "waiter [\"zz-a3\"]"] && replayed.jobs == ["X"], "the replay brings W1…W3 to X, the only job (visit-first): \(replayed)")
+        }
         await c.s.harness.source.release(x, with: .progress(received: 0, expected: nil))
         await held.stop()
         let answers = await Self.owedAnswers(c)
-        #expect(Self.sizes([answers.k]) == [16] && Self.sizes(answers.w) == [18, 18, 18], "K gets O's bytes, and W1…W3 X's (visit-first): \(answers)")
-        let after = await engine.readForTests { e in (pending: e.state.groups[group]?.pending.keys.map(\.rawValue).sorted() ?? [], heal: e.state.heals[ids[0]] == nil) }
-        #expect(after.pending.isEmpty && after.heal, "X served the group's zz-a3, and no heal came back: \(after.pending)")
+        if wanters == .userGroup {
+            // No waiter is answered at X's commit in this shape: the reads below wait for it, as the waiters' answers do.
+            await EngineRegressionCycle6Tests.driving([c.s.time], fence: engine) {
+                await engine.awaitCondition { $0.state.jobs[x] == nil }
+            }
+        }
+        #expect(Self.sizes([answers.k]) == [16] && Self.sizes(answers.w) == Array(repeating: 18, count: c.w.count), "K gets O's bytes, and W1…W3 X's (visit-first): \(answers)")
+        let after = await engine.readForTests { e in (pending: c.group.flatMap { e.state.groups[$0]?.pending.keys.map(\.rawValue).sorted() } ?? [], heal: e.state.heals[ids[0]] == nil) }
+        #expect(after.pending.isEmpty && after.heal, "X served the group's ids, and no heal came back: \(after.pending)")
+        if wanters == .userGroup {
+            // The ids X stored for the group are present: a later request is answered from the store, not by X's later
+            // attempt (a 404).
+            var later: [Result<AssetLocation, AssetError>] = []
+            for id in ids {
+                later.append(await EngineRegressionCycle6Tests.driving([c.s.time], fence: engine) { await engine.awaitAsset(id, lane: .userInitiated) })
+            }
+            let xStarts = await c.s.harness.source.starts.filter { $0.id == x }.count
+            #expect(Self.sizes(later) == [18, 18, 18] && xStarts == 1, "the store holds zz-a1…zz-a3 at X's content (visit-first): \(later); X started \(xStarts) times")
+        }
         #expect(turns.violations.isEmpty, "\(turns.violations.prefix(3))")
         await Self.finishHeld(c.s)
     }
