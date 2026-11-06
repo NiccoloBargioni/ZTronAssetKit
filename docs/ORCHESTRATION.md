@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (5 Nov 23:25 CET): run 9 runs cycle 22 under S3-R27 (items 1–12), launched 23:21; its sub-bullets near the end say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 11:25 CET): run 9 (cycle 22) is stopped. S3-R28 is being written and its join rule (f1b) re-analysed; run 10 then runs cycle 23. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -227,13 +227,25 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - stage C: A2.4's table order, after the A7 order audit.
 
       Estimated at 5–12 ms after the sorted stages, and 19–28 h of fixer work. e2-B′ (slices) needs its own review first, and is 30–50 h.
-    - **Decisions for S3-R28** (orchestrator, 11:25):
+    - **Decisions for S3-R28** (orchestrator, 11:20):
       1. Rule f1's replay half now, as f1 review "must add" 1 says. Have the join rule re-analysed (f1b, with its own review) while cycle 23 starts. Append the join rule to S3-R28 between fixer runs. Its shapes (W-HP, W-AWAY at both ends, W-DB, W-PD and T-F4's lazy twin) run in step 0 in both orders, 2 rounds each; each red one is blocking (1(a)).
       2. Adopt f2's route as its review corrects it.
       3. Adopt route C, stages A to C, as f3's review corrects it. e2-B′ is not authorised. A miss after the last stage is blocking.
       4. Cycle 23 also carries S3-R27's unfinished steps 5 to 8. The fixer works over several runs: when a fixer run returns with steps left, stop the workflow before the verifiers get far, then relaunch "continue cycle 23 from HEAD". Each new fixer run reads the rulings file at its start, so an appended ruling is picked up. Agents keep command output short, and the verifiers run lens 3 (repeat runs, TSan, the iOS suite, the benchmarks) first.
       5. Write S3-R28 as item 12 was written: these decisions, then a writer, a fidelity checker, a consistency checker and an editor.
-    - **Plan:** let the cycle-22 verifiers finish. When they land, stop run 9 once its cycle-23 fixer starts, as was done with run 8, because run 9's focus describes cycle 22. Then run one read-only analysis for S3-R28: e2-B re-specified with its review's corrections, an alternative that stays in one turn for the k = 4 shapes, and any new finding that needs a route. Then write S3-R28 and launch run 10 for cycle 23. Cycle 23 continues S3-R27's unfinished steps: e2-A2.1 to A2.4, steps 5 to 8, and the open lines.
+    - **The 08:46 plan (done by 11:20):** let the cycle-22 verifiers finish. When they land, stop run 9 once its cycle-23 fixer starts, as was done with run 8, because run 9's focus describes cycle 22. Then run one read-only analysis for S3-R28: e2-B re-specified with its review's corrections, an alternative that stays in one turn for the k = 4 shapes, and any new finding that needs a route. Then write S3-R28 and launch run 10 for cycle 23. Cycle 23 continues S3-R27's unfinished steps: e2-A2.1 to A2.4, steps 5 to 8, and the open lines.
+  - **S3-R28 is being written, and its join rule re-analysed, from 11:22.** Two read-only workflows were launched together; their files go to `.build-orchestrator/s3f-c22-analysis/`.
+    - `wf_a8e115ce-781` (task `w06dy3jof`) writes S3-R28 from the decisions above:
+      - a writer (`s3-r28-draft.md`);
+      - a fidelity checker and a consistency checker in parallel (`s3-r28-review-fidelity.md`, `s3-r28-review-consistency.md`);
+      - an editor (the copy before its changes is `s3-r28-draft-v1.md`, and its list is `s3-r28-changes.md`).
+    - `wf_68bfc610-0b4` (task `wdnen8n8a`) re-analyses the join rule (f1b), then reviews it (`f1b-join-rule.md`, `f1b-join-rule-review.md`).
+    - **Next:**
+      1. When the editor returns, rule its "For the orchestrator" items.
+      2. Append S3-R28 to `s3-rulings-s3f.md`, keeping a `.before-s3-r28` copy.
+      3. Write `s3-fix-args-run10.json` from run 9's, with `fromCycle: 23`, `findingsFile: …/s3f-c22-issues.json` and a focus naming S3-R28 and HEAD `9aa337c`. Launch run 10.
+      4. When f1b's review returns, write item 1b from it and append it between fixer runs.
+    - If this session compacts or ends first, read both journals (`~/.claude/projects/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/subagents/workflows/<run id>/journal.jsonl`) and the files above, then do the "Next" steps.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
