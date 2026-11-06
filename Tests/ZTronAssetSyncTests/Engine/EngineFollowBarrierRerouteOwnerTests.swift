@@ -169,7 +169,7 @@ extension EngineFollowBarrierTests {
     /// stopped waiting for zz-a1 and zz-a2 and the heal was forgotten, while the user waiters, the user-lane group and
     /// the prefetch-lane waiters kept theirs. The purge withdraws the owed ones alike, at the purge, and the replay
     /// re-routes the rest to X. `.userGroup`: the group's ids are stored at X's content, so a later request for each is
-    /// answered from the store (X's later attempt would get a 404). `.prefetchWaiters`: the batch's items are required,
+    /// answered from the store (X's later attempts would get a 404 each). `.prefetchWaiters`: the batch's items are required,
     /// so that b23-no-kind, which leaves W1 and W2 on no job and in no batch, ends the test instead of hanging it; their
     /// tasks are leaked then, by design.
     @available(macOS 15.0, iOS 18.0, *)
@@ -200,7 +200,10 @@ extension EngineFollowBarrierTests {
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
         let onX = Self.movedOnto(xBytes, c)
         let x = onX[0].transferID
-        await c.s.harness.source.script(x, wanters == .userGroup ? [.hold, .stage(xBytes), .fail(.permanentMissing(httpStatus: 404))] : [.hold, .stage(xBytes)])
+        // `.userGroup`: a later request that finds its id not stored starts X's content again, and gets a 404 (one for each
+        // of the three ids), so that it is answered, not left on an attempt the script does not give.
+        let missing = Array(repeating: FakeTransferStep.fail(.permanentMissing(httpStatus: 404)), count: 3)
+        await c.s.harness.source.script(x, wanters == .userGroup ? [.hold, .stage(xBytes)] + missing : [.hold, .stage(xBytes)])
         let held = try await Self.oweThroughK0(c, k0: onX, items: wanters == .waitersAndGroup ? 7 : 3, visit: visit)
         let purged = await engine.purge(.scope(.identifiers([ids[0], ids[1]])))
         #expect((try? purged.get()) != nil, "setup: the purge completes: \(purged)")
