@@ -180,6 +180,26 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - Check at the fixer's report:
       - e1-P1's fix keeps a failed publication for replays from before its end, with a seam that counts decision instants. That is not the route 12.2 named for e1-P1, `relane`'s guard; the fixer recorded its design (`1b4c2ff`);
       - the 'before' figures for items 3 and 4 are deferred to steps 5 and 6, a deviation recorded in the draft.
+  - **The cycle-22 fixer returned at about 08:44 on Fri 6 Nov**, after about 9.4 h. Its HEAD is `9aa337c` (worktree clean), and its code is unchanged since `2abddd1`. Run 9's two cycle-22 verifiers started at once.
+    - **Done:** steps 0 to 4.
+      - Step 1: e1-R1, plus the three red probes fixed (e1-PS, e1-P1, e1-P2).
+      - Steps 2 and 3: item 1 closed. `waitersStalledSubscriber` is at 6.51 ms and `manyGroups` at 7.72; terminal events are published as one batch per subscriber (`5f7db46`).
+      - Step 4: e2-A1.1 to A1.7 and e2-A2.5. `purgeWhileOwedTurns` closes at 5.01.
+      - Step 7, part: e2's 19 mutants are all killed or Equivalent. Three real gaps were closed by test `eca67b8`.
+    - **Gates:**
+      - `--quick` VERIFY: PASS; `--gates-only` VERIFY: PASS; the release build has 0 warnings;
+      - Sync ×3 passes, and TSan is clean;
+      - the iOS Simulator ran 1660/1660;
+      - ZTronAssetSync coverage is 95.06 %;
+      - the benchmarks fail only on P-13 and the six purge misses. `--full` was not run; its stages were run one by one.
+    - **Open and blocking, from the fixer itself:**
+      - Six purge cases miss C2 at quiet loads: fourGroups 62.2 ms, oneGroupScope 39.7, oneMemberGroups 37.1, retryJobs 36.1, oneGroup 35.7 and sharedJobFourGroups 17.8. e2-A2.1 to A2.4 were authorised but not made ("budget"), and e2-B is not authorised.
+      - Not started: step 5 (item 3, APM) and step 6 (item 4).
+      - Step 7: the survivors' kills, the 429 probe, e1-R1's rewritten mutants and the probe fixes' kills.
+      - Step 8's records, and item 9's rows.
+      - `EngineCommands.swift:1004` and `:1009` are reached by no test (1(e)).
+    - **Usage at 08:46: weekly 49 %** (0.74 points an hour since 02:00).
+    - **Plan:** let the cycle-22 verifiers finish. When they land, stop run 9 once its cycle-23 fixer starts, as was done with run 8, because run 9's focus describes cycle 22. Then run one read-only analysis for S3-R28: e2-B re-specified with its review's corrections, an alternative that stays in one turn for the k = 4 shapes, and any new finding that needs a route. Then write S3-R28 and launch run 10 for cycle 23. Cycle 23 continues S3-R27's unfinished steps: e2-A2.1 to A2.4, steps 5 to 8, and the open lines.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
