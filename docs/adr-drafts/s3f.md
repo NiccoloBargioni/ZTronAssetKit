@@ -6920,9 +6920,10 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    `b603475` (T-E1, T-E3 and T-E4, red); `5ad245d` (e1-R1, with rr21-T8b's and the PIN-END invariants test's changes,
    T-E2 and T-E5; the regression controls green in both orders); `34b299c` (e1-PS, red) and `b4eebb1` (its fix);
    `94aa4b5` (e1-P1, red), `b83112c` (its seam, behaviour-free), `9005651` (its bound and other side, red) and `58e2c1c`
-   (its fix); `f7c993f` (e1-P2, red) and `75b9e45` (its fix); `a83f54e` (e1-P3, holds) and `2b33c73` (e1-PR, holds). No unnamed 1(a) to 1(d) finding exists: every blocking finding of
-   the file is named by S3-R27 (the mapping below).
-2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): not started.
+   (its fix); `f7c993f` (e1-P2, red) and `75b9e45` (its fix); `a83f54e` (e1-P3, holds) and `2b33c73` (e1-PR, holds).
+   No unnamed 1(a) to 1(d) finding exists: every blocking finding of the file is named by S3-R27 (the mapping below).
+2. Item 6's removal and settle slice, and item 5's removal and its cheap kills (d4 review's steps 1 to 5): **in
+   progress**.
 3. Item 1 (with item 11.7's c3, c1 and c6 for `commitTurns(.manyGroups)`): not started.
 4. Item 2 with item 12.3 (the purge cases red, e2-A1.1 to e2-A1.7, e2-A2 if triggered): not started.
 5. Item 3, in its sub-steps: not started.
