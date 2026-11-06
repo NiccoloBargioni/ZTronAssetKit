@@ -128,6 +128,44 @@ extension EngineFollowBarrierTests {
         await Self.finishHeld(c.s)
     }
 
+    /// T-R1's delisted sibling (Stage 3 close-out cycle 22, ruling S3-R27 item 5; d4 §3.4 with its review's M4): v4 maps
+    /// zz-a1 and zz-a2 to W's content and omits zz-a3, and before O's commit a further apply, v5 (the same ids, other
+    /// fillers), is held in flight after the store applied it (`holdNextApplyFollow`). The commit owes the three
+    /// re-routes and holds nothing for the manifest: the copy no longer lists zz-a3, so it is moved, not refused. A hold
+    /// would wait for v5's follow, since a catch-up is in flight, so the set is read before v5 is released, in both
+    /// orders. The answers: W1 and W2 W's bytes, W3 `.notFound` (T21), K O's.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a commit holds nothing for the manifest for an id an apply delisted, while another apply is in flight (F-20, C1)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func commitHoldsNothingForADelistedIDWhileAnApplyIsInFlight(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_029_401
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3)
+        let engine = c.engine
+        let wBytes = EngineFixture.bytes(seed + 9, count: 20)
+        let onW = Array(c.ids.map { EngineHarness.onDemand($0.rawValue, wBytes) }.prefix(2))
+        await c.s.harness.source.script(onW[0].transferID, [.stage(wBytes)])
+        let (units, releaser) = try await Self.holdPublications(of: [c.transfer], c.s, bulk: c.bulk)
+        try await Self.applyHeld(c.manifest(onW, round: 1), tag: "v4-delisted-\(seed)", c.s, visit: visit)
+        let v5 = try ValidatedManifest(entries: c.manifest(onW, round: 2), digest: ContentHash.sha256(of: Data("v5-delisted-\(seed)".utf8)))
+        await engine.holdNextApplyFollow()
+        let applying = Task { await engine.applyAndFollow(v5, etag: nil, eviction: nil) }
+        await engine.awaitCondition { $0.applyFollowHeld && $0.state.appliesInFlight == 1 }
+        let batches = await Self.commitOwing(c, unit: units[0])
+        let held = await engine.readForTests { $0.state.heldForManifest }
+        #expect(batches.count == 1 && batches.first?.items.count == 3, "setup: the commit owes the three re-routes: \(batches.map(\.items.count))")
+        #expect(held.isEmpty, "nothing is held for the manifest (visit-first): \(held)")
+        releaser.cancel()
+        await releaser.value
+        await c.bulk.setHolding(false)
+        await engine.readForTests { $0.releaseApplyFollow() }
+        let applied = await applying.value
+        #expect((try? applied.get()) != nil, "setup: v5 is applied: \(applied)")
+        let turns = await Self.releaseOwedTurns(c)
+        #expect(turns.violations.isEmpty, "\(turns.violations.prefix(3))")
+        let answers = await Self.owedAnswers(c)
+        #expect(Self.sizes([answers.k] + answers.w.prefix(2)) == [16, 20, 20] && answers.w.last == .failure(.notFound), "K gets O's bytes, W1 and W2 W's, W3 notFound (visit-first): K \(answers.k), W \(answers.w)")
+        await Self.finishHeld(c.s)
+    }
+
     // MARK: T-R2: an id its job took after the capture holds nothing
 
     /// T-R2 (`design2-commit-window.md` N3): zz-n shares O's content, unwanted while O's publication begins (held at its
