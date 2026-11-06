@@ -277,10 +277,29 @@ extension SyncEngine {
         self.addInterest(token, asset: entry.identifier, entry: entry, lane: lane, kind: .system)
     }
 
+    /// Whether a re-lane of `job`, failed with its verdict not yet deferred, comes from an input that met the attempt
+    /// still running on a visit-first engine (`relane`): the follow's own visit or move for an apply before the end
+    /// (`inFollowVisit`; the applies followed then, `AttemptEnd.failedAfter` or `Job.transferSpaceEnd`), or, outside a
+    /// visit, the drain's replay of an event that arrived before the publication's end (the replay's decision instant,
+    /// `EngineState.reading`, against `AttemptEnd.stamped`; Stage 3 close-out cycle 22, ruling S3-R27 item 12.2's e1-P1).
+    /// A visit's reading is the instant of the apply it belongs to, so it is dated by the applies, as before. The drain's
+    /// visit after a verdict (`visitingAfterVerdict`) stands for visits at the applies since that verdict, not for the
+    /// verdict's arrival, so the replay's instant does not date it either.
+    func metInItsAttempt(_ job: Job) -> Bool {
+        if self.state.inFollowVisit {
+            return self.state.appliesFollowed == (job.attemptEnd?.failedAfter ?? job.transferSpaceEnd)
+        }
+        guard !self.state.visitingAfterVerdict, let reading = self.state.reading, let stamped = job.attemptEnd?.stamped else {
+            return false
+        }
+        return reading.serial <= stamped
+    }
+
     /// Re-evaluates a job after its lane changed: promotion re-queues or re-prioritises it, demotion re-runs
     /// admission (sync-1 S1-07), and a user request skips a backoff (T20), unless the job's attempt is still at its end
     /// for the follow: its verdict waiting, or being booked while the follow's own visit stands for one at an apply
-    /// before the end (Stage 3 close-out cycle 21, ruling S3-R26 item 5, probe (i)).
+    /// before the end (Stage 3 close-out cycle 21, ruling S3-R26 item 5, probe (i)) or the drain replays an event that
+    /// arrived before it (`metInItsAttempt`; cycle 22, ruling S3-R27 item 12.2's e1-P1).
     func relane(_ transfer: TransferID, from before: AssetPriority) {
         guard let job = self.state.jobs[transfer] else {
             return
@@ -304,7 +323,7 @@ extension SyncEngine {
                 self.pauseIfRefused(transfer)
             }
         case .failed(let disposition):
-            if job.attemptEnd?.deferredAfter != nil || (self.state.inFollowVisit && self.state.appliesFollowed == (job.attemptEnd?.failedAfter ?? job.transferSpaceEnd)) {
+            if job.attemptEnd?.deferredAfter != nil || self.metInItsAttempt(job) {
                 // The attempt's verdict waits for the follow (`defersFailure`, or an ENOSPC's in `spaceFailed`;
                 // `recordDeferredVerdict`). Only the follow's own visit, an attempt's end that brings a visit's interests
                 // forward (`bringInbound`), or an event the drain applies before the verdict, re-lanes such a job: each
@@ -325,6 +344,14 @@ extension SyncEngine {
                 // same window before its reads (`failed`), its end recorded as `Job.transferSpaceEnd`: that engine's visit
                 // met the job downloading, whose re-lane re-queues nothing either. A visit for an apply made since the end
                 // met the job failed, as that engine's did, and skips the backoff (T20).
+                //
+                // So does the drain's replay, in that window, of an event that arrived before the publication's end: the
+                // read's turns may end the follow and run the drain, whose replay of a join, or of a batch of owed
+                // re-routes pinned to the job (`waitingTarget(_:epoch:)`), stands for an input that met the job
+                // publishing on a visit-first engine; re-queued, the job's ENOSPC verdict was skipped as above (Stage 3
+                // close-out cycle 22, ruling S3-R27 item 12.2's e1-P1). An event that arrived inside the read met the job
+                // failed, as that engine's input did, and skips the backoff (T20). A transfer's ENOSPC records no such
+                // instant (`AttemptEnd.stamped`), so a replay inside its reads is not told apart (cycle 22's residual).
                 return
             }
             if isUser, disposition != .untilEntryChanges, self.originAdmitsUser() {
