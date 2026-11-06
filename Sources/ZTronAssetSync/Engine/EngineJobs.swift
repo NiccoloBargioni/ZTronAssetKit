@@ -513,7 +513,11 @@ extension SyncEngine {
             // A drained copy nobody will publish now.
             self.discardLater(adopt.name)
         }
-        self.state.heap.remove(.retry(transfer, epoch: job.epoch))
+        // Inside a purge's walk the deadline waits for the walk's one pass (`retiredRetries`; e2-A2.5).
+        let retry = DeadlineReason.retry(transfer, epoch: job.epoch)
+        if self.state.retiredRetries?.insert(retry) == nil {
+            self.state.heap.remove(retry)
+        }
         // Only a key with a `lastEmitted` entry has anything to retire: a trailing emission, a scheduled flush and a
         // subscriber's live slot each imply one (the progress gate's clauses P1-P3, `invariantViolations`), and
         // progress is offered for one id of a job (`onProgress`), so the other ids skip a retire that does nothing

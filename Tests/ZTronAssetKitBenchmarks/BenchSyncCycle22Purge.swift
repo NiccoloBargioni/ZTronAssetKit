@@ -24,6 +24,7 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
             #expect(run.jobsBefore == shape.jobs(10_000) && run.idsBefore == 10_000 && run.interestsBefore == shape.interests(10_000), "setup: \(run)")
             #expect(shape != .retryJobs || run.retrying == 10_000, "setup: every job waited for its retry: \(run)")
             #expect(run.purged && run.jobsAfter == (shape == .userWaiters || shape == .ensures ? 10_000 : 0) && run.violations.isEmpty, "\(run)")
+            #expect(run.retriesAfter == 0, "no job's retry deadline is left (S3-R27 item 12.3, e2-A2.5): \(run)")
         }
         let waits = runs.map(\.wait)
         let turns = runs.map(\.turn)
@@ -122,12 +123,14 @@ struct PurgeRun: CustomStringConvertible {
     /// The jobs that waited for a retry before the purge.
     var retrying = 0
     var jobsAfter = -1
+    /// The `.retry` deadlines left on the heap after the purge (e2-A2.5's one pass takes the retired jobs' out).
+    var retriesAfter = -1
     var purged = false
     var violations: [String] = []
     var load = ""
 
     var description: String {
-        "heartbeat \(String(format: "%.2f", self.wait)) ms, turn \(String(format: "%.2f", self.turn)) ms; jobs \(self.jobsBefore) (ids \(self.idsBefore), interests \(self.interestsBefore), retrying \(self.retrying)) -> \(self.jobsAfter); purged \(self.purged); violations \(self.violations.prefix(2)); load \(self.load)"
+        "heartbeat \(String(format: "%.2f", self.wait)) ms, turn \(String(format: "%.2f", self.turn)) ms; jobs \(self.jobsBefore) (ids \(self.idsBefore), interests \(self.interestsBefore), retrying \(self.retrying)) -> \(self.jobsAfter), retry deadlines left \(self.retriesAfter); purged \(self.purged); violations \(self.violations.prefix(2)); load \(self.load)"
     }
 }
 
@@ -158,6 +161,16 @@ struct PurgeJoinsRun: CustomStringConvertible {
 
 @available(macOS 15.0, iOS 18.0, *)
 extension SyncBench {
+    /// The `.retry` deadlines on the heap.
+    static func retryDeadlines(_ engine: isolated SyncEngine) -> Int {
+        engine.state.heap.entries.filter { deadline in
+            if case .retry = deadline.reason {
+                return true
+            }
+            return false
+        }.count
+    }
+
     /// The jobs, their ids, their interests and the jobs waiting for a retry.
     static func purgeCounts(_ engine: isolated SyncEngine) -> (jobs: Int, ids: Int, interests: Int, retrying: Int, pairs: Int) {
         let jobs = engine.state.jobs.values
@@ -257,6 +270,7 @@ extension SyncBench {
         await SyncBench.markCommitTurns(engine, nil)
         run.purged = purged
         run.jobsAfter = await SyncBench.purgeCounts(engine).jobs
+        run.retriesAfter = await SyncBench.retryDeadlines(engine)
         run.violations = await SyncBench.violations(engine)
         await engine.shutdown()
         for caller in callers {

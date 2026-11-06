@@ -131,6 +131,50 @@ struct EnginePurgeWithdrawalTests {
         await Self.finish(s)
     }
 
+    /// e2-A2.5: x and y, each its own content, wait for their retries, each held by a prefetch group of its own. A
+    /// `.scope` purge of x retires x's job, and the walk's one pass takes its `.retry` deadline out, leaving y's; the
+    /// release of y's group then retires y's job outside a purge, and `removeJob` takes y's deadline out itself. With the
+    /// pass dropped x's deadline would stay; with `removeJob` deferring outside a walk, or the walk's set left behind it,
+    /// y's would.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-CLN-6: a purge takes the retry deadlines of the jobs it retires out of the heap in one pass, and a removal after it takes its own (S3-R27 item 12.3, e2-A2.5)", .timeLimit(.minutes(1)))
+    func purgeTakesItsRetiredJobsRetryDeadlinesOut() async throws {
+        let entries = [EngineHarness.onDemand("x", EngineFixture.bytes(2_031_141)), EngineHarness.onDemand("y", EngineFixture.bytes(2_031_142))]
+        let transfers = entries.map(\.transferID)
+        try #require(transfers[0] != transfers[1], "setup: x and y have contents of their own")
+        let harness = try await EngineGroupClaimTests.started(entries)
+        let engine = harness.engine
+        for transfer in transfers {
+            await harness.source.script(transfer, [.fail(.transient(.timedOut, retryAfter: nil)), .hold])
+        }
+        let x = try await engine.registerGroup(["x"], lane: .prefetch).get()
+        let y = try await engine.registerGroup(["y"], lane: .prefetch).get()
+        await engine.awaitCondition { engine in
+            transfers.allSatisfy { EngineRegressionTests.retryScheduled(engine, $0) }
+        }
+        // No clock is driven: a driver would advance the time to y's retry, which would start y's job again, and to a
+        // deadline of x's left on the heap, which would fire and leave it.
+        let purged = await engine.purge(.scope(.identifiers(["x"])))
+        #expect((try? purged.get()) != nil, "the purge completes: \(purged)")
+        let afterPurge = await engine.readForTests { engine in
+            (
+                gone: engine.state.jobs[transfers[0]] == nil,
+                x: EngineRegressionTests.retryScheduled(engine, transfers[0]),
+                y: EngineRegressionTests.retryScheduled(engine, transfers[1]),
+                violations: engine.invariantViolations()
+            )
+        }
+        #expect(afterPurge.gone && !afterPurge.x, "the purge retired x's job and took its retry deadline out: \(afterPurge)")
+        #expect(afterPurge.y, "y's job still waits for its retry")
+        #expect(afterPurge.violations.isEmpty, "\(afterPurge.violations)")
+        await engine.releaseGroup(y)
+        await engine.awaitCondition { $0.state.jobs[transfers[1]] == nil }
+        let afterRelease = await engine.readForTests { EngineRegressionTests.retryScheduled($0, transfers[1]) }
+        #expect(!afterRelease, "the release retired y's job, which took its retry deadline out")
+        await engine.releaseGroup(x)
+        await engine.shutdown()
+    }
+
     /// t1's interest is `.prefetch` and t2's `.bulk`, both on x, and t3's `.bulk`, on y, which shares x's content; the
     /// purge selects x only. Removed one at a time, t1's removal re-laned the job to `.bulk` and t2's changed nothing:
     /// one priority change. The single settle re-lanes the job once, from its lane before the first removal (e2-A1.4).

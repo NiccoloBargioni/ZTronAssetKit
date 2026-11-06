@@ -394,6 +394,12 @@ struct EngineState {
 
     /// Every deadline.
     var heap = DeadlineHeap()
+
+    /// The `.retry` deadlines of the jobs a purge's walk retires (`SyncEngine.withdrawPurged`), which the walk takes out
+    /// of the heap in one pass once it ends; `nil` outside the walk, where `removeJob` takes each job's out itself. One
+    /// pass per job was quadratic in the jobs waiting for a retry: 10,000 of them held the purge's turn 586 to 629 ms
+    /// (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A2.5).
+    var retiredRetries: Set<DeadlineReason>?
     /// The single alarm.
     var alarm: Alarm?
     /// The last alarm token.

@@ -1014,6 +1014,8 @@ extension SyncEngine {
         // A purge of everything takes the jobs' fast path (`Job.withdrawPurged`'s `all`; e2-A1.5).
         let all = request == .all
         self.withdrawPurgedJoins(isPurged)
+        // The jobs the walk retires leave their `.retry` deadlines to one pass after it (`removeJob`; e2-A2.5).
+        self.state.retiredRetries = []
         for transfer in self.state.jobs.keys.sorted() {
             // One access to the job removes its purged interests, in ascending token order (`Job.withdrawPurged`); the
             // writes they imply follow it (S3-R27 item 12.3, e2-A1.4, with item 1's exclusivity rule).
@@ -1055,6 +1057,12 @@ extension SyncEngine {
             }
             self.settleRemoval(transfer, before: before, last: last)
         }
+        // One pass over the heap takes the retired jobs' `.retry` deadlines out, and observers are notified once more:
+        // the walk's last notification still counted them (`EngineIntrospection.scheduledDeadlines`).
+        let retired = self.state.retiredRetries ?? []
+        self.state.retiredRetries = nil
+        self.state.heap.removeAll { retired.contains($0) }
+        self.notifyObservers()
     }
 
     /// Withdraws the waiting joins (`EventAfterFollow.join`) of the non-user interests a purge removes, as `withdrawPurged`
