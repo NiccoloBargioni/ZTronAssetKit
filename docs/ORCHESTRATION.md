@@ -403,6 +403,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       - Its order: step 1 (item 2) first, then a re-read, because the owner's decision on the remaining C2 work (items 3 and 3b, and S3-R27's items 3 and 4) is pending.
       - **Watcher `beit4jpfl`:** `watch_putback.py .worktrees/s3f 9aa337c <run 11's journal> 0`.
     - **`wf_76e8f9f2-6c4` (task `w9wuvj2yu`) from 15:36:** one independent checker reads item 1c as the fixer and the verifiers will (`s3-r28-item1c-review.md`). Any correction is appended as a short note after item 1c, before run 11's fixer finishes item 2.
+    - **Item 1c's check returned at about 15:54: CORRECTED, with 7 must-fix items.** All 7 are accepted (**N29, 15:55**) and were appended at 15:55 as "S3-R28 item 1c, amended" (rulings file line 1618, now 1,664 lines; `.before-item1c-amend` kept). The main correction: item 1c had exempted a whole class, which went beyond the owner's words.
+      - Only correct #1 and #2 are exempt, defined by their deciding line.
+      - Any other ENOSPC-window answer difference is blocking, under N21, and goes to the owner at once.
+      - S3-R16 1(b) to 1(f) still block, the e1 kills included.
+      - The effect text is corrected: in correct #1 the request comes before the end, and the probes cap retries at 1 and script the second attempt to succeed.
+      - Run 11's order is now `verify.sh --quick`, then the record amended, then the C2 re-read, then step 2.
+    - **Run 11 so far:** step 1 (item 2) is in as `03c4e59` (15:44; a test and the draft only). The record of N25's misses and item 1c's risks is in as `4b38eb4` (15:50, +294 lines in the draft), written before the amendment, so the fixer amends it.
+    - **Archive snapshot 2 (15:55, local only):** `archive/build-orchestrator` → `5ba3601` (parent `765102c`), with 2,825 files matching the disk. It adds S3-R28, item 1c with its amendment, N24 to N29, and f1c and f3b with their reviews. Pushing it needs the owner's word.
+    - **Asked of the owner:** whether every other ENOSPC-window answer difference that a verifier finds should also be a known risk. If the owner says yes, the class is defined by T20 (N29).
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
