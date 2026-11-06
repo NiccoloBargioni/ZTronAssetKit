@@ -402,6 +402,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Run 11 (cycle 23) launched at 15:34:** `wf_e1cbc5ed-f72` (task `w1avgdalh`), with `.build-orchestrator/s3-fix-args-run11.json`, which is run 10's args with the focus rewritten for item 1c.
       - Its order: step 1 (item 2) first, then a re-read, because the owner's decision on the remaining C2 work (items 3 and 3b, and S3-R27's items 3 and 4) is pending.
       - **Watcher `beit4jpfl`:** `watch_putback.py .worktrees/s3f 9aa337c <run 11's journal> 0`.
+    - **`wf_76e8f9f2-6c4` (task `w9wuvj2yu`) from 15:36:** one independent checker reads item 1c as the fixer and the verifiers will (`s3-r28-item1c-review.md`). Any correction is appended as a short note after item 1c, before run 11's fixer finishes item 2.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
