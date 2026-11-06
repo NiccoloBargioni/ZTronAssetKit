@@ -312,3 +312,65 @@ extension EngineFollowBarrierTests.PinEndOutcome {
         self.layer.w
     }
 }
+
+// MARK: d4 §3.7: a waiting join pinned to a job that committed, and a later 429 (p7 and r5)
+
+/// d4 §3.7, with its review's M2 (Stage 3 close-out cycle 23, ruling S3-R28 item 4; S3-R27 item 5): the pin a commit
+/// keeps (`EngineState.reroutePinCommits`) is read by waiting chained joins too (`joinListing`), not only by owed
+/// re-routes, so it must outlive the last batch; and `followedLane` reads a waiting join's reach under its chain.
+extension EngineFollowBarrierTests {
+    /// `pinEndDropped`'s shape at `shortInteractiveRetry`, with zz-p (P's, a prefetch waiter) on Z's content (24 bytes),
+    /// which downloads, and J, a user request for zz-a1 made after O's commit, whose join waits with a chain (K0 lists
+    /// zz-a1 on X's content). K1 drops zz-a1…zz-a3 while X publishes (its layer pins X, for the batch and for J's chain),
+    /// X commits, K2 lists the ids again on Z's content, and Z then gets a 429 with Retry-After 60 s, above the user lane's
+    /// 30 s cap. Visited first, J joined X publishing, K1's visit passed X, and X's commit re-routed J under K1's copy,
+    /// which does not list zz-a1 (T21): J got `.notFound`, as W1…W3 did, and K2 found no interest to move; Z's 429 met
+    /// only P, so the origin was throttled and Z's retry served P.
+    @available(macOS 15.0, iOS 18.0, *)
+    @Test("R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
+    func waitingJoinPinnedToACommittedJobEndsUnderItsChainAtA429(_ visit: LaneDropVisit) async throws {
+        let seed: UInt64 = 2_028_311
+        let xBytes = EngineFixture.bytes(seed + 5, count: 18)
+        let zBytes = EngineFixture.bytes(seed + 7, count: 24)
+        let x = EngineHarness.onDemand("zz-x", xBytes)
+        let zp = EngineHarness.onDemand("zz-p", zBytes)
+        let c = try await Self.stageOwedCommit(seed: seed, moved: 3, extra: [x, zp], tuning: SyncTuning(interactiveRetry: Self.shortInteractiveRetry))
+        let engine = c.engine
+        let xT = x.transferID
+        let zT = zp.transferID
+        let onX = Self.movedOnto(xBytes, c)
+        let onZ = Self.movedOnto(zBytes, c)
+        try #require(onZ[0].transferID == zT && zT != xT, "setup: K2 maps the ids to zz-p's content")
+        await c.s.harness.source.script(xT, [.hold, .stage(xBytes)])
+        await c.s.harness.source.script(zT, [.hold, .fail(.transient(.throttled, retryAfter: .seconds(60))), .stage(zBytes)])
+        let v = await Self.downloadingWaiter(x, c)
+        let p = await Self.downloadingWaiter(zp, c, lane: .prefetch)
+        var held = try await Self.oweThroughK0(c, k0: [x, zp] + onX, publishing: [xT], visit: visit)
+        let a1 = c.ids[0]
+        let j = Task { await engine.awaitAsset(a1, lane: .userInitiated) }
+        await engine.awaitCondition { FollowBarrier.joinWaits($0, onX[0]) }
+        let chained = await engine.readForTests { e in
+            e.state.eventsAfterFollow.contains { event in
+                if case .join(let join) = event {
+                    return join.asset == a1 && join.chain != nil
+                }
+                return false
+            }
+        }
+        try #require(chained, "setup: J's join waits behind the batch with a chain (K0 lists zz-a1)")
+        try await Self.applyBehindBatch(c.manifest([x, zp], round: 2), tag: "k1-pin-join-\(seed)", c)
+        #expect(await Self.pins(xT, c) == [true], "setup: K1's layer pins X, which publishes")
+        await held.release(held.kept[0])
+        await engine.awaitCondition { $0.state.jobs[xT] == nil }
+        try await Self.applyBehindBatch(c.manifest([x, zp] + onZ, round: 3), tag: "k2-pin-join-\(seed)", c)
+        await c.s.harness.source.release(zT, with: .progress(received: 0, expected: nil))
+        await engine.awaitCondition { $0.state.jobs[zT]?.state != .downloading }
+        let throttled = await engine.readForTests { e in e.state.remote.flatMap { e.state.throttles[$0.originID] } != nil }
+        let layer = await Self.finishOwed(c, held: held, others: [v, p, j])
+        await Self.finishHeld(c.s)
+        #expect(layer.others[2] == .failure(.notFound), "J follows its chain to K1's copy at X's commit, which drops zz-a1 (T21, visit-first): \(layer)")
+        #expect(layer.w.allSatisfy { $0 == .failure(.notFound) } && Self.sizes([layer.k, layer.others[0]]) == [16, 18], "W1…W3 get .notFound, K O's bytes and V X's (visit-first): \(layer)")
+        #expect(throttled && Self.sizes([layer.others[1]]) == [24], "Z's 429 meets only P: the origin is throttled at the arrival and Z's retry serves P (visit-first): throttled \(throttled), \(layer)")
+        #expect(layer.violations.isEmpty, "\(layer.violations.prefix(3))")
+    }
+}
