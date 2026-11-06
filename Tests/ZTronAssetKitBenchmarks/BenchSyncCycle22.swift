@@ -9,8 +9,8 @@ import ZTronAssetTransport
 @testable import ZTronAssetSync
 
 /// The C2 pins of Stage 3 close-out cycle 22 (ruling S3-R27): the re-announcement shape of a commit to a stalled
-/// subscriber (item 1; d1 review M1), gated at C2's 10 ms on the heartbeat, best of 3, with the commit's own turn
-/// recorded.
+/// subscriber (item 1; d1 review M1) and the `.failed` arm of a job's terminal events (item 1; d1 review M3), each gated
+/// at C2's 10 ms on the heartbeat, best of 3, with the commit's or the resolution's own turn recorded.
 extension ZTronAssetKitBenchmarks.SyncBenchmarks {
     @Test("R-SYN-11: a commit that re-announces 10,000 ids to a stalled subscriber already holding them holds the engine's actor at most C2's 10 ms", .timeLimit(.minutes(10)))
     @available(macOS 15.0, iOS 18.0, *)
@@ -27,6 +27,23 @@ extension ZTronAssetKitBenchmarks.SyncBenchmarks {
         let waits = runs.map(\.commit.wait)
         let turns = runs.map(\.commit.turn)
         print("R-SYN-11 commitReannounceTurns at 10,000: heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); the commit's own turn \(turns) ms, best \(turns.min() ?? .infinity) ms; runs \(runs)")
+        #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
+    }
+
+    @Test("R-SYN-11: a 404 that fails 10,000 user waiters with one stalled subscriber holds the engine's actor at most C2's 10 ms", .timeLimit(.minutes(10)))
+    @available(macOS 15.0, iOS 18.0, *)
+    func commitFailedArmTurns() async throws {
+        _ = try await SyncBench.failedArmTurn(count: 1_000)
+        var runs: [CommitRun] = []
+        for _ in 0..<3 {
+            runs.append(try await SyncBench.failedArmTurn(count: 10_000))
+        }
+        for run in runs {
+            #expect(run.ids == 10_000 && run.interests == 10_000 && run.served && run.committed && run.buffered >= 10_000, "setup: \(run)")
+        }
+        let waits = runs.map(\.wait)
+        let turns = runs.map(\.turn)
+        print("R-SYN-11 commitFailedArmTurns at 10,000: heartbeat \(waits) ms, best \(waits.min() ?? .infinity) ms (budget \(Self.c2Budget) ms best); the resolution's own turn \(turns) ms, best \(turns.min() ?? .infinity) ms; runs \(runs)")
         #expect((waits.min() ?? .infinity) <= Self.c2Budget, "\(waits)")
     }
 }
@@ -134,6 +151,66 @@ extension SyncBench {
         run.commit.served = served
         await engine.shutdown()
         run.commit.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
+        return run
+    }
+
+    /// The `.failed` arm (ruling S3-R27 item 1; d1 review M3): `count` user waiters on one job, every id sharing its
+    /// content, that a 404 fails at `.userInitiated` (`resolveAll(.failed)`), with one stalled subscriber; the
+    /// resolution's own turn is timed inside the actor.
+    static func failedArmTurn(count: Int) async throws -> CommitRun {
+        var run = CommitRun()
+        let loadBefore = SyncBench.loadAverages()
+        let held = try await SyncBench.heldPublicationBench()
+        let engine = held.bench.engine
+        let source = held.bench.source
+        let hBytes = Data(repeating: 0x68, count: 16)
+        let members = SyncBench.sharing(count, hBytes)
+        await source.scriptManifest([.fetched(SyncBench.manifestData(members), etag: ETag(rawValue: "\"v2\""))])
+        guard await engine.sync(.force).isComplete else {
+            throw SyncBenchError.incomplete("the second sync did not complete")
+        }
+        try await held.bench.store.flush(.ordered)
+        let holder = members[0].transferID
+        await source.script(holder, [.hold, .fail(.permanentMissing(httpStatus: 404))])
+        var callers: [Task<Result<AssetLocation, AssetError>, Never>] = []
+        for entry in members {
+            let id = entry.identifier
+            callers.append(Task { await engine.awaitAsset(id, lane: .userInitiated) })
+        }
+        try await SyncBench.untilHolding(engine, holder, ids: count, interests: count)
+        let before = await SyncBench.userHolding(engine, holder)
+        run.ids = before.ids
+        run.interests = before.interests
+        let subscription = try await engine.subscribe().get()
+        await SyncBench.raiseOwnedTaskPriority(engine)
+        let clock = CommitTurnClock()
+        await SyncBench.markCommitTurns(engine) { ended in clock.mark(ended) }
+        run.wait = try await SyncBench.longestWait(on: engine) {
+            await source.release(holder, with: .progress(received: 0, expected: nil))
+            var spins = 0
+            while !Task.isCancelled, await SyncBench.commitUnanswered(engine, holder) {
+                spins += 1
+                if spins > 50_000_000 {
+                    throw SyncBenchError.incomplete("the 404 never resolved H's waiters")
+                }
+                await Task.yield()
+            }
+        }
+        run.turn = clock.longest
+        await SyncBench.markCommitTurns(engine, nil)
+        run.committed = !(await SyncBench.jobExists(engine, holder))
+        run.buffered = await engine.introspect().bufferedEvents
+        withExtendedLifetime(subscription) {}
+        var served = true
+        for caller in callers {
+            if case .failure(.notFound) = await caller.value {
+                continue
+            }
+            served = false
+        }
+        run.served = served
+        await engine.shutdown()
+        run.load = "\(loadBefore) -> \(SyncBench.loadAverages())"
         return run
     }
 

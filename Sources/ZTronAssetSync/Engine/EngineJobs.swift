@@ -817,11 +817,16 @@ extension SyncEngine {
         self.answerFollowUp()
     }
 
-    /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023), in ascending id order.
-    /// A commit walks its binding, which `publish` sorted: the store binds only ids of it, so the bound ids of
-    /// `job.assets` come in the order `job.assets.sorted()` gave them, with no sort (step C3). The subscriber keys are
-    /// sorted once for every event (step C8). `lane` is the lane of the interests the outcome answers: the job's, unless
-    /// a commit answered each interest only its bound ids (`resolveAll`'s `boundOnly`).
+    /// The non-bulk per-asset terminal events (bulk outcomes fold into run progress, ADR-023), in ascending id order,
+    /// published as one batch (`broadcastAll`; Stage 3 close-out cycle 22, ruling S3-R27 item 1). A commit walks its
+    /// binding, which `publish` sorted: the store binds only ids of it, so the bound ids of `job.assets` come in the
+    /// order `job.assets.sorted()` gave them, with no sort (step C3). When the store bound as many ids as the binding
+    /// holds, no location is looked up (c3): this rests on WP-B's contract that `AssetStore.publish` returns locations
+    /// only for ids of `binding` (`bindRecords` writes keys only from its ids), so equal counts mean every id is bound.
+    /// The ids are filtered once, and the generation read, before any queue is accessed: the events are a lazy map over
+    /// them, evaluated inside each queue's access, where `self.state` must not be read. The subscriber keys are sorted
+    /// once for every event (step C8). `lane` is the lane of the interests the outcome answers: the job's, unless a
+    /// commit answered each interest only its bound ids (`resolveAll`'s `boundOnly`).
     func publishTerminal(job: Job, outcome: InterestOutcome, lane: AssetPriority) {
         guard lane > .bulk else {
             return
@@ -829,13 +834,16 @@ extension SyncEngine {
         let keys = self.state.subscribers.keys.sorted()
         switch outcome {
         case .committed(let locations, let ascending):
-            for asset in ascending where locations[asset] != nil && job.assets.contains(asset) {
-                self.broadcast(.assetAvailable(asset, generation: self.state.generation), to: keys)
+            let allBound = locations.count == ascending.count
+            var announced: [AssetID] = []
+            announced.reserveCapacity(ascending.count)
+            for asset in ascending where (allBound || locations[asset] != nil) && job.assets.contains(asset) {
+                announced.append(asset)
             }
+            let generation = self.state.generation
+            self.broadcastAll(announced.lazy.map { AssetEvent.assetAvailable($0, generation: generation) }, to: keys)
         case .failed(let error):
-            for asset in job.assets.sorted() {
-                self.broadcast(.assetFailed(asset, error, .nextRun), to: keys)
-            }
+            self.broadcastAll(job.assets.sorted().lazy.map { AssetEvent.assetFailed($0, error, .nextRun) }, to: keys)
         }
     }
 
