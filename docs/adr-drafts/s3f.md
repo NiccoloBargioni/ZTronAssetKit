@@ -6934,30 +6934,35 @@ A fixer resumed after an interruption continues from the worktree's HEAD with th
    `1ccf796` (the purge's turn marks, behaviour-free); `e174f81` (the purge cases, red); `170c376` (e2-A1.1);
    `4c572fb` (e2-A1.2); `0500e6c` (e2-A1.3); `1c684cf` (e2-A1.4); `6ae763d` (e2-A1.5); `332b6cc` (e2-A1.6);
    `03c3504` (e2-A1.7); `2abddd1` (e2-A2.5). After e2-A1 six cases close and six miss, so e2-A2 is triggered; e2-A2.1 to
-   e2-A2.4 were not made in this cycle (budget). The figures, the records and the kills are under step 4 below.
-5. Item 3, in its sub-steps: not started.
-6. Item 4: not started.
-7. Item 5's remaining kills (d4 review's steps 6 to 12), its default-tuning probe, e1-R1's and e2's kills: not started.
+   e2-A2.4 were not made in this cycle (budget). The figures and the records are under step 4 below, the kills under
+   step 7. After e2-A2.5 six cases still miss: blocking, with no route in this cycle (under "Open at the close (cycle
+   22; blocking, reported)").
+5. Item 3, in its sub-steps: not started (budget).
+6. Item 4: not started (budget).
+7. Item 5's remaining kills (d4 review's steps 6 to 12), its default-tuning probe, e1-R1's and e2's kills: **e2's
+   committed, the rest not run** (budget). Committed: `eca67b8` (the kept-interests test, test-only), which kills e2's
+   three survivors that are not Equivalent. Under step 7 below.
 8. Items 7 and 8, the records (item 1's, 5's `followedLane`, 12.2's, 12.3's, 11.6's), item 9, and every gate on the
-   final HEAD: not started.
+   final HEAD: **the gates, and item 9's re-measure, margin list and changed-line counts, made; item 9's inventory
+   rows, items 7 and 8 and the records not written** (budget). Under step 8 below and "Gate evidence (cycle 22)".
 
 ### The named findings (S3-R27 item 12.4)
 
 | Finding | Goes to | Where it stands |
 |---|---|---|
-| correct #1 (blocking): the pin after an ENOENT re-queue | item 12.2 | step 1 |
-| correct #2 and reqs #4 (blocking): the purge's first turn; `purgeWhileOwedTurns` | item 12.3 with item 2 | step 4 |
-| correct #3 and reqs #2 (blocking): `commitTurns(.waitersStalledSubscriber)` | item 1 | step 3 |
-| correct #4 and reqs #5 (blocking): `answerPresentMembers`' answer turn | item 3 | step 5 |
-| correct #5, reqs #6 and reqs #12: PROBE-C21-HOLDERS; two stalled subscribers | item 12.1 (outside the bar, by the owner's ruling of 5 Nov; recorded); k ≤ 4 stays with item 4 | steps 6 and 8 |
-| correct #6, reqs #7 and reqs #8 (blocking): the survivors; the unreached lines | items 5 and 6 | steps 2 and 7 |
+| correct #1 (blocking): the pin after an ENOENT re-queue | item 12.2 | step 1 (fixed) |
+| correct #2 and reqs #4 (blocking): the purge's first turn; `purgeWhileOwedTurns` | item 12.3 with item 2 | step 4: `purgeWhileOwedTurns` closes; six purge cases miss (open) |
+| correct #3 and reqs #2 (blocking): `commitTurns(.waitersStalledSubscriber)` | item 1 | step 3 (closes: 6.51 ms in the gate run) |
+| correct #4 and reqs #5 (blocking): `answerPresentMembers`' answer turn | item 3 | step 5: not started (open) |
+| correct #5, reqs #6 and reqs #12: PROBE-C21-HOLDERS; two stalled subscribers | item 12.1 (outside the bar, by the owner's ruling of 5 Nov; recorded); k ≤ 4 stays with item 4 | steps 6 and 8: not made (open) |
+| correct #6, reqs #7 and reqs #8 (blocking): the survivors; the unreached lines | items 5 and 6 | steps 2 and 7: step 2's made; d4 review's steps 6 to 12 not run (open) |
 | reqs #1 (blocking): ownership of the bench files | item 11.6 | recorded under "Authorised edits outside WP-F" |
-| reqs #3 (blocking): `commitTurns(.manyGroups)` | item 11.7 | steps 3 and 5 |
-| reqs #9: no cycle-21 "Proposed document changes" | records | step 8 |
-| reqs #10: item 5's reaching test (`s3f.md:5072`) | item 12.5.9's records | step 8 |
-| reqs #11: `releaseRerouteHolds`' row | item 8 | step 8 |
+| reqs #3 (blocking): `commitTurns(.manyGroups)` | item 11.7 | steps 3 and 5 (closes: 7.72 ms in the gate run; c6 not taken) |
+| reqs #9: no cycle-21 "Proposed document changes" | records | step 8: not written (open) |
+| reqs #10: item 5's reaching test (`s3f.md:5072`) | item 12.5.9's records | step 8: not written (open) |
+| reqs #11: `releaseRerouteHolds`' row | item 8 | step 8: not written (open) |
 | reqs #13: two red commits before one fix | noted: one red commit per fix in this cycle | this cycle |
-| reqs #14: the held-turn readers | item 7 | step 8 |
+| reqs #14: the held-turn readers | item 7 | step 8: not made (open) |
 | reqs #15 and correct #7: P-13 | WP-B's (S3-R26 item 10) | not WP-F's |
 
 ### Step 0: the baseline and the 'before' figures on `d5b2ab9`
@@ -7595,6 +7600,29 @@ The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
   benchmark's purge cases assert that no `.retry` deadline is left (`PurgeRun.retriesAfter`; the ruling's "the retry
   case asserts that no `.retry` entry is left"). The test's first form drove the clock and failed (`afterPurge.y`: the
   driver had started y's retry); it was fixed before the commit.
+- **Every purge case after e2-A2.5** (`2abddd1`, release with `-enable-testing`; `.build-s3f/c22/each/a25-*.log`). The
+  retry shape fell from 571.12 to 36.24 ms best and is now a miss of the same kind as (i); the others are where e2-A1
+  left them. Every run of every shape left no `.retry` deadline (27 of 27). The decision rule leaves six misses,
+  blocking with no route in cycle 22 (item 12.3: e2-A2 is not finished, and e2-B is not authorised):
+
+| Case | Heartbeat, three runs, ms | Best | The purge's turn, best | 1-minute loads | After e2-A1, best | Verdict |
+|---|---|---|---|---|---|---|
+| `purgeWhileOwedTurns` | 5.05, 4.85, 4.84 | 4.84 | (no mark) | 9.54 to 9.09 | 4.87 | closed |
+| `purgeTurns(.oneGroup)` | 36.14, 36.31, 36.36 | 36.14 | 36.13 | 9.09 to 8.52 | 33.97 | **miss, blocking** |
+| `purgeTurns(.oneMemberGroups)` | 39.65, 37.17, 38.69 | 37.17 | 37.16 | 8.52 to 4.90 | 35.39 | **miss, blocking** |
+| `purgeTurns(.oneGroupScope)` | 39.90, 40.25, 39.59 | 39.59 | 39.58 | 4.90 | 37.55 | **miss, blocking** |
+| `purgeTurns(.sharedJob)` | 4.63, 4.65, 5.11 | 4.63 | 4.63 | 4.90 | 4.61 | closed |
+| `purgeTurns(.sharedJobFourGroups)` | 18.00, 18.01, 17.85 | 17.85 | 17.85 | 4.90 to 4.59 | 17.83 | **miss, blocking** |
+| `purgeTurns(.fourGroups)` | 61.55, 61.09, 61.49 | 61.09 | 61.08 | 4.59 to 4.38 | 59.47 | **miss, blocking** |
+| `purgeTurns(.retryJobs)` | 36.95, 36.24, 36.32 | 36.24 | 36.23 | 4.38 to 3.33 | 571.12 | **miss, blocking** |
+| `purgeTurns(.userWaiters)` | 7.65, 6.89, 6.82 | 6.82 | 6.81 | 3.33 | 6.78 | closed |
+| `purgeTurns(.ensures)` | 6.92, 8.45, 8.51 | 6.92 | 6.91 | 3.33 to 14.43 (the host's load rose after the last run) | 6.78 | closed |
+| `purgeJoinsTurns(.bucket)` | 5.04, 5.00, 5.00 | 5.00 | 4.99 | 9.64 | 4.99 | closed |
+| `purgeJoinsTurns(.queue)` | 5.21, 5.15, 5.16 | 5.15 | 5.15 | 9.64 to 9.19 | 5.20 | closed |
+
+  PROBE-C21-PURGE-PARTS on `2abddd1`: the walk of the events 2.87, 2.90, 2.99 ms (load 9.53). The one-group shapes
+  and (iv) rose 3 to 6 % against the run after e2-A1, which ran at 1-minute loads near 3 where these ran at 9 to 4.
+  e2-A2.5 adds one heap pass and one notification per purge, not per job; the two causes were not measured apart.
 - **e2-A2.1 to e2-A2.4: not made in cycle 22** (e2-A2.6 is dropped: A5's audit was not done). The cycle's remaining
   budget went to the step-8 gate run. What A2.1 needs is recorded for the next fixer:
   - `Set.remove` and `Dictionary.removeValue(forKey:)` hash before they probe, even in an empty collection (the macOS
@@ -7608,6 +7636,177 @@ The mutants ran from 03:36 to 03:38 at 1-minute loads of 10.11 to 5.30.
     `spaceAdmitted` (none); A2.1's negation kills need one added for each.
   - A guard per collection kind (a `Set` and a `Dictionary` helper that return early when empty) would make A2.1 two
     branches rather than one per index.
+
+### Steps 5 and 6: not started
+
+Item 3 (`answerPresentMembers`' answer turn, in its sub-steps) and item 4 (one id held by 10,000 interests) were not
+started in cycle 22 (budget). Their 'before' figures were not taken, and no seam of theirs landed. Both stay open as
+cycle 21 left them (its items 5 and 6 under "Open at the close (cycle 21; blocking, reported)").
+
+### Step 7 (in part): e2's kills
+
+Only e2's kills were run (item 12.3: "Each is killed 2/2 at its new line, or given a disposition under S3-R25 item
+10"). Item 5's remaining kills (d4 review's steps 6 to 12), its default-tuning probe, e1-R1's rewritten mutants and the
+kills of e1-PS's, e1-P1's and e1-P2's fixes were not run (budget).
+
+`.build-s3f/c22/tools/mut-e2.py` holds 19 mutants of e2-A1's and e2-A2.5's lines: the job method's order and arms, the
+fast path, the walk's settle, the conditions e2-A1.2 and e2-A1.4 moved (b23's at their new lines among them), and A2.5's
+one pass. `tools/mut-e2.sh` ran them with `tools/mut22s.py` on `snap-e2` (`git archive 2abddd1`, the `Sources` of every
+later commit of the cycle), from 06:43 to 07:57, beside the gate run (`mut-e2.txt`; logs in `.build-s3f/c22/mut-e2a/`,
+copied from `mut/` before the re-run below wrote its own there). A mutant's filter runs twice when its first run fails;
+otherwise the whole Sync bundle runs once, and again when it fails, each run capped at 600 s.
+
+| Mutant | The change | Result | Where it fails |
+|---|---|---|---|
+| `e2-order-reversed` | `Job.withdrawPurged` walks the tokens descending | killed 2/2 | `EnginePurgeWithdrawalTests.swift:87`, `:88` |
+| `e2-fast-always` | `all` is always true | killed 2/2 | `:127` to `:129` |
+| `e2-whole-never` | the whole-interest arm is never taken | killed 2/2 | `EngineFollowBarrierAnswerTests.swift:227`, `:237` and others (26 issues in the filter) |
+| `e2-partial-whole` | every purged interest is taken whole | killed 2/2 | `EnginePurgeWithdrawalTests.swift:127`, `:129`, `:130` |
+| `e2-prerelane-never` | no pre-relane | killed 2/2 | `:104`, `:107` |
+| `e2-prerelane-no-emptied` | a pre-relane for a job left with interests too | killed 2/2 | `:187` |
+| `e2-prerelane-no-lanes` | a pre-relane when the lane did not fall | survived: Equivalent | below |
+| `e2-run-held-kept` | the run's `held` entry is kept | survived: Equivalent | below |
+| `e2-job-no-lane` | the job walk takes user-lane interests | survived; killed by the new test | below |
+| `e2-job-no-kind` | the job walk takes waiters' interests | killed 2/2 in the whole bundle | `EngineFollowBarrierMoveRevalidationTests.swift:165`, `:226`, `:233` and `:201`'s time limit (180 s), in both runs; each run then passed the 600 s cap |
+| `e2-join-no-withdrawn` | the join predicate takes a withdrawn join again | survived: Equivalent | below |
+| `e2-join-no-lane` | the join predicate takes user-lane joins | survived; killed by the new test | below |
+| `e2-join-no-kind` | the join predicate takes waiters' joins | survived; killed by the new test | below |
+| `b23-no-lane-moved` | the re-route predicate takes user-lane items | killed 2/2 | `EngineFollowBarrierRerouteOwnerTests.swift:223` and others (8 issues) |
+| `b23-no-kind-moved` | the re-route predicate takes waiters' items | killed 2/2 | `EngineFollowBarrierRerouteOwnerTests.swift:226` |
+| `a25-no-pass` | no heap pass after the walk | killed 2/2 | `EnginePurgeWithdrawalTests.swift:167` |
+| `a25-defer-outside` | `removeJob` leaves its deadline to a pass outside a walk too | killed 2/2 | `:173` |
+| `a25-set-left` | the walk's set is left behind it | killed 2/2 | `:173` |
+| `a25-no-set` | no set before the walk | survived: Equivalent (cost only) | below |
+
+- **Equivalent.**
+  - `e2-prerelane-no-lanes`: with `before == last`, `relane(transfer, from: before)` does nothing for an emptied job.
+    The purge emptied it of non-user interests only, so its lane is below user-initiated: a queued job is re-enqueued
+    only when the lane changed or is user-initiated, a downloading one is re-prioritised or paused only when the lane
+    changed, and a failed one is touched only for a user lane (`relane`, `EngineJobs.swift:304`).
+  - `e2-run-held-kept`: as cycle 21's `EngineFollow.swift:610`. Two readers use `run.held`: `finishRun` skips a job
+    without the run's interest (`EngineRuns.swift:825`), and the invariant clause checks the other direction
+    (`EngineCommands.swift:1866`). `removeJob` removes the entry when the job ends (`EngineJobs.swift:510`); the purge
+    settles the run before its walk and keeps `state.run`. A stale entry costs `finishRun` one skipped lookup.
+  - `e2-join-no-withdrawn`: a join a purge withdrew is no longer listed in `joinsAfterFollow` (its withdrawal removed
+    the entry), so `withdrawJoinInterest` returns at its guard (`EngineCommands.swift:1131`) and the mark is set again.
+    Where a later join of the same token and id is listed, the earlier join, walked first, removes that entry and drops
+    the member at that join's transfer, and the later join then finds nothing: the same writes, made once.
+  - `a25-no-set`: `retiredRetries` stays `nil`, so each removal inside the walk takes its own deadline out, as before
+    e2-A2.5; the pass then removes nothing and the observers are notified once more, with nothing changed. Only the
+    cost differs: the retry shape's figure (571.12 ms best before e2-A2.5, 36.24 after), which the runner does not run.
+  - The notification after the pass was not made a mutant: dropped, the purge's turn still notifies after the pass,
+    when `joinEntry` spawns the purge's task in the same turn (`spawn`, `EngineLifecycle.swift:67`).
+- **Killed by the new test** (`purgeKeepsUserLaneAndWaiterInterests`, `eca67b8`, test-only): a user-lane group's
+  interest in zz-u and a prefetch waiter's in zz-p, joined (followed first) or waiting for the follow (swept first),
+  survive `purge(.scope([zz-u, zz-p]))`. The job walk's mutants fail the joined order, the join predicate's the
+  waiting one. On `snap-e2b` (`git archive eca67b8`; `tools/mut-e2b.sh`, 08:13 to 08:16, `mut-e2b.txt`; the first
+  run's logs are kept in `.build-s3f/c22/mut-e2a/`), each of the four was killed 2/2 in its filter, in 5 to 8 s, by
+  no hang or time limit: `e2-job-no-lane` at `EnginePurgeWithdrawalTests.swift:244` (followed first);
+  `e2-job-no-kind` at `:245` and at `finishHeld`'s invariants (`EngineFollowBarrierReachTests.swift:38`), followed
+  first; `e2-join-no-lane` at `:244` (swept first); `e2-join-no-kind` at `:245` and `:38` (swept first). With it,
+  every mutant of the list is killed 2/2 or Equivalent.
+
+### Step 8 (in part): item 9's check and the gate runs
+
+Two gate runs were made, both under "Gate evidence (cycle 22)": the first on `f1b38c8`, whose `Sources` and tests are
+`2abddd1`'s, and the second on `eca67b8`, which adds step 7's kept-interests test and changes no `Sources` file. Items 7
+and 8, item 9's inventory rows for items 1 and 2's new per-id and per-event operations, and the records (item 1's,
+item 5's `followedLane`, 12.1's, 12.2's and 12.3's cross-references, 11.6's) were not written in this cycle (budget).
+
+- **The re-measure of every C2 case** (item 9): the first gate run's release benchmarks ran every BenchSync case
+  (under "Gate evidence (cycle 22)"). Its eleven cases from about 06:42:20 to 06:43:05 ran while the 1-minute load was
+  above 10 (their own readings up to 13.09): `purgeTurns(.ensures)`'s end, `purgeJoinsTurns`' two shapes,
+  `joinChainTurns`, `commitRerouteWaitersTurns`, `supersededUserTurns`, `runSuperseded`'s three, `commitTwoTokensTurns`
+  and `userMovedToBound`. They ran again alone under `sim.lock`, on the gate run's release build (`--skip-build`):
+  `tools/bench-rerun22.sh` (08:05:11 to 08:09:18, `.build-s3f/c22/rerun/`) with `purgeTurns` among them, whose shapes
+  ran at 1-minute loads of 2.90 to 6.07; the load rose again from 08:07:57, during `purgeTurns(.ensures)` (11.07 to
+  19.73), so `tools/bench-rerun22b.sh` (08:10:05 to 08:10:40, `rerun2/`) ran the others once more, without
+  `purgeTurns`, at 4.92 to 6.79:
+
+| Case | First gate run, best (1-minute load) | Re-run, best (load) | Second re-run, best (load) |
+|---|---|---|---|
+| `purgeTurns(.oneGroup)` | 35.71 (3.31 to 3.20) | 35.98 (6.07 to 5.82) | |
+| `purgeTurns(.oneMemberGroups)` | 37.11 (3.20 to 2.70) | 37.38 (5.82 to 4.27) | |
+| `purgeTurns(.oneGroupScope)` | 39.74 (2.54 to 2.42) | 39.82 (3.64) | |
+| `purgeTurns(.sharedJob)` | 4.64 (2.42) | 4.58 (3.64) | |
+| `purgeTurns(.sharedJobFourGroups)` | 17.82 (2.42) | 17.91 (3.64 to 3.83) | |
+| `purgeTurns(.fourGroups)` | 62.21 (2.38 to 2.35) | 62.56 (3.83 to 3.68) | |
+| `purgeTurns(.retryJobs)` | 36.06 (2.35 to 2.67) | 36.19 (3.79 to 2.98) | |
+| `purgeTurns(.userWaiters)` | 6.83 (2.87) | 6.81 (2.90) | |
+| `purgeTurns(.ensures)` | 6.80 (3.77 to 10.62) | 6.95 (2.90 to 15.98) | |
+| `purgeJoinsTurns(.bucket)` | 4.99 (13.09) | 5.01 (18.23) | 4.96 (6.41) |
+| `purgeJoinsTurns(.queue)` | 5.18 (13.09) | 5.16 (18.23) | 5.24 (6.41) |
+| `joinChainTurns`, the applies | 6.31 (13.09) | 6.28 (18.23 to 16.93) | 6.42 (6.41 to 6.21) |
+| `commitRerouteWaitersTurns` | 7.51 (12.20) | 7.38 (16.93) | 7.43 (6.21) |
+| `supersededUserTurns` | 7.44 (12.20) | 7.41 (15.98) | 7.40 (6.21) |
+| `runSuperseded`: moved away | 7.41 (12.20 to 11.38) | 7.38 (15.98) | 7.42 (5.88) |
+| `runSuperseded`: superseded | 7.36 (11.38) | 7.36 (15.98) | 7.35 (5.88) |
+| `runSuperseded`: to a present content | 4.76 (11.38) | 4.74 (15.98 to 15.02) | 4.77 (5.88) |
+| `commitTwoTokensTurns` | 8.79 (11.38) | 9.05 (15.02) | **9.02 (5.88 to 5.57), at the edge** |
+| `userMovedToBound` | 4.64 (10.63 to 9.94) | 4.40 (15.02 to 12.20) | 4.26 (5.57 to 5.17) |
+
+  `purgeTurns(.ensures)`'s reading after its last run was above 10 in each run of it (10.62 and 15.98 here, 14.43
+  after e2-A2.5), from 2.90 to 3.77 before it, and in both runs here the cases after it ran while that load decayed;
+  without it (the second re-run) the load stayed at 4.92 to 6.79. Its 10,000 ensure calls may raise the load
+  themselves (not measured apart). Its figure closes in every run.
+- **The margin list** (item 9; best above 8.5 ms at a 1-minute load of 10 or less): the six purge misses (blocking,
+  under step 4 and "Open at the close (cycle 22; blocking, reported)"), and `commitTwoTokensTurns` at 9.02 ms, at the
+  edge (cycle 21's runs gave 8.82 and 8.90). No other case is above 8.5: the largest are the take-off with every
+  interest held (8.21, load 8.87) and the throttle extension (8.04 best of [14.06, 8.50, 8.04], before 06:42:15).
+- **S3-R25 item 10 for `d5b2ab9..HEAD`**: under "Not reached and structural lines (cycle 22)" below.
+
+### Not reached and structural lines (cycle 22)
+
+`.build-s3f/c22/tools/covdiff22.py` (cycle 21's `covdiff21c.py` with `d5b2ab9` as its base) on a copy of a coverage
+stage's profile and bundles. Of the 515 lines changed in `Sources` this cycle, six are at zero count on the
+final HEAD (the second gate run's coverage stage, `gates-b/covdiff.txt`; the first run's, `gates/covdiff.txt`, gives
+the same six lines): `EngineCommands.swift` 4 of 106 and `EngineState.swift` 2 of 131. `EngineDispatch.swift` (16),
+`EngineEvents.swift` (18), `EngineFailures.swift` (5), `EngineFollow.swift` (138), `EngineJobs.swift` (64) and
+`SubscriberQueue.swift` (37) have none.
+
+- **Structural** (4; S3-R25 item 10).
+  - `EngineCommands.swift:1131`: `withdrawJoinInterest`'s `return` when the join is no longer listed in
+    `joinsAfterFollow`: the Optional's empty case. On `d5b2ab9` the same test was an `if let` with no `else`
+    (`withdrawPurgedJoin`); e2-A1.2 made it a `guard`, whose `else` must leave.
+  - `EngineCommands.swift:1142`: `withdrawJoinInterest`'s `case .run, .waiter: break`, the arm cycle 21 recorded at
+    `:1077` and `:1112`: a waiter's join never reaches it (the predicate excludes waiters), and a run's has nothing
+    to drop (the purge settles the run first).
+  - `EngineState.swift:1112`: `Job.retirement()`'s `nil` for a job with interests. Each of `retire`'s three callers
+    checks, in the same turn, that the job has none: `dropClaim` (`EngineCommands.swift:545`), `settleRemoval`
+    through `holdIfUnwanted` (`EngineJobs.swift:427`) and the present answer (`EnginePresence.swift:283`). A missing
+    job is the caller's optional chain, not this line.
+  - `EngineState.swift:1383`: `Group.dropMember`'s `nil` for a member that is not pending, or pending at another
+    transfer: recorded as structural under step 4 (d2 review M1). The old guard's line was at count 0 in cycle 21's
+    second gate run too.
+- **Not reached: open** (2 lines in one place). S3-R25 item 10 is not met for them; they are blocking under S3-R16
+  1(e) and reported.
+  - `EngineCommands.swift:1004` and `:1009`: the purge predicate's answer for an id the applied copy does not list,
+    under `.evictable` and under `.scope`. On `d5b2ab9` one guard before the switch answered it for every request;
+    e2-A1.1 put the lookup inside the two cases that need it, so a purge of `.all` no longer reaches it. The state
+    that reaches them: a purge of a scope, or of what is evictable, while a job, a waiting join or an owed re-route
+    holds a non-user interest in an id the applied copy no longer lists (an apply that delisted it while a follow
+    is owed). No test builds it, and no mutant of the two lines was run.
+
+### Open at the close (cycle 22; blocking, reported)
+
+1. **Six purge cases miss C2** (item 2 with item 12.3; correct #2): best of 3 at 1-minute loads of 6.07 or less,
+   the first gate run and the re-run: `purgeTurns(.fourGroups)` 62.21 and 62.56 ms, `.oneGroupScope` 39.74 and
+   39.82, `.oneMemberGroups` 37.11 and 37.38, `.retryJobs` 36.06 and 36.19, `.oneGroup` 35.71 and 35.98,
+   `.sharedJobFourGroups` 17.82 and 17.91. e2-A1 and e2-A2.5 took the walk's events from 9.09 to 2.87 ms and the retry
+   shape from 589.83 to 36.06 ms; e2-A2.1 to e2-A2.4 were not made, and e2-B is not authorised, so there is no route
+   in cycle 22 (under "Step 4"). `purgeWhileOwedTurns` (reqs #4) closes: 5.01 ms in the gate run.
+2. **Items 3 and 4 were not started** (steps 5 and 6): cycle 21's open items 5 and 6 stand as it left them
+   (`answerPresentMembers`' answer turn, correct #4 and reqs #5; one id held by 10,000 interests, correct #5).
+3. **Step 7's other kills were not run**: item 5's survivors after step 2 (d4 review's steps 6 to 12), its
+   default-tuning probe, e1-R1's rewritten mutants, and the kills of e1-PS's, e1-P1's and e1-P2's fixes. e2's kills
+   are done (under "Step 7 (in part)").
+4. **Two changed lines no test reaches** (S3-R25 item 10): the purge predicate's unlisted-id answers under
+   `.evictable` and `.scope` (`EngineCommands.swift:1004` and `:1009`; under "Not reached and structural lines (cycle
+   22)").
+5. **Item 9's inventory rows, items 7 and 8, and the records were not written** (step 8): reqs #9, #10, #11 and #14
+   stay open.
+
+At the edge, not blocking: `commitTwoTokensTurns`, 9.02 ms best at a 1-minute load of 5.88 to 5.57.
 
 ## Items
 
@@ -10416,6 +10615,159 @@ failed to compile on an availability error in the probe, and 16:13:57 to 16:17:5
   docs/adr-drafts/s3f.md` only; `.build-s3f*` is untracked scratch. `docs/TRACEABILITY.md` is unchanged (the trace
   gate ran without `--write`).
 
+## Gate evidence (cycle 22)
+
+Two gate runs were made at step 8, on the shared 8-core host. The final HEAD's code is `2abddd1`'s: `git diff --stat
+2abddd1 HEAD -- Sources Package.swift Tests/ZTronAssetKitBenchmarks` is empty. `eca67b8` adds one test to
+`EnginePurgeWithdrawalTests.swift`, and the commits after it change this draft only. S3-R23 item 1's three load
+averages are in each run's `times.txt` beside every stage.
+
+### The first run, on `f1b38c8`
+
+`.build-s3f/c22/tools/gates22.sh`, 06:30:51 to 08:04:53, logs under `.build-s3f/c22/gates/` (`start head f1b38c8
+dirty 0`, `done dirty 0`). `f1b38c8`'s `Sources` and tests are `2abddd1`'s; it changes this draft only. The benchmarks
+stage and the locked stages sampled the load every 5 s (`bench-load.txt`, `cov-load.txt`, `sim-load.txt`); the other
+stages have their stamps only. Step 7's mutant run (`tools/mut-e2.sh`, from 06:43 to 07:57) ran beside every stage
+after the benchmarks, from its start in their last minute.
+
+- **Benchmarks** under `sim.lock` (taken 06:30:52 at a 1-minute load of 8.44, released 06:43:41): the release test
+  build (`bench-build.log`: exit 0, `Build complete! (0,58 s)`, nothing to build after step 4's runs), then `swift test
+  -c release --scratch-path .build-s3f-perf -Xswiftc -enable-testing --filter Benchmarks` (`bench.log`).
+  - When the suites ran: the test command's own build took `Build complete! (186,54 s)`, and the run reported `after
+    580.068 seconds`, so the suites ran from about 06:33:59 to 06:43:39; SyncBenchmarks from about 06:36:14 (`failed
+    after 444.720 seconds`).
+  - Load: over SyncBenchmarks the 1-minute load was mean 4.75, min 2.35, max 14.14 over 89 samples, and above 10 from
+    06:42:15 to 06:43:00 (mean 3.33, max 9.20, before 06:42:15); over all the suites, mean 4.35 (2.35 to 14.14, 116
+    samples); over the build before them, mean 6.32 (3.50 to 9.03, 38 samples). The window began during
+    `purgeTurns(.ensures)`, and the cases measured in it were run again alone (under "Step 8 (in part)").
+  - Result: `✘ Test run with 85 tests in 8 suites failed after 580.068 seconds with 7 issues.`
+    - P-13's (`BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget`, unit max 8.907 ms against 5.0
+      ms in 478 units; WP-B's, `other-wp:b`).
+    - The six purge misses (`BenchSyncCycle22Purge.swift:32:9`), each at a 1-minute load of 3.31 or less:
+      `purgeTurns(.fourGroups)` [62.21, 63.50, 62.73] ms, best 62.21; `.oneGroupScope` [42.79, 39.84, 39.74], best
+      39.74; `.oneMemberGroups` [37.72, 42.35, 37.11], best 37.11; `.retryJobs` [36.06, 36.30, 36.15], best 36.06;
+      `.oneGroup` [35.71, 35.93, 36.46], best 35.71; `.sharedJobFourGroups` [17.83, 17.82, 17.98], best 17.82. Each
+      of their runs left no job and no `.retry` deadline, and no invariant violation (the user shapes keep their
+      10,000 jobs, as asserted).
+  - Every other BenchSync case is at most 8.5 ms best but `commitTwoTokensTurns`, 8.79 at a load of 11.38 (9.02 at a
+    quiet load, at the edge: under "Step 8 (in part)"). The commit cases after step 3: `commitTurns(.waiters)` 5.74,
+    `.waitersStalledSubscriber` 6.51, `.groupStalledSubscriber` 4.55, `.manyGroups` 7.72, two stalled subscribers
+    7.19, `commitReannounceTurns` 7.02, `commitFailedArmTurns` 6.12 (loads 2.91 to 3.31); `purgeWhileOwedTurns` 5.01
+    (6.59).
+  - P-11: `speedup 3.7171102457971177 (min 3.0)`, concurrency 1 3.794 s and 5 1.021 s. P-9 p99 15.13 ms (budget 50.0,
+    WP-G's). P-4 plan 10,000 11.55 ms (budget 20.0), ratio 2.06 (max 2.5). P-7 resident delta 0.81 MiB for 256 MiB
+    and 0.38 MiB for 1,024 MiB (max 48.0). P-14: 0 armed timers, 0 owned tasks, 0 sleepers.
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (06:43:41 to 06:53:01; `quick.log`): `VERIFY: PASS`,
+  `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines. Tests passed: Transport 151, Sync 705 (`passed after
+  389.267 seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104.
+- **Release build** with `-warnings-as-errors` (ended 06:53:33, `release.log`): `Build complete! (31,38 s)`, 0
+  `warning:` lines. **`verify.sh --gates-only`** (06:53:33, `gates-only.log`): `SELFTEST: PASS`; `HARNESS: unchanged
+  since harness-frozen`; `TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1586` / `TRACE: PASS`; `UNSAFE
+  escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` /
+  `DOCS: PASS`; `VERIFY: PASS`. `docs/TRACEABILITY.md`, which the trace step rewrites, was restored (`git checkout`),
+  and the tree was clean after it. **Gates** alone (06:53:34): `UNSAFE: PASS` and `DOCS: PASS`, with the same lines.
+- **ZTronAssetSyncTests ×3** (06:53:34 to 07:13:34; `sync{1,2,3}.log`):
+  - `✔ Test run with 705 tests in 57 suites passed after 375.940 seconds.` (the 1-minute load at its end 4.17, the
+    15-minute 12.22);
+  - `… passed after 371.424 seconds.` (3.88 at its end, 15-minute 9.80);
+  - `… passed after 367.723 seconds.` (2.38 at its end, 15-minute 7.96).
+  - Durations against guards (`python3 .build-s3f/c20/guards.py`, 640 of the 705 matched, the other 65 at most 0.76
+    s): none over half; the largest 6.0 % (`R-SYN-5: a 429 counts the interest a waiting verdict leaves to move after
+    it, not one it answers (F-28)`, 10.63 to 10.84 s of 3 minutes).
+- **TSan** (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip Benchmarks --filter
+  ZTronAssetSyncTests`, 07:13:34 to 07:44:18; `tsan.log`): `✔ Test run with 705 tests in 57 suites passed after
+  1754.232 seconds.`; 0 `ThreadSanitizer` lines, 0 `Time limit` lines, 0 `warning:` lines. Its load was stamped at
+  its start (2.38 4.80 7.96) and end (3.77 4.57 5.24) only. Guards: none over half; the largest 28.3 % (the same
+  R-SYN-5 test, 51.00 s of 3 minutes), then 25.7 % (15.44 s of 1 minute).
+- **iOS generic build** (`xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`, 07:44:18 to 07:44:46, `ios.log`): exit 0;
+  the only output line is the usual `IDERunDestination: Supported platforms for the buildables in the current scheme
+  is empty.`
+- **Coverage** under `sim.lock` (taken 07:44:46, released 07:54:42; `swift test --scratch-path .build-s3f
+  --enable-code-coverage --skip Benchmarks`; `cov.log`, `cov-gate.log`).
+  - Load (`cov-load.txt`): mean 13.47, min 3.92, max 46.14 over 119 samples.
+  - Every bundle passed: Transport 151, Sync 705 (`passed after 375.948 seconds`), Storage 459, Model 84, Kit 85,
+    Compatibility 71, AppleHosted 104.
+  - `xcrun llvm-cov export -summary-only` to `.build-s3f/cov.json` (exit 0; on stderr seven `profile data may be out
+    of date - object is newer`, one per bundle: the copies `cp -R` made after the run carry newer times, and each is
+    byte-identical to the bundle the run used, `cmp`), then `python3 Scripts/gates.py coverage --json
+    .build-s3f/cov.json`:
+    - `COVERAGE target=ZTronAssetSync           lines= 95.04% (12353/12998) min=90.0 OK`;
+    - `COVERAGE overall lines=96.84% (28865/29806) min=80.0 OK`;
+    - `COVERAGE device-only-excluded lines=177 share=0.59% max=3.0% OK` / `COVERAGE: PASS`;
+    - the other targets: AppleHosted 99.76 %, Kit 97.83 %, Model 99.31 %, Storage 97.41 %, Transport 99.08 %.
+  - The changed lines' counts (`covdiff.txt`): six at zero count, the same six as the second run's (under "Not
+    reached and structural lines (cycle 22)").
+- **iOS Simulator** under `sim.lock` (taken 07:54:43, released 08:04:51), on WP-F's own simulator
+  `897F9D8D-B10D-4D91-8E22-417A2B9D70AA` (iPhone 18 Pro, iOS 27.0): `xcrun simctl shutdown` afterwards found it
+  already shut down (`Unable to shutdown device in current state: Shutdown`, exit 149).
+  - `caffeinate -i xcodebuild test -scheme ZTronAssetKit -destination "platform=iOS Simulator,id=897F9D8D…"
+    -derivedDataPath .build-s3f/xcode-sim -skip-testing:ZTronAssetKitBenchmarks -collect-test-diagnostics never
+    OTHER_SWIFT_FLAGS='-warnings-as-errors'` (`.build-s3f/sim.log`, copied to `gates/sim.log`): `** TEST SUCCEEDED
+    **`. The only `warning:` lines are four of `appintentsmetadataprocessor`'s `Metadata extraction skipped, no
+    AppIntents.framework dependency found`, none from the compiler.
+  - `xcrun xcresulttool get test-results summary` (`sim.xcresult`, `sim-summary.json`): `result: Passed`,
+    `totalTestCount: 1659`, `passedTests: 1659`, `failedTests: 0`, `skippedTests: 0` (the device's 3,372 test runs,
+    0 failed), on `iPhone 18 Pro` `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`, iOS 27.0, from 07:54:50 to 08:04:46.
+  - Load (`sim-load.txt`): mean 49.91, min 5.02, max 276.72 over 120 samples (the mutant run's builds beside it).
+- **`git status`** after the run (`status-after.txt`): empty.
+
+### The second run, on `eca67b8`
+
+`.build-s3f/c22/tools/gates22b.sh`, 08:13:40 to 08:42:02, logs under `.build-s3f/c22/gates-b/` (`start head eca67b8
+dirty 0`, `done dirty 0`). Only this draft was edited in the tree while it ran. The whole run's load was sampled every 5
+s (`all-load.txt`), and each locked stage's on its own (`cov-load.txt`, `sim-load.txt`). The re-run of e2's four
+survivors (`tools/mut-e2b.sh`, 08:13 to 08:16) ran beside its `--quick` stage. The release benchmarks were not run
+again: `eca67b8` changes no `Sources` or benchmark file.
+
+- **`SWIFTPM_SCRATCH=.build-s3f bash Scripts/verify.sh --quick`** (08:13:40 to 08:23:42; `quick.log`): `VERIFY:
+  PASS`, `::: SUMMARY mode=--quick steps-failed=0`, 0 `warning:` lines. Tests passed: Transport 151, Sync 706
+  (`passed after 366.573 seconds`), Storage 459, Model 84, Kit 85, Compatibility 71, AppleHosted 104.
+- **Release build** with `-warnings-as-errors` (ended 08:24:13, `release.log`): `Build complete! (30,35 s)`, 0
+  `warning:` lines. **`verify.sh --gates-only`** (08:24:14, `gates-only.log`): `SELFTEST: PASS`; `HARNESS: unchanged
+  since harness-frozen`; `TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1587` / `TRACE: PASS`; `UNSAFE
+  escapes found=0 max=3` / `UNSAFE: PASS`; `DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%` /
+  `DOCS: PASS`; `VERIFY: PASS`. `docs/TRACEABILITY.md` was restored, and the tree was clean after it. **Gates** alone
+  (08:24:14): `UNSAFE: PASS` and `DOCS: PASS`, with the same lines.
+- **The purge suite ×3** (`swift test --scratch-path .build-s3f --skip-build --filter EnginePurgeWithdrawalTests`,
+  08:24:14 to 08:24:20; `purge{1,2,3}.log`): `✔ Test run with 6 tests in 1 suite passed after 0.251 seconds.`, then
+  0.249 and 0.250 seconds. **TSan** on it (`swift test --scratch-path .build-s3f-tsan --sanitize=thread --skip
+  Benchmarks --filter EnginePurgeWithdrawalTests`, ended 08:25:05; `tsan-purge.log`): `✔ Test run with 6 tests in 1
+  suite passed after 1.253 seconds.`; 0 `ThreadSanitizer`, `Time limit` or `warning:` lines. The whole Sync bundle ran
+  in this run's `--quick` and coverage stages, twice in all.
+- **iOS generic build** (`xcodebuild -scheme ZTronAssetKit -destination 'generic/platform=iOS' -derivedDataPath
+  .build-s3f/xcode build OTHER_SWIFT_FLAGS='-warnings-as-errors' -quiet`, 08:25:05 to 08:25:13, `ios.log`): exit 0;
+  the only output line is the usual `IDERunDestination: Supported platforms for the buildables in the current scheme
+  is empty.`
+- **Coverage** under `sim.lock` (taken 08:25:13, released 08:33:25; `swift test --scratch-path .build-s3f
+  --enable-code-coverage --skip Benchmarks`; `cov.log`, `cov-gate.log`).
+  - Load (`cov-load.txt`): mean 4.54, min 2.61, max 10.65 over 99 samples.
+  - Every bundle passed: Transport 151, Sync 706 (`passed after 358.879 seconds`), Storage 459, Model 84, Kit 85,
+    Compatibility 71, AppleHosted 104.
+  - `xcrun llvm-cov export -summary-only` to `.build-s3f/cov.json` (exit 0, nothing on stderr: the bundles were
+    copied with `cp -Rp` this time), then `python3 Scripts/gates.py coverage --json .build-s3f/cov.json`:
+    - `COVERAGE target=ZTronAssetSync           lines= 95.06% (12356/12998) min=90.0 OK`;
+    - `COVERAGE overall lines=96.86% (28870/29806) min=80.0 OK`;
+    - `COVERAGE device-only-excluded lines=177 share=0.59% max=3.0% OK` / `COVERAGE: PASS`;
+    - the other targets: AppleHosted 99.76 %, Kit 97.90 %, Model 99.31 %, Storage 97.42 %, Transport 99.08 %.
+  - The changed lines' counts (`covdiff.txt`): six at zero count, under "Not reached and structural lines (cycle
+    22)".
+- **iOS Simulator** under `sim.lock` (taken 08:33:26, released 08:42:01), on `897F9D8D-B10D-4D91-8E22-417A2B9D70AA`:
+  `xcrun simctl shutdown` afterwards found it already shut down (exit 149), and `simctl list` shows it `(Shutdown)`.
+  - The same `xcodebuild test` command (`.build-s3f/sim.log`, copied to `gates-b/sim.log`): `** TEST SUCCEEDED **`;
+    the only `warning:` line is one of `appintentsmetadataprocessor`'s, none from the compiler.
+  - `xcrun xcresulttool get test-results summary` (`sim.xcresult`, `sim-summary.json`): `result: Passed`,
+    `totalTestCount: 1660`, `passedTests: 1660`, `failedTests: 0`, `skippedTests: 0` (the device's 3,374 test runs,
+    0 failed), on `iPhone 18 Pro`, iOS 27.0, from 08:33:34 to 08:41:56.
+  - Load (`sim-load.txt`): mean 34.19, min 3.76, max 181.49 over 103 samples. Over the whole run (`all-load.txt`):
+    mean 20.59, min 2.61, max 181.49 over 339 samples; over its `--quick` stage, mean 24.40 (3.20 to 125.08), with
+    the four mutants' builds beside it.
+- **`git status`** after the run (`status-after.txt`): empty; `docs/TRACEABILITY.md` is unchanged.
+
+  With the quick and coverage stages of both runs, the three plain runs and TSan, the Sync bundle passed eight times
+  on this cycle's `Sources` (six times before the kept-interests test and twice with it), and once on the simulator in
+  each run.
+
 ## Not verified here
 
 - Device-only behaviour (NWPathMonitor's first callback timing behind S3-CONC-04, background URLSession, real packs,
@@ -10582,3 +10934,16 @@ failed to compile on an availability error in the probe, and 16:13:57 to 16:17:5
   verifiers' probes were not re-run as probes; those this cycle used were adapted into tests and benchmarks (their
   shapes kept, as PROBE-C20C-MANY-MOVES and PROBE-C20R-PARTIAL-MOVE-C2). The R1 boundary probes were not re-run. The
   C2 figures are this host's only (no device run). `other-wp:b` (P-13) is not WP-F's.
+- Cycle 22: six purge cases miss C2 (blocking, reported; under "Open at the close (cycle 22; blocking, reported)").
+  Items 3 and 4 were not started, step 7's kills other than e2's were not run, two changed lines no test reaches are
+  open (under "Not reached and structural lines (cycle 22)"), and item 9's inventory rows, items 7 and 8, and the
+  records were not written. `verify.sh --full` was not run: its benchmark step fails on those misses and on P-13, so
+  it would end `VERIFY: FAIL`. Its other steps ran on their own (under "Gate evidence (cycle 22)"), with these
+  differences: TSan and the three repeated runs covered the Sync bundle in the first run and the purge suite in the
+  second (every bundle ran in `--quick` and under coverage in both); the release benchmarks ran in the first run only
+  (the second run's tree changes no `Sources` or benchmark file); the trace step's rewrite of `docs/TRACEABILITY.md`
+  was restored, so it was not regenerated. TSan's load was stamped at its start and end only, not sampled during the
+  run. Eleven benchmark cases of the first run were measured above a 1-minute load of 10 and re-run alone;
+  `purgeTurns(.ensures)`'s load rose above 10 during each run of it, cause not measured. Step 7's mutant run ran beside
+  the first run's stages after the benchmarks. The C2 figures are this host's only (no device run). `other-wp:b`
+  (P-13) is not WP-F's.
