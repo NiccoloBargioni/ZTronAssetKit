@@ -1061,67 +1061,64 @@ extension SyncEngine {
     /// in (id, token) order, as `withdrawPurged` drops them; a batch the purge empties stays queued, and its replay
     /// counts it done (`continueReroutes`). The walk runs whether or not a join waits: an empty walk costs nothing
     /// (ruling S3-R26 item 1; the early return on no waiting join was removed with it).
+    ///
+    /// Each event, and each bucket, is changed in place in one access (`EventAfterFollow.withdrawPurged`,
+    /// `Array.markWithdrawn(where:)`): a join is marked and a batch loses its items inside the access, and the writes
+    /// they imply (`joinsAfterFollow`, the groups, the heals) follow it, in the same order (Stage 3 close-out cycle 22,
+    /// ruling S3-R27 item 12.3, e2-A1.2). Made inside the access, those writes would overlap it, and the predicates read
+    /// only `isPurged`'s locals for the same reason (exclusivity, ruling S3-R27 item 1).
     private func withdrawPurgedJoins(_ isPurged: (AssetID) -> Bool) {
+        // A waiting join is withdrawn when its interest is a non-user interest other than a waiter's in a purged id, and
+        // no purge withdrew it already; an owed re-route, when its interest is such an interest.
+        func withdraws(_ join: JoinAfterFollow) -> Bool {
+            !join.withdrawn && join.lane < .userInitiated && join.kind != .waiter && isPurged(join.asset)
+        }
+        func removes(_ item: RerouteItem) -> Bool {
+            item.lane < .userInitiated && item.kind != .waiter && isPurged(item.asset)
+        }
         for index in self.state.eventsAfterFollow.indices {
-            let event = self.state.eventsAfterFollow[index]
-            if case .join(var join) = event {
-                if self.withdrawPurgedJoin(&join, isPurged) {
-                    self.state.eventsAfterFollow[index] = .join(join)
-                }
+            switch self.state.eventsAfterFollow[index].withdrawPurged(joins: withdraws, reroutes: removes) {
+            case .nothing:
                 continue
-            }
-            if case .reroutes(var batch) = event {
-                let removed = batch.items.removeAll { $0.lane < .userInitiated && $0.kind != .waiter && isPurged($0.asset) }
-                guard !removed.isEmpty else {
-                    continue
-                }
+            case .join(let join):
+                self.withdrawJoinInterest(join)
+            case .reroutes(let from, let removed):
                 for item in removed.sorted() {
                     switch item.kind {
                     case .prefetch, .ensure:
-                        self.dropGroupMember(item.token, asset: item.asset, from: batch.from)
+                        self.dropGroupMember(item.token, asset: item.asset, from: from)
                     case .system:
                         self.state.heals[item.asset] = nil
                     case .run, .waiter:
                         break
                     }
                 }
-                self.state.eventsAfterFollow[index] = .reroutes(batch)
-                continue
-            }
-            guard let key = event.verdictKey, let count = self.state.joinsBehindVerdicts[key]?.count else {
-                continue
-            }
-            for slot in (0..<count).reversed() {
-                if var join = self.state.joinsBehindVerdicts[key]?[slot].join, self.withdrawPurgedJoin(&join, isPurged) {
-                    self.state.joinsBehindVerdicts[key]?[slot].join = join
+            case .verdict(let key):
+                for join in self.state.joinsBehindVerdicts[key]?.markWithdrawn(where: withdraws) ?? [] {
+                    self.withdrawJoinInterest(join)
                 }
             }
         }
     }
 
-    /// Withdraws `join`, a waiting join, if the purge removes its interest (`withdrawPurgedJoins`): a non-user interest
-    /// other than a waiter's in a purged id leaves `joinsAfterFollow`, its group stops waiting for the member or its heal
-    /// is forgotten, and the join is marked withdrawn. Returns whether it withdrew it: the caller writes its copy back
-    /// then, the join being held in the state this mutates.
-    private func withdrawPurgedJoin(_ join: inout JoinAfterFollow, _ isPurged: (AssetID) -> Bool) -> Bool {
-        guard !join.withdrawn, join.lane < .userInitiated, join.kind != .waiter, isPurged(join.asset) else {
-            return false
+    /// What follows a waiting join's withdrawal (`withdrawPurgedJoins`), once the access that marked it ended: the join
+    /// leaves `joinsAfterFollow`, and its group stops waiting for the member or its heal is forgotten. A join no longer
+    /// listed there is only marked.
+    private func withdrawJoinInterest(_ join: WithdrawnJoin) {
+        guard let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) else {
+            return
         }
-        if let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) {
-            if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
-                self.state.joinsAfterFollow[join.token] = nil
-            }
-            switch join.kind {
-            case .prefetch, .ensure:
-                self.dropGroupMember(join.token, asset: join.asset, from: transfer)
-            case .system:
-                self.state.heals[join.asset] = nil
-            case .run, .waiter:
-                break
-            }
+        if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
+            self.state.joinsAfterFollow[join.token] = nil
         }
-        join.withdrawn = true
-        return true
+        switch join.kind {
+        case .prefetch, .ensure:
+            self.dropGroupMember(join.token, asset: join.asset, from: transfer)
+        case .system:
+            self.state.heals[join.asset] = nil
+        case .run, .waiter:
+            break
+        }
     }
 
     private func purgeTask(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {

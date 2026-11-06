@@ -1821,6 +1821,64 @@ enum EventAfterFollow: Sendable {
         }
         return nil
     }
+
+    /// Withdraws in place what a purge removes from the event (`SyncEngine.withdrawPurgedJoins`): a join `withdraws`
+    /// names is marked withdrawn, and a batch of owed re-routes loses the items `removes` names. The event is consumed and
+    /// made again, as `appendLayer` makes it, so neither the join nor the batch's items are copied: a batch copied out of
+    /// the queue copied its items whole when it lost one (Stage 3 close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.2).
+    /// The predicates run inside the caller's access to the queue, so they read nothing of the engine's state. Returns
+    /// what the walk withdraws after that access, or an exit verdict's attempt (`verdictKey`), behind which joins may
+    /// wait; any other event is left as it was.
+    mutating func withdrawPurged(joins withdraws: (JoinAfterFollow) -> Bool, reroutes removes: (RerouteItem) -> Bool) -> PurgedFromEvent {
+        switch consume self {
+        case .join(var join):
+            guard withdraws(join) else {
+                self = .join(join)
+                return .nothing
+            }
+            join.withdrawn = true
+            let withdrawn = WithdrawnJoin(token: join.token, asset: join.asset, kind: join.kind)
+            self = .join(join)
+            return .join(withdrawn)
+        case .reroutes(var batch):
+            let removed = batch.items.removeAll(where: removes)
+            let from = batch.from
+            self = .reroutes(batch)
+            return .reroutes(from: from, removed: removed)
+        case let other:
+            let key = other.verdictKey
+            self = other
+            guard let key else {
+                return .nothing
+            }
+            return .verdict(key)
+        }
+    }
+}
+
+/// What a purge withdrew from one waiting event in place (`EventAfterFollow.withdrawPurged`): the walk makes the writes
+/// it implies after its access to the queue, in this order (`SyncEngine.withdrawPurgedJoins`).
+enum PurgedFromEvent {
+    /// Nothing: the event names nothing the purge removes.
+    case nothing
+    /// A join, now marked withdrawn.
+    case join(WithdrawnJoin)
+    /// The items a batch of owed re-routes lost, none or more, and the job its interests left (`RerouteBatch.from`).
+    case reroutes(from: TransferID, removed: [RerouteItem])
+    /// An exit verdict's attempt: the joins that wait behind it (`EngineState.joinsBehindVerdicts`) are walked next.
+    case verdict(VerdictKey)
+}
+
+/// A waiting join a purge marked withdrawn (`EventAfterFollow.withdrawPurged`, `Array.markWithdrawn(where:)`): what the
+/// walk needs after the access that marked it, to take the join out of `EngineState.joinsAfterFollow` and drop its
+/// group's member or forget its heal (`SyncEngine.withdrawJoinInterest`).
+struct WithdrawnJoin {
+    /// The join's interest.
+    let token: InterestToken
+    /// The id it joined for.
+    let asset: AssetID
+    /// Its interest's kind.
+    let kind: InterestKind
 }
 
 /// An exit verdict that waits for the follow (`EventAfterFollow.attemptFailed`).
@@ -2033,4 +2091,20 @@ struct JoinBehindVerdict: Sendable {
     var join: JoinAfterFollow
     /// Its decision instant: the visit's (`SyncEngine.worldStamp()`).
     let stamp: WorldStamp
+}
+
+extension Array where Element == JoinBehindVerdict {
+    /// Marks the joins `withdraws` names withdrawn, in place, newest first (`SyncEngine.withdrawPurgedJoins`): the queue
+    /// held them in that order when each was inserted right behind its verdict. One access to the bucket marks them all,
+    /// where the walk looked the bucket up twice and copied each join (Stage 3 close-out cycle 22, ruling S3-R27 item
+    /// 12.3, e2-A1.2). `withdraws` runs inside the caller's access, so it reads nothing of the engine's state. Returns
+    /// the joins it marked, in that order, for the writes the walk makes after the access.
+    mutating func markWithdrawn(where withdraws: (JoinAfterFollow) -> Bool) -> [WithdrawnJoin] {
+        var withdrawn: [WithdrawnJoin] = []
+        for slot in self.indices.reversed() where withdraws(self[slot].join) {
+            self[slot].join.withdrawn = true
+            withdrawn.append(WithdrawnJoin(token: self[slot].join.token, asset: self[slot].join.asset, kind: self[slot].join.kind))
+        }
+        return withdrawn
+    }
 }
