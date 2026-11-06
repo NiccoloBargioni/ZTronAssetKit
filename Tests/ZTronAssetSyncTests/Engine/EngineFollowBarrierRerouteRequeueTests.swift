@@ -22,9 +22,15 @@ extension EngineFollowBarrierTests {
     /// onto X publishing, K1's visit passed X, and X's fresh attempt's commit, under K1's copy, re-routed them to W's
     /// content. The re-queue keeps the pin (e1-R1), and no apply came after it: the replay keeps W1…W3 on X's fresh
     /// attempt, so X holds zz-a1…zz-a3 and zz-x and W has no job, and X's commit re-routes them to W's content.
+    ///
+    /// With `edge` (e1-P3, Stage 3 close-out cycle 22, ruling S3-R27 item 12.2; `analyse-g4-reach.md` (b)), the network
+    /// drops and returns after K0, before O's commit: swept first, the two elements' decisions about jobs wait ahead of
+    /// the batch, so the drain replays them between X's re-queue and the batch's replay, which reads X's state then (a
+    /// park at the same epoch would leave X `.blocked` there). Visited first they apply at once, while X and O publish.
+    /// Visit-first answers either way: the ids ride X.
     @available(macOS 15.0, iOS 18.0, *)
-    @Test("R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases)
-    func owedReroutePinnedToARequeuedJobKeepsThePin(_ visit: LaneDropVisit) async throws {
+    @Test("R-SYN-11: an owed re-route pinned to a job an ENOENT re-queued before the replay keeps the pin, and X's commit re-routes it (F-28, D-13, T22)", .timeLimit(.minutes(3)), arguments: LaneDropVisit.allCases, [false, true])
+    func owedReroutePinnedToARequeuedJobKeepsThePin(_ visit: LaneDropVisit, _ edge: Bool) async throws {
         let seed: UInt64 = 2_027_451
         let oBytes = Self.owedOBytes(seed)
         let xBytes = EngineFixture.bytes(seed + 5, count: 18)
@@ -98,6 +104,12 @@ extension EngineFollowBarrierTests {
         let setup = FollowBarrier.Setup(time: time, fileSystem: fileSystem, harness: harness, q: o)
         try await Self.applyHeld(manifest([x] + onX, round: 1), tag: "k0-requeue-\(seed)", setup, visit: visit)
         await engine.readForTests { $0.holdDrainFollowUps() }
+        if edge {
+            for conditions in [EngineRegressionCycle10Tests.offline, DeviceConditions.unrestricted] {
+                await harness.conditions.send(conditions)
+                await engine.awaitCondition { $0.state.conditions == conditions }
+            }
+        }
         await held.release(oUnit)
         await engine.awaitCondition { $0.state.jobs[oT] == nil }
         let owed = await engine.readForTests { e in Self.owedBatches(e).map(\.items.count) }
@@ -113,7 +125,13 @@ extension EngineFollowBarrierTests {
         let requeued = await engine.readForTests { e in (epoch: e.state.jobs[xT]?.epoch, waiting: !Self.owedBatches(e).isEmpty) }
         try #require(requeued.epoch == pin.epoch && requeued.waiting, "setup: X's ENOENT re-queues it at the same epoch while the batch waits: \(requeued)")
         var violations: [String] = []
+        // X's job as the turn that replays the batch finds it (the last turn while the batch waits), recorded only.
+        var atReplay = ""
         while await engine.readForTests({ $0.followOwed || !$0.state.eventsAfterFollow.isEmpty }) {
+            let waiting = await engine.readForTests { e in
+                Self.owedBatches(e).isEmpty ? nil : e.state.jobs[xT].map { "\($0.state) at epoch \($0.epoch)" } ?? "gone"
+            }
+            atReplay = waiting ?? atReplay
             _ = await Self.runOneHeldTurn(engine)
             violations += await engine.invariantViolations()
         }
@@ -122,7 +140,7 @@ extension EngineFollowBarrierTests {
             e.releaseFollowFollowUps()
         }
         let replayed = await engine.readForTests { e in (x: e.state.jobs[xT]?.assets.sorted() ?? [], w: e.state.jobs[wT]?.assets.sorted() ?? []) }
-        #expect(replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty, "the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: \(replayed)")
+        #expect(replayed.x == (ids + [xID]).sorted() && replayed.w.isEmpty, "the pin holds: X holds zz-a1…zz-a3 and zz-x, and W has no job: \(replayed); X at the replay \(atReplay) (pin epoch \(String(describing: pin.epoch)))")
         await held.stop()
         await claim.stop()
         // X first: W's job appears only at X's commit, which re-routes W1…W3 under K1's copy.
