@@ -3,7 +3,7 @@
 Compact hand-off for whoever orchestrates the next step (a fresh Claude Code session in this folder is the cheapest way to resume). Read this file, then only the sections it names; do not re-read the whole repository.
 
 ## Stage 3 (hardening) — RUNNING: fix close-outs (launched 2026-10-29, session `eaf5a17f-…`). Next session: start here
-- **Now (6 Nov 15:34 CET): run 11 (cycle 23) is running (`wf_e1cbc5ed-f72`, launched 15:34), item 2 first. The owner ruled two sets out of cycle 23: three purge cases are known misses of the 10 ms limit (N25), and the ENOSPC windows are known residual correctness risks (N28, item 1c). The owner's decision on the remaining C2 work is pending; the end-sooner options are being checked. The analyses are archived on `archive/build-orchestrator`, which is pushed. The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
+- **Now (6 Nov 16:16 CET): run 12 (cycle 23) is running (`wf_ee08701d-249`, launched 16:16), doing the work that does not depend on the C2 ruling first (N30). Run 11 committed step 1 and the records (to `247e85b`). The owner ruled two sets out of cycle 23: three purge cases are known misses (N25), and correct #1 and #2 are known residual correctness risks (N28, narrowed by N29). Pending with the owner: whether the whole ENOSPC class is a known risk, and the C2 decision (the end-sooner options are in their final edit; item 3b waits for it). The analyses are archived on `archive/build-orchestrator` (snapshot 2 is local only). The sub-bullets dated 6 Nov say what is running. Run 8 (cycle 21) began at 08:57, at the owner's word "resume". Session `c4407fcb-53ee-44ae-8d93-02e7220ac38a` (app session "Resume"). Read this bullet first. The 4 Nov bullet below it is history; this session applied its cut-off procedure (steps 1 to 4).**
   - **What cut off run 7:** the weekly limit. The cycle-21 fixer (agent `ad6043d9…`) hit it at 03:55:48 CET in step 5, while it was starting rr21-C5's red benches. The four verifier attempts after it failed at once on the same limit.
   - **Usage at 08:52 and 08:56:** weekly all models **2 %**, Fable 0 %. The meter reset early again; the next reset is **Thu 12 Nov 03:00 CET** (02:00 UTC). No 5-hour window is shown. There is no usage stop (the 29 Oct ruling stands).
   - **The retired scheduled task fired at 08:51:** `ztron-assetkit-resume-after-reset`, catching up its 5 Nov 03:10 time. Its guard held: it launched and changed nothing (app session "ZTronAssetKit: resume after the Thu 5 Nov weekly reset", 12 s). It is disabled, and as a one-time task it does not fire again.
@@ -412,6 +412,25 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
     - **Run 11 so far:** step 1 (item 2) is in as `03c4e59` (15:44; a test and the draft only). The record of N25's misses and item 1c's risks is in as `4b38eb4` (15:50, +294 lines in the draft), written before the amendment, so the fixer amends it.
     - **Archive snapshot 2 (15:55, local only):** `archive/build-orchestrator` → `5ba3601` (parent `765102c`), with 2,825 files matching the disk. It adds S3-R28, item 1c with its amendment, N24 to N29, and f1c and f3b with their reviews. Pushing it needs the owner's word.
     - **Asked of the owner:** whether every other ENOSPC-window answer difference that a verifier finds should also be a known risk. If the owner says yes, the class is defined by T20 (N29).
+    - **Run 11 returned at 16:12, at its working budget** (context 85 % full at 15:57). It made 5 commits, from `9aa337c` to `247e85b`:
+      - `03c4e59`: step 1 (item 2, correct #3), test-only, with f2-R1 red 2/2 before it;
+      - `4b38eb4` and `5e518b8`: the records of N25's three known misses and item 1c's known risks, the latter amended to N29;
+      - `be8804a` and `247e85b`: `verify.sh --quick` PASS on `9aa337c` and on HEAD (Sync: 706 tests).
+      - Item 3's five new purge cases are written in `.build-s3f/c23/bench0` and have not been run. The gates script `.build-s3f/c23/tools/gates23.sh` is written and has not run.
+      - The workflow then started both verifiers. **They were stopped at 16:13** (item 8's point 5: a HEAD with blocking items known to be open is not verified). No lock or process was left, the simulators were shut down, and the worktree was clean.
+    - **N30 (16:15)** appended "S3-R28, order for run 12" at rulings line 1666:
+      - first, S3-R27 step 7's work outside the purge code: the e1 kills, the d4 survivors with the default-tuning probe, and reqs #8's guard;
+      - then the records that no C2 route changes;
+      - then the C2 work, as the owner rules. The three unreached purge lines wait for that ruling;
+      - the fixer reads narrowly, S3-R28 and the draft's cycle-23 section, to save context.
+    - **Run 12 launched at 16:16:** `wf_ee08701d-249` (task `woo1izrqr`), with `.build-orchestrator/s3-fix-args-run12.json`. **Watcher `bz02zu459`** runs from `247e85b`.
+    - **The item 3b and f3c run returned at about 16:14** (`wf_41c9f6c8-57b`):
+      - **Item 3b** (`s3-r28-item3b.md`, 129 lines) was checked CORRECTED with 6 must-fix items, and all 6 are applied, N25 included. **It is not appended:** it waits for the owner's C2 ruling. If the owner keeps the purge work, it goes in together with S3-R28's N23 text, which is already in the rulings file.
+      - **f3c** (`f3c-open-shapes.md`; review CORRECTED with 5 must-fix items) is kept for a later re-open. By estimate its route closes N25's shapes only at stage C, at 3-10.8 ms.
+      - **f3c also finds new C2 risks, all estimates:**
+        - `readmit` scans the heap once per failed candidate (`EngineReadmission.swift:165-167`), and so does `removeJob` outside a walk (`EngineJobs.swift:517-520`), at 27-55 ms a turn with 5,000-10,000 `.retry` entries. This is in letter and outside N25.
+        - A production-only cost: `originID` is parsed on every gate read (`HTTPRemoteSource.swift:116-118`), at 15-60 ms per 10,000 reads, and caching it would change a documented contract (NEEDS-HUMAN-REVIEW).
+        - Both feed the owner's C2 decision.
   - **Re-forecast at 19:40** (weekly **32 %**, Fable 21 %). Cycle 22 is larger than the 18:57 forecast assumed.
     - Its fixer work is about 35–50 h: D4 24–30 h, items 1–3 about 10–15 h, plus the verifiers' findings and the close.
     - At 0.65–1.8 points an hour, that is about 25–60 points against about 60 left. So the weekly limit will probably cut off cycle 22, or cycle 23 at the latest.
