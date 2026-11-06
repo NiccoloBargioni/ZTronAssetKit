@@ -7880,6 +7880,12 @@ worktree's HEAD with the first step that is not "committed". Each step's results
      15:52:39 and released at the end; 1-minute load 2.35 at the start, 40.91 after the pre-build, 6.32 at the end).
      Tests passed: Transport 151, Sync 706 (`passed after 364.515 seconds`), Storage 459, Model 84, Kit 85,
      Compatibility 71, AppleHosted 104.
+   - `verify.sh --quick` on HEAD (item 1c amended, point 5.1; `be8804a`, whose code and tests are HEAD's; the coverage
+     run under `sim.lock`, taken 16:03:17, released 16:11:52; `tools/quick-head.sh`, `quick-head.log`, `.meta`; 1-minute
+     load 4.10 at the start, 36.49 after the pre-build, 6.67 at the end): `VERIFY: PASS`, `::: SUMMARY mode=--quick
+     steps-failed=0`, 0 `warning:` lines; Transport 151, Sync 706 (`passed after 362.068 seconds`), Storage 459,
+     Model 84, Kit 85, Compatibility 71, AppleHosted 104. It replaces the run on `9aa337c` above.
+   - Re-read at 16:12: no ruling on the remaining C2 work yet, so the 'before' figures below come next (point 5.3).
    - Item 3's five new cases are written (`.build-s3f/c23/probes/BenchSyncCycle23Purge.swift`: `purgeInLetterTurns`
      over `keptUnderThreeGroups`, `fourGroupJoins`, `mixedLaneGroups`, `pendingClaimGroups` and
      `oneMemberGroupsFourPerID`), not yet built or run. They are copied, with PROBE-C21-APM (the cycle-22 verifier's
