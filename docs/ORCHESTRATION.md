@@ -611,10 +611,16 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            - Nothing goes to the owner.
            - The trace gate's `docs/TRACEABILITY.md` is identical to the committed copy, so the regeneration needed no commit.
            - Log: `.build-orch/stage5-full.log`; `.verify-logs` copied to `.build-orch/stage5-verify-logs-45df2e1/`.
-         - **Tools-6.4 (c): RUNNING (06:03):** task `ba3t493dh`. `.worktrees/t64` is detached at `45df2e1` with line 1 at 6.4. It runs `--full`, then the `warning:` grep, with logs in `.build-orch/t64c/`. Its benchmarks are expected red with the same accepted causes; "0 warnings" here means the grep finds nothing, and every other step is OK.
+         - **Tools-6.4 (c): DONE. It passes by its definition (06:03-07:33, task `ba3t493dh`).** `.worktrees/t64` is detached at `45df2e1` with line 1 at 6.4, and the toolchain reports Swift 6.4.
+           - Every step except the benchmarks is OK, and the `warning:` grep finds 0 lines (`.build-orch/t64c/status.txt`, `warnings.txt`).
+           - The run ends `VERIFY: FAIL (1 failed: benchmarks)`. Its 6 issues are all at `BenchSyncCycle22Purge.swift:32`, the six accepted purge shapes.
+           - P-13 passed this time.
+           - Coverage: overall 96.94 %, Storage 97.58 %, Sync 95.10 %.
+           - The 1-minute load was 9.91 at the end.
+           - Nothing goes to the owner.
          - **RESUME HERE AFTER THE RESET (Thu 12 Nov 03:00 CET). Weekly: 98 % at 06:05, so part A may be cut and part B will not fit. Weekly 100 % at 07:33: stopped here (usage stop).**
            1. **Part A:** `wp/s5docs` is at `6eab1ba`, and its worktree is clean. A writer applies round 2's fixes from the persisted JSON: the 1 blocking (§6.4:237) and the 7 non-blocking. Then an independent verifier checks the changed lines against their records; it must be neither round 2's verifier nor the writer (P4). Part A is done at 0 blocking.
-           2. **Tools-6.4 (c):** read `.build-orch/t64c/status.txt`. PASS means every step except the benchmarks is OK and `warning lines: 0`. A warning is a defect (it goes to the owner under point 10 only if it is a new cause of the FAIL; otherwise it is recorded).
+           2. **Tools-6.4 (c): DONE.** It passes with 0 warnings; its bullet above has the details.
            3. **Part B:** `docs/VERIFICATION.md`, with an independent verifier: what ran, the thresholds, the results and what was not verified. It is built from this checklist's items 3-9, `.build-orch/stage5-full.log`, `t64b/`, `t64c/`, `sim-merged/`, `mut-recheck/`, the P-13 runs, and ADR-057's Not-verified list. Write it in `.worktrees/s5docs`.
            4. **Then:**
               - merge `wp/s5docs` and push;
