@@ -567,6 +567,13 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
       7. Tag `s3-merged` (local; never push a tag unless the owner asks). Remove `.worktrees/s3f` and `wp/s3f` only after the merge is pushed (N25); the cited logs are in archive snapshot 3. Never remove `.build-orchestrator/`.
          - **Correction (7 Nov 00:40):** snapshot 3 (`2d87b7c`, 6 Nov 16:47) predates runs 13 and 14. Its 283 cited logs are all from `.worktrees/s3f` and cited before 16:47, so cycle 23's evidence (`.build-s3f/c23/`, the gates logs) is not archived. Nor are the other s3 worktrees' logs or this checklist's `.build-orch/` evidence. Removing any s3 worktree therefore waits until item 10's final snapshot has archived the logs that the drafts, the rulings and this file cite. The tag can come first.
       8. Ask the owner about the uncommitted `Package.swift` before Stage 5's `--full`.
+         - **DONE, the owner's answer (7 Nov, by 02:12):** "Yes, clean worktree". The question was "May Stage 5's final --full run in a clean worktree, leaving your Package.swift edit alone?". Stage 5's `--full` therefore runs in a clean detached worktree at the final head, with the committed manifest (tools 6.0). Nobody touches the main checkout's `Package.swift`.
+         - **Order from here:**
+           1. The ADR-057 workflow (`wf_fc587e9e-0a9`), then its follow-up round for the P-13 records.
+           2. Merge `wp/s3docs`.
+           3. Stage 5's `--full` in the clean worktree. It also serves as the docs merge's `--quick` and `--gates-only` re-run.
+           4. The four Stage 5 documents, then the tools-6.4 (c) `--full` in `.worktrees/t64`.
+           5. Item 10.
       9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`). The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
           - The final snapshot's cited-log list covers every path cited in `docs/adr-drafts/s3*.md`, `.build-orchestrator/` and this file, under each `.worktrees/s3*` and `.build-orch/` (`merge-full.log`, `merge-userToBound-rerun1.log`, `merge-P13-quiet.log`, `t64b/`, `sim-merged/` without the xcresult bundle unless small, `mut-recheck/`). Item 7's worktree removals come after it, with a restore test.
