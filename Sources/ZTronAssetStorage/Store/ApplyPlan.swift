@@ -83,7 +83,8 @@ struct ApplyPlan: Sendable {
 /// bulk executor from the plan, a value.
 struct ApplyEvictionChunks: Sendable, Hashable {
     /// The plan's victims in chunks of whole blobs: each chunk ends at the first blob boundary at or past the record
-    /// limit, as quota eviction's chunks do (a blob's records leave together, and the hook re-validates them together).
+    /// limit (a blob's records leave together, and the hook re-validates them together), so a blob of more records than
+    /// a chunk is one chunk, unlike quota eviction, which since Stage 3 takes such a blob across turns (S3C-2).
     var chunks: [EvictionPlan]
     /// Whether the chunks list the victims in plan order. A plan lists each blob's victims together (the dry run's
     /// `EvictionOrder.plan`); one that names a blob in several places is grouped by key, its blobs in the order the plan

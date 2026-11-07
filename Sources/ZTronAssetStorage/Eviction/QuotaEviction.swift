@@ -5,8 +5,8 @@ import ZTronAssetModel
 /// `apply`'s re-validation of a plan. Eviction dooms through `setResidency(.absent(.evicted), of:dooming: .unreferenced)`
 /// only; the reaper deletes after acknowledgement, grace, commit and leases (ARCHITECTURE §4.4).
 extension AssetStore {
-    /// Candidates are marked in chunks of whole blobs holding this many records, yielding the actor in between (C2,
-    /// REENTRANCY R8).
+    /// Candidates are marked in chunks of whole blobs holding this many records, yielding the actor in between; a blob
+    /// of more records than this is taken this many of its records per turn (C2, REENTRANCY R8 and s3c-1; S3C-2).
     static let evictionChunk = 1_000
 
     /// The dry run's plan over the current state, computed on the actor: only for the synchronous `evictionPlan` (a
@@ -50,9 +50,10 @@ extension AssetStore {
     }
 
     /// `evictIfNeeded()`: measures, evicts down to the hysteresis target in chunks (a blob of more records than a chunk
-    /// a chunk of its records per turn, `evictAcrossTurns`), publishes the snapshot without the victims and commits. It stops once the bytes released since the measurement, by itself or by any eviction,
-    /// `apply`'s plan, purge, quarantine or recorded failure that ran while it awaited (`EvictionState.releasedBytes`),
-    /// cover what it measured.
+    /// is taken a chunk of its records per turn, `evictAcrossTurns`), publishes the snapshot without the victims and
+    /// commits. It stops once the bytes released since the measurement, by itself or by any eviction, `apply`'s plan,
+    /// purge, quarantine, recorded failure or `apply`'s and `admit`'s own releases that ran while it awaited
+    /// (`EvictionState.releasedBytes`, less what a rescue of a counted doom took back), cover what it measured.
     func performEvictIfNeeded() async throws(StoreError) -> CleanupResult {
         // REENTRANCY: R1 — nothing was read before it; `awaitOpen` re-reads the phase itself.
         try await self.awaitOpen()

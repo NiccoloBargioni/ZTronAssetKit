@@ -29,7 +29,7 @@ struct CleanupState: Sendable {
     /// ZProbe-phantom). In memory only.
     var collectingOrphans = false
     /// Records a purge changes, and orphans a GC sweep dooms, between two releases of the actor (C2, review round 3 and
-    /// the L3 close-out; proposed REENTRANCY rows c-5 and the R10 amendment): `AssetStore.cleanupChunk`; a test lowers it
-    /// so a handful of items reaches the release and its re-validation (G4: the seam that release needs).
+    /// the L3 close-out; proposed REENTRANCY rows c-5, s3c-2 and the R10 amendment): `AssetStore.cleanupChunk`; a test
+    /// lowers it so a handful of items reaches the release and its re-validation (G4: the seam that release needs).
     var chunk: Int = AssetStore.cleanupChunk
 }

@@ -16,7 +16,7 @@ public struct AvailabilityReport: Sendable, Hashable, Codable {
     public var failed: Int
     /// Present but checksum-less (R-INT-5).
     public var unverified: Int
-    /// Known bytes of the missing entries.
+    /// Known bytes of the missing entries; saturates at `Int64.max` and never traps (S3B-1).
     public var bytesMissing: Int64
     /// Whether a manifest fetch succeeded (or returned 304) for this report.
     public var manifestFresh: Bool

@@ -58,9 +58,10 @@ struct RequestFactory: Sendable {
 
 /// Joins `baseURL` and a manifest `remotePath` by path components only (transport-1 TR1-10).
 ///
-/// The Model already rejected absolute paths, schemes, authorities, `..`, control characters, `?` and `#`
-/// (R-MAN-2); this is defence in depth for paths that reach the transport by another route (the manifest path of
-/// the configuration). Each component is appended with `appendingPathComponent`, which percent-encodes it, exactly
+/// The Model already rejected absolute paths, schemes, authorities, `..`, empty and `.` segments (also `%2E`), `\`,
+/// control characters, `?` and `#` (R-MAN-2; the empty and `.` segments and `\` since Stage 3, S3AH-1); this is
+/// defence in depth for paths that reach the transport by another route (the manifest path of the configuration).
+/// Each component is appended with `appendingPathComponent`, which percent-encodes it, exactly
 /// as the prior art built its URLs; empty components, `.` and `..` (also percent-encoded), `?`, `#` and `\` reject
 /// the whole path.
 enum RemoteURL {

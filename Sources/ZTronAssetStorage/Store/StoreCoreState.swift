@@ -128,7 +128,9 @@ struct StoreCoreState: Sendable {
     /// and their resumption would otherwise decide what they return (close-out cycle 4, ADR draft B-35).
     var openReportWaiters: [CheckedContinuation<OpenReport?, Never>] = []
     /// Commit scheduling (P-5, ARCHITECTURE §4.1). WP-C's legacy phase 3 reads `mutationSerial`, which every persisted
-    /// change bumps through `markDirty(_:)`, to tell whether its chunked check saw a quiet store (ADR draft C-24).
+    /// change bumps through `markDirty(_:)` in its own turn, except `apply`'s fenced writes, bumped in their last
+    /// writing turn (phase 3 relies on the manifest digest for those; S3-B-035), to tell whether its chunked check saw
+    /// a quiet store (ADR draft C-24).
     var commits = CommitBookkeeping()
     /// Snapshot versions, installs and acknowledgements (ADR-016, ADR-017).
     var snapshots = SnapshotBookkeeping()

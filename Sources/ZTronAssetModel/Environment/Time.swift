@@ -17,7 +17,8 @@ public struct MonotonicInstant: Hashable, Comparable, Sendable, Codable, CustomS
     /// The origin.
     public static let zero = MonotonicInstant(nanoseconds: 0)
 
-    /// `self + seconds`, saturating at `UInt64.max`.
+    /// `self + seconds`, the delta rounded to the nearest nanosecond (exact for `b.seconds(since: a)` below 2^50 ns),
+    /// saturating at `UInt64.max`.
     ///
     /// `+infinity` and any delta beyond the remaining headroom saturate to the end of time, so an "infinite"
     /// `deletionGrace`, cooldown or backoff means *never*, never *now* (conservative for I-3). Zero, negative and

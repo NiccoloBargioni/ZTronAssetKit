@@ -58,7 +58,8 @@ public enum RemotePathViolation: Sendable, Hashable {
     case tooLong(bytes: Int)
     /// Starts with `/`.
     case absolute
-    /// Contains a `..` segment.
+    /// Contains a segment that does not name a child of the path before it: `..` or `.` (also percent-encoded), an
+    /// empty segment, or a `\` (the transport refuses each on every fetch; Stage 3, S3AH-1).
     case parentSegment
     /// Carries a URL scheme.
     case scheme

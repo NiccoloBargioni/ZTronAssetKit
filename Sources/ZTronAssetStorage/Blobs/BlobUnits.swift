@@ -152,12 +152,14 @@ enum BlobDeletionUnit {
         var attempted: Int
     }
 
-    /// The time a deletion unit may take before it yields. P-13 bounds **every** batch between suspension points by
-    /// `batch_ms_max` (5 ms; orchestrator ruling on ADR draft B-9, L2 close-out), so the unit's own work is kept to a
-    /// fifth of it: one unit plus one slow last unlink stays far below 5 ms, and the remaining 4 ms absorb the
-    /// scheduler. Measured on this Mac (release, 64-byte blobs, APFS): a single unlink p50 0.045 ms, p99 < 0.1 ms, and
-    /// a unit's own work about 1 ms on CPU (1.01–1.14 ms at most across the close-out runs). What no budget bounds is one `unlink(2)` that blocks in the kernel while the
-    /// volume commits (4.6–9.3 ms, about every 150 ms of sustained unlinking; ADR draft B-9's P-13 profile).
+    /// The time a deletion unit may take before it yields. P-13 bounds the batches between suspension points by
+    /// `batch_ms_max` (5 ms; orchestrator ruling on ADR draft B-9, L2 close-out), judged on the p99 of their durations
+    /// (SPEC §6; the owner's ruling of 2026-10-29, ADR-050 option A), so the unit's own work is kept to a fifth of it:
+    /// one unit plus one slow last unlink stays far below 5 ms, and the remaining 4 ms absorb the scheduler. Measured
+    /// on this Mac (release, 64-byte blobs, APFS): a single unlink p50 0.045 ms, p99 < 0.1 ms, and a unit's own work
+    /// about 1 ms on CPU (1.01–1.14 ms at most across the close-out runs). What no budget bounds is one `unlink(2)` that
+    /// blocks in the kernel while the volume commits (4.6–9.3 ms in ADR draft B-9's P-13 profile); such stalls recur by
+    /// count, about once every 850–1,060 unlinks with the 256-way fan-out, not on a timer (S3B-12).
     static let budget: TimeInterval = 0.001
 
     /// Removes each key's blob until the budget would be spent; absent files count as removed (idempotent sweeps,
