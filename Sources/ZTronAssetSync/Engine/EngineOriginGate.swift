@@ -85,8 +85,10 @@ extension SyncEngine {
     /// Performs, in this turn, the transitions `gate` shows the clock or an outcome has opened, as the alarm's `.throttle`
     /// and `.breaker` turns would: an ended throttle is cleared (its deadline dropped) and every job a throttle parked
     /// re-queued (also when no throttle is recorded any more, so no such job is left behind);
-    /// every job a breaker that admits parked is re-queued (the first the pump dispatches probes, the others park again
-    /// behind it). At most `readmissionsPerTurn` are re-queued and the rest owed (`unblockOrigin`); the pump follows. A
+    /// every job a breaker that admits every transfer parked is re-queued, and a breaker that admits only a probe
+    /// re-admits the first job it parked in the pump's order, unless one already waits in the queue for the probe
+    /// (`readmitForProbe`; Stage 3, S3-B-063). At most `readmissionsPerTurn` are re-queued and the rest owed
+    /// (`unblockOrigin`); the pump follows. A
     /// decision that finds a job parked by a gate that admits calls this instead of waiting for the alarm's turn, so no
     /// decision depends on that turn having run (L4-R20, F-40). `true` when a job was re-queued or owed.
     @discardableResult

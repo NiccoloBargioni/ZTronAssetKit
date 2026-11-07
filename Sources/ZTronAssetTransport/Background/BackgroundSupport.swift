@@ -810,7 +810,8 @@ package final class BackgroundTransferHandle: TransferHandle {
 /// UIKit's plain `() -> Void` and never leaves the main actor.
 ///
 /// **Several handlers for one identifier (S3-CONC-02).** UIKit may hand a second handler for a session while the
-/// first still waits; Apple requires every one to be called, so each is kept, oldest first, and none replaces
+/// first still waits (whether it ever does is device-only and unverified); the SDK header asks that a completion
+/// handler be called once the session's callbacks are handled, so each is kept, oldest first, and none replaces
 /// another. Each `accept` is followed by one `complete` once a wait for the session's events that began after the
 /// handler was accepted returned (`AssetClient.handleBackgroundEvents`). A `complete` cannot tell whose wait it ends,
 /// so it calls the oldest handler still waiting: by the k-th `complete`, k such waits returned, and at least one of

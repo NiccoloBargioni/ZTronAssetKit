@@ -37,7 +37,8 @@ public struct PowerPolicy: Sendable, Hashable, Codable {
     public var pauseBackgroundAtThermal: ThermalLevel
     /// Paused work resumes only at or below this level (hysteresis, sync-2 S2-25). Default `.fair`.
     public var resumeBackgroundAtThermal: ThermalLevel
-    /// Concurrent user-initiated transfers allowed at `.critical`. Default 1.
+    /// Concurrent user-initiated transfers allowed at `.critical`. Default 1. Applies to dispatch decisions taken
+    /// while the thermal state is known; transfers started before a critical reading arrives are not trimmed.
     public var interactiveConcurrencyAtCritical: Int
 
     /// The defaults of ADR-036.
