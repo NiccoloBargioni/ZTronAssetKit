@@ -27,7 +27,7 @@ Nothing in this file was re-run when it was written (Stage 5, on `d002758`); eac
   - Host load averages were 10-50 for storage (8 shared cores) and 14-100 for network, so absolute timings are inflated.
   - A killed mutant's killing-test list is the first failing target's, not exhaustive. The storage survivors were not run against the Model and Transport targets, which do not use the real store.
   - Seven network kills (M-N-02, M-N-05, M-N-08, M-N-15, M-N-35, M-N-36 and M-N-38) show partly as 60 s per-test time limits, "alongside failed expectations". M-N-05 was stopped by hand after its first killing tests because it hung, and M-N-19 hit the agent's 300 s watchdog; the agent records both as "already clearly killed".
-  - Neither agent ran TSan or `verify.sh`.
+  - Neither agent ran TSan. The network agent states that it did not run `verify.sh --quick`; the storage agent's record does not mention `verify.sh`.
   - The network `status` text is stale. It says "34 mutants applied … 28 KILLED and 6 SURVIVED" and "Thirty own probes", while its records hold 37 mutants (30 killed and 7 survived, the seven survivors the same text names) and 32 own probes (M-N-06 to M-N-40 without M-N-30, M-N-32 and M-N-33, which were never applied). This file follows the records, as ORCHESTRATION does.
   - The records' own locations are approximate for many mutants (a `~` line, or a line near the change). The tables give the line where each change block of the diff starts at `s3-base`; Appendix A also keeps the record's location.
 
@@ -213,7 +213,7 @@ Sources: ADR-057's WP-F records (`docs/DECISIONS.md:684`) and `docs/adr-drafts/s
 - MC1 (`reach` returning `max(radius, 0)`, the old walk): `PrefetchFacadeTests.swift:167:33` (`s3g.md:59-60`).
 - M05 (the stopped forwarder's exit after `registerEvents` removed): `FacadeRaceTests.swift:437:9`, `registrations == 1` (`s3g.md:71-75`).
 - M01s (`sync`'s hand-off narrowed to `.shutDown` and `.storageUnavailable`): `FacadeReopenTests.swift:775:9` for both cases (`s3g.md:122-124`).
-- MR4 and MR2 (`reopenAttempts = 4` and `= 2`): `FacadeReopenLimitTests.swift:52`, `:53`, `:106`, `:107` (`s3g.md:141-143`).
+- MR4 and MR2 (`reopenAttempts = 4` and `= 2`): MR4 fails at `FacadeReopenLimitTests.swift:52:9`, `:106:9` and `:107:9`, MR2 at those and `:53:9` (`.build-orchestrator/s3g-probes-c1/reqs-mutants-summary.txt:44-53`, `:54-63`). ADR-057 lists the four lines (`docs/DECISIONS.md:646`); the draft quotes `:52:9` and `:106:9` (`s3g.md:141-143`).
 - MT1 and MT2 (the forwarder drops `clientStarted` or `maintenanceFinished`): each fails 10 of 10 model cases and passes on `s3-base`'s model; MC00 (the L5-R19 defect rebuilt) is still caught 10 of 10 (`s3g.md:104-115`).
 - Discovery's M-N-11 and M-N-35 to M-N-38 are killed (§3).
 - Not re-run on the merged head: these were measured on `wp/s3g` before WP-F's merge changed `SubscriberQueue.swift` (MC00's file), `EngineEvents.swift` and `EngineLifecycle.swift` (ADR-057, `docs/DECISIONS.md:670`).
