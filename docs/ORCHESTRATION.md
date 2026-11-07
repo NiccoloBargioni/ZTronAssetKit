@@ -618,7 +618,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            - Coverage: overall 96.94 %, Storage 97.58 %, Sync 95.10 %.
            - The 1-minute load was 9.91 at the end.
            - Nothing goes to the owner.
-         - **RESUME HERE AFTER THE RESET (Thu 12 Nov 03:00 CET). Weekly: 98 % at 06:05, so part A may be cut and part B will not fit. Weekly 100 % at 07:33: stopped here (usage stop).**
+         - **RESUME HERE AFTER THE RESET (Thu 12 Nov 03:00 CET). Weekly: 98 % at 06:05, so part A may be cut and part B will not fit. Weekly 100 % at 07:33: stopped here (usage stop). The owner agreed to resume after the reset and starts the fresh session; no scheduled task is set (owner rule of 2 Nov).**
+           0. **Start checks:**
+              - Run `get_usage` before any launch.
+              - Confirm `git -C .worktrees/s5docs rev-parse --short HEAD` is `6eab1ba` with an empty `status` (checked 7 Nov, 11:26).
+              - Start a keep-awake for the long runs. The old one, `bmt90jpqj`, was stopped at 11:27 on 7 Nov, since nothing was running.
+              - Part A's workflow script, whose writer and verifier prompts can be reused for the fix round, is kept at `.build-orchestrator/s3-post-merge/assetkit-s5-docs-a-wf_c7c92797-46b.js`.
            1. **Part A:** `wp/s5docs` is at `6eab1ba`, and its worktree is clean. A writer applies round 2's fixes from the persisted JSON: the 1 blocking (§6.4:237) and the 7 non-blocking. Then an independent verifier checks the changed lines against their records; it must be neither round 2's verifier nor the writer (P4). Part A is done at 0 blocking.
            2. **Tools-6.4 (c): DONE.** It passes with 0 warnings; its bullet above has the details.
            3. **Part B:** `docs/VERIFICATION.md`, with an independent verifier: what ran, the thresholds, the results and what was not verified. It is built from this checklist's items 3-9, `.build-orch/stage5-full.log`, `t64b/`, `t64c/`, `sim-merged/`, `mut-recheck/`, the P-13 runs, and ADR-057's Not-verified list. Write it in `.worktrees/s5docs`.
@@ -628,7 +633,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
               - remove the s3 worktrees and branches after a restore test;
               - write the dossier's final version;
               - write the final message (at most 60 lines, `PROMPT.md:65`);
-              - stop `bmt90jpqj` if it is still running.
+              - stop the keep-awake that step 0 started.
          - *Superseded by the RESUME list above, since Stage 5's TRACEABILITY needed no commit.* **Part B, after Stage 5's `--full` (task `bvaplc5ov`):** `docs/VERIFICATION.md`, with its own verifier. Then merge `wp/s5docs`, commit the `--full`'s regenerated `docs/TRACEABILITY.md`, and run the tools-6.4 (c) `--full` in `.worktrees/t64`.
          - If the limit cuts in: `wp/s5docs` and its worktree hold the drafts, uncommitted work included. Resume part A with `resumeFromRunId` in this session, or read its journal from a fresh one. The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
