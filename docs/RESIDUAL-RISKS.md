@@ -4,7 +4,7 @@ Every risk accepted at the end of Stage 3: what it is, the ruling that accepted 
 impact, what would show it, and what would re-open it. This document fixes nothing and changes no ruling. Where it
 differs from ADR-057 (`docs/DECISIONS.md:563-699`) or from the rulings, they decide. It was written at Stage 5 on
 `wp/s5docs` (base `d002758`), with no device and no build or test run of its own (G2). Stage 5's `--full` figures
-are read from that run's logs (§0.4). It is not independently verified (P4).
+are read from that run's logs (§0.4). It is not independently verified (`CLAUDE.md` P4).
 
 ## 0. How to read it
 
@@ -14,6 +14,8 @@ are read from that run's logs (§0.4). It is not independently verified (P4).
   risks (S3-R16). `S3-B-nnn` are the Stage 3 backlog's (`.build-orchestrator/s3-backlog.json`). `c23 #n` are point
   8's verification findings (N33). `N<n>` are the orchestrator's rulings (`s3-r28-orchestrator-rulings.md`).
   `rulings` is `.build-orchestrator/s3-rulings-s3f.md`. `s3f.md`, `s3b.md` and the like are `docs/adr-drafts/`.
+  `P1` to `P8` are P-13's follow-up items (`.build-orchestrator/s3-post-merge/docs-followup-items.md`), as ADR-057
+  cites them (`docs/DECISIONS.md:383`).
 - **Heads.** "The merged head" is ADR-057's: s3f's merge, `e840b0e` (`docs/DECISIONS.md:564`). The records cite
   its `--full` logs under `.worktrees/merge-check/.verify-logs/`. They are now in
   `.build-orch/merge-verify-logs-e840b0e/` (`docs/ORCHESTRATION.md:579`), and `.worktrees/merge-check/.verify-logs/`
@@ -71,8 +73,11 @@ are read from that run's logs (§0.4). It is not independently verified (P4).
 ### 0.4 Stage 5's `--full`
 
 - It ran in `.worktrees/merge-check`, detached at `45df2e1` with the committed manifest, from 04:38 to 06:02 on
-  7 Nov (`docs/ORCHESTRATION.md:578`; `.build-orch/stage5-full.log:1`, `:132`). The log gives the 1-minute load
-  only at the start, 4.11, and at the end, 7.77 (`:2`, `:131`). The benchmarks log prints none per case.
+  7 Nov (`docs/ORCHESTRATION.md:578`; `.build-orch/stage5-full.log:1`, `:132`). The run log gives the 1-minute
+  load at the start, 4.11, and at the end, 7.77 (`:2`, `:131`). The TSan log prints no load.
+- The benchmarks log (`.worktrees/merge-check/.verify-logs/benchmarks.log`) prints each run's 1-, 5- and
+  15-minute loads on 61 case lines, from `:242` to `:449`. No other line prints a load: none before `:242` or after
+  `:449`, and none at `:260`, `:263`, `:266`, `:269`, `:279` and `:281`. The Stage 5 loads below are read from it.
 - Its code is the merged head's, doc comments aside. Between `e840b0e` and `45df2e1`, `Tests/`, `Scripts/` and
   `Package.swift` are unchanged, and every changed line in `Sources/` (18 files) is a `///` line (checked for this
   document with `git diff`; `docs/DECISIONS.md:690`).
@@ -122,8 +127,11 @@ are read from that run's logs (§0.4). It is not independently verified (P4).
   - Passing shapes at the merged head: `sharedJob` 4.64 ms, `userWaiters` 6.97 ms, `ensures` 7.02 ms (`:589`).
   - Stage 5's `--full` (§0.4), best heartbeat of 3 in ms: `oneGroup` 35.80, `oneMemberGroups` 37.23,
     `oneGroupScope` 39.45, `sharedJobFourGroups` 18.65, `fourGroups` 62.29 and `retryJobs` 36.20, all inside the
-    17.82-64.00 ms span above. Passing: `sharedJob` 4.64, `userWaiters` 6.80 and `ensures` 7.28
-    (`.worktrees/merge-check/.verify-logs/benchmarks.log:339-385`).
+    17.82-64.00 ms span above, at 1-minute loads of 2.45-3.12
+    (`.worktrees/merge-check/.verify-logs/benchmarks.log:339-376`). So all six were measured at a quiet load, the
+    three above included, on code that differs from the merged head's only in `///` lines (§0.4). Passing:
+    `sharedJob` 4.64 (load 2.65), `userWaiters` 6.80 (2.60 → 2.55) and `ensures` 7.28 (2.55 → 16.27) (`:360`,
+    `:383`, `:385`).
 - **Field.**
   - Likelihood: it needs a purge (`AssetClient.purge(_:)`, `AssetClient.swift:324`) while the engine holds jobs or
     groups over about 10,000 ids. How often an app purges at that scale is unknown.
@@ -151,8 +159,11 @@ are read from that run's logs (§0.4). It is not independently verified (P4).
   - One `unlink(2)` stalls in the kernel about once every 850-1,060 unlinks with the fan-out, and every 490-550 in a
     flat directory. The stalls recur by count, whatever the store controls (`docs/DECISIONS.md:621`).
 - **Ruling.**
-  - The owner's ruling, option A: the owner answered "P99". `batch_ms_max` stays 5 ms, and `gc_total_s_max` stays 2 s
-    (`docs/DECISIONS.md:380`).
+  - The owner's ruling, option A. The owner's words (29 Oct, 14:25 UTC) were
+    "Do not set any budget stop. List P99". The orchestrator read them as option A, the deletion units' nearest-rank
+    p99, recorded that reading and told the owner at 14:30 UTC; no correction was found (P4;
+    `docs/DECISIONS.md:383`; `.build-orchestrator/s3-post-merge/docs-followup-items.md:39`). ADR-050's amendment
+    gives the reading as "P99". `batch_ms_max` stays 5 ms, and `gc_total_s_max` stays 2 s (`docs/DECISIONS.md:380`).
   - It sits inside the accepted FAIL: "A P-13 red with no code change falls inside the accepted FAIL, not a new
     cause" (`:635`).
   - For the owner, information only, not a re-judgment (P8): P-13 "now passes or fails on how many times APFS stalls
@@ -683,9 +694,33 @@ Common to RES-17 to RES-31, unless the entry says otherwise:
   8. Each owed batch keeps its copy and layers alive (memory only).
 - **Ruling.** S3-R24 item 5 (the timing class); S3-R26 item 1 (rulings 1-5); S3-R27 item 12.2
   (`docs/DECISIONS.md:613`: "RR-21 fixed except its residuals").
-- **Evidence.** Item B's residuals, each with class, condition and test, are under the draft's cycle 21, "Step 4"
-  (ledger s3f-docs 105). `releaseRerouteHolds` (R12) has no figure (RES-39).
-- **Field.** As §6. Items 7 and 8 cost time and memory while owed batches drain.
+- **Evidence.**
+  - `releaseRerouteHolds` (R12) has no figure (RES-39).
+  - Item B's residuals (the per-job index from id to holders; ruling S3-R26 item 10; `s3f.md:5768-5783`; ledger
+    s3f-docs 105), each with the draft's class, what would make it blocking, and its test:
+    1. The earlier take-off: order and timing (S3-R16 item 2), blocking if a reader gives a different answer. B-T4
+       and the reader check (`s3f.md:5740-5767`). §6's class.
+    2. Q1's holder now binds A: one transport start fewer, the same answer. B-T5 pins one start in both orders.
+       Not a risk: no answer changes.
+    3. Variant Y's T1 half broke S3-R16 item 1 and is fixed (`2ae5a34`); its test runs in both orders. Not a risk.
+    4. The index's memory and costs: about 0.5 MB a job of 10,000 ids, estimated and never measured
+       (`s3f.md:5775`). A cost: blocking if a C2 case through them misses `c2Budget` at a 1-minute load of 10 or
+       less (S3-R22 item 1). `indexOwnCosts` times the release, the copy and the freeing: 3.51, 4.06 and 0.78 ms
+       on `82ba8a1` at loads 5.78 → 6.06 (`s3f.md:5705-5708`), and 3.26, 3.64 and 0.71 ms in Stage 5's run at
+       load 3.34 (`.worktrees/merge-check/.verify-logs/benchmarks.log:316`). No figure gauges the memory.
+    5. An id with many holders moves whole in one turn, O(h log h): RES-33 (PROBE-C21-HOLDERS, outside the bar).
+    6. Pre-existing, and the same in both orders:
+       - Moved ids leave `Job.assets` without `retireProgress`, as on the fit path (`s3f.md:5760-5762`, `:5782-5783`).
+         The reader check found no different answer, stale binding or failure record (`:5764-5767`); the draft
+         gives it no test and no blocking condition. By this document's reading of the code, not a run:
+         `removeJob` retires only the progress keys of ids still on the job (`EngineJobs.swift:525-527`), and
+         progress is offered for `job.assets.min()` on non-bulk lanes (`EngineDispatch.swift:913-915`). So a moved
+         id whose progress was offered keeps its `lastEmitted` entry, any trailing emission with its flush, and any
+         undelivered slot (`EngineEvents.swift:82-96`), until a later `removeJob` of a job holding it. The cost is
+         a stale `transferProgress` for that id from its old job, and the entry kept.
+       - An empty binding can occur on the bounded path: RR-20's family, RES-16.
+- **Field.** As §6. Items 7 and 8 cost time and memory while owed batches drain. Item B's residual 4 costs about
+  0.5 MB a job of 10,000 ids, by estimate; residual 6's progress gap can show a stale progress event.
 - **Noticed.** As §6.
 - **Re-open.** As §6.
 
@@ -745,8 +780,8 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
     s3f-docs 108).
   - A second stalled subscriber (`commitTwoStalledSubscribersTurns`, "recorded, not gated"): 15.57 ms in cycle 21
     (load 7.44), 7.08 ms at the close, and 7.13 ms at the merged head (load 3.03-3.18) (`docs/DECISIONS.md:592`); in
-    Stage 5's `--full`, 6.84 ms (`.worktrees/merge-check/.verify-logs/benchmarks.log:329`). Its doc comment is
-    `BenchSyncCycle21.swift:156-159`.
+    Stage 5's `--full`, 6.84 ms at load 3.30 (`.worktrees/merge-check/.verify-logs/benchmarks.log:329`). Its doc
+    comment is `BenchSyncCycle21.swift:156-159`.
 - **Field.** It needs an app that puts more than 4 interests on one id, such as several groups that hold the same
   asset, or two event subscribers that both stall. Such turns take about 40 ms on the host.
 - **Noticed.** No field signal. The host benchmarks record the second-subscriber case, not gated.
@@ -761,16 +796,20 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
 
   | Case | Cycle 22, the close, the verification | Merged head (all pass) | Stage 5's `--full` (all pass) |
   |---|---|---|---|
-  | `commitTwoTokensTurns` | 9.02 (load 5.88); 8.95 (alone, 1.75-1.88); 9.27 (3.67) | 8.80 (load 14.35) | 8.71 |
-  | `userSharedApplyTurns(.keep)` | 9.04 (3.01-3.11); 8.50 | 8.28 (no load printed) | 8.27 |
-  | `divergenceTurns` | 8.83; 8.35 | 7.60 | 7.60 |
-  | `concentrationCommitRerouteTurns` | 8.71; 8.05 | 7.31 | 7.39 |
+  | `commitTwoTokensTurns` | 9.02 (load 5.88); 8.95 (alone, 1.75-1.88); 9.27 (3.67) | 8.80 (load 14.35) | 8.71 (load 14.22 → 13.56) |
+  | `userSharedApplyTurns(.keep)` | 9.04 (3.01-3.11); 8.50 | 8.28 (no load printed) | 8.27 (no load printed) |
+  | `divergenceTurns` | 8.83; 8.35 | 7.60 (no load printed) | 7.60 (no load printed) |
+  | `concentrationCommitRerouteTurns` | 8.71; 8.05 | 7.31 (load 3.28) | 7.39 (load 2.90) |
 
   - c23 #3 added the last three, with the reqs verifier's figures, not independently verified (`:591`).
-  - The Stage 5 column is from `.worktrees/merge-check/.verify-logs/benchmarks.log:408`, `:281`, `:266` and `:248`,
-    with no load printed (§0.4). For `divergenceTurns` both right-hand columns give the larger of its two figures,
-    "on to fresh contents". The other, "back to their own contents", was 7.53 in Stage 5's run and 7.50 at the
-    merged head (`.build-orch/merge-verify-logs-e840b0e/benchmarks.log:276`).
+  - The Stage 5 column is from `.worktrees/merge-check/.verify-logs/benchmarks.log:408`, `:281`, `:266` and `:248`
+    (§0.4). `commitTwoTokensTurns` ran all three runs at 1-minute loads of 13.56-14.22, so its pass at 8.71 ms is
+    not a quiet-load figure under the load rule (`rulings:759`, `:764`). At the merged head, too, all three ran at
+    14.35. `concentrationCommitRerouteTurns` prints one load for the case. `:281` and `:266` print none. The merged
+    head's loads are from `.build-orch/merge-verify-logs-e840b0e/benchmarks.log:418`, `:291`, `:276` and `:258`.
+  - For `divergenceTurns` both right-hand columns give the larger of its two figures, "on to fresh contents". The
+    other, "back to their own contents", was 7.53 in Stage 5's run and 7.50 at the merged head
+    (`.build-orch/merge-verify-logs-e840b0e/benchmarks.log:276`).
   - This host's run-to-run spread reaches about 17 % (`:591`).
 - **Field.** These turns already take 8-9.3 ms on the host. A slower device could put them over 10 ms; that is this
   document's inference, since no device figure exists.
@@ -787,8 +826,8 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
   - Merged head's `--full`: [13.84, 15.53, 13.24] at loads 14.35 → 10.54, every reading above 10.
   - Alone at 3.19 → 3.06: [4.37, 4.63, 4.63], longest held turn 1.23 ms (`.build-orch/merge-userToBound-rerun1.log`).
   - On `wp/s3f`: best 4.35 ([4.35, 12.41, 4.80]) at 10.74 → 8.26.
-  - Stage 5's `--full`: passed, [4.63, 4.69, 4.64], longest held turn 1.36 ms, no load printed
-    (`.worktrees/merge-check/.verify-logs/benchmarks.log:411-412`).
+  - Stage 5's `--full`: passed, [4.63, 4.69, 4.64], longest held turn 1.36 ms, at loads 13.56 → 11.75, every run
+    above 10 (`.worktrees/merge-check/.verify-logs/benchmarks.log:411-412`).
 - **Field.** It holds about 4.4 ms at a quiet load, so no field risk is known. The risk is a red host run on a busy
   host.
 - **Noticed.** Host benchmarks.
@@ -924,7 +963,9 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
   (`StoreCrashTests.swift:113-116`).
 - **Ruling.** Non-blocking, routed to WP-B (S3-R8). The fix: rethrow on `.cancelled` or when `Task.isCancelled`
   holds, or check cancellation per pair (`docs/DECISIONS.md:647`; ledger s3c 64).
-- **Evidence.** 1,961, 2,118 and 350 `.cancelled` issues in three overloaded TSan runs (`s3c.md:84`, `:89-95`).
+- **Evidence.** 1,961, 2,118 and 350 `.cancelled` issues in three overloaded TSan runs: the correctness lens's
+  (`s3c.md:87`, `:90-93`), then the draft's second and third, at 1-minute loads up to 602 and 465 (`:686-692`,
+  `:695-700`).
 - **Field.** None: it floods a failed run's log with follow-on issues.
 - **Noticed.** Hundreds of `.cancelled` issues after a time-out.
 - **Re-open.** WP-B's next round (`docs/DECISIONS.md:647`).
@@ -1534,7 +1575,7 @@ wording.
 
 Source: the ADR-057 docs workflow's ledger readers (`.build-orchestrator/s3-post-merge/adr057-docs-journal.jsonl`,
 results labelled `ledger:<draft>`). Of their 536 items (`docs/ORCHESTRATION.md:568`), these are the 87 of kind
-`residual-risk`. The number is the item's number in its ledger.
+`residual-risk`. The number is the item's 0-based index into its `ledger:<draft>` result's `items` array.
 
 | Ledger | Items → entry |
 |---|---|
