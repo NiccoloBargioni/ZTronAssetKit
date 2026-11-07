@@ -588,7 +588,12 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            3. Stage 5's `--full` in the clean worktree. It also serves as the docs merge's `--quick` and `--gates-only` re-run.
            4. The four Stage 5 documents, then the tools-6.4 (c) `--full` in `.worktrees/t64`.
            5. Item 10.
-      9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`). The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
+      9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`).
+         - **Part A RUNNING (launched 04:45):** workflow `wf_c7c92797-46b` (task `w8hf3p47y`), whose script is the persisted `assetkit-s5-docs-a-wf_c7c92797-46b.js`.
+           - One writer drafts `docs/MUTATION-PROBES.md`, `docs/DEVICE-TEST-PLAN.md` and `docs/RESIDUAL-RISKS.md` in `.worktrees/s5docs` (`wp/s5docs` at `d002758`), from SPEC §7.4 and §8, ADR-057, the hunt JSON, `s3-post-merge/` and the ADR-057 ledgers' journal.
+           - An independent verifier follows, with at most one fix round.
+         - **Part B, after Stage 5's `--full` (task `bvaplc5ov`):** `docs/VERIFICATION.md`, with its own verifier. Then merge `wp/s5docs`, commit the `--full`'s regenerated `docs/TRACEABILITY.md`, and run the tools-6.4 (c) `--full` in `.worktrees/t64`.
+         - If the limit cuts in: `wp/s5docs` and its worktree hold the drafts, uncommitted work included. Resume part A with `resumeFromRunId` in this session, or read its journal from a fresh one. The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
           - **Snapshot 4: DONE (04:42), `cd17cdc`, pushed and restore-tested.** It was taken ahead of the limit, so the evidence survives a local wipe.
             - It starts from snapshot 3's tree, so nothing is dropped: 3,320 files, with 283 added and 4 updated (the rulings file, the close drafts, N31-N33 and the README).
