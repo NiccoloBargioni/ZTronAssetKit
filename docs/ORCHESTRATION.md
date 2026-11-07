@@ -590,6 +590,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            5. Item 10.
       9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`). The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
+          - **Snapshot 4: DONE (04:42), `cd17cdc`, pushed and restore-tested.** It was taken ahead of the limit, so the evidence survives a local wipe.
+            - It starts from snapshot 3's tree, so nothing is dropped: 3,320 files, with 283 added and 4 updated (the rulings file, the close drafts, N31-N33 and the README).
+            - `.build-orchestrator/` is refreshed, including `s3-post-merge/`.
+            - 357 cited logs of at most 3 MB each (26 MB), listed in the session scratchpad's `cited-logs-4.tsv`:
+              - `worktree-s3f-logs/` (cycle 23's evidence included), `worktree-s3c-logs/`, `worktree-s3d-logs/` and `worktree-s3g-logs/`;
+              - `build-orch-logs/`: the merged head's `--full` and its `.verify-logs`, the quiet re-runs, `t64b/`, `sim-merged/` without the xcresult bundle, `mut-recheck/`, and the start of `stage5-full.log`.
+            - The secret scan of the logs and of the newer `.build-orchestrator` files found nothing.
+            - Restore test: `merge-P13-quiet.log` read back identical, and the `c23/` folder restored.
+            - The final snapshot (5) still follows Stage 5; then come the worktree removals.
           - The final snapshot's cited-log list covers every path cited in `docs/adr-drafts/s3*.md`, `.build-orchestrator/` and this file, under each `.worktrees/s3*` and `.build-orch/` (`merge-full.log`, `merge-userToBound-rerun1.log`, `merge-P13-quiet.log`, `t64b/`, `sim-merged/` without the xcresult bundle unless small, `mut-recheck/`). Item 7's worktree removals come after it, with a restore test.
       11. Stop the keep-awake `bmt90jpqj`.
     - **Weekly: 86 % at 00:11 on 7 Nov,** 14 points left (reset Thu 12 Nov 03:00 CET). These are estimates for what is left:
