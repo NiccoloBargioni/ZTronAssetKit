@@ -537,7 +537,21 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
              - `BenchStorage.swift:20-21`.
            - **For the owner, as information and not a re-judgment:** P-13 now passes or fails on the count of APFS unlink stalls in a run. Only the owner can change the percentile or the number.
       5. The mutation re-check of the 11 survivors.
-         - **RUNNING (launched 00:36 at a load of 6.62):** background task `bxn0cg0jq`, script `mut-recheck.sh` in the session scratchpad. It covers discovery's 11 survivors (M-S-07, 08, 11 and 20; M-N-09, 12, 14, 16, 20, 22 and 39; diffs in `.build-orchestrator/s3-mutants/`).
+         - **DONE (01:26): all 11 KILLED on `e840b0e`, each by a test named for its mutant, with an assertion failure and no time-out.** The first issue for each mutant is in `.build-orchestrator/s3-post-merge/mut-recheck/first-issues.txt`, with its summary and the applied diffs; the logs are in `.build-orch/mut-recheck/`.
+           - M-S-07: `LeaseTests.swift:387`, R-CLN-5 "apply skips a planned victim leased after the plan…".
+           - M-S-08: `LeaseTests.swift:409`, R-CLN-5 "the eviction dry run neither names a leased asset nor counts its bytes".
+           - M-S-11: `StagingSinkTests.swift:180`, R-STO-6 "an ENOSPC while staging a chunk source surfaces as insufficientSpace…".
+           - M-S-20: `GarbageCollectionTests.swift:622`, R-CLN-2 "an orphan younger than the orphan grace, or exactly that old, is kept…".
+           - M-N-09: `EngineBoundaryTests.swift:42`, R-SYN-3 "a queued bulk job a prefetch request joins is promoted…".
+           - M-N-12: `EngineBoundaryTests.swift:50` and 13 more issues, R-SYN-2 F-28 and R-SYN-3.
+           - M-N-14: `EngineBoundaryTests.swift:73`, R-SYN-5 "the backoff ceiling doubles with every attempt…".
+           - M-N-16: `EngineBoundaryTests.swift:94`, R-SYN-5 "a window whose 5xx share equals serverErrorRatio exactly opens the breaker".
+           - M-N-20: `EngineBoundaryTests.swift:102`, R-SYN-5 "a Retry-After equal to maxRetryAfter is honoured…".
+           - M-N-22: `SizeAndResumeTests.swift:213`, R-NET-8 "a weak ETag is never the resume validator…".
+           - M-N-39 (re-made): `EngineBoundaryTests.swift:137`, R-SYN-5 "a later transfer 429 with a shorter Retry-After never shortens the origin's throttle".
+           - The unmutated head passed these tests in the `--full`'s three runs, in TSan and on the simulator, so each failure comes from its mutant.
+           - `git status` was the same before and after: only the trace gate's `docs/TRACEABILITY.md` rewrite. Every mutated file was restored.
+         - Launched 00:36 at a load of 6.62, as background task `bxn0cg0jq`, script `mut-recheck.sh` in the session scratchpad. It covers discovery's 11 survivors (M-S-07, 08, 11 and 20; M-N-09, 12, 14, 16, 20, 22 and 39; diffs in `.build-orchestrator/s3-mutants/`).
            - It mutates one file at a time in `.worktrees/merge-check` at `e840b0e` and runs that target's tests, the way `run_tests` does (Storage, Sync or Transport, scratch `.build-orch-merge`). It restores the file with `git checkout -- <file>`.
            - A survivor of its own target is re-run against every target. The S3-R3 standard is that a test must fail against the mutant.
            - Ten diffs apply as they are. M-N-39 changes the same line (`max(previous ?? .zero, until)` → `until`, now at `EngineFailures.swift:374`), but its context moved, so it is re-made as `.build-orch/mut-recheck/M-N-39.reapplied.diff`.
