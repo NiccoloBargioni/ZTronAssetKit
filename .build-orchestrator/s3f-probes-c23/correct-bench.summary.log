@@ -1,0 +1,247 @@
+# cycle-23 correctness verifier: release benchmarks on HEAD d88bdb1 (swift test -c release --scratch-path .build-verify-s3f-c23-correct-perf -Xswiftc -enable-testing --filter Benchmarks)
+21:16:41 bench build start head d88bdb1 load { 18.34 77.10 121.66 }
+21:28:19 bench build exit 0 load { 263.60 204.11 163.47 }
+21:45:24 bench run start load { 3.87 13.85 56.94 }
+22:00:19 bench run exit 1: ✘ Test run with 85 tests in 8 suites failed after 624.235 seconds with 7 issues. load { 8.82 9.59 26.64 }
+1-min load samples every 10 s: 90 min 2.61 median 8.39 max 35.72
+✘ Test run with 85 tests in 8 suites failed after 624.235 seconds with 7 issues.
+## figure lines
+P-1 lookup p99 0.417 µs at 10,000 (median 0.292), 0.333 µs at 100; ratio 1.2522522522522521 (max 3.0); budget 25.0 µs
+P-8 main-thread file-system calls 0 (max 0)
+P-8 events: p99 0.007208 ms, max 0.066667 ms (budget 1.0 ms)
+P-8 locate: p99 0.0019590000000000002 ms, max 0.018333 ms (budget 1.0 ms)
+P-8 lookup: p99 0.001583 ms, max 0.007667 ms (budget 1.0 ms)
+P-8 prefetch: p99 0.006584 ms, max 0.022959 ms (budget 1.0 ms)
+P-8 register: p99 0.005959 ms, max 0.016875 ms (budget 1.0 ms)
+P-8 resolve entry: p99 0.006416000000000001 ms, max 0.0205 ms (budget 1.0 ms)
+P-8 unregister: p99 0.004625 ms, max 0.0052910000000000006 ms (budget 1.0 ms)
+P-8 window update: p99 0.028416 ms, max 0.037083 ms (budget 1.0 ms)
+P-8 bundle enumerations [false] (on main: 0); locate 0.000130333 ms per call (budget 1.0 ms)
+P-9 64 resolves of 2 MiB in 0.679005584 seconds; heartbeat gaps 47, p99 15.337 ms, max 15.337 ms (budget 50.0 ms, tick 10.0 ms)
+P-12 init p99 0.003041 ms over fakes, 0.00625 ms over .live() (budget 1.0 ms); file-system calls 0
+P-3 reference 3283455 bytes: p50 18.285292 ms, max 18.358291 ms, budget 80.0 ms
+P-3 at the limit, dense manifest: 33064934 bytes, worst 214.466542 ms, threshold 817.5396221358295 ms
+P-3 at the limit, dense manifest truncated: 24798700 bytes, worst 69.48375 ms, threshold 817.5396221358295 ms
+P-3 at the limit, dense manifest with edits: 33064934 bytes, worst 36.994 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge unknown string: 33554172 bytes, worst 19.854083 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge multi-byte string: 33554170 bytes, worst 111.240084 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge escaped file name: 33554173 bytes, worst 109.59825 ms, threshold 817.5396221358295 ms
+P-3 at the limit, deep nesting: 33554432 bytes, worst 0.000625 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings: 14600001 bytes, worst 43.096583 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings, keepFirst: 14600001 bytes, worst 38.7635 ms, threshold 817.5396221358295 ms
+P-3 at the limit, minimal entries of 16-byte strings, at the estimate's limit: 16199954 bytes, worst 92.028542 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 entries with one 16-byte path component and one 16-byte tag, at the estimate's limit: 17053287 bytes, worst 94.06825 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 entries with three 16-byte path components, at the estimate's limit: 18333287 bytes, worst 89.443292 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 60,000 entries with three 16-byte strings and three 16-byte path components, at the estimate's limit: 13732933 bytes, worst 68.777042 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 minimal entries, at the estimate's limit: 11079954 bytes, worst 81.400416 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 100,000 empty objects, quarantined: 300001 bytes, worst 9.320708 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 25-byte path components: 33553806 bytes, worst 110.221959 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 61 one-byte tags per entry: 33554361 bytes, worst 272.781417 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge identifier: 33554169 bytes, worst 18.297375 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge tag: 33554174 bytes, worst 18.5595 ms, threshold 817.5396221358295 ms
+P-3 at the limit, huge checksum: 33554176 bytes, worst 18.5605 ms, threshold 817.5396221358295 ms
+P-3 at the limit, entries sharing one identifier, keepFirst: 8100001 bytes, worst 50.480333 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 32 empty path components and 31 one-byte tags per entry, at the estimate's limit: 23627640 bytes, worst 170.436542 ms, threshold 817.5396221358295 ms
+P-3 at the limit, 31 one-byte tags per entry, at the estimate's limit: 28146620 bytes, worst 209.541417 ms, threshold 817.5396221358295 ms
+P-3 at the limit, shortest escaped 8-byte unknown keys, assets before schemaVersion: 33554429 bytes, worst 329.195667 ms, threshold 817.5396221358295 ms
+P-3 at the limit, shortest escaped 8-byte unknown keys in one entry: 33554428 bytes, worst 199.891792 ms, threshold 817.5396221358295 ms
+P-3 at the limit, escaped 13-byte unknown keys in the envelope: 33554415 bytes, worst 105.678209 ms, threshold 817.5396221358295 ms
+P-2 index load, 1411449 bytes, 10,000 records: p50 9.583167 ms, p95 9.914333 ms, max 10.366042 ms, budget 25.0 ms
+P-5 commit of 10,000 records, 16 dirty fan-outs: ordered p50 13.584208 ms, p95 13.865625 ms, max 14.429792 ms; durable p50 21.063666 ms, p95 23.193 ms, max 23.193 ms; budget 40.0 ms. Bulk sync: 40 commits in 10 s, at most 4 in any second, budget 4.0
+P-6 streaming SHA-256 of 256 MiB: 2376.5901096994094 MB/s, one-shot 2905.8689500633272 MB/s, ratio 0.8178586682815192, peak resident delta 0.0 MiB over 1542 in-read samples; floors 800.0 MB/s, 0.7x, cap 4.0 MiB
+P-13 reclaim of 10000 blobs: 0.6402151669999999 s in 507 units, unit max 9.874834 ms (p50 0.96375 ms, p95 0.99175 ms); budgets 2.0 s, 5.0 ms per batch; unit time budget 1.0 ms; unlink profile of this volume: p50 0.043792 ms, p99 0.057542 ms, max 0.220708 ms; unit on-CPU max 1.021708 ms; units over the batch budget: ["5.612416 ms wall, 0.280083 ms on CPU", "6.773583 ms wall, 0.8525 ms on CPU", "7.1
+P-4 plan 10,000: 11.506166 ms (budget 20.0); 20,000: 23.813292 ms; ratio 2.0696113718505367 (max 2.5)
+P-14 armed timers 0 (max 0), owned tasks 0 (max 0), sleepers 0
+P-7 resident delta: 0.84375 MiB for 256 MiB, 0.1875 MiB for 1024 MiB (max 48.0)
+P-11 200 assets at 10.0 ms: concurrency 1 3.555600958 s, 5 1.022143084 s, speedup 3.4785745886825366 (min 3.0)
+R-SYN-12 prune of 10,000 ids: nobody subscribed 0.008470208 s, one stalled subscriber 0.011841708 s, ratio 1.3980421732264425 (max 2, plus 5 ms)
+R-SYN-11 space parking of 10,000 prefetch members: longest actor wait while parking 3.994291 ms, during an ENOSPC's free-space read 3.091833 ms (budgets 50.0 ms median, 10.0 ms best); runs [3.994291, 4.02175, 3.981834] and [3.091833, 3.445667, 2.911291]
+R-SYN-11 re-admission of 10,000 prefetch members parked for space: longest actor wait 5.007917 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.291625, 5.007917, 4.402958]
+R-SYN-13 network edges under 10,000 prefetch members: longest actor wait going offline 1.350375 ms, coming back 3.967583 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.354791, 1.350375, 1.342041] and [3.947, 3.967583, 6.569292]
+R-SYN-4 release of a 10,000-member prefetch handle: longest actor wait 5.372208 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.696208, 5.364083, 5.372208]
+R-SYN-15 shutdown under 10,000 prefetch members and 10,000 waiting resolves: longest actor wait 1.529375 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.529375, 1.496875, 1.551584]; at 1,000: 0.224458 ms; the group without waiters: [0.674084, 0.674708, 0.727]
+R-SYN-6 refresh under a 10,000-member prefetch group: longest actor wait 1.239834 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.239834, 1.213042, 1.255541]
+R-SYN-6 refresh changing every member of a 10,000-member prefetch group: longest actor wait 4.320833 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.585208, 4.320833, 4.273458]
+R-SYN-12 prune announcement of 10,000 ids to a stalled subscriber: longest actor wait 4.883875 ms (budgets 50.0 ms median, 10.0 ms best); runs [4.843417, 4.883875, 4.995708]
+R-SYN-5 retries of 10,000 prefetch members falling due together: longest actor wait 1.213458 ms (budgets 50.0 ms median, 10.0 ms best); runs [1.213458, 1.17875, 1.214458]
+R-SYN-4 release of a 10,000-member user-initiated prefetch handle: longest actor wait 5.55825 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.55825, 5.506958, 5.573834]
+R-SYN-3 re-join of a released 10,000-member prefetch handle: longest actor wait 5.594542 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.594542, 5.810542, 5.405958]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-3 re-join of a released 10,000-member bulk handle: longest actor wait 5.695542 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.274625, 5.695542, 5.538375]; members re-joined while the release was pending [432, 432, 432]
+R-SYN-4 cancelled resolve beside 10,000 prefetch members: longest actor wait 0.02625 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.025583, 0.02625, 0.027625]
+R-SYN-5 cooldown end over 10,000 prefetch members parked by the breaker: longest actor wait 0.06975 ms (budgets 50.0 ms median, 10.0 ms best); runs [0.070833, 0.06975, 0.069667]
+R-SYN-5 chain of probes without a verdict over 10,000 prefetch members parked by the breaker: longest actor wait 0.089125 ms (budgets 50.0 ms median, 10.0 ms best); totals [0.596348459, 0.588848917, 0.589085708] s; runs [3.029291, 0.075791, 0.089125]
+R-SYN-5 throttle extension over 10,000 user-initiated waiters: longest actor wait 7.840291 ms (budgets 50.0 ms median, 10.0 ms best); runs [14.337583, 7.63175, 7.840291]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 1 handle(s): longest actor wait 3.83575 ms (budgets 50.0 ms median, 10.0 ms best); runs [3.83575, 3.83575, 3.833167]
+R-SYN-11 reclaim during an owed follow under 10,000 prefetch members, 2 handle(s): longest actor wait 5.038708 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.011167, 5.038708, 5.106416]
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 1 handle(s): longest actor wait 6.75675 ms (budgets 50.0 ms median, 10.0 ms best); runs [6.677833, 6.929834, 6.75675]
+R-SYN-11 reclaim during an owed follow that changed 1 member in 20 of 10,000 prefetch members, 2 handle(s): longest actor wait 7.85075 ms (budgets 50.0 ms median, 10.0 ms best); runs [7.85075, 7.76325, 8.746]
+R-SYN-11 follow end and drain of 10,000 places under 10,000 changed prefetch members: longest actor wait 5.36275 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.455792, 5.362125, 5.36275]; follow ended [200.481625, 196.165542, 202.414292] ms and drain ended [200.485833, 196.169375, 202.417917] ms after the release
+R-SYN-11 follow's last turn plus the drain's first batch under 10,000 prefetch members and 10,000 waiting places: the turn [5.030959, 4.925958, 4.954292] ms; longest actor wait 5.551542 ms (budgets 50.0 ms median, 10.0 ms best); runs [5.689792, 5.551542, 5.47875]
+R-SYN-5 attempt end and 429 while an owed follow covers 10,000 jobs: longest actor wait at the 404 3.880583 ms; followedLane [3.049, 3.07375, 3.140041] ms (budgets 50.0 ms median, 10.0 ms best); runs [3.880583, 3.763166, 4.045041]
+R-SYN-11 10,000 ids converging on one content during an owed follow, a 404 whose verdict waits: longest actor wait [6.017167, 5.684917, 5.682375] ms, best 5.682375 ms; the commit window [0.0, 0.0, 0.0] ms; longest held turn [5.606959, 5.590125, 5.678625] ms; the drain's window [0.0, 0.0, 0.0] ms, its longest held turn [0.0, 0.0, 0.0] ms; followedLane with the moves owed [3.528, 3.566125, 3.623666]
+R-SYN-11 10,000 ids converging on one content during an owed follow, a publication through its commit: longest actor wait [5.925166, 5.612083, 5.955958] ms, best 5.612083 ms; the commit window [4.39275, 4.384709, 4.310792] ms; longest held turn [4.059333, 3.896459, 3.925083] ms; the drain's window [0.0, 0.0, 0.0] ms, its longest held turn [0.0, 0.0, 0.0] ms; followedLane with the moves owed [] ms 
+R-SYN-11 10,000 ids converging on one content during an owed follow, a commit that re-routes the ids moved away: longest actor wait [7.598083, 7.945584, 7.465375] ms, best 7.465375 ms; the commit window [4.106583, 4.547833, 3.985042] ms; longest held turn [4.001125, 3.853792, 4.00275] ms; the drain's window [7.598083, 7.945584, 7.465375] ms, its longest held turn [2.464709, 2.627625, 2.401375] ms;
+R-SYN-11 10,000 ids converging on one content during an owed follow, a superseded exit that re-routes every id: longest actor wait [7.643291, 7.533875, 7.658166] ms, best 7.533875 ms; the commit window [1.618625, 1.671125, 1.4775] ms; longest held turn [4.104334, 4.019209, 3.918792] ms; the drain's window [7.643291, 7.533875, 7.658166] ms, its longest held turn [2.38975, 2.396875, 2.46525] ms; fol
+R-SYN-11 10,000 ids converging on one content during an owed follow, no ending: longest actor wait [3.727208, 3.72675, 3.864166] ms, best 3.72675 ms; the commit window [0.0, 0.0, 0.0] ms; longest held turn [3.721125, 3.717958, 3.854209] ms; the drain's window [0.0, 0.0, 0.0] ms, its longest held turn [0.0, 0.0, 0.0] ms; followedLane with the moves owed [] ms (budget 10.0 ms best); load 3.50 10.46 
+R-SYN-11 the drain's verdict on a job holding 10,000 ids moved off before it and back: longest actor wait [5.234375, 5.220083, 5.314625] ms, best 5.220083 ms; longest held turn [5.229417, 5.214834, 5.314542] ms; J's 500 deferring its verdict [3.024625, 3.259875, 3.599833] ms, best 3.024625 ms (budget 10.0 ms best); load 3.50 10.46 36.01; runs [wait 5.234375 ms; J's ending 3.024625 ms; moved before
+R-SYN-11 the walk an apply makes for the publications in flight while an owed follow covers 10,000 jobs: median of 21 calls [2.267167, 2.253084, 2.232666] ms, best 2.232666 ms; the apply's longest actor wait [4.318041, 4.715166, 5.646458] ms, best 4.318041 ms; with a move found for nearly every member [6.561875, 6.553333, 6.345708] ms, best 6.345708 ms (budget 10.0 ms best); runs [walk 2.267167 ms
+R-SYN-6 an apply moving 10,000 members that share one content: onto one other content, longest actor wait [7.427708, 7.293208, 7.386584] ms, best 7.293208 ms; each onto a content of its own [7.976792, 7.98225, 8.126333] ms, best 7.976792 ms (budget 10.0 ms best); runs [wait 7.427708 ms; 10000 ids before, O's job 10001 after; 1 jobs after, follow owed false, wait 7.293208 ms; 10000 ids before, O's 
+R-SYN-6 an apply mapping 10,000 ids converged on one content away again: back to their own contents, longest actor wait [7.614208, 7.819583, 7.682333] ms, best 7.614208 ms; on to fresh contents [7.72375, 7.619375, 8.226667] ms, best 7.619375 ms (budget 10.0 ms best); runs [wait 7.614208 ms; 10001 ids before, O's job 1 after; 10001 jobs after, follow owed false, wait 7.819583 ms; 10001 ids before, 
+R-SYN-11 an attempt's end bringing 10,000 ids one job holds onto its content during an owed follow: longest actor wait [6.971083, 7.043583, 6.911583] ms, best 6.911583 ms; longest held turn [6.966625, 7.040542, 6.906709] ms (budget 10.0 ms best); runs [wait 6.971083 ms; H held 10000 ids, owed its visit true, verdict waits true, answered true; 20 held turns, longest 6.966625 ms, wait 7.043583 ms; H
+R-SYN-6 the drain's visits after 16 waiting verdicts moving 8000 members off their jobs: longest held turn [5.220917, 6.981542, 4.959709] ms, best 4.959709 ms; longest actor wait [5.226292, 6.999792, 4.965625] ms, best 4.965625 ms (budget 10.0 ms best); runs [24 turns, longest 5.220917 ms; heartbeat 5.226292 ms; verdicts waiting 16, ids held 8000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 512
+R-SYN-6 the drain's visits after 16 waiting verdicts moving 10000 members off their jobs: longest held turn [5.47275, 4.691708, 4.679458] ms, best 4.679458 ms; longest actor wait [5.476458, 4.699625, 4.684917] ms, best 4.684917 ms (budget 10.0 ms best); runs [30 turns, longest 5.47275 ms; heartbeat 5.476458 ms; verdicts waiting 16, ids held 10000 then 0; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 0, 
+R-SYN-6 an apply moving 10,000 ids that share one content, a user-initiated waiter each, supersede: longest actor wait [7.740708, 7.631791, 7.892333] ms, best 7.631791 ms (budget 10.0 ms best); runs [wait 7.740708 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false, wait 7.631791 ms; H held 10000 ids, 10000 interests; after: O 10001 ids, H 0 ids, owed false, wait 7.89233
+R-SYN-6 an apply moving 10,000 ids that share one content, a user-initiated waiter each, keep: longest actor wait [8.72625, 8.817375, 8.907584] ms, best 8.72625 ms (budget 10.0 ms best); runs [wait 8.72625 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false, wait 8.817375 ms; H held 10001 ids, 10001 interests; after: O 10001 ids, H 1 ids, owed false, wait 8.907584 ms; H 
+R-SYN-11 deferBehindVerdictTurns notFoundGroup at 10,000: longest held turn [5.604083, 5.642917, 5.726875] ms, best 5.604083 ms; heartbeat [7.989625, 8.77475, 7.98625] ms, best 7.98625 ms (budget 10.0 ms best); runs [turns 38 longest 5.60 ms; apply 6.76 ms, turns' heartbeat 7.99 ms; most events during the follow 9729, most queued joins 0; joins at the follow's end 9489 queued, 0 behind a verdict; 
+R-SYN-11 deferBehindVerdictTurns timeoutGroup at 10,000: longest held turn [6.349417, 6.2605, 6.163708] ms, best 6.163708 ms; heartbeat [7.870167, 8.878167, 7.936625] ms, best 7.870167 ms (budget 10.0 ms best); runs [turns 38 longest 6.35 ms; apply 6.84 ms, turns' heartbeat 7.87 ms; most events during the follow 9729, most queued joins 0; joins at the follow's end 9489 queued, 0 behind a verdict; 
+R-SYN-11 deferBehindVerdictTurns notFoundUsers at 10,000: longest held turn [6.521208, 6.389125, 6.394916] ms, best 6.389125 ms; heartbeat [7.93625, 7.787625, 7.799916] ms, best 7.787625 ms (budget 10.0 ms best); runs [turns 38 longest 6.52 ms; apply 6.92 ms, turns' heartbeat 7.94 ms; most events during the follow 9729, most queued joins 0; joins at the follow's end 9489 queued, 0 behind a verdict
+R-SYN-11 deferBehindVerdictTurns timeoutUsers at 10,000: longest held turn [6.461041, 6.377, 6.347666] ms, best 6.347666 ms; heartbeat [7.943833, 7.8575, 7.817583] ms, best 7.817583 ms (budget 10.0 ms best); runs [turns 38 longest 6.46 ms; apply 6.99 ms, turns' heartbeat 7.94 ms; most events during the follow 9729, most queued joins 0; joins at the follow's end 9489 queued, 0 behind a verdict; on 
+R-SYN-6 drainVerdictChainTurns 500 a job: longest held turn [5.66025, 5.609708, 5.329041] ms, best 5.329041 ms; heartbeat [5.663583, 5.612333, 6.151291] ms, best 5.612333 ms (budget 10.0 ms best); runs [24 turns, longest 5.66025 ms; heartbeat 5.663583 ms; verdicts waiting 16, ids held 8000 then 7500; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 512, 12, 512, 464, -500, -428, 12, 512, -96, 0, -368, 12, 
+R-SYN-6 drainVerdictChainTurns 625 a job: longest held turn [4.201875, 4.221458, 4.310542] ms, best 4.201875 ms; heartbeat [4.206333, 4.226667, 6.009833] ms, best 4.206333 ms (budget 10.0 ms best); runs [36 turns, longest 4.201875 ms; heartbeat 4.206333 ms; verdicts waiting 16, ids held 10000 then 9375; moved per turn [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 512, 512, -286, 399, 113, 0, -512, 399, 113, -512
+R-SYN-11 manyMovesTurns k=1 off 10,000 ids: longest follow turn [3.400458, 3.36675, 3.358] ms, best 3.358 ms (budget 10.0 ms best); runs [publishing 1; H ids after v3 10000; owed after v4 1 (off H 1); first turn's moves 1; longest follow turn 3.40 ms over 2 turns; load 3.69 9.65 34.54 -> 3.69 9.65 34.54, publishing 1; H ids after v3 10000; owed after v4 1 (off H 1); first turn's moves 1; longest f
+R-SYN-11 manyMovesTurns k=16 off 10,000 ids: longest follow turn [3.531542, 3.573375, 3.506958] ms, best 3.506958 ms (budget 10.0 ms best); runs [publishing 16; H ids after v3 10000; owed after v4 16 (off H 16); first turn's moves 16; longest follow turn 3.53 ms over 2 turns; load 3.69 9.65 34.54 -> 3.69 9.65 34.54, publishing 16; H ids after v3 10000; owed after v4 16 (off H 16); first turn's mov
+R-SYN-11 manyMovesTurns k=64 off 10,000 ids: longest follow turn [4.067333, 3.944709, 3.878875] ms, best 3.878875 ms (budget 10.0 ms best); runs [publishing 64; H ids after v3 10000; owed after v4 64 (off H 64); first turn's moves 64; longest follow turn 4.07 ms over 2 turns; load 3.69 9.65 34.54 -> 3.69 9.65 34.54, publishing 64; H ids after v3 10000; owed after v4 64 (off H 64); first turn's mov
+R-SYN-11 manyMovesTurns k=256 off 10,000 ids: longest follow turn [3.989291, 3.907167, 3.911333] ms, best 3.907167 ms (budget 10.0 ms best); runs [publishing 256; H ids after v3 10000; owed after v4 256 (off H 256); first turn's moves 256; longest follow turn 3.99 ms over 2 turns; load 3.69 9.65 34.54 -> 3.69 9.65 34.54, publishing 256; H ids after v3 10000; owed after v4 256 (off H 256); first tu
+R-SYN-11 partialMoveTurns users=false 500 of 10,000: heartbeat [5.839542, 5.965583, 6.140167] ms, best 5.839542 ms (budget 10.0 ms best); runs [wait 5.84 ms; on O 501, on H 9500; load 3.80 9.57 34.36 -> 3.80 9.57 34.36, wait 5.97 ms; on O 501, on H 9500; load 3.80 9.57 34.36 -> 3.80 9.57 34.36, wait 6.14 ms; on O 501, on H 9500; load 3.80 9.57 34.36 -> 3.80 9.57 34.36]
+R-SYN-11 partialMoveTurns users=true 500 of 10,000: heartbeat [6.905125, 6.942875, 6.903333] ms, best 6.903333 ms (budget 10.0 ms best); runs [wait 6.91 ms; on O 501, on H 9500; load 3.80 9.57 34.36 -> 3.80 9.57 34.36, wait 6.94 ms; on O 501, on H 9500; load 3.80 9.57 34.36 -> 3.80 9.57 34.36, wait 6.90 ms; on O 501, on H 9500; load 3.80 9.57 34.36 -> 3.80 9.57 34.36]
+R-SYN-11 indexOwnCosts 10,000 ids: release [3.702416, 3.749958, 3.759709] ms (best 3.702416), keepInterests on a copy [4.237584, 4.080958, 4.201417] ms (best 4.080958), freeing [0.829, 0.779167, 0.837084] ms (best 0.779167) (budget 10.0 ms best); runs [release 3.702 ms, keep on a copy 4.238 ms, free 0.829 ms; indexed 10000 -> 10000, copy 10000; load 3.80 9.57 34.36 -> 3.80 9.57 34.36, release 3.75
+R-SYN-11 commitTurns waiters at 10,000: heartbeat [6.312042, 6.26925, 6.429292] ms, best 6.26925 ms (budget 10.0 ms best); the commit's own turn [6.306875, 6.262584, 6.424083] ms, best 6.262584 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 6.31 ms, turn 6.31 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.80 9.57 34.36 -> 3.80 9.57 34.36, heartbeat 6.27 ms, turn 6.26
+R-SYN-11 commitTurns waitersStalledSubscriber at 10,000: heartbeat [7.04175, 7.274917, 7.2295] ms, best 7.04175 ms (budget 10.0 ms best); the commit's own turn [7.03575, 7.266542, 7.224333] ms, best 7.03575 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 7.04 ms, turn 7.04 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 3.80 9.57 34.36 -> 3.89 9.49 34.19, heartbeat 7
+R-SYN-11 commitTurns groupStalledSubscriber at 10,000: heartbeat [5.585792, 5.401083, 5.096625] ms, best 5.096625 ms (budget 10.0 ms best); the commit's own turn [5.576542, 5.395667, 5.091375] ms, best 5.091375 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 5.59 ms, turn 5.58 ms; ids 10000, interests 1; served true, committed true, buffered 10002; load 3.89 9.49 34.19 -> 3.89 9.49 34.19, heartbeat 5
+R-SYN-11 commitTurns manyGroups at 10,000: heartbeat [8.775584, 9.962959, 30.664916] ms, best 8.775584 ms (budget 10.0 ms best); the commit's own turn [8.769083, 9.954958, 8.948042] ms, best 8.769083 ms (Phase 2 trigger 7.0 ms); runs [heartbeat 8.78 ms, turn 8.77 ms; ids 10000, interests 10000; served true, committed true, buffered 0; load 3.89 9.49 34.19 -> 3.74 9.37 34.00, heartbeat 9.96 ms, tur
+R-SYN-11 commitTurns waiters with two stalled subscribers at 10,000 (recorded, not gated): heartbeat [7.944959, 8.501708, 8.578083] ms, best 7.944959 ms; the commit's own turn [7.93925, 8.494958, 8.57125] ms, best 7.93925 ms; runs [heartbeat 7.94 ms, turn 7.94 ms; ids 10000, interests 10000; served true, committed true, buffered 20004; load 3.78 9.19 33.65 -> 3.88 9.12 33.48, heartbeat 8.50 ms, tu
+R-SYN-11 commitReannounceTurns at 10,000: heartbeat [8.455291, 8.045875, 7.630625] ms, best 7.630625 ms (budget 10.0 ms best); the commit's own turn [8.439292, 8.041625, 7.626875] ms, best 7.626875 ms; runs [heartbeat 8.46 ms, turn 8.44 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 3.88 9.12 33.48 -> 3.88 9.12 33.48; asset slots held before the second commit 100
+R-SYN-11 commitFailedArmTurns at 10,000: heartbeat [6.210542, 5.823833, 5.863833] ms, best 5.823833 ms (budget 10.0 ms best); the resolution's own turn [6.204667, 5.818375, 5.858375] ms, best 5.818375 ms; runs [heartbeat 6.21 ms, turn 6.20 ms; ids 10000, interests 10000; served true, committed true, buffered 10002; load 3.73 9.00 33.30 -> 3.73 9.00 33.30, heartbeat 5.82 ms, turn 5.82 ms; ids 10000
+R-CLN-6 purgeTurns oneGroup at 10,000: heartbeat [38.24425, 36.446125, 38.652125] ms, best 36.446125 ms (budget 10.0 ms best); the purge's first turn [38.233959, 36.433833, 38.640584] ms, best 36.433833 ms; runs [heartbeat 38.24 ms, turn 38.23 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 3.73 9.00 33.30 -> 3.73 9.00 33.30, h
+R-CLN-6 purgeTurns oneMemberGroups at 10,000: heartbeat [37.61, 41.842083, 38.369958] ms, best 37.61 ms (budget 10.0 ms best); the purge's first turn [37.599458, 41.835291, 38.360584] ms, best 37.599458 ms; runs [heartbeat 37.61 ms, turn 37.60 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 3.51 8.87 33.11 -> 3.32 8.56 32.58, h
+R-CLN-6 purgeTurns oneGroupScope at 10,000: heartbeat [41.68025, 40.729041, 45.02775] ms, best 40.729041 ms (budget 10.0 ms best); the purge's first turn [41.668792, 40.719917, 45.011958] ms, best 40.719917 ms; runs [heartbeat 41.68 ms, turn 41.67 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 3.08 7.84 31.21 -> 3.08 7.84 31.2
+R-CLN-6 purgeTurns sharedJob at 10,000: heartbeat [5.51675, 4.780709, 4.691917] ms, best 4.691917 ms (budget 10.0 ms best); the purge's first turn [5.514792, 4.777625, 4.690458] ms, best 4.690458 ms; runs [heartbeat 5.52 ms, turn 5.51 ms; jobs 1 (ids 10000, interests 1, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 3.08 7.84 31.21 -> 3.08 7.84 31.21, heartbeat 4.78 ms,
+R-CLN-6 purgeTurns sharedJobFourGroups at 10,000: heartbeat [18.555209, 18.180209, 18.209166] ms, best 18.180209 ms (budget 10.0 ms best); the purge's first turn [18.5485, 18.174792, 18.20125] ms, best 18.174792 ms; runs [heartbeat 18.56 ms, turn 18.55 ms; jobs 1 (ids 10000, interests 4, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 3.08 7.84 31.21 -> 3.15 7.77 31.05, 
+R-CLN-6 purgeTurns fourGroups at 10,000: heartbeat [62.705792, 62.385791, 68.862042] ms, best 62.385791 ms (budget 10.0 ms best); the purge's first turn [62.694333, 62.372708, 68.838792] ms, best 62.372708 ms; runs [heartbeat 62.71 ms, turn 62.69 ms; jobs 10000 (ids 10000, interests 40000, retrying 0) -> 0, retry deadlines left 0; purged true; violations []; load 3.15 7.77 31.05 -> 3.15 7.77 31.05
+R-CLN-6 purgeTurns retryJobs at 10,000: heartbeat [36.484167, 36.7055, 36.523916] ms, best 36.484167 ms (budget 10.0 ms best); the purge's first turn [36.475083, 36.696541, 36.519375] ms, best 36.475083 ms; runs [heartbeat 36.48 ms, turn 36.48 ms; jobs 10000 (ids 10000, interests 10000, retrying 10000) -> 0, retry deadlines left 0; purged true; violations []; load 3.05 7.60 30.71 -> 2.87 7.19 29.9
+R-CLN-6 purgeTurns userWaiters at 10,000: heartbeat [6.86725, 7.077625, 6.837333] ms, best 6.837333 ms (budget 10.0 ms best); the purge's first turn [6.864708, 7.070083, 6.82925] ms, best 6.82925 ms; runs [heartbeat 6.87 ms, turn 6.86 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 3.33 6.62 28.38 -> 3.33 6.62 28.38, heartb
+R-CLN-6 purgeTurns ensures at 10,000: heartbeat [7.364834, 7.006583, 7.011083] ms, best 7.006583 ms (budget 10.0 ms best); the purge's first turn [7.35525, 7.009625, 7.005708] ms, best 7.005708 ms; runs [heartbeat 7.36 ms, turn 7.36 ms; jobs 10000 (ids 10000, interests 10000, retrying 0) -> 10000, retry deadlines left 0; purged true; violations []; load 3.33 6.62 28.38 -> 15.44 9.22 28.81, heartbe
+R-CLN-6 purgeJoinsTurns bucket at 10,000: heartbeat [5.374042, 5.668667, 6.065917] ms, best 5.374042 ms (budget 10.0 ms best); the purge's first turn [5.362916, 5.658, 6.05575] ms, best 5.362916 ms; runs [heartbeat 5.37 ms, turn 5.36 ms; live joins 9216 (bucket 9216, queue 0) -> 0; purged true; violations []; load 17.98 10.81 28.39 -> 17.98 10.81 28.39, heartbeat 5.67 ms, turn 5.66 ms; live joins 
+R-CLN-6 purgeJoinsTurns queue at 10,000: heartbeat [5.360209, 5.208417, 5.755417] ms, best 5.208417 ms (budget 10.0 ms best); the purge's first turn [5.355833, 5.202833, 5.748084] ms, best 5.202833 ms; runs [heartbeat 5.36 ms, turn 5.36 ms; live joins 9489 (bucket 0, queue 9489) -> 0; purged true; violations []; load 17.98 10.81 28.39 -> 17.98 10.81 28.39, heartbeat 5.21 ms, turn 5.20 ms; live joi
+R-SYN-11 joinChainTurns at 10,000: the applies' heartbeat [6.559083, 6.449167, 6.395209] ms, best 6.395209 ms; the layer pass alone [0.85225, 0.931042, 0.854625] ms; followedLane [5.059958, 4.52075, 4.546583] ms, best 4.52075 ms (every chain empty [4.69425, 4.588, 4.660084] ms); the drain's heartbeat [6.271167, 5.541417, 5.6285] ms, best 5.541417 ms (budget 10.0 ms best); runs [applies 6.559083 ms
+R-SYN-11 waiters, 10,000 user waiters moved onto one content, 511 joins behind the batch, at 10,000: heartbeat [8.129, 8.030792, 7.989458] ms, best 7.989458 ms; longest held turn [3.15725, 3.455583, 3.133792] ms, best 3.133792 ms; the commit's own turn [5.165625, 6.169291, 4.93675] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.17 ms, while ow
+R-SYN-11 supersededWaiters, 10,000 user waiters of a superseded publication moved onto one content, at 10,000: heartbeat [8.03575, 7.8345, 7.971] ms, best 7.8345 ms; longest held turn [3.266125, 3.2135, 3.391208] ms, best 3.2135 ms; the commit's own turn not timed inside the actor (an exit, no commit: the heartbeat covers it); while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best)
+R-SYN-11 runMovedAway, a run's 10,000 claims moved away at a commit, at 10,000: heartbeat [7.948125, 7.860584, 8.108291] ms, best 7.860584 ms; longest held turn [3.966, 4.049542, 3.965875] ms, best 3.965875 ms; the commit's own turn [5.244958, 5.136625, 5.33025] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.25 ms, while owed 0.00 ms, drain 7.
+R-SYN-11 runSuperseded, a run's 10,000 claims at a superseded exit, at 10,000: heartbeat [8.042, 8.249583, 7.810125] ms, best 7.810125 ms; longest held turn [4.045375, 4.067417, 3.974375] ms, best 3.974375 ms; the commit's own turn not timed inside the actor (an exit, no commit: the heartbeat covers it); while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commi
+R-SYN-11 runToBound, a run's 10,000 claims moved onto a present content, at 10,000: heartbeat [5.419792, 34.995125, 5.049833] ms, best 5.049833 ms; longest held turn [2.458959, 2.387458, 2.441459] ms, best 2.387458 ms; the commit's own turn [5.402584, 34.965542, 5.046375] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.42 ms, while owed 0.00 ms
+R-SYN-11 twoTokens, 10,000 ids with two tokens each, at 10,000: heartbeat [9.213208, 8.943125, 9.007958] ms, best 8.943125 ms; longest held turn [4.951334, 4.725042, 4.78375] ms, best 4.725042 ms; the commit's own turn [9.2075, 8.938583, 9.002042] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 9.21 ms, while owed 0.00 ms, drain 7.67 ms; commit t
+R-SYN-11 userToBound, 10,000 user waiters moved onto a present content, at 10,000: heartbeat [4.744417, 4.786625, 4.622042] ms, best 4.622042 ms; longest held turn [1.6335, 2.063417, 1.267292] ms, best 1.267292 ms; the commit's own turn [4.738541, 4.781459, 4.616958] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 4.74 ms, while owed 0.00 ms, dra
+R-SYN-11 appliesWhileOwed, two applies while 10,000 re-routes are owed, at 10,000: heartbeat [7.687625, 7.651292, 8.540375] ms, best 7.651292 ms; longest held turn [2.962166, 3.025375, 3.19475] ms, best 2.962166 ms; the commit's own turn [5.141125, 4.96825, 5.225958] ms; while owed [4.198125, 4.167917, 4.445042] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.15 ms, while ow
+R-SYN-11 rateLimitWhileOwed, a 429 on the owed re-routes' content, at 10,000: heartbeat [6.118875, 6.281417, 6.230334] ms, best 6.118875 ms; longest held turn [2.836208, 2.78475, 3.056417] ms, best 2.78475 ms; the commit's own turn [5.170791, 5.22825, 5.340666] ms; while owed [6.118875, 6.281417, 6.230334] ms; followedLane [5.50125, 6.017291, 5.949083] ms (budget 10.0 ms best); runs [heartbeat com
+R-SYN-11 take-off, 10,000 user waiters, all held: heartbeat [8.403042, 7.639375, 7.394917] ms, best 7.394917 ms; longest held turn [7.127542, 7.207792, 7.13475] ms, best 7.127542 ms; the verdict's turn [7.127542, 7.207792, 7.13475] ms (budget 10.0 ms best); load 11.91 10.17 27.35; runs [wait 8.403042 ms, verdict turn 7.127542 ms; moved before 10000, given true, owed 10000, made 0, rest false, visi
+R-SYN-11 take-off, 10,000 user waiters, half held: heartbeat [7.805917, 7.555834, 7.614917] ms, best 7.555834 ms; longest held turn [6.35575, 6.304958, 6.127666] ms, best 6.127666 ms; the verdict's turn [6.35575, 6.304958, 6.127666] ms (budget 10.0 ms best); load 11.91 10.17 27.35; runs [wait 7.805917 ms, verdict turn 6.35575 ms; moved before 5000, given true, owed 5000, made 0, rest false, visit 
+R-SYN-11 take-off, 5,000 ids moved before and 5,000 after the deferral: heartbeat [5.645458, 5.636416, 5.5955] ms, best 5.5955 ms; longest held turn [5.63725, 5.632917, 5.591] ms, best 5.591 ms; the verdict's turn [5.63725, 5.632917, 5.591] ms (budget 10.0 ms best); load 11.91 10.17 27.35; runs [wait 5.645458 ms, verdict turn 5.63725 ms; moved before 5000, given true, owed 5000, made 0, rest true,
+R-SYN-11 commitRerouteDivergentTurns at 10,000: heartbeat [4.990875, 5.079416, 5.0095] ms, best 4.990875 ms; longest held turn [3.709833, 3.863458, 3.838208] ms, best 3.709833 ms; the commit's own turn [4.985917, 5.073459, 5.005792] ms (budget 10.0 ms best); runs [heartbeat commit 4.99 ms, while owed 0.00 ms, drain 3.71 ms; commit turn 4.99 ms; 20 held turns, longest 3.71 ms; made at the commit 0,
+R-SYN-11 groupToBound, a 10,000-member group moved onto a present content, at 10,000: heartbeat [5.223833, 4.943375, 5.363709] ms, best 4.943375 ms; longest held turn [1.043125, 1.043666, 1.065416] ms, best 1.043125 ms; the commit's own turn [5.21875, 4.937916, 5.357417] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.22 ms, while owed 0.00 ms,
+R-SYN-11 delistedGroup, 10,000 ids v4 dropped, at 10,000: heartbeat [3.966542, 4.002917, 4.092542] ms, best 3.966542 ms; longest held turn [0.544917, 0.563875, 0.560709] ms, best 0.544917 ms; the commit's own turn [3.958458, 3.999, 4.088208] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 3.97 ms, while owed 0.00 ms, drain 0.69 ms; commit turn 3.
+R-SYN-11 delistedWaiters, 10,000 ids v4 dropped, at 10,000: heartbeat [3.648875, 3.5775, 15.965291] ms, best 3.5775 ms; longest held turn [1.268958, 0.822333, 0.801917] ms, best 0.801917 ms; the commit's own turn [3.644791, 3.57325, 3.539209] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 3.65 ms, while owed 0.00 ms, drain 1.30 ms; commit turn 3
+R-SYN-11 delistedGroupFit, 255 delisted members of a 10,000-member group, at the fit edge, at 10,000: heartbeat [0.398584, 0.395458, 0.395166] ms, best 0.395166 ms; longest held turn [0.0, 0.0, 0.0] ms, best 0.0 ms; the commit's own turn [0.394666, 0.391791, 0.391791] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 0.40 ms, while owed 0.00 ms, dr
+R-SYN-11 purgeWhileOwed, a purge of everything while 10,000 re-routes are owed, at 10,000: heartbeat [7.742459, 5.021542, 5.190667] ms, best 5.021542 ms; longest held turn [0.000875, 0.000875, 0.000958] ms, best 0.000875 ms; the commit's own turn [5.030167, 5.017167, 5.184334] ms; while owed [7.742459, 3.071958, 3.076833] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.04 ms
+R-SYN-11 commitFitBoundaryTurns at once: heartbeat [1.349542, 1.343125, 1.330417] ms, best 1.330417 ms; longest held turn [0.0, 0.0, 0.0] ms, best 0.0 ms; the commit's own turn [1.346791, 1.340084, 1.32725] ms (budget 10.0 ms best); runs [heartbeat commit 1.35 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 1.35 ms; 0 held turns, longest 0.00 ms; made at the commit 255, owed 0 ids, 0 pairs in 0
+R-SYN-11 commitFitBoundaryTurns owed: heartbeat [1.162333, 1.161458, 1.160917] ms, best 1.160917 ms; longest held turn [1.163292, 1.162084, 1.161375] ms, best 1.161375 ms; the commit's own turn [0.149625, 0.147542, 0.149666] ms (budget 10.0 ms best); runs [heartbeat commit 0.15 ms, while owed 0.00 ms, drain 1.16 ms; commit turn 0.15 ms; 1 held turns, longest 1.16 ms; made at the commit 0, owed 256
+R-SYN-11 waitersBound, 10,000 user waiters all bound, at 10,000: heartbeat [6.170084, 5.89425, 6.082584] ms, best 5.89425 ms; longest held turn [0.0, 0.0, 0.0] ms, best 0.0 ms; the commit's own turn [6.164292, 5.889916, 6.077333] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 6.17 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 6.16 ms; 0 hel
+P-10 500 assets: 8 TCP connections (max 8), 500 requests, 0.041766458 seconds
+## issues
+✘ Test "P-13: reclaiming 10,000 blobs finishes under budget in batches of bounded duration" recorded an issue at BenchStorage.swift:249:13: Expectation failed: longest <= batchBudget
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .oneGroup at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .oneMemberGroups at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budg
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .oneGroupScope at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .sharedJobFourGroups at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .fourGroups at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+✘ Test "R-CLN-6: a purge's first turn over 10,000 ids holds the engine's actor at most C2's 10 ms" recorded an issue with 1 argument shape → .retryJobs at BenchSyncCycle22Purge.swift:32:9: Expectation failed: (waits.min() ?? .infinity) <= Self.c2Budget
+## load samples
+21:45:24 { 3.87 13.85 56.94 }
+21:45:34 { 3.89 13.52 56.32 }
+21:45:44 { 3.76 13.18 55.70 }
+21:45:54 { 3.64 12.84 55.08 }
+21:46:04 { 3.69 12.55 54.48 }
+21:46:14 { 5.12 12.55 53.99 }
+21:46:24 { 19.15 15.30 54.48 }
+21:46:34 { 29.28 17.65 54.86 }
+21:46:44 { 26.08 17.35 54.32 }
+21:46:54 { 23.65 17.12 53.81 }
+21:47:04 { 20.62 16.69 53.22 }
+21:47:14 { 18.44 16.35 52.68 }
+21:47:24 { 16.30 15.96 52.11 }
+21:47:34 { 14.40 15.56 51.55 }
+21:47:44 { 13.04 15.23 51.01 }
+21:47:54 { 11.80 14.90 50.47 }
+21:48:04 { 11.12 14.65 49.97 }
+21:48:14 { 10.02 14.30 49.43 }
+21:48:24 { 9.10 13.96 48.90 }
+21:48:34 { 8.39 13.65 48.38 }
+21:48:44 { 12.44 14.33 48.22 }
+21:48:54 { 19.02 15.67 48.30 }
+21:49:04 { 17.51 15.46 47.84 }
+21:49:14 { 24.62 17.03 48.02 }
+21:49:24 { 28.39 18.13 48.05 }
+21:49:34 { 29.12 18.64 47.88 }
+21:49:44 { 35.72 20.43 48.18 }
+21:49:54 { 34.63 20.73 47.96 }
+21:50:04 { 30.09 20.21 47.46 }
+21:50:14 { 26.07 19.67 46.95 }
+21:50:24 { 22.68 19.16 46.45 }
+21:50:34 { 19.97 18.69 45.96 }
+21:50:44 { 17.68 18.24 45.48 }
+21:50:54 { 15.65 17.79 45.00 }
+21:51:04 { 13.78 17.32 44.52 }
+21:51:14 { 12.13 16.84 44.03 }
+21:51:24 { 10.80 16.40 43.56 }
+21:51:34 { 9.76 16.00 43.09 }
+21:51:44 { 8.56 15.53 42.61 }
+21:51:54 { 7.77 15.14 42.16 }
+21:52:04 { 6.88 14.70 41.69 }
+21:52:14 { 6.44 14.35 41.25 }
+21:52:24 { 5.92 13.98 40.80 }
+21:52:34 { 5.32 13.58 40.34 }
+21:52:45 { 4.96 13.23 39.91 }
+21:52:55 { 4.58 12.88 39.47 }
+21:53:05 { 4.40 12.57 39.05 }
+21:53:15 { 4.03 12.22 38.62 }
+21:53:25 { 4.04 11.95 38.21 }
+21:53:35 { 3.88 11.66 37.80 }
+21:53:45 { 3.67 11.35 37.39 }
+21:53:55 { 3.57 11.08 36.98 }
+21:54:05 { 3.40 10.80 36.58 }
+21:54:15 { 3.72 10.62 36.22 }
+21:54:25 { 3.62 10.37 35.83 }
+21:54:35 { 3.59 10.14 35.45 }
+21:54:45 { 3.79 9.97 35.09 }
+21:54:55 { 3.67 9.74 34.72 }
+21:55:05 { 3.80 9.57 34.36 }
+21:55:15 { 3.74 9.37 34.00 }
+21:55:25 { 3.78 9.19 33.65 }
+21:55:35 { 3.73 9.00 33.30 }
+21:55:45 { 3.39 8.75 32.93 }
+21:55:55 { 3.32 8.56 32.58 }
+21:56:05 { 3.12 8.35 32.22 }
+21:56:15 { 3.10 8.17 31.88 }
+21:56:25 { 3.01 7.98 31.53 }
+21:56:35 { 3.08 7.84 31.21 }
+21:56:45 { 3.14 7.69 30.88 }
+21:56:55 { 3.13 7.54 30.56 }
+21:57:05 { 3.03 7.37 30.23 }
+21:57:15 { 2.87 7.19 29.90 }
+21:57:25 { 2.73 7.02 29.57 }
+21:57:35 { 2.70 6.87 29.25 }
+21:57:45 { 2.81 6.76 28.95 }
+21:57:55 { 2.61 6.59 28.63 }
+21:58:05 { 3.33 6.62 28.38 }
+21:58:15 { 10.95 8.13 28.67 }
+21:58:25 { 15.44 9.22 28.81 }
+21:58:35 { 15.37 9.40 28.65 }
+21:58:45 { 18.67 10.29 28.74 }
+21:58:55 { 17.80 10.37 28.55 }
+21:59:05 { 19.29 10.94 28.54 }
+21:59:15 { 16.86 10.70 28.25 }
+21:59:25 { 15.47 10.61 28.01 }
+21:59:35 { 14.02 10.45 27.75 }
+21:59:45 { 12.78 10.31 27.50 }
+21:59:55 { 11.44 10.10 27.23 }
+22:00:05 { 10.06 9.85 26.94 }
+22:00:15 { 8.82 9.59 26.64 }

@@ -1,0 +1,25 @@
+Building for debugging...
+[Using on-disk description]
+[2 / 6] ZTronAssetSync
+[3 / 7] ZTronAssetSync
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c23-reqs/mut/src/Sources/ZTronAssetSync/Engine/EngineCommands.swift:976:13: [1;33mwarning: [1;39minitialization of immutable value 'jobsBefore' was never used; consider replacing with assignment to '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+ [0;36m974 |[0;0m         // The turn's counts as it begins, before the withdrawal removes jobs: both O(1) (C2).
+ [0;36m975 |[0;0m         let turnBegan = self.environment.time.monotonicNow()
+ [0;36m976 |[0;0m         let jobsBefore = self.state.jobs.count
+     [0;36m|[0;0m             `- [1;33mwarning: [1;39minitialization of immutable value 'jobsBefore' was never used; consider replacing with assignment to '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+ [0;36m977 |[0;0m         let groupsBefore = self.state.groups.count
+ [0;36m978 |[0;0m         self.state.purgeEpoch += 1
+
+/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c23-reqs/mut/src/Sources/ZTronAssetSync/Engine/EngineCommands.swift:977:13: [1;33mwarning: [1;39minitialization of immutable value 'groupsBefore' was never used; consider replacing with assignment to '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+ [0;36m975 |[0;0m         let turnBegan = self.environment.time.monotonicNow()
+ [0;36m976 |[0;0m         let jobsBefore = self.state.jobs.count
+ [0;36m977 |[0;0m         let groupsBefore = self.state.groups.count
+     [0;36m|[0;0m             `- [1;33mwarning: [1;39minitialization of immutable value 'groupsBefore' was never used; consider replacing with assignment to '_' or removing it[0;0m [#]8;;https://docs.swift.org/compiler/documentation/diagnostics/no-usage\NoUsage]8;;\]
+ [0;36m978 |[0;0m         self.state.purgeEpoch += 1
+ [0;36m979 |[0;0m         // The store clears the stamp before its first await of the purge (R-CLN-6).
+
+[#NoUsage]: <https://docs.swift.org/compiler/documentation/diagnostics/no-usage>
+[7 / 11] ZTronAssetSync
+[10 / 11] ZTronAssetSyncTests-product
+[12 / 12] ZTronAssetSyncTests-product
+Build complete! (3,12 s)

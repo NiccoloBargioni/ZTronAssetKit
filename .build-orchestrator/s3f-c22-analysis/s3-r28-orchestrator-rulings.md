@@ -327,3 +327,28 @@ The append review (`s3-r28-append-review.md`, CORRECTED) and its editor left O1 
 - **Run 12 was stopped at 16:41** (`wf_ee08701d-249`) at `9e9a500`, after 7 commits from `247e85b`: reqs #8's guard, an e1-P1 kill and five d4-survivor kill tests. Its worktree was clean. No process, lock or booted simulator of set 1 was left. Watcher `bz02zu459` was stopped too.
 - **The close ruling** is drafted as `s3-r28-close-e.md` ("S3-R28, the owner's close ruling"). Two independent checks of it run before it is appended (`wf_1c475778-94c`): fidelity to the owner's answers, and consistency as the fixer and verifiers will read it. Run 13 starts after the append.
 - **Persistence:** snapshot 3 of the archive is made now and pushed, with `feature/asset-kit`.
+
+## N32 (17:12): the close ruling's two checks, and its append
+
+- **The checks** (`wf_1c475778-94c`, 16:45-17:08) both returned CORRECTED: fidelity (3 must-fix, 14 should-fix; `s3-r28-close-e-review-fidelity.md`) and consistency (10 must-fix, 10 should-fix; `s3-r28-close-e-review-consistency.md`). They read the orchestrator rulings before N31 was appended at 16:47.
+- **Applied:** every must-fix item and every should-fix item, with these choices where the two differ:
+  - a flaky test goes to the owner when it is inside the ENOSPC window (the owner's "there"), not "inside or after" it;
+  - the class is the owner's words, with T20 as the test, and a late-drain difference is in it only when its cause is inside the window (fidelity); the consistency check's "the late drain is in by N29's definition" is not taken;
+  - a defect in S1 found by the verification is reverted, not fixed (fidelity), because the owner chose "record rather than fix" and a fix would go unchecked;
+  - run 13 makes the mutant runs for run 12's five kill tests (consistency must-fix 8), so that the verifiers re-run evidence instead of making it.
+- **Appended at 17:12** as "S3-R28, the owner's close ruling" (`s3-r28-close-e-appended.md`; the first draft is `s3-r28-close-e-v1.md`; the rulings file before is `.before-close-e`). The revised text was not checked a third time. It is mostly the checks' own replacement texts, and run 13's verifiers read it.
+- **Taken to the owner with the close:** f3c's two open shapes, which the options did not show; they are recorded as open and not as known misses. Before Stage 5's `--full`, the owner is also asked about the uncommitted `Package.swift`.
+
+## N33 (22:04): the cycle-23 verification, sorted under the close ruling's point 8
+
+- **Run 13's verifiers** (`wf_c02a97cf-a3e`, 20:12-22:00) closed both lenses on `d88bdb1` with 0 blocking findings and 9 non-blocking ones. correct #3 is closed by `03c4e59`: three host Sync runs, the full simulator suite and 30 simulator iterations of A-T-SD were all green. reqs #7 is closed by the heavy checks. The benchmarks show exactly the 7 expected issues: the six and P-13.
+- **Nothing goes to the owner.** No finding is a broken MUST, a hang, a flaky test inside an ENOSPC window, or a new cause of the FAIL.
+  - #7, the probe that hung, is in the test harness: `isIdleSilent` ignores an `applyAndFollow` in the caller's own task, and one clock advance ends it. It is not an engine hang.
+  - #4: mutant `s1-late-start` survives against S1's test, because the ruling's test design advances the clock only at the `?(true)` mark. S1's code is right; the verifier confirmed it matches point 5 exactly. So this is not "a defect in S1" (no revert). It is a survivor, recorded as open under "anything else", with the re-open route the verifier gives: a mark inside the walk. `s1-groups-after` is equivalent.
+- **Record corrections** (point 8, this ruling's own work; not independently verified):
+  - #1, a stale citation;
+  - #2 and #6, the mutant issue counts as ranges;
+  - #3, three more cases on the margin list above 8.5 ms (the verifier's figures);
+  - #5, `p2-after-verdict-true` killed 2/2 swept first by the verifier.
+- **Recorded as they are:** #4 and #7 as open, with re-open notes; #8 (correct #1 and #2 still reproduce, known risks) and #9 (the accepted FAIL's figures).
+- **Run 14** is a records-only agent that applies these to the draft. Then come the merge and point 10.

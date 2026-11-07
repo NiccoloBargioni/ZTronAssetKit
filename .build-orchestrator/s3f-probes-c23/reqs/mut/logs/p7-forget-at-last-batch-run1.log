@@ -1,0 +1,43 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" started.
+✘ Test "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierReroutePinEndTests.swift:371:9: Expectation failed: layer.others[2] == .failure(.notFound)
+↳ J follows its chain to K1's copy at X's commit, which drops zz-a1 (T21, visit-first): K [16], W [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)], others [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5e/5eb6dc66451ed3b6ff1e6ceaea7e0f6dc0fe82502414993cb0f6dacbab6d66a3.png, fileExtension: png, byteSize: 18, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/0f/0fcfa162c8ce60d94b7b599fcb51cbf9028cdb712fb91a5b3124f6eefe566557.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))]; violations []
+↳ layer.others[2] == .failure(.notFound) → false
+↳   layer.others[2] → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳     failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳       serverUnavailable → (retryAfter: Optional(60.0))
+↳         retryAfter → 60.0
+↳           some → 60.0
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" started.
+✘ Test "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierReroutePinEndTests.swift:371:9: Expectation failed: layer.others[2] == .failure(.notFound)
+↳ J follows its chain to K1's copy at X's commit, which drops zz-a1 (T21, visit-first): K [16], W [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.notFound)], others [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/5e/5eb6dc66451ed3b6ff1e6ceaea7e0f6dc0fe82502414993cb0f6dacbab6d66a3.png, fileExtension: png, byteSize: 18, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-p, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/0f/0fcfa162c8ce60d94b7b599fcb51cbf9028cdb712fb91a5b3124f6eefe566557.png, fileExtension: png, byteSize: 24, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))]; violations []
+↳ layer.others[2] == .failure(.notFound) → false
+↳   layer.others[2] → failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(60.0)))
+↳     failure → .serverUnavailable(retryAfter: Optional(60.0))
+↳       serverUnavailable → (retryAfter: Optional(60.0))
+↳         retryAfter → 60.0
+↳           some → 60.0
+↳   .failure(.notFound) → failure(ZTronAssetModel.AssetError.notFound)
+↳     failure → .notFound
+✘ Test "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" with 2 test cases failed after 3.049 seconds with 2 issues.
+↳ /// `pinEndDropped`'s shape at `shortInteractiveRetry`, with zz-p (P's, a prefetch waiter) on Z's content (24 bytes),
+↳ /// which downloads, and J, a user request for zz-a1 made after O's commit, whose join waits with a chain (K0 lists
+↳ /// zz-a1 on X's content). K1 drops zz-a1…zz-a3 while X publishes (its layer pins X, for the batch and for J's chain),
+↳ /// X commits, K2 lists the ids again on Z's content, and Z then gets a 429 with Retry-After 60 s, above the user lane's
+↳ /// 30 s cap. Visited first, J joined X publishing, K1's visit passed X, and X's commit re-routed J under K1's copy,
+↳ /// which does not list zz-a1 (T21): J got `.notFound`, as W1…W3 did, and K2 found no interest to move; Z's 429 met
+↳ /// only P, so the origin was throttled and Z's retry served P.
+✘ Suite "Engine follow barrier (F-28)" failed after 3.050 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 3.050 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

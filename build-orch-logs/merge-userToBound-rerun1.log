@@ -1,0 +1,20 @@
+Sat Nov  7 00:08:28 CET 2026
+loadavg before: { 3.21 5.80 7.83 }
+Building for production...
+[Computing dependencies]
+[1 / 4]
+Build complete! (0,58 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite ZTronAssetKitBenchmarks started.
+◇ Suite "SyncBenchmarks" started.
+◇ Test "R-SYN-11: owed re-routes of 10,000 user waiters onto a present content are answered from the store holding the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 userToBound, 10,000 user waiters moved onto a present content, at 10,000: heartbeat [4.365292, 4.626666, 4.634958] ms, best 4.365292 ms; longest held turn [1.228292, 1.284375, 2.41075] ms, best 1.228292 ms; the commit's own turn [4.357291, 4.621166, 4.628875] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 4.37 ms, while owed 0.00 ms, drain 1.57 ms; commit turn 4.36 ms; 20 held turns, longest 1.23 ms; made at the commit 0, owed 10000 ids, 10000 pairs in 1 batches, 10000 at the drain; made per turn [512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272]; re-routed 0; committed true, served true, answered 10000, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 3.19 5.76 7.80 -> 3.17 5.71 7.77, heartbeat commit 4.63 ms, while owed 0.00 ms, drain 1.31 ms; commit turn 4.62 ms; 20 held turns, longest 1.28 ms; made at the commit 0, owed 10000 ids, 10000 pairs in 1 batches, 10000 at the drain; made per turn [512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272]; re-routed 0; committed true, served true, answered 10000, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 3.17 5.71 7.77 -> 3.15 5.62 7.72, heartbeat commit 4.63 ms, while owed 0.00 ms, drain 2.45 ms; commit turn 4.63 ms; 20 held turns, longest 2.41 ms; made at the commit 0, owed 10000 ids, 10000 pairs in 1 batches, 10000 at the drain; made per turn [512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 272]; re-routed 0; committed true, served true, answered 10000, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 3.15 5.62 7.72 -> 3.06 5.56 7.68]
+✔ Test "R-SYN-11: owed re-routes of 10,000 user waiters onto a present content are answered from the store holding the engine's actor at most C2's 10 ms per turn" passed after 25.411 seconds.
+✔ Suite "SyncBenchmarks" passed after 25.411 seconds.
+✔ Suite ZTronAssetKitBenchmarks passed after 25.411 seconds.
+✔ Test run with 1 test in 2 suites passed after 25.411 seconds.
+exit 0
+loadavg after: { 3.06 5.56 7.68 }
+Sat Nov  7 00:08:57 CET 2026

@@ -1,0 +1,14 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+✔ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" with 2 test cases passed after 1.298 seconds.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+✔ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" with 2 test cases passed after 1.375 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 2.674 seconds.
+✔ Test run with 2 tests in 1 suite passed after 2.674 seconds.

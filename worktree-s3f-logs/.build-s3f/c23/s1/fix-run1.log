@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine long purge turn log (S3-R28 point 5)" started.
+◇ Test "R-OBS-1: a purge's first turn longer than C2's 10 ms writes one info line on sync with its milliseconds and its job and group counts" started.
+◇ Test "R-OBS-1: a purge's first turn of exactly C2's 10 ms writes no long-turn line" started.
+✔ Test "R-OBS-1: a purge's first turn longer than C2's 10 ms writes one info line on sync with its milliseconds and its job and group counts" passed after 0.008 seconds.
+✔ Test "R-OBS-1: a purge's first turn of exactly C2's 10 ms writes no long-turn line" passed after 0.008 seconds.
+✔ Suite "Engine long purge turn log (S3-R28 point 5)" passed after 0.008 seconds.
+✔ Test run with 2 tests in 1 suite passed after 0.008 seconds.

@@ -1,0 +1,49 @@
+Building for debugging...
+[Pre-planning 1 / 240]
+[Planning deferred tasks]
+[55 / 112]
+[56 / 113] ZTronAssetModel
+[66 / 159]
+[71 / 159]
+[75 / 159]
+[76 / 159]
+[80 / 159]
+[83 / 159]
+[89 / 159]
+[91 / 159]
+[92 / 159]
+[102 / 159] ZTronAssetModel
+[110 / 161] ZTronAssetStorage
+[113 / 162] ZTronAssetModel
+[113 / 162] ZTronAssetAppleHosted
+[127 / 195] ZTronAssetStorage
+[128 / 195] ZTronAssetTransport
+[129 / 195] ZTronAssetStorage
+[142 / 195] ZTronAssetTransport
+[144 / 195] ZTronAssetTransport
+[146 / 195] ZTronAssetAppleHosted
+[155 / 195] ZTronAssetTransport
+[157 / 195] ZTronAssetTestSupport
+[160 / 195] ZTronAssetAppleHosted
+[161 / 195] ZTronAssetAppleHosted
+[164 / 195]
+[166 / 197]
+[166 / 197] ZTronAssetAppleHosted
+[168 / 197] ZTronAssetTestSupport
+[175 / 215] ZTronAssetSync
+[176 / 215] ZTronAssetTestSupport
+[178 / 215] ZTronAssetTestSupport
+[179 / 215] ZTronAssetTestSupport
+[181 / 215] ZTronAssetTestSupport
+[186 / 215] ZTronAssetTestSupport
+[188 / 215] ZTronAssetSync
+[195 / 215] ZTronAssetSync
+[199 / 215] ZTronAssetStorage
+[205 / 216] ZTronAssetSync
+[205 / 216] ZTronAssetKit
+[208 / 225] ZTronAssetKit
+[213 / 225] ZTronAssetKit
+[220 / 225] ZTronAssetKit-product
+[220 / 225] ZTronAssetKit
+[221 / 225] ZTronAssetSync
+Build complete! (13,20 s)

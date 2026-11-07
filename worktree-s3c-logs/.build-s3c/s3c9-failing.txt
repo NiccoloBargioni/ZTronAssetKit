@@ -1,0 +1,10 @@
+↳ a record present at the failed content is left unchanged: Optional(ZTronAssetStorage.Residency.failed(ZTronAssetStorage.FailureReason.integrity))
+↳ after == before → false
+↳   after → AssetRecord(entry: ZTronAssetModel.ManifestEntry(identifier: present, fileExtension: "png", remotePath: "media/present.png", localPathComponents: ["dir"], localFileName: nil, byteSize: Optional(300), checksum: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), tags: [], policy: ZTronAssetModel.AssetPolicy.standard), residency: ZTronAssetStorage.Residency.failed(ZTronAssetStorage.FailureReason.integrity), expectedBlob: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), lastAccess: 2023-11-14 22:13:20 +0000, storedAt: Optional(2023-11-14 22:13:20 +0000), verifiedAt: nil, pinned: false, integrity: ZTronAssetStorage.IntegrityHistory(attempts: 1, failedIdentity: Optional(ZTronAssetModel.ContentIdentity.checksum(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8)), nextEligibleAt: nil), revision: 0)
+↳ nothing is written for it
+↳ harness.fileSystem.mutationCount == mutations → false
+↳   harness.fileSystem.mutationCount → 60
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:163:9: Expectation failed: after == before
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:164:9: Expectation failed: harness.fileSystem.mutationCount == mutations
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:169:9: Expectation failed: live
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:170:9: Expectation failed: await harness.store.location(for: present.id, extensions: [], recordingAccess: false) != nil

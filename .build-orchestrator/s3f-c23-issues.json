@@ -1,0 +1,93 @@
+{
+ "cycle": 23,
+ "head": "d88bdb1",
+ "workflow": "wf_c02a97cf-a3e",
+ "lenses": {
+  "reqs": {
+   "issues": [
+    {
+     "lens": "reqs",
+     "blocking": false,
+     "area": "Records (G2; close ruling S3-R28 point 8: a wrong record is fixed)",
+     "location": "docs/adr-drafts/s3f.md:8609",
+     "problem": "N25's case 3 (f3c's claimHeldFalls) cites `EngineCommands.swift:1051-1058` for `heldLane = last`, the re-lane and `claimHeld`. That line dates from 4b38eb4, before S1. S1 (f38dd8c) then added 24 lines above it (961-965, 974-977, 986, 1001-1014). 5672c6d rewrote the next lines (8610-8612) but did not re-cite this one, so it is stale at HEAD and carries no commit qualifier. Its neighbours :8007, :8024, :8272 and :12023 do say 'at 9aa337c' or 'at HEAD'. At d88bdb1, lines 1051-1058 are earlier in the purge's withdrawal loop. The cited block (`if off.emptied, before != last {` ... `self.relane(transfer, from: before)`) is at :1075-1082, with `self.state.jobs[transfer]?.heldLane = last` at :1079; `git show 9aa337c:...` has it at :1055. The `EngineJobs.swift:424-431` citation (settleRemoval) is still correct.",
+     "fix": "Change the citation to `EngineCommands.swift:1075-1082` (or add 'at `9aa337c`'). Record the correction as not independently verified (point 8)."
+    },
+    {
+     "lens": "reqs",
+     "blocking": false,
+     "area": "Records / mutant evidence (point 6: 64f276d and run 12's e1 runs 'recorded as those logs show them')",
+     "location": "docs/adr-drafts/s3f.md:8258; Tests/ZTronAssetSyncTests/Engine/EngineFollowBarrierReroutePinSpaceTests.swift:182",
+     "problem": "The p1-rule-false row reads '2/2, 10 issues each: PinSpace :154, :155, :167, :168, :182; no time-limit issue | both'. That is true of run 12's two logs, but it does not hold across runs. I applied the same mutant to d88bdb1's code (EngineJobs.swift:293 replay branch \u2192 `return false`) and ran it 8 times: twice in the mutant run, then 6 repeats. The issue counts were 9, 8, 9, 10, 10, 9, 9 and 10. The expectation at :182 failed in only 10 of the 16 order-runs; in run2 neither order failed at :182. The kill itself is robust: :154, :155, :167 and :168 fail in both orders in every run, and there were 0 time-limit issues.",
+     "fix": "Add one sentence to the row: the issue count varies (8-10 over 8 verifier runs), :182 is reached in some runs only, and the kill rests on :154, :155, :167 and :168. Then a later re-check will not read a 9-issue run as a regression. No code or test change."
+    },
+    {
+     "lens": "reqs",
+     "blocking": false,
+     "area": "C2 margin list (close ruling point 7, item 9; S3-R16 1(f)); open under point 8 'anything else'",
+     "location": "docs/adr-drafts/s3f.md:11800-11806; Tests/ZTronAssetKitBenchmarks/BenchSync.swift (userSharedApplyTurns, divergenceTurns, concentrationCommitRerouteTurns)",
+     "problem": "The close's margin list says that, apart from the six purge misses and commitTwoTokensTurns (8.95), 'No other case is above 8.5', and gives the keep form at 8.32. My release re-measures on d88bdb1, all at 1-minute loads of 10 or less, put three more cases above 8.5 ms best:\n- userSharedApplyTurns(.keep): 9.04 ms ([9.04, 9.36, 9.24], load 3.01-3.11, bench-rerun-edge) and 8.50 ms ([8.85, 8.50, 8.51], load about 4.2-4.4, bench-run2);\n- divergenceTurns 'on to fresh contents': 8.83 ([8.83, 10.39, 9.00], load about 4.2-4.4) and 8.35 (load 3.0);\n- concentrationCommitRerouteTurns ('a commit that re-routes the ids moved away'): 8.71 ([10.61, 8.71, 8.74], load 4.57) and 8.05 (load 3.0).\nAll of them pass (best of 3 at or under 10 ms), so there is no new FAIL cause today. But keep-form sits as near the limit as commitTwoTokensTurns, which measured 9.27 at load 3.67 in my re-run. Against the fixer's close log at similar loads, my figures were up to about 17% higher: divergenceTurns 7.55 there against 8.35-8.83 here, concentrationCommitRerouteTurns 7.47 against 8.05-8.71. A later --perf or Stage 5 --full on this host could therefore see a new red case, which point 3 would have to take to the owner.",
+     "fix": "Add userSharedApplyTurns(.keep), and the figures for divergenceTurns' fresh contents and concentrationCommitRerouteTurns, to the margin list as the verifier's figures with their loads (not independently verified). Note the host's run-to-run spread (up to about 17%), so that a red result for these cases is read as a known edge, not a regression."
+    }
+   ],
+   "status": [
+    "CLOSED for the reqs lens: 0 blocking issues, 3 non-blocking. I verified WP-F on wp/s3f at d88bdb1. git status was clean before and after (0 lines). I did not write this code.\n(1) Every blocking item from cycle 22 is fixed or has the state the close ruling S3-R28 gives it. The 21-findings table at s3f.md:8011-8035 is complete.\n- I re-ran point 6's mutants as S3-R3 requires, in a Sync-only scratch copy of d88bdb1. Run 12's five kill tests, with b22-no-waiter-owner, p7, r5, r8, vy and r2c, and p2-after-verdict-replay-rule are each killed 2/2 by assertions with 0 time-limit issues. They fail in the orders the draft names, and the issue lines match the run-13 table at s3f.md:8226-8234 exactly.\n- 64f276d's p1-rule-false is killed in 8/8 runs.\n- Row 3's fix (03c4e59) holds on three counts. A T20 regression (t20-never) fails A-T-SD's new set-up #require at DeferBucket :775, 2/2. The fixer's f2-R1 probe of the old set-up is red 2/2 on HEAD's code. A-T-SD passed 30/30 iterations per argument on my simulator.\n- S1 (e7cf01a red first, then f38dd8c) matches point 5. Six S1 mutants each fail EngineLongPurgeTurnLogTests: no line, >= instead of >, counts after the walk, read before the end mark, .debug, and an 11 ms limit. S1's changed lines are all executed, so S3-R25 item 10 is met.\n(2) Ownership: s3-base...HEAD touches only Sources/ZTronAssetSync, Tests/ZTronAssetSyncTests, BenchSync.swift plus the eight bench files 11.6 authorises as amended, and docs/adr-drafts/s3f.md. In cycle 23 the only production change is S1: EngineCommands.swift, 24 lines added.\n(3) No regression, and no flake anywhere:\n- verify --quick ends VERIFY: PASS;\n- the release and iOS generic builds pass with -warnings-as-errors;\n- ZTronAssetSyncTests passed 3 times in a row and once under TSan with no report;\n- the unsafe gate finds 0 escapes and the docs gate is at 100%;\n- ZTronAssetSync coverage is 95.10%;\n- all 1667 tests passed on 6BE15CAF.\nSync x3, TSan and the simulator suite ran at 1-minute loads up to 663 and nothing failed.\n(4) The benchmarks fail only on the accepted seven: P-13 and the six purge misses. Cycle 22's closes (reqs #7) hold at a quiet load. reqs #11's load-only cases pass at loads of 3.56 to 5.89. commitTwoTokensTurns is at 9.27 ms, at the edge, and stays on the margin list. The rulings were applied and recorded.\nThe 3 non-blocking items:\n- A stale line citation from before S1. It is a wrong record, which point 8 says the fixer corrects and records as not independently verified.\n- The issue count under the p1-rule-false mutant varies from run to run.\n- Three cases belong on the C2 margin list: at a quiet load they measure 8.5 to 9.04 ms. Under point 8 these last two are recorded as open.\nNot run, because this lens does not include them: --gates-only and --full.\nEvidence, tools and logs are in /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c23/reqs/. My three scratch paths are deleted, simulator 6BE15CAF is Shutdown, and sim.lock is released."
+   ]
+  },
+  "correct": {
+   "issues": [
+    {
+     "lens": "correct",
+     "blocking": false,
+     "area": "G4 test strength: S1 (close ruling point 5)",
+     "location": "Tests/ZTronAssetSyncTests/Engine/EngineLongPurgeTurnLogTests.swift:66-90 (TurnEndAdvance); Sources/ZTronAssetSync/Engine/EngineCommands.swift:975",
+     "problem": "Mutant s1-late-start survives 2/2. It moves `let turnBegan = self.environment.time.monotonicNow()` to just after `self.withdrawPurged(request)`. The test advances the manual clock only at the ?(true) mark, as the ruling prescribed, so a read at the turn's start and a read after the walk give the same 11 ms. In production that mutant would time about 0 ms and never write the line. A code review confirms the current placement is right. s1-groups-after also survives 2/2, but it is equivalent: the purge's first turn never removes a group. Groups are removed only by performReleaseGroup (:359), releaseEntryGroup (:1631) and shutdown; dropGroupMember (EngineJobs.swift:696) keeps the group.",
+     "fix": "Record both in the draft's point-5 record: s1-late-start as a survivor (the seam has no mark inside the turn), s1-groups-after as equivalent. At a re-open, kill s1-late-start with a mark inside the walk (for example, the seam called once from withdrawPurged) so the test can advance the clock during the withdrawal. No change now."
+    },
+    {
+     "lens": "correct",
+     "blocking": false,
+     "area": "Records (point 6/8): p2-after-verdict-true",
+     "location": "docs/adr-drafts/s3f.md:8025, :8265-8266, :8270, :12021",
+     "problem": "The draft says p2-after-verdict-true was never run and stays open. I ran it with text identical to .build-s3f/c23/tools/mut-e1.py:48 on a snapshot of d88bdb1. It is killed 2/2 in the swept-first order by assertions at EngineFollowBarrierAfterVerdictSpaceTests.swift:171 and :172, with 0 time-limit issues. As with p2-after-verdict-never, the visited-first order never reaches it.",
+     "fix": "Point-8 correction: at those four places, change p2-after-verdict-true from open to 'killed 2/2 swept-first (AfterVerdictSpace :171, :172), cycle-23 correctness verifier'. Evidence: .build-orchestrator/s3f-probes-c23/correct-mut-summary.txt."
+    },
+    {
+     "lens": "correct",
+     "blocking": false,
+     "area": "Records: mutant issue counts",
+     "location": "docs/adr-drafts/s3f.md:8258 (p1-rule-false), :8261 (p1-count-not-kept)",
+     "problem": "The kills hold, at the same locations, but the per-run issue counts vary from what the draft records. p1-rule-false gave 10 and 9 issues; the draft records 10 each. p1-count-not-kept gave 7 and 7; the draft records 8 each.",
+     "fix": "Record the counts as ranges (9-10 and 7-8) or drop them, and keep '2/2 by assertions'."
+    },
+    {
+     "lens": "correct",
+     "blocking": false,
+     "area": "Test harness (found while hunting; not an engine bug)",
+     "location": "Sources/ZTronAssetSync/Engine/EngineSupport.swift:107-109 (isIdleSilent); Tests/ZTronAssetSyncTests/Engine/EngineHarness.swift:303 (drive)",
+     "problem": "isIdleSilent ignores an applyAndFollow running in a caller's own task (applyTurnHeld, applyQueue, appliesInFlight). In PROBE-C23C-WALK2, 11 of the 24 even seeds hung past their 900 s time limit. The diagnostic variant (PROBE-C23C-WALK2-DIAG) re-ran 8 of those seeds. Where a seed stalled (102, 112, 116), the drive had returned 'idle' with applyTurnHeld true, applyQueue 29-52, and one store sleeper 0.25 s ahead (the commit window). After shutdown, the apply in flight waited on the manual clock for ever. One 1 s clock advance ended every apply, and all end checks then passed in 8/8 seeds (76 s). A live clock ends that window, so no production liveness defect is proven. But any test that applies from its own task and drives on isIdleSilent can leave work pending without noticing.",
+     "fix": "At a re-open: tests or probes that call applyAndFollow, or the availability/ensure paths, from their own tasks should drive until isIdleSilent && appliesInFlight == 0, or the harness could offer that predicate. No change now."
+    },
+    {
+     "lens": "correct",
+     "blocking": false,
+     "area": "Known risks c22 correct #1/#2 (owner ruling: item 1c, close ruling point 4)",
+     "location": "Sources/ZTronAssetSync/Engine/EngineJobs.swift:289-297 (metInItsAttempt, frozen by item 1c)",
+     "problem": "Both still reproduce on d88bdb1, 2 rounds each. PROBE-C22C-TS-DRAIN-JOIN (beforeEnd): visited first gives A/X/V failed(insufficientSpace(required: 100000, ...)) with T starting once; swept first gives ok(100000 B) x3 with T starting twice. PROBE-C22C-APPLY-IN-READ diverges the same way. The draft's cycle-23 status table already records them as known risks.",
+     "fix": "None now, by ruling. Keep them under 'Known residual correctness risks' and cite this HEAD's rerun (.build-orchestrator/s3f-probes-c23/correct-c22-known-risk-rerun.summary.log)."
+    },
+    {
+     "lens": "correct",
+     "blocking": false,
+     "area": "Known misses (close ruling point 2): the accepted benchmark FAIL",
+     "location": "Tests/ZTronAssetKitBenchmarks/BenchSyncCycle22Purge.swift:32; Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:249",
+     "problem": "Exactly the expected 7 issues, nothing else red. Best-of-3 figures against the 10 ms budget: oneGroup 36.45, oneMemberGroups 37.61, oneGroupScope 40.73, sharedJobFourGroups 18.18, fourGroups 62.39, retryJobs 36.48 ms. P-13's longest unit is 9.87 ms against its 5 ms batch budget.",
+     "fix": "None, by ruling: these are the accepted FAIL's cause. The S1 line is now their signal in the field."
+    }
+   ],
+   "status": [
+    "CLOSED for the correctness lens: 0 blocking issues on wp/s3f HEAD d88bdb1, worktree .worktrees/s3f, against base s3-base. I did not write this code (P4). All 7 blocking c22 correctness findings are now in the state the owner's close ruling (option e) gives them:\n- correct #3 (the A-T-SD flake) is fixed by 03c4e59. Three host Sync runs, the full simulator suite, 30 simulator iterations of A-T-SD and my own progress probe are all green.\n- correct #1 and #2 (the ENOSPC windows) still reproduce on HEAD. They are known risks by item 1c and point 4, not blocking.\n- correct #4 is a known miss: the same six purgeTurns cases plus P-13 are red, and nothing else.\n- correct #5 (APM) is a known miss.\n- correct #6 is open by ruling: the unreached lines are now :1025, :1028 and :1033.\n- correct #7: the five run-12 kill tests and p2-after-verdict-replay-rule kill their mutants 2/2, by assertions.\n- reqs #7 (the verification gap) is closed by this run's heavy checks.\n\nThe only production change in cycle 23, S1 (f38dd8c, the long-purge log line), matches point 5 exactly. Both clock reads and the O(1) counts sit right after the ?(false) and ?(true) marks, at EngineCommands.swift:975-977 and :985-986. It adds no await and no spawn, so no REENTRANCY row is needed. It uses the injected clock, and seconds(since:) cannot go negative (Time.swift:40). The line is .info on .sync and names no id. Every S1 line is reached.\n\nI reviewed the cycle-23 test commits: 03c4e59, 29dfb12, 64f276d, the five kill tests, e7cf01a and d5's pin. I found no reentrancy, cancellation, race, growth or availability defect.\n\nOne hunt result looked like a hang in my new walk probe. It turned out to come from the test harness and the probe's ending, not the engine: one 1-second clock advance finishes every pending apply. I list it as non-blocking.\n\nNot done: I did not run --gates-only or --full, so docs/TRACEABILITY.md was not touched. The accepted VERIFY: FAIL from --full is therefore not re-quoted. My --quick run ended VERIFY: PASS.\n\nClean-up: git status is empty, my three scratch paths are deleted, simulator 5B940E6E is shut down and sim.lock is released. The cited probes and logs are in /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c23/ (all files prefixed correct-)."
+   ]
+  }
+ }
+}

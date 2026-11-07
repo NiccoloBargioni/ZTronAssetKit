@@ -1,0 +1,34 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" started.
+✘ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:188:9: Expectation failed: !throttled
+↳ U's waiting join reaches X through its own entry: X is user work, and the 429 beyond the user lane's cap throttles nothing (visit-first)
+↳ !throttled → <not evaluated>
+↳   throttled → <not evaluated>
+✘ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:192:29: Issue recorded
+↳ P is answered serverUnavailable at the 429's verdict (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-x, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/27/2712e21e4fa758581674529cb9af733a68877f5a1a48ee4418f96e11f3568491.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false))
+✘ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierUnlistedTests.swift:195:9: Expectation failed: starts == 1
+↳ X starts once (visit-first): 2
+↳ starts == 1 → false
+↳   starts → 2
+✘ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" with 2 test cases failed after 0.882 seconds with 3 issues.
+↳ /// X (zz-x, 20 bytes) downloads for P, a prefetch waiter. v3 changes only the fillers, so behind the barrier its
+↳ /// follow is owed; v4, which adds zz-u at X's content, is applied by the store and its follow-up held. U, a user
+↳ /// request for zz-u, which the copy (v3) does not list, is admitted from the fetched v4: swept first its join waits
+↳ /// unlisted, with no chain (an unlisted join waits only behind the barrier, so the state is swept first only:
+↳ /// S3-R26 answer 1's citation); visited first it joins X at once. X then gets a 429 with Retry-After 60 s, above the
+↳ /// user lane's 30 s cap, while U's join waits. Visited first, U was on X: X was user work, the 429 throttled nothing,
+↳ /// X failed and P and U were answered `serverUnavailable`, X started once. Skipped, U's join would leave X prefetch
+↳ /// work: the origin throttled at the arrival, and X's retry serving P.
+✘ Suite "Engine follow barrier (F-28)" failed after 0.883 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 0.883 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

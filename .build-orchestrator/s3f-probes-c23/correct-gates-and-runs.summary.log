@@ -1,0 +1,151 @@
+# cycle-23 correctness verifier: verify --quick, coverage, gates, Sync x3, simulator, iOS generic, release (HEAD d88bdb1)
+start 20:19:42 head d88bdb1 dirty 0 load { 9.07 9.24 14.49 }
+prebuild1 rc=0 20:20:09 load { 47.97 18.24 17.55 }
+prebuild2 rc=0 20:22:31 load { 96.16 48.02 29.63 }
+lock taken 20:22:31 load { 96.16 48.02 29.63 }
+lock released; end 20:36:47 exit 0 load { 42.20 44.00 48.21 }
+::: SUMMARY mode=--quick steps-failed=0
+VERIFY: PASS
+baseline run1 rc=0 48.2s: Test run with 32 tests in 4 suites passed after 46.446 seconds. issues={} timelimit=0 load { 20.98 60.68 54.44 }
+baseline run2 rc=0 47.5s: Test run with 32 tests in 4 suites passed after 46.420 seconds. issues={} timelimit=0 load { 14.16 53.30 52.04 }
+k1-b22-no-waiter-owner run1 rc=1 6.9s: Test run with 1 test in 1 suite failed after 4.788 seconds with 7 issues. | per order: {'swept': 7} | locs {'swept': ['EngineFollowBarrierRerouteOwnerTests.swift:424', 'EngineFollowBarrierRerouteOwnerTests.swift:425', 'EngineFollowBarrierRerouteOwnerTests.swift
+k1-b22-no-waiter-owner run2 rc=1 7.0s: Test run with 1 test in 1 suite failed after 4.536 seconds with 7 issues. | per order: {'swept': 7} | locs {'swept': ['EngineFollowBarrierRerouteOwnerTests.swift:424', 'EngineFollowBarrierRerouteOwnerTests.swift:425', 'EngineFollowBarrierRerouteOwnerTests.swift
+k2-p7-forget-at-last-batch run1 rc=1 8.5s: Test run with 1 test in 1 suite failed after 5.547 seconds with 2 issues. | per order: {'visit': 1, 'swept': 1} | locs {'visit': ['EngineFollowBarrierReroutePinEndTests.swift:371'], 'swept': ['EngineFollowBarrierReroutePinEndTests.swift:371']} | timelimit-m
+k2-p7-forget-at-last-batch run2 rc=1 8.4s: Test run with 1 test in 1 suite failed after 7.031 seconds with 2 issues. | per order: {'visit': 1, 'swept': 1} | locs {'visit': ['EngineFollowBarrierReroutePinEndTests.swift:371'], 'swept': ['EngineFollowBarrierReroutePinEndTests.swift:371']} | timelimit-m
+k2-r5-lane-engine-copy run1 rc=1 9.5s: Test run with 1 test in 1 suite failed after 7.624 seconds with 2 issues. | per order: {'visit': 1, 'swept': 1} | locs {'visit': ['EngineFollowBarrierReroutePinEndTests.swift:373'], 'swept': ['EngineFollowBarrierReroutePinEndTests.swift:373']} | timelimit-menti
+k2-r5-lane-engine-copy run2 rc=1 7.9s: Test run with 1 test in 1 suite failed after 6.492 seconds with 2 issues. | per order: {'visit': 1, 'swept': 1} | locs {'visit': ['EngineFollowBarrierReroutePinEndTests.swift:373'], 'swept': ['EngineFollowBarrierReroutePinEndTests.swift:373']} | timelimit-menti
+k3-r8-fast-any-join run1 rc=1 6.6s: Test run with 1 test in 1 suite failed after 4.019 seconds with 3 issues. | per order: {'swept': 3} | locs {'swept': ['EngineFollowBarrierUnlistedTests.swift:188', 'EngineFollowBarrierUnlistedTests.swift:192', 'EngineFollowBarrierUnlistedTests.swift:195']} | timel
+k3-r8-fast-any-join run2 rc=1 4.7s: Test run with 1 test in 1 suite failed after 3.197 seconds with 3 issues. | per order: {'swept': 3} | locs {'swept': ['EngineFollowBarrierUnlistedTests.swift:188', 'EngineFollowBarrierUnlistedTests.swift:192', 'EngineFollowBarrierUnlistedTests.swift:195']} | timel
+k4-vy-owed-moves-too run1 rc=1 5.6s: Test run with 1 test in 1 suite failed after 3.635 seconds with 3 issues. | per order: {'swept': 3} | locs {'swept': ['EngineFollowBarrierMoveHoldersTests.swift:371', 'EngineFollowBarrierMoveHoldersTests.swift:384', 'EngineFollowBarrierMoveHoldersTests.swift:387'
+k4-vy-owed-moves-too run2 rc=1 4.4s: Test run with 1 test in 1 suite failed after 2.957 seconds with 3 issues. | per order: {'swept': 3} | locs {'swept': ['EngineFollowBarrierMoveHoldersTests.swift:371', 'EngineFollowBarrierMoveHoldersTests.swift:384', 'EngineFollowBarrierMoveHoldersTests.swift:387'
+k5-r2c-made-ignores-verdicts run1 rc=1 4.4s: Test run with 1 test in 1 suite failed after 2.298 seconds with 10 issues. | per order: {'visit': 5, 'swept': 5} | locs {'visit': ['EngineFollowBarrierRerouteLayerTests.swift:554', 'EngineFollowBarrierRerouteLayerTests.swift:561', 'EngineFollowBarrierRero
+k5-r2c-made-ignores-verdicts run2 rc=1 3.3s: Test run with 1 test in 1 suite failed after 1.930 seconds with 10 issues. | per order: {'visit': 5, 'swept': 5} | locs {'visit': ['EngineFollowBarrierRerouteLayerTests.swift:554', 'EngineFollowBarrierRerouteLayerTests.swift:561', 'EngineFollowBarrierRero
+p1-count-not-kept run1 rc=1 7.8s: Test run with 3 tests in 1 suite failed after 6.000 seconds with 7 issues. | per order: {'visit': 4, 'swept': 3} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:111', 'EngineFollowBarrierReroutePinSpaceTests.swift:154', 'EngineFollowBarrierReroutePi
+p1-count-not-kept run2 rc=1 8.0s: Test run with 3 tests in 1 suite failed after 6.733 seconds with 7 issues. | per order: {'visit': 3, 'swept': 4} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:111', 'EngineFollowBarrierReroutePinSpaceTests.swift:154', 'EngineFollowBarrierReroutePi
+p1-le-as-lt run1 rc=1 9.0s: Test run with 3 tests in 1 suite failed after 7.142 seconds with 4 issues. | per order: {'visit': 2, 'swept': 2} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:167', 'EngineFollowBarrierReroutePinSpaceTests.swift:168'], 'swept': ['EngineFollowBarrierRero
+p1-le-as-lt run2 rc=1 8.6s: Test run with 3 tests in 1 suite failed after 7.214 seconds with 4 issues. | per order: {'visit': 2, 'swept': 2} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:167', 'EngineFollowBarrierReroutePinSpaceTests.swift:168'], 'swept': ['EngineFollowBarrierRero
+p1-rule-false run1 rc=1 8.5s: Test run with 3 tests in 1 suite failed after 6.727 seconds with 10 issues. | per order: {'visit': 5, 'swept': 5} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:154', 'EngineFollowBarrierReroutePinSpaceTests.swift:155', 'EngineFollowBarrierReroutePinSp
+p1-rule-false run2 rc=1 8.2s: Test run with 3 tests in 1 suite failed after 6.873 seconds with 9 issues. | per order: {'visit': 4, 'swept': 5} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:154', 'EngineFollowBarrierReroutePinSpaceTests.swift:155', 'EngineFollowBarrierReroutePinSpa
+p1-rule-true run1 rc=1 8.4s: Test run with 3 tests in 1 suite failed after 6.366 seconds with 4 issues. | per order: {'visit': 2, 'swept': 2} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:181', 'EngineFollowBarrierReroutePinSpaceTests.swift:182'], 'swept': ['EngineFollowBarrierRer
+p1-rule-true run2 rc=1 7.5s: Test run with 3 tests in 1 suite failed after 5.976 seconds with 4 issues. | per order: {'visit': 2, 'swept': 2} | locs {'visit': ['EngineFollowBarrierReroutePinSpaceTests.swift:181', 'EngineFollowBarrierReroutePinSpaceTests.swift:182'], 'swept': ['EngineFollowBarrierRer
+p2-after-verdict-never run1 rc=1 27.0s: Test run with 2 tests in 1 suite failed after 24.699 seconds with 2 issues. | per order: {'swept': 2} | locs {'swept': ['EngineFollowBarrierAfterVerdictSpaceTests.swift:160', 'EngineFollowBarrierAfterVerdictSpaceTests.swift:161']} | timelimit-mentions=0 | load
+p2-after-verdict-never run2 rc=1 11.4s: Test run with 2 tests in 1 suite failed after 6.384 seconds with 2 issues. | per order: {'swept': 2} | locs {'swept': ['EngineFollowBarrierAfterVerdictSpaceTests.swift:160', 'EngineFollowBarrierAfterVerdictSpaceTests.swift:161']} | timelimit-mentions=0 | load 
+p2-after-verdict-replay-rule run1 rc=1 6.9s: Test run with 2 tests in 1 suite failed after 5.217 seconds with 2 issues. | per order: {'swept': 2} | locs {'swept': ['EngineFollowBarrierAfterVerdictSpaceTests.swift:171', 'EngineFollowBarrierAfterVerdictSpaceTests.swift:172']} | timelimit-mentions=0 | 
+p2-after-verdict-replay-rule run2 rc=1 18.1s: Test run with 2 tests in 1 suite failed after 16.681 seconds with 2 issues. | per order: {'swept': 2} | locs {'swept': ['EngineFollowBarrierAfterVerdictSpaceTests.swift:171', 'EngineFollowBarrierAfterVerdictSpaceTests.swift:172']} | timelimit-mentions=0 
+ps-literal-requeue run1 rc=1 10.0s: Test run with 2 tests in 1 suite failed after 7.198 seconds with 4 issues. | per order: {'visit': 2, 'swept': 2} | locs {'visit': ['EngineFollowBarrierReroutePinSupersedeTests.swift:88', 'EngineFollowBarrierReroutePinSupersedeTests.swift:89'], 'swept': ['EngineFol
+ps-literal-requeue run2 rc=1 8.1s: Test run with 2 tests in 1 suite failed after 6.521 seconds with 4 issues. | per order: {'visit': 2, 'swept': 2} | locs {'visit': ['EngineFollowBarrierReroutePinSupersedeTests.swift:88', 'EngineFollowBarrierReroutePinSupersedeTests.swift:89'], 'swept': ['EngineFoll
+ps-write-always run1 rc=1 45.9s: Test run with 20 tests in 3 suites failed after 43.862 seconds with 5 issues. | per order: {'noarg': 1, 'visit': 4} | locs {'noarg': ['EngineRegressionTests.swift:91'], 'visit': ['EngineFollowBarrierReachTests.swift:38', 'EngineFollowBarrierRerouteSupersedeTests.swif
+ps-write-always run2 rc=1 46.1s: Test run with 20 tests in 3 suites failed after 44.820 seconds with 5 issues. | per order: {'noarg': 1, 'visit': 4} | locs {'noarg': ['EngineRegressionTests.swift:91'], 'visit': ['EngineFollowBarrierReachTests.swift:38', 'EngineFollowBarrierRerouteSupersedeTests.swif
+ps-write-dropped run1 rc=1 13.4s: Test run with 2 tests in 1 suite failed after 11.233 seconds with 8 issues. | per order: {'visit': 4, 'swept': 4} | locs {'visit': ['EngineFollowBarrierReroutePinSupersedeTests.swift:100', 'EngineFollowBarrierReroutePinSupersedeTests.swift:101', 'EngineFollowBarrier
+ps-write-dropped run2 rc=1 10.6s: Test run with 2 tests in 1 suite failed after 8.354 seconds with 8 issues. | per order: {'visit': 4, 'swept': 4} | locs {'visit': ['EngineFollowBarrierReroutePinSupersedeTests.swift:100', 'EngineFollowBarrierReroutePinSupersedeTests.swift:101', 'EngineFollowBarrierR
+s1-ge run1 rc=1 1.7s: Test run with 2 tests in 1 suite failed after 0.014 seconds with 1 issue. | per order: {'noarg': 1} | locs {'noarg': ['EngineLongPurgeTurnLogTests.swift:26']} | timelimit-mentions=0 | load { 122.15 212.06 164.63 }
+s1-ge run2 rc=1 1.2s: Test run with 2 tests in 1 suite failed after 0.012 seconds with 1 issue. | per order: {'noarg': 1} | locs {'noarg': ['EngineLongPurgeTurnLogTests.swift:26']} | timelimit-mentions=0 | load { 122.15 212.06 164.63 }
+s1-groups-after run1 rc=0 1.7s: Test run with 2 tests in 1 suite passed after 0.013 seconds. | per order: {} | locs {} | timelimit-mentions=0 | load { 100.79 195.98 160.95 }
+s1-groups-after run2 rc=0 1.2s: Test run with 2 tests in 1 suite passed after 0.011 seconds. | per order: {} | locs {} | timelimit-mentions=0 | load { 100.79 195.98 160.95 }
+s1-jobs-after run1 rc=1 1.8s: Test run with 2 tests in 1 suite failed after 0.015 seconds with 1 issue. | per order: {'noarg': 1} | locs {'noarg': ['EngineLongPurgeTurnLogTests.swift:19']} | timelimit-mentions=0 | load { 112.58 201.40 162.42 }
+s1-jobs-after run2 rc=1 1.3s: Test run with 2 tests in 1 suite failed after 0.012 seconds with 1 issue. | per order: {'noarg': 1} | locs {'noarg': ['EngineLongPurgeTurnLogTests.swift:19']} | timelimit-mentions=0 | load { 112.58 201.40 162.42 }
+s1-late-start run1 rc=0 1.8s: Test run with 2 tests in 1 suite passed after 0.013 seconds. | per order: {} | locs {} | timelimit-mentions=0 | load { 121.62 206.12 163.60 }
+s1-late-start run2 rc=0 1.3s: Test run with 2 tests in 1 suite passed after 0.012 seconds. | per order: {} | locs {} | timelimit-mentions=0 | load { 121.62 206.12 163.60 }
+s1-no-line run1 rc=1 1.9s: Test run with 2 tests in 1 suite failed after 0.015 seconds with 1 issue. | per order: {'noarg': 1} | locs {'noarg': ['EngineLongPurgeTurnLogTests.swift:19']} | timelimit-mentions=0 | load { 122.09 209.06 164.12 }
+s1-no-line run2 rc=1 1.6s: Test run with 2 tests in 1 suite failed after 0.030 seconds with 1 issue. | per order: {'noarg': 1} | locs {'noarg': ['EngineLongPurgeTurnLogTests.swift:19']} | timelimit-mentions=0 | load { 123.77 207.97 163.99 }
+x-p2-after-verdict-true run1 rc=1 6.7s: Test run with 2 tests in 1 suite failed after 4.802 seconds with 2 issues. | per order: {'swept': 2} | locs {'swept': ['EngineFollowBarrierAfterVerdictSpaceTests.swift:171', 'EngineFollowBarrierAfterVerdictSpaceTests.swift:172']} | timelimit-mentions=0 | load 
+x-p2-after-verdict-true run2 rc=1 5.8s: Test run with 2 tests in 1 suite failed after 4.417 seconds with 2 issues. | per order: {'swept': 2} | locs {'swept': ['EngineFollowBarrierAfterVerdictSpaceTests.swift:171', 'EngineFollowBarrierAfterVerdictSpaceTests.swift:172']} | timelimit-mentions=0 | load 
+✔ Test run with 104 tests in 14 suites passed after 1.871 seconds.
+✔ Test run with 151 tests in 16 suites passed after 1.078 seconds.
+✔ Test run with 459 tests in 60 suites passed after 107.030 seconds.
+✔ Test run with 71 tests in 10 suites passed after 7.245 seconds.
+✔ Test run with 713 tests in 58 suites passed after 594.007 seconds.
+✔ Test run with 84 tests in 18 suites passed after 91.497 seconds.
+✔ Test run with 85 tests in 11 suites passed after 12.919 seconds.
+## Sync x3
+20:37:36 sync run 1 start load { 56.14 48.32 49.62 }
+20:59:52 sync run 1 exit 0: ✔ Test run with 713 tests in 58 suites passed after 1074.922 seconds. load { 257.53 199.70 169.64 }
+20:59:52 sync run 2 start load { 257.53 199.70 169.64 }
+21:11:37 sync run 2 exit 0: ✔ Test run with 713 tests in 58 suites passed after 697.082 seconds. load { 106.48 168.88 161.65 }
+21:11:37 sync run 3 start load { 106.48 168.88 161.65 }
+21:26:17 sync run 3 exit 0: ✔ Test run with 713 tests in 58 suites passed after 873.998 seconds. load { 150.22 154.41 141.63 }
+## simulator
+21:04:34 sim build start head d88bdb1 dirty 0 load { 13.82 114.65 143.80 }
+21:07:03 sim build exit 0 load { 102.80 108.15 135.94 }
+21:07:03 waiting for lock load { 102.80 108.15 135.94 }
+21:07:03 lock taken load { 102.80 108.15 135.94 }
+21:22:58 sim test exit 0 load { 180.71 136.13 131.96 }
+21:25:06 sim rep30 exit 0 load { 209.87 167.09 144.88 }
+21:25:08 lock released load { 209.87 167.09 144.88 }
+21:25:10 sim done dirty 0 load { 193.63 164.43 144.08 }
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "5B940E6E-490F-4E9E-A917-A6456A18225E",
+        "deviceName" : "iPhone Air",
+        "modelName" : "iPhone Air",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 3386,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environment
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "5B940E6E-490F-4E9E-A917-A6456A18225E",
+        "deviceName" : "iPhone Air",
+        "modelName" : "iPhone Air",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+     
+rep30 case starts: 60
+An error was encountered processing the command (domain=com.apple.CoreSimulator.SimError, code=405):
+Unable to shutdown device in current state: Shutdown
+shutdown exit 149
+## iOS generic
+21:15:25 ios generic start load { 14.52 92.76 130.79 }
+21:16:02 ios generic exit 0 load { 28.49 87.03 127.14 }
+## release
+21:38:21 release start load { 12.50 42.69 90.54 }
+21:39:20 release exit 0 load { 14.35 37.63 85.38 }
+Build complete! (58,08 s)
+## coverage (from the verify --quick run's merged profile, .build-verify-s3f-c23-correct/cov.json)
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.68% (1247/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.90% (1445/1476) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.31% (3328/3351) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.42% (8121/8336) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 95.09% (12372/13011) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.08% (2372/2394) min=70.0 OK
+COVERAGE overall lines=96.87% (28885/29819) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.59% max=3.0% OK
+COVERAGE: PASS
+## unsafe (relative path: checks nothing, see verify.sh:117; superseded below)
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+## docs (relative path: checks nothing, see verify.sh:117; superseded below)
+DOCS public declarations=0 documented=0 exempt=0 fraction=100.0%
+DOCS: PASS
+## unsafe and docs, as verify.sh runs them (absolute paths)
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+## TSan (swift test --scratch-path .build-verify-s3f-c23-correct-tsan --sanitize=thread --skip Benchmarks --filter ZTronAssetSyncTests)
+tsan build start 20:19:42 load { 9.07 9.24 14.49 }
+tsan build rc=0 20:24:33 load { 198.73 94.42 49.91 }
+20:49:38 tsan sync start load { 45.01 164.37 151.38 }
+21:45:01 tsan sync exit 0: ✔ Test run with 713 tests in 58 suites passed after 3277.271 seconds.; ThreadSanitizer reports: 0 load { 3.74 14.71 58.52 }
+WARNING: ThreadSanitizer count: 0

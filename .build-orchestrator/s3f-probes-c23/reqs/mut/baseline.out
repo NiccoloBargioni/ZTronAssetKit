@@ -1,0 +1,23 @@
+== baseline start 20:27:43 load { 53.00 93.31 60.14 }
+baseline build ok=True 65s load { 80.84 91.98 61.96 }
+base owedRerouteOfAWaiterRemovedAheadCountsForNothing run1: ✔ Test run with 1 test in 1 suite passed after 1.036 seconds. | issues 0  | load { 75.16 90.62 61.66 }
+base owedRerouteOfAWaiterRemovedAheadCountsForNothing run2: ✔ Test run with 1 test in 1 suite passed after 1.058 seconds. | issues 0  | load { 75.16 90.62 61.66 }
+base waitingJoinPinnedToACommittedJobEndsUnderItsChainAtA429 run1: ✔ Test run with 1 test in 1 suite passed after 1.864 seconds. | issues 0  | load { 69.55 89.20 61.33 }
+base waitingJoinPinnedToACommittedJobEndsUnderItsChainAtA429 run2: ✔ Test run with 1 test in 1 suite passed after 1.886 seconds. | issues 0  | load { 69.55 89.20 61.33 }
+base waitingUnlistedJoinCountsTowardA429sLane run1: ✔ Test run with 1 test in 1 suite passed after 0.843 seconds. | issues 0  | load { 64.54 87.84 61.01 }
+base waitingUnlistedJoinCountsTowardA429sLane run2: ✔ Test run with 1 test in 1 suite passed after 0.729 seconds. | issues 0  | load { 64.54 87.84 61.01 }
+base barrierContinuesAnOwedMoveInsideItsHoldersPublication run1: ✔ Test run with 1 test in 1 suite passed after 1.071 seconds. | issues 0  | load { 59.85 86.48 60.69 }
+base barrierContinuesAnOwedMoveInsideItsHoldersPublication run2: ✔ Test run with 1 test in 1 suite passed after 1.076 seconds. | issues 0  | load { 59.85 86.48 60.69 }
+base layerOfAnOwedBatchPinsAVerdictBetweenItAndALaterJoin run1: ✔ Test run with 1 test in 1 suite passed after 1.653 seconds. | issues 0  | load { 55.30 85.09 60.35 }
+base layerOfAnOwedBatchPinsAVerdictBetweenItAndALaterJoin run2: ✔ Test run with 1 test in 1 suite passed after 1.555 seconds. | issues 0  | load { 55.30 85.09 60.35 }
+base afterVerdictVisitInsideAnENOSPCsReadGetsItsVerdict|afterVerd run1: ✔ Test run with 2 tests in 1 suite passed after 2.663 seconds. | issues 0  | load { 51.27 83.76 60.02 }
+base afterVerdictVisitInsideAnENOSPCsReadGetsItsVerdict|afterVerd run2: ✔ Test run with 2 tests in 1 suite passed after 2.674 seconds. | issues 0  | load { 51.27 83.76 60.02 }
+base owedReroutePinnedToAJobInItsSpaceReadGetsItsVerdict|userJoin run1: ✔ Test run with 3 tests in 1 suite passed after 4.335 seconds. | issues 0  | load { 47.56 82.45 59.70 }
+base owedReroutePinnedToAJobInItsSpaceReadGetsItsVerdict|userJoin run2: ✔ Test run with 3 tests in 1 suite passed after 4.111 seconds. | issues 0  | load { 44.23 81.18 59.38 }
+base shutdownClearsTheJoinsBehindAVerdict run1: ✔ Test run with 1 test in 1 suite passed after 1.399 seconds. | issues 0  | load { 41.01 79.90 59.06 }
+base shutdownClearsTheJoinsBehindAVerdict run2: ✔ Test run with 1 test in 1 suite passed after 1.197 seconds. | issues 0  | load { 41.01 79.90 59.06 }
+base EngineLongPurgeTurnLogTests run1: ✔ Test run with 2 tests in 1 suite passed after 0.008 seconds. | issues 0  | load { 41.01 79.90 59.06 }
+base EngineLongPurgeTurnLogTests run2: ✔ Test run with 2 tests in 1 suite passed after 0.008 seconds. | issues 0  | load { 38.05 78.64 58.74 }
+base barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued run1: ✔ Test run with 1 test in 1 suite passed after 1.977 seconds. | issues 0  | load { 38.05 78.64 58.74 }
+base barrierMakesAMoveOntoAJobItsDrainedPublicationReQueued run2: ✔ Test run with 1 test in 1 suite passed after 2.375 seconds. | issues 0  | load { 35.32 77.40 58.42 }
+== baseline end 20:29:40 load { 35.32 77.40 58.42 }

@@ -1,0 +1,27 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" recorded an issue with 1 argument visit → .followVisitedFirst at EngineFollowBarrierDeferBucketTests.swift:775:17: Expectation failed: o?.state == .downloading && o?.interests == count + 1
+↳ setup: visited first, v4's visit re-queued O (T20), and its held retry holds zz-o's waiter and every member: Optional((state: ZTronAssetSync.JobState.failed(ZTronAssetModel.RetryDisposition.at(1023044292ns)), interests: 11))
+↳ o?.state == .downloading && o?.interests == count + 1 → false
+↳   o?.state == .downloading → false
+↳   o?.interests == count + 1 → <not evaluated>
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+✘ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" with 2 test cases failed after 1.368 seconds with 1 issue.
+↳ /// Shutdown while joins wait behind O's verdict clears every follow table, the buckets included
+↳ /// (`drainEverything`), and answers zz-o's waiter and every member's `shutDown`. O times out; the members are user
+↳ /// waiters; O's retry holds at the source (`holdRetry`). Visited first, the follow had ended, and v4's visit had moved
+↳ /// the members onto O's job and re-queued it (T20), so its retry, started at v4's barrier end, waits held with zz-o's
+↳ /// waiter and every member until the shutdown (the set-up check). Unheld, that retry could serve them before the
+↳ /// shutdown's first turn, an interleaving the test does not order (cycle 22's flake, ruling S3-R28 item 2).
+✘ Suite "Engine follow barrier (F-28)" failed after 1.368 seconds with 1 issue.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.369 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

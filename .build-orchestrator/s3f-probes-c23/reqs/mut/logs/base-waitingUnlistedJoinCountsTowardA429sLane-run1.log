@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" started.
+✔ Test "R-SYN-5: an unlisted join waiting for the drain counts toward a 429's lane through its own entry (F-28, R-CAR-2, d4 §3.8)" with 2 test cases passed after 0.842 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 0.843 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.843 seconds.

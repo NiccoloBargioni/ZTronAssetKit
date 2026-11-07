@@ -1,0 +1,267 @@
+15:33  up 4 days,  3:57, 2 users, load averages: 7.98 9.55 13.56
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" started.
+◇ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 0 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 0: 143 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 1 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 1: 142 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 2 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 2: 142 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 3 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 3: 141 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 4 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 4: 141 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 5 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 5: 141 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 6 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 6: 140 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 7 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 7: 139 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 8 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 8: 131 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 9 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 9: 130 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 10 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 10: 129 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 11 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 11: 126 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 12 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 12: 125 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 13 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 13: 125 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 14 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 14: 122 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 15 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 15: 121 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 16 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 16: 120 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 17 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 17: 123 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 18 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 18: 122 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 19 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 19: 120 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 20 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 20: 116 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 21 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 21: 115 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 22 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 22: 114 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 23 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 23: 113 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 24 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 24: 109 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 25 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 25: 108 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 26 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 26: 107 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 27 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 27: 103 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 28 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 28: 102 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 29 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 29: 101 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 30 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 30: 77 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 31 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 31: 77 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 32 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 32: 77 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 33 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 33: 74 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 34 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 34: 74 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 35 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 35: 74 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 36 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 36: 71 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 37 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 37: 71 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 38 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 38: 71 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 39 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 39: 68 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 40 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 40: 67 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 41 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 41: 67 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 42 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 42: 67 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 43 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 43: 64 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 44 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 44: 64 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 45 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 45: 64 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 46 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 46: 61 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 47 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 47: 61 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 48 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 48: 61 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 49 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 49: 58 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 50 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 50: 58 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 51 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 51: 58 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 52 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 52: 55 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 53 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 53: 55 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 54 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 54: 55 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 55 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 55: 52 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 56 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 56: 52 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 57 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 57: 51 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 58 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 58: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 59 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 59: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 60 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 60: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 61 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 61: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 62 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 62: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, slice → 63 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossDropUnsynced, slice 63: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 0 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 0: 143 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 1 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 1: 142 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 2 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 2: 142 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 3 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 3: 141 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 4 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 4: 141 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 5 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 5: 141 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 6 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 6: 140 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 7 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 7: 139 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 8 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 8: 131 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 9 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 9: 130 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 10 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 10: 129 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 11 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 11: 126 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 12 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 12: 125 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 13 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 13: 125 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 14 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 14: 122 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 15 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 15: 121 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 16 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 16: 120 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 17 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 17: 123 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 18 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 18: 122 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 19 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 19: 120 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 20 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 20: 116 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 21 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 21: 115 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 22 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 22: 114 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 23 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 23: 113 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 24 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 24: 109 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 25 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 25: 108 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 26 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 26: 107 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 27 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 27: 103 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 28 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 28: 102 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 29 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 29: 101 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 30 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 30: 77 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 31 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 31: 77 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 32 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 32: 77 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 33 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 33: 74 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 34 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 34: 74 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 35 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 35: 74 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 36 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 36: 71 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 37 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 37: 71 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 38 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 38: 71 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 39 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 39: 68 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 40 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 40: 67 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 41 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 41: 67 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 42 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 42: 67 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 43 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 43: 64 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 44 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 44: 64 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 45 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 45: 64 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 46 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 46: 61 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 47 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 47: 61 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 48 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 48: 61 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 49 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 49: 58 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 50 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 50: 58 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 51 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 51: 58 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 52 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 52: 55 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 53 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 53: 55 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 54 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 54: 55 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 55 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 55: 52 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 56 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 56: 52 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 57 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 57: 51 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 58 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 58: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 59 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 59: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 60 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 60: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 61 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 61: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 62 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 62: 48 pairs
+◇ Test case passing 2 arguments mode → .powerLossKeepMetadata, slice → 63 to "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" started.
+R-STO-11 legacy kill → powerLossKeepMetadata, slice 63: 48 pairs
+✔ Test "R-STO-11: a kill at every boundary of legacy migration, then a power loss at every boundary of the next lifetime, loses no verified legacy file" with 128 test cases passed after 203.553 seconds.
+✔ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" passed after 203.553 seconds.
+✔ Test run with 1 test in 1 suite passed after 203.553 seconds.
+exit 0
+15:37  up 4 days, 4 hrs, 2 users, load averages: 21.00 15.53 15.20

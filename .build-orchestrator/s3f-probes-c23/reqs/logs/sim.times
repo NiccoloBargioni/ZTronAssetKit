@@ -1,0 +1,8 @@
+20:37:15 start head d88bdb1 dirty 0 load { 65.53 49.49 50.05 }
+20:41:53 build-for-testing rc=0 load { 293.49 198.13 116.40 }
+20:41:53 waiting for lock load { 293.49 198.13 116.40 }
+20:41:53 lock taken load { 293.49 198.13 116.40 }
+20:58:54 suite rc=0 load { 222.38 188.07 163.93 }
+21:00:49 atsd x30 rc=0 load { 335.70 235.97 185.28 }
+21:00:50 lock released load { 335.70 235.97 185.28 }
+21:00:52 done dirty 0 load { 309.37 232.17 184.23 }

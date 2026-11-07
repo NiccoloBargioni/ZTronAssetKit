@@ -1,0 +1,10 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" started.
+✔ Test "R-SYN-11: a waiting join pinned to a job that committed follows its chain to the copy at the commit, and counts for nothing toward a later 429's lane (F-28, T21, d4 §3.7)" with 2 test cases passed after 1.864 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 1.864 seconds.
+✔ Test run with 1 test in 1 suite passed after 1.864 seconds.

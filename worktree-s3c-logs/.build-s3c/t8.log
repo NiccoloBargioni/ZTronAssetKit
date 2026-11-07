@@ -1,0 +1,308 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" started.
+◇ Suite "Cleanup: model-based oracle (R-STO-5)" started.
+◇ Suite "Cleanup: crash at every boundary of purge, quarantine, orphan GC, verification, a second extension and a leased eviction (R-STO-5)" started.
+◇ Suite "Cleanup: integrity bookkeeping and deep verification (R-INT-3, R-INT-4, R-CLN-8)" started.
+◇ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" started.
+◇ Test "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" started.
+◇ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" started.
+◇ Test "R-STO-5: crash at every boundary during orphan GC's doom and reap preserves I-1…I-5" started.
+◇ Test "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" started.
+◇ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+◇ Test "R-INT-3: repeated mismatches back off and finally mark the asset failed until its manifest entry changes" started.
+◇ Test "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" started.
+◇ Test "R-NET-6: recordFailure persists notFound across a reopen and a changed entry clears it" started.
+◇ Test "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" started.
+◇ Test "R-INT-3: a failure reported for content an entry no longer has changes nothing" started.
+◇ Test "R-INT-4: deep verification builds its due list off the actor and skips a blob quarantined while it is built" started.
+◇ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" started.
+◇ Test "R-CLN-7: a truncated blob is replaced by the next verified download" started.
+◇ Test "R-INT-4: deep verification repairs a corrupted resident blob within its byte budget" started.
+◇ Test "R-CLN-8: reportUnreadable quarantines the entry, removes the blob after grace and schedules a re-download" started.
+◇ Test "R-CLN-8: a quarantined blob resurrected by power loss is never re-adopted" started.
+◇ Test "R-INT-3: a stale asset keeps serving its old bytes while its new content backs off, and fails over to nothing at the cap" started.
+◇ Test "R-INT-4: deep verification discards a hash whose blob was quarantined or replaced meanwhile and never quarantines the new bytes" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" started.
+◇ Test "R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" started.
+◇ Test "R-INT-4: deep verification stops at its deadline and does nothing while the store is degraded" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during orphan GC's doom and reap preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" started.
+◇ Test case passing 2 arguments mode → .processKill, purge → blobs to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 1 argument mode → .processKill to "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" started.
+◇ Test case passing 1 argument seed → 1 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+◇ Test case passing 1 argument foundAtLaunch → true to "R-CLN-7: a truncated blob is replaced by the next verified download" started.
+◇ Test case passing 1 argument foundAtLaunch → false to "R-CLN-7: a truncated blob is replaced by the next verified download" started.
+◇ Test case passing 1 argument replaced → false to "R-INT-4: deep verification discards a hash whose blob was quarantined or replaced meanwhile and never quarantines the new bytes" started.
+◇ Test case passing 1 argument replaced → true to "R-INT-4: deep verification discards a hash whose blob was quarantined or replaced meanwhile and never quarantines the new bytes" started.
+◇ Test case passing 1 argument releasedUnits → 0 to "R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass" started.
+◇ Test case passing 1 argument releasedUnits → 1 to "R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass" started.
+◇ Test "R-NET-6: recordFailure leaves a record present at the failed content unchanged, and still fails a stale one" started.
+◇ Test case passing 1 argument releasedUnits → 2 to "R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass" started.
+✔ Test "R-INT-3: repeated mismatches back off and finally mark the asset failed until its manifest entry changes" passed after 0.040 seconds.
+✔ Test "R-INT-3: a failure reported for content an entry no longer has changes nothing" passed after 0.040 seconds.
+✔ Test "R-NET-6: recordFailure persists notFound across a reopen and a changed entry clears it" passed after 0.040 seconds.
+✔ Test "R-CLN-7: a truncated blob is replaced by the next verified download" with 2 test cases passed after 0.059 seconds.
+✔ Test "R-INT-3: a stale asset keeps serving its old bytes while its new content backs off, and fails over to nothing at the cap" passed after 0.060 seconds.
+✔ Test "R-INT-4: deep verification repairs a corrupted resident blob within its byte budget" passed after 0.060 seconds.
+✔ Test "R-CLN-8: reportUnreadable quarantines the entry, removes the blob after grace and schedules a re-download" passed after 0.060 seconds.
+✔ Test "R-CLN-8: a quarantined blob resurrected by power loss is never re-adopted" passed after 0.060 seconds.
+✔ Test "R-NET-6: recordFailure leaves a record present at the failed content unchanged, and still fails a stale one" passed after 0.060 seconds.
+✔ Test "R-INT-4: deep verification stops at its deadline and does nothing while the store is degraded" passed after 0.060 seconds.
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:163:9: Expectation failed: after == before
+↳ a record present at the failed content is left unchanged: Optional(ZTronAssetStorage.Residency.failed(ZTronAssetStorage.FailureReason.integrity))
+↳ after == before → false
+↳   after → AssetRecord(entry: ZTronAssetModel.ManifestEntry(identifier: present, fileExtension: "png", remotePath: "media/present.png", localPathComponents: ["dir"], localFileName: nil, byteSize: Optional(300), checksum: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), tags: [], policy: ZTronAssetModel.AssetPolicy.standard), residency: ZTronAssetStorage.Residency.failed(ZTronAssetStorage.FailureReason.integrity), expectedBlob: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), lastAccess: 2023-11-14 22:13:20 +0000, storedAt: Optional(2023-11-14 22:13:20 +0000), verifiedAt: nil, pinned: false, integrity: ZTronAssetStorage.IntegrityHistory(attempts: 1, failedIdentity: Optional(ZTronAssetModel.ContentIdentity.checksum(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8)), nextEligibleAt: nil), revision: 0)
+↳     some → AssetRecord(entry: ZTronAssetModel.ManifestEntry(identifier: present, fileExtension: "png", remotePath: "media/present.png", localPathComponents: ["dir"], localFileName: nil, byteSize: Optional(300), checksum: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), tags: [], policy: ZTronAssetModel.AssetPolicy.standard), residency: ZTronAssetStorage.Residency.failed(ZTronAssetStorage.FailureReason.integrity), expectedBlob: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), lastAccess: 2023-11-14 22:13:20 +0000, storedAt: Optional(2023-11-14 22:13:20 +0000), verifiedAt: nil, pinned: false, integrity: ZTronAssetStorage.IntegrityHistory(attempts: 1, failedIdentity: Optional(ZTronAssetModel.ContentIdentity.checksum(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8)), nextEligibleAt: nil), revision: 0)
+↳       entry → ManifestEntry(identifier: present, fileExtension: "png", remotePath: "media/present.png", localPathComponents: ["dir"], localFileName: nil, byteSize: Optional(300), checksum: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), tags: [], policy: ZTronAssetModel.AssetPolicy.standard)
+↳         identifier → present
+↳           rawValue → "present"
+↳         fileExtension → "png"
+↳         remotePath → "media/present.png"
+↳         localPathComponents → ["dir"]
+↳         localFileName → nil
+↳         byteSize → 300
+↳           some → 300
+↳         checksum → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳           some → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳             w0 → 17319718723509393887
+↳             w1 → 13334299877071491716
+↳             w2 → 12352908193315383962
+↳             w3 → 1821382955552225016
+↳         tags → []
+↳         policy → .standard
+↳       residency → .failed(ZTronAssetStorage.FailureReason.integrity)
+↳         failed → .integrity
+↳       expectedBlob → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳         some → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳           w0 → 17319718723509393887
+↳           w1 → 13334299877071491716
+↳           w2 → 12352908193315383962
+↳           w3 → 1821382955552225016
+↳       lastAccess → 2023-11-14 22:13:20 +0000
+↳         timeIntervalSinceReferenceDate → 721692800.0
+↳       storedAt → 2023-11-14 22:13:20 +0000
+↳         some → 2023-11-14 22:13:20 +0000
+↳           timeIntervalSinceReferenceDate → 721692800.0
+↳       verifiedAt → nil
+↳       pinned → false
+↳       integrity → IntegrityHistory(attempts: 1, failedIdentity: Optional(ZTronAssetModel.ContentIdentity.checksum(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8)), nextEligibleAt: nil)
+↳         attempts → 1
+↳         failedIdentity → .checksum(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8)
+↳           some → .checksum(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8)
+↳             checksum → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳               w0 → 17319718723509393887
+↳               w1 → 13334299877071491716
+↳               w2 → 12352908193315383962
+↳               w3 → 1821382955552225016
+↳         nextEligibleAt → nil
+↳       revision → 0
+↳   before → AssetRecord(entry: ZTronAssetModel.ManifestEntry(identifier: present, fileExtension: "png", remotePath: "media/present.png", localPathComponents: ["dir"], localFileName: nil, byteSize: Optional(300), checksum: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), tags: [], policy: ZTronAssetModel.AssetPolicy.standard), residency: ZTronAssetStorage.Residency.present(blob: ZTronAssetStorage.BlobKey(hash: f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8, ext: png), byteSize: 300, integrity: ZTronAssetModel.AssetIntegrity.verified), expectedBlob: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), lastAccess: 2023-11-14 22:13:20 +0000, storedAt: Optional(2023-11-14 22:13:20 +0000), verifiedAt: nil, pinned: false, integrity: ZTronAssetStorage.IntegrityHistory(attempts: 0, failedIdentity: nil, nextEligibleAt: nil), revision: 0)
+↳     entry → ManifestEntry(identifier: present, fileExtension: "png", remotePath: "media/present.png", localPathComponents: ["dir"], localFileName: nil, byteSize: Optional(300), checksum: Optional(f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8), tags: [], policy: ZTronAssetModel.AssetPolicy.standard)
+↳       identifier → present
+↳         rawValue → "present"
+↳       fileExtension → "png"
+↳       remotePath → "media/present.png"
+↳       localPathComponents → ["dir"]
+↳       localFileName → nil
+↳       byteSize → 300
+↳         some → 300
+↳       checksum → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳         some → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳           w0 → 17319718723509393887
+↳           w1 → 13334299877071491716
+↳           w2 → 12352908193315383962
+↳           w3 → 1821382955552225016
+↳       tags → []
+↳       policy → .standard
+↳     residency → .present(blob: ZTronAssetStorage.BlobKey(hash: f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8, ext: png), byteSize: 300, integrity: ZTronAssetModel.AssetIntegrity.verified)
+↳       present → (blob: ZTronAssetStorage.BlobKey(hash: f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8, ext: png), byteSize: 300, integrity: ZTronAssetModel.AssetIntegrity.verified)
+↳         blob → BlobKey(hash: f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8, ext: png)
+↳           hash → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳             w0 → 17319718723509393887
+↳             w1 → 13334299877071491716
+↳             w2 → 12352908193315383962
+↳             w3 → 1821382955552225016
+↳           ext → png
+↳             rawValue → "png"
+↳         byteSize → 300
+↳         integrity → .verified
+↳     expectedBlob → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳       some → f05c006a4c7599dfb90cf3170d619284ab6e588da5936a9a1946da25e1a436f8
+↳         w0 → 17319718723509393887
+↳         w1 → 13334299877071491716
+↳         w2 → 12352908193315383962
+↳         w3 → 1821382955552225016
+↳     lastAccess → 2023-11-14 22:13:20 +0000
+↳       timeIntervalSinceReferenceDate → 721692800.0
+↳     storedAt → 2023-11-14 22:13:20 +0000
+↳       some → 2023-11-14 22:13:20 +0000
+↳         timeIntervalSinceReferenceDate → 721692800.0
+↳     verifiedAt → nil
+↳     pinned → false
+↳     integrity → IntegrityHistory(attempts: 0, failedIdentity: nil, nextEligibleAt: nil)
+↳       attempts → 0
+↳       failedIdentity → nil
+↳       nextEligibleAt → nil
+↳     revision → 0
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:164:9: Expectation failed: harness.fileSystem.mutationCount == mutations
+↳ nothing is written for it
+↳ harness.fileSystem.mutationCount == mutations → false
+↳   harness.fileSystem.mutationCount → 60
+↳   mutations → 50
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:169:9: Expectation failed: live
+↳ its blob stays live: Optional(ZTronAssetStorage.BlobState.doomed(ZTronAssetStorage.DoomInfo(reason: ZTronAssetStorage.DoomReason.unreferenced, sinceSnapshotVersion: 6, droppedInGeneration: 5, eligibleAt: Optional(11000000000ns), failedUnlinks: 0)))
+↳ live → <not evaluated>
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" recorded an issue at IntegrityTests.swift:170:9: Expectation failed: await harness.store.location(for: present.id, extensions: [], recordingAccess: false) != nil
+↳ it is still served
+↳ await harness.store.location(for: present.id, extensions: [], recordingAccess: false) != nil → <not evaluated>
+✔ Test "R-INT-4: deep verification builds its due list off the actor and skips a blob quarantined while it is built" passed after 0.093 seconds.
+✘ Test "R-INT-3: recordIntegrityFailure leaves a record present at the failed content unchanged, and still fails a stale one" failed after 0.104 seconds with 4 issues.
+↳ /// Stage 3 ruling S3C-9 (S3-B-040): the engine reads presence before it reports (`sparePresent`), but one await
+↳ /// separates that read from this write, and a legacy adoption, or an `apply` adopting an orphaned blob of the same
+↳ /// content, can bind the id meanwhile. The store then holds a record present at the failed content, as here; with
+↳ /// one attempt allowed, counting the failure against it dropped the verified bytes it serves.
+R-STO-5 verifyIntegrity processKill: 7 crash points
+✔ Test "R-INT-4: deep verification discards a hash whose blob was quarantined or replaced meanwhile and never quarantines the new bytes" with 2 test cases passed after 0.157 seconds.
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" started.
+R-STO-5 orphan GC processKill: 8 crash points
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during orphan GC's doom and reap preserves I-1…I-5" started.
+✔ Test "R-CLN-12: deep verification cancelled while it builds its due list or hashes a blob records nothing, and the next run completes the pass" with 3 test cases passed after 0.179 seconds.
+✘ Suite "Cleanup: integrity bookkeeping and deep verification (R-INT-3, R-INT-4, R-CLN-8)" failed after 0.183 seconds with 4 issues.
+↳ /// Persisted failure bookkeeping, quarantine and deep verification (R-INT-3, R-INT-4, R-CLN-7, R-CLN-8, R-NET-6;
+↳ /// ADR-032, store.md §5.4–§5.6, §6.6).
+R-STO-5 eviction held by a lease processKill: 13 crash points
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" started.
+R-STO-5 oracle, seed 1: 40 steps, 5 lifetimes, 2 blob unlinks
+◇ Test case passing 1 argument seed → 2 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 verifyIntegrity processKillTornWrite: 7 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" started.
+R-STO-5 orphan GC processKillTornWrite: 8 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during orphan GC's doom and reap preserves I-1…I-5" started.
+R-STO-5 purge(.evictable) processKill: 14 crash points
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" started.
+R-STO-5 eviction held by a lease processKillTornWrite: 13 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" started.
+R-STO-5 oracle, seed 2: 40 steps, 4 lifetimes, 0 blob unlinks
+R-STO-5 purge(.all) processKill: 15 crash points
+◇ Test case passing 1 argument seed → 3 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" started.
+R-STO-5 verifyIntegrity powerLossDropUnsynced: 7 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" started.
+R-STO-5 orphan GC powerLossDropUnsynced: 8 crash points
+R-STO-5 reportUnreadable and its re-download processKill: 22 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during orphan GC's doom and reap preserves I-1…I-5" started.
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" started.
+R-STO-5 a second extension, then a removal processKill: 32 crash points
+◇ Test case passing 1 argument mode → .processKillTornWrite to "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" started.
+R-STO-5 oracle, seed 3: 40 steps, 5 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 4 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 verifyIntegrity powerLossKeepMetadata: 7 crash points
+✔ Test "R-STO-5: crash at every boundary during deep verification preserves I-1…I-5" with 4 test cases passed after 0.450 seconds.
+R-STO-5 orphan GC powerLossKeepMetadata: 8 crash points
+✔ Test "R-STO-5: crash at every boundary during orphan GC's doom and reap preserves I-1…I-5" with 4 test cases passed after 0.466 seconds.
+R-STO-5 eviction held by a lease powerLossDropUnsynced: 13 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" started.
+R-STO-5 oracle, seed 4: 40 steps, 4 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 5 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 purge(.evictable) processKillTornWrite: 14 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" started.
+R-STO-5 purge(.all) processKillTornWrite: 15 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" started.
+R-STO-5 oracle, seed 5: 40 steps, 5 lifetimes, 3 blob unlinks
+◇ Test case passing 1 argument seed → 6 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 reportUnreadable and its re-download processKillTornWrite: 22 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" started.
+R-STO-5 oracle, seed 6: 40 steps, 7 lifetimes, 3 blob unlinks
+◇ Test case passing 1 argument seed → 7 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 eviction held by a lease powerLossKeepMetadata: 13 crash points
+✔ Test "R-STO-5: crash at every boundary during an eviction whose reap waits for a lease preserves I-1…I-5" with 4 test cases passed after 0.595 seconds.
+R-STO-5 oracle, seed 7: 40 steps, 8 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 8 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 a second extension, then a removal processKillTornWrite: 32 crash points
+◇ Test case passing 1 argument mode → .powerLossDropUnsynced to "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" started.
+R-STO-5 purge(.evictable) powerLossDropUnsynced: 14 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" started.
+R-STO-5 oracle, seed 8: 40 steps, 7 lifetimes, 4 blob unlinks
+◇ Test case passing 1 argument seed → 9 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 purge(.all) powerLossDropUnsynced: 15 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" started.
+R-STO-5 oracle, seed 9: 40 steps, 5 lifetimes, 5 blob unlinks
+◇ Test case passing 1 argument seed → 10 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 reportUnreadable and its re-download powerLossDropUnsynced: 22 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" started.
+R-STO-5 oracle, seed 10: 40 steps, 9 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 11 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 purge(.evictable) powerLossKeepMetadata: 14 crash points
+✔ Test "R-STO-5: crash at every boundary during purge(.evictable) preserves I-1…I-5 and keeps the essential asset" with 4 test cases passed after 0.809 seconds.
+R-STO-5 oracle, seed 11: 40 steps, 6 lifetimes, 2 blob unlinks
+◇ Test case passing 1 argument seed → 12 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 a second extension, then a removal powerLossDropUnsynced: 32 crash points
+◇ Test case passing 1 argument mode → .powerLossKeepMetadata to "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" started.
+R-STO-5 oracle, seed 12: 40 steps, 5 lifetimes, 4 blob unlinks
+◇ Test case passing 1 argument seed → 13 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → blobs at CrashPairTests.swift:227:13: Expectation failed: stampedThenLost > 0
+↳ premise: some crash left a persisted stamp over a blob the purge then removed
+↳ stampedThenLost > 0 → false
+↳   stampedThenLost → 0
+◇ Test case passing 2 arguments mode → .processKill, purge → root to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 processKill, purge blobs: 80 crash points, 0 stamped then lost a blob
+R-STO-5 purge(.all) powerLossKeepMetadata: 15 crash points
+✔ Test "R-STO-5: crash at every boundary during purge(.all) preserves I-1…I-5" with 4 test cases passed after 0.906 seconds.
+R-STO-5 reportUnreadable and its re-download powerLossKeepMetadata: 22 crash points
+✔ Test "R-STO-5: crash at every boundary during a quarantine, its reap and the re-download preserves I-1…I-5" with 4 test cases passed after 0.923 seconds.
+R-STO-5 oracle, seed 13: 40 steps, 2 lifetimes, 2 blob unlinks
+◇ Test case passing 1 argument seed → 14 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 14: 40 steps, 7 lifetimes, 0 blob unlinks
+◇ Test case passing 1 argument seed → 15 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 15: 40 steps, 8 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 16 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 16: 40 steps, 5 lifetimes, 0 blob unlinks
+✔ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" with 16 test cases passed after 1.035 seconds.
+✔ Suite "Cleanup: model-based oracle (R-STO-5)" passed after 1.035 seconds.
+R-STO-5 a second extension, then a removal powerLossKeepMetadata: 32 crash points
+✔ Test "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" with 4 test cases passed after 1.049 seconds.
+✔ Suite "Cleanup: crash at every boundary of purge, quarantine, orphan GC, verification, a second extension and a leased eviction (R-STO-5)" passed after 1.049 seconds.
+R-CLN-7 processKill, purge root: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .processKill, purge → half to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .processKill, purge → half at CrashPairTests.swift:227:13: Expectation failed: stampedThenLost > 0
+↳ premise: some crash left a persisted stamp over a blob the purge then removed
+↳ stampedThenLost > 0 → false
+↳   stampedThenLost → 0
+R-CLN-7 processKill, purge half: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .processKill, purge → staging to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 processKill, purge staging: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → blobs to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, purge → blobs at CrashPairTests.swift:227:13: Expectation failed: stampedThenLost > 0
+↳ premise: some crash left a persisted stamp over a blob the purge then removed
+↳ stampedThenLost > 0 → false
+↳   stampedThenLost → 0
+R-CLN-7 powerLossDropUnsynced, purge blobs: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → root to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 powerLossDropUnsynced, purge root: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → half to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" recorded an issue with 2 arguments mode → .powerLossDropUnsynced, purge → half at CrashPairTests.swift:227:13: Expectation failed: stampedThenLost > 0
+↳ premise: some crash left a persisted stamp over a blob the purge then removed
+↳ stampedThenLost > 0 → false
+↳   stampedThenLost → 0
+R-CLN-7 powerLossDropUnsynced, purge half: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → staging to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 powerLossDropUnsynced, purge staging: 80 crash points, 0 stamped then lost a blob
+✘ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" with 8 test cases failed after 3.646 seconds with 4 issues.
+↳ /// The hunters' probe could not fail its "no stale synced claim" check: `FirstSync` never stamps. Here the run ends
+↳ /// stamped, so a crash after the stamp's commit leaves a persisted claim, and an OS purge that loses a blob must reset
+↳ /// it (R-CLN-7).
+✘ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" failed after 3.646 seconds with 4 issues.
+↳ /// Two-lifetime crash combinations (Stage 3 ruling S3C-8, S3-CRAS-04; adapted from the crash hunters'
+↳ /// `S3LegacyPairsProbe` and `S3PurgeAfterCrashProbe`): a kill at every boundary of legacy migration, then a power loss at
+↳ /// every boundary of the next lifetime, which migrates on (H-10, the S1-01 hazard: a lifetime building on a killed
+↳ /// process's unsynced namespace); and a crash at every boundary of a first sync that ends stamped, then an OS purge
+↳ /// between launches (R-CLN-7).
+✘ Test run with 23 tests in 4 suites failed after 3.646 seconds with 8 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetStorageTests (Swift Testing)

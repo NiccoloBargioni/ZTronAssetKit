@@ -1,0 +1,124 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -scheme ZTronAssetKit -destination "platform=iOS Simulator,id=6BE15CAF-7E02-4060-9338-9DAC025EDF0B" -derivedDataPath .build-verify-s3f-c23-reqs/xcode-sim "-only-testing:ZTronAssetSyncTests/EngineFollowBarrierTests/shutdownClearsTheJoinsBehindAVerdict(_:)" -test-iterations 30 -collect-test-diagnostics never
+
+Running tests repeatedly 30 times.
+
+Resolve Package Graph
+2026-11-06 20:59:07.915 xcodebuild[73498:18518593] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+
+
+Resolved source packages:
+  ZTronAssetKit: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f
+
+Test Suite 'Selected tests' started at 2026-11-06 20:59:42.747.
+Test Suite 'ZTronAssetSyncTests.xctest' started at 2026-11-06 20:59:42.748.
+Test Suite 'ZTronAssetSyncTests.xctest' passed at 2026-11-06 20:59:42.748.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-11-06 20:59:42.748.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.002) seconds
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64-apple-ios17.0-simulator
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 2).
+Resolve Package Graph
+
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 3).
+Resolve Package Graph
+
+Resolve Package Graph
+
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 4).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 5).
+Resolve Package Graph
+
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 6).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 7).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 8).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 9).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 10).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 11).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 12).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 13).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 14).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 15).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 16).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 17).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 18).
+Resolve Package Graph
+
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 19).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 20).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 21).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 22).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 23).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 24).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 25).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 26).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 27).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 28).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 29).
+​◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 30).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started.
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 2).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 3).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 4).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 5).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 6).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 7).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 8).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 9).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 10).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 11).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 12).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 13).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 14).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 15).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 16).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 17).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 18).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 19).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 20).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 21).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 22).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 23).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 24).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 25).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 26).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 27).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 28).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 29).
+​◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" started (repetition 30).
+​✔ Test "R-SYN-15: shutdown with joins behind a waiting verdict clears them and answers their waiters (F-28)" with 2 test cases passed after 62.939 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 62.945 seconds.
+✔ Test run with 1 test in 1 suite passed after 62.945 seconds.
+2026-11-06 21:00:46.022 xcodebuild[73498:18518593] [MT] IDETestOperationsObserverDebug: 97.561 elapsed -- Testing started completed.
+2026-11-06 21:00:46.022 xcodebuild[73498:18518593] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-11-06 21:00:46.022 xcodebuild[73498:18518593] [MT] IDETestOperationsObserverDebug: 97.561 sec, +97.561 sec -- end
+
+Test session results, code coverage, and logs:
+	/Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-verify-s3f-c23-reqs/xcode-sim/Logs/Test/Test-ZTronAssetKit-2026.11.06_20-59-08-+0100.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

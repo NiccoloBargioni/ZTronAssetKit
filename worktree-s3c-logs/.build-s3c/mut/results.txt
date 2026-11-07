@@ -1,0 +1,31 @@
+M-S-07 exit=1 :: ✘ Test run with 1 test in 1 suite failed after 0.004 seconds with 2 issues. 
+✘ Test "R-CLN-5: apply skips a planned victim leased after the plan, even when no access since the plan protects it" recorded an issue at LeaseTests.swift:387:9: Expectation failed: report.evicted.isEmpty
+✘ Test "R-CLN-5: apply skips a planned victim leased after the plan, even when no access since the plan protects it" recorded an issue at LeaseTests.swift:388:9: Expectation failed: await harness.isPresent(asset.id, at: asset.key) && harness.hasBlob(asset.ke
+M-S-08 exit=1 :: ✘ Test run with 1 test in 1 suite failed after 0.009 seconds with 1 issue. 
+✘ Test "R-CLN-5: the eviction dry run neither names a leased asset nor counts its bytes" recorded an issue at LeaseTests.swift:409:9: Expectation failed: beyond == nil
+M-S-20 exit=1 :: ✘ Test run with 1 test in 1 suite failed after 0.003 seconds with 3 issues. 
+✘ Test "R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed" recorded an issue at GarbageCollectionTests.swift:622:9: Expectation failed: inside == CleanupResult() && insideDoom == nil
+✘ Test "R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed" recorded an issue at GarbageCollectionTests.swift:623:9: Expectation failed: atGrace == CleanupResult() && atGraceDoom == nil
+✘ Test "R-CLN-2: an orphan younger than the orphan grace, or exactly that old, is kept; one older is doomed" recorded an issue at GarbageCollectionTests.swift:624:9: Expectation failed: past == CleanupResult(bytesFreed: 60, filesRemoved: 1, bytesDeferred: 0)
+baseline-oracle exit=0 :: ✔ Test run with 1 test in 1 suite passed after 0.580 seconds. 
+oracle-Z exit=1 :: error: Process '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper --test-bundle-path /Users/admin/Documents/ZTronAssetKit/.worktrees/s3c/.build-s3c/mut/build/out/Products/Debug/ZTronAssetStorageTests.xctest/Contents/MacOS/ZTron
+ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran
+oracle-C exit=0 :: ✔ Test run with 1 test in 1 suite passed after 0.564 seconds. 
+oracle-F exit=0 :: ✔ Test run with 1 test in 1 suite passed after 0.559 seconds. 
+oracle-S exit=0 :: ✔ Test run with 1 test in 1 suite passed after 0.569 seconds. 
+oracle-G exit=1 :: ✘ Test run with 1 test in 1 suite failed after 0.541 seconds with 235 issues. 
+✘ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" recorded an issue with 1 argument seed → 1 at OracleTests.swift:236:9: Expectation failed: violations.isEmpty
+↳ seed 1, lifetime crash Optional(65) powerLossDropUnsynced, unacknowledged: after ["add m1", "reopen", "publish m1", "evict m1", "reap"]: ["I-3: op 59 unlinked 629df4591cb15095e5acf5b15b378a5e07f7a447af3ca653316a535ed5188fc8.png before a snapshot without it
+↳   violations → ["I-3: op 59 unlinked 629df4591cb15095e5acf5b15b378a5e07f7a447af3ca653316a535ed5188fc8.png before a snapshot without it was acknowledged"]
+baseline-flows exit=0 :: ✔ Test run with 7 tests in 1 suite passed after 0.914 seconds. 
+flows-X exit=1 :: error: Process '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper --test-bundle-path /Users/admin/Documents/ZTronAssetKit/.worktrees/s3c/.build-s3c/mut/build/out/Products/Debug/ZTronAssetStorageTests.xctest/Contents/MacOS/ZTron
+ZTronAssetStorage/AssetStore+Publish.swift:358: Fatal error: S3MUT X: copyBlob ran
+flows-Z exit=1 :: error: Process '/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper --test-bundle-path /Users/admin/Documents/ZTronAssetKit/.worktrees/s3c/.build-s3c/mut/build/out/Products/Debug/ZTronAssetStorageTests.xctest/Contents/MacOS/ZTron
+ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran
+flows-G exit=1 :: ✘ Test run with 7 tests in 1 suite failed after 0.912 seconds with 363 issues. 
+✘ Test "R-STO-5: crash at every boundary while identical bytes are copied under a second extension, then one is removed, preserves I-1…I-5" recorded an issue with 1 argument mode → .processKill at CleanupFlowCrashTests.swift:64:9: Expectation failed: vio
+↳ a second extension, then a removal: the run without a crash: ["I-3: op 83 unlinked 77e0635edff7a29c70f770d96b0ae1bf11296741ea553e110cff38b3e78d1dcd.png 0.0 s after the acknowledgement, inside the 10.0 s grace"]
+↳   violations → ["I-3: op 83 unlinked 77e0635edff7a29c70f770d96b0ae1bf11296741ea553e110cff38b3e78d1dcd.png 0.0 s after the acknowledgement, inside the 10.0 s grace"]
+flows-S exit=0 :: ✔ Test run with 7 tests in 1 suite passed after 0.941 seconds. 
+flows-F exit=0 :: ✔ Test run with 7 tests in 1 suite passed after 0.909 seconds. 
+DONE

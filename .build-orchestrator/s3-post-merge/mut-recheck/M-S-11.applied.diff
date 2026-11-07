@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift b/Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift
+index 04e8bab..2a3bfed 100644
+--- a/Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift
++++ b/Sources/ZTronAssetStorage/Staging/StoreStagingSink.swift
+@@ -172,6 +172,8 @@ package struct StoreStagingSink: StagingSink {
+                     }
+                     do throws(FileSystemError) {
+                         try fileSystem.write(data, to: temporary, mode: truncate ? .truncate : .append)
++                    } catch .noSpace {
++                        // swallowed
+                     } catch {
+                         throw FileSystemErrorMapping.stagingError(error)
+                     }

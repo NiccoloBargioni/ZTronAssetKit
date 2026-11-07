@@ -1,4 +1,30 @@
-# Archive of `.build-orchestrator/` (snapshot 3, 2026-11-06 16:47 CET)
+# Archive of `.build-orchestrator/` (snapshot 4, 2026-11-07 04:40 CET)
+
+## Snapshot 4: what changed since snapshot 3
+
+The tree starts from snapshot 3's tree (`2d87b7c`), so every file that snapshot 3 held is still here. It adds:
+
+- **`.build-orchestrator/`**, refreshed. It now includes:
+  - the close ruling's appendix in `s3-rulings-s3f.md`;
+  - notes N31-N33;
+  - `s3f-c23-issues.json`;
+  - the post-merge folder `s3-post-merge/`:
+    - P-13's independent verification `p13-verify-wf_19408ffa-9ba.json`, with its items in `docs-followup-items.md`;
+    - the mutation re-check `mut-recheck/`;
+    - the ADR-057 docs workflow's output and journal.
+- **`worktree-<wp>-logs/.build-<wp>/…`**: every file, each up to 3 MB, that is cited under `.build-<wp>/` by the final Stage 3 drafts (`docs/adr-drafts/s3*.md` at `45df2e1`), or by a `.worktrees/s3*/…` path in `docs/ORCHESTRATION.md`, `docs/DECISIONS.md` or `.build-orchestrator/**/*.md`. This adds WP-F's cycle 23 evidence (runs 13 and 14) and the s3c, s3d and s3g citations.
+- **`build-orch-logs/`**: the post-merge evidence from the main checkout's `.build-orch/`:
+  - the merged head's `--full` (`merge-full.log`), with its `.verify-logs` copied as `merge-verify-logs-e840b0e/`;
+  - the quiet re-runs (`merge-userToBound-rerun1.log`, `merge-P13-quiet.log`);
+  - the tools-6.4 check (b) (`t64b/`);
+  - the simulator run (`sim-merged/`, without the 35 MB xcresult bundle; its summary is `sim-summary.json`);
+  - the mutation re-check logs (`mut-recheck/`);
+  - Stage 5's `--full` log as far as it had run (`stage5-full.log`; the run was still going).
+
+The state these files belong to: WP-F is merged into `feature/asset-kit` (`e840b0e`), ADR-057 is merged (`45df2e1`), and the post-merge checks are done (`docs/ORCHESTRATION.md`, the checklist under 6 Nov). The re-open dossier is `docs/REOPEN-WP-F.md` on `feature/asset-kit`.
+
+The rest of this README is snapshot 3's text. It is still true of the files it describes.
+
 
 This branch keeps the orchestrator's working files for ZTronAssetKit's Stage 3, so that a later re-open of WP-F (the `ZTronAssetSync` engine) can resume. The owner asked for it on 2026-11-06: "keep all your analysis results and persist what's needed for a later resume".
 

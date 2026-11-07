@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..54f4e7f 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -480,7 +480,7 @@ package struct CircuitBreaker: Sendable, Hashable {
+             self.appendWindow(true)
+             let errors = self.serverWindow.filter { $0 }.count
+             let samples = self.serverWindow.count
+-            if samples >= max(1, self.policy.serverMinimumSamples), Double(errors) >= self.policy.serverErrorRatio * Double(samples) {
++            if samples >= max(1, self.policy.serverMinimumSamples), Double(errors) > self.policy.serverErrorRatio * Double(samples) {
+                 self.open(.serverErrors, trips: self.carriedTrips + 1, at: now, seed: seed)
+             }
+         case .neutral, .abandoned:

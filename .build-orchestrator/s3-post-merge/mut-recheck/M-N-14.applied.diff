@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineSupport.swift b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+index 5892de5..90c9446 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineSupport.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineSupport.swift
+@@ -208,7 +208,7 @@ package enum Backoff {
+         if let retryAfter, retryAfter > policy.maxRetryAfter {
+             return nil
+         }
+-        let exponent = Double(max(attempt, 1) - 1)
++        let exponent = Double(max(attempt - 1, 1) - 1)
+         let ceiling = min(policy.maxDelay, policy.baseDelay * pow(2, min(exponent, 62)))
+         let unit = KeyedRandom.unitInterval(seed: seed, key: key, counter: UInt64(max(attempt, 1)))
+         let jittered = max(0, ceiling) * unit

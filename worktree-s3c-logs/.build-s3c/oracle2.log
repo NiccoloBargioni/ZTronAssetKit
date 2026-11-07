@@ -1,0 +1,40 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Cleanup: model-based oracle (R-STO-5)" started.
+◇ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+◇ Test case passing 1 argument seed → 1 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 1: 40 steps and 8 reaps, 7 lifetimes, 2 blob unlinks
+◇ Test case passing 1 argument seed → 2 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 2: 40 steps and 15 reaps, 6 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 3 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 3: 40 steps and 17 reaps, 8 lifetimes, 4 blob unlinks
+◇ Test case passing 1 argument seed → 4 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 4: 40 steps and 15 reaps, 4 lifetimes, 3 blob unlinks
+◇ Test case passing 1 argument seed → 5 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 5: 40 steps and 7 reaps, 9 lifetimes, 3 blob unlinks
+◇ Test case passing 1 argument seed → 6 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 6: 40 steps and 15 reaps, 10 lifetimes, 3 blob unlinks
+◇ Test case passing 1 argument seed → 7 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 7: 40 steps and 9 reaps, 8 lifetimes, 6 blob unlinks
+◇ Test case passing 1 argument seed → 8 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 8: 40 steps and 9 reaps, 9 lifetimes, 4 blob unlinks
+◇ Test case passing 1 argument seed → 9 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 9: 40 steps and 20 reaps, 9 lifetimes, 8 blob unlinks
+◇ Test case passing 1 argument seed → 10 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 10: 40 steps and 10 reaps, 9 lifetimes, 4 blob unlinks
+◇ Test case passing 1 argument seed → 11 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 11: 40 steps and 11 reaps, 6 lifetimes, 6 blob unlinks
+◇ Test case passing 1 argument seed → 12 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 12: 40 steps and 16 reaps, 5 lifetimes, 5 blob unlinks
+◇ Test case passing 1 argument seed → 13 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 13: 40 steps and 6 reaps, 6 lifetimes, 2 blob unlinks
+◇ Test case passing 1 argument seed → 14 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 14: 40 steps and 12 reaps, 8 lifetimes, 1 blob unlinks
+◇ Test case passing 1 argument seed → 15 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 15: 40 steps and 9 reaps, 8 lifetimes, 2 blob unlinks
+◇ Test case passing 1 argument seed → 16 to "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" started.
+R-STO-5 oracle, seed 16: 40 steps and 13 reaps, 6 lifetimes, 5 blob unlinks
+✔ Test "R-STO-5: seeded random store, relocate, remove, evict, reap, crash and reopen sequences match the oracle with I-1…I-5 after every step" with 16 test cases passed after 0.689 seconds.
+✔ Suite "Cleanup: model-based oracle (R-STO-5)" passed after 0.689 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.689 seconds.

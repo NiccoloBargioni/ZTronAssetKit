@@ -1,0 +1,45 @@
+Building for debugging...
+[Computing dependencies]
+[Pre-planning 1 / 472]
+[Planning deferred tasks]
+[3 / 4] ZTronAssetAppleHostedTests-product
+[16 / 25] ZTronAssetStorageTests-product
+[23 / 36] ZTronAssetStorageTests-product
+[26 / 36] ZTronAssetStorageTests-product
+[27 / 36] ZTronAssetStorageTests-product
+[32 / 36] ZTronAssetStorageTests-product
+[34 / 36] ZTronAssetStorageTests-product
+Build complete! (4,78 s)
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Test support: the poll that releases held store units (S3C-1)" started.
+◇ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" started.
+◇ Test case passing 1 argument mode → everyUnit to "Test support: the release poll never lets through a unit submitted after a condition read it outran" started.
+◇ Test case passing 1 argument mode → oldest to "Test support: the release poll never lets through a unit submitted after a condition read it outran" started.
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → everyUnit at PollReleaseTests.swift:58:9: Expectation failed: held == [2]
+↳ the unit submitted after the condition held is still held: []
+↳ held == [2] → false
+↳   held → []
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → oldest at PollReleaseTests.swift:58:9: Expectation failed: held == [2]
+↳ the unit submitted after the condition held is still held: []
+↳ held == [2] → false
+↳   held → []
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → everyUnit at PollReleaseTests.swift:59:9: Expectation failed: completed == [1]
+↳ only the unit submitted before the change ran: [1, 2]
+↳ completed == [1] → false
+↳   completed → [1, 2]
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" recorded an issue with 1 argument mode → oldest at PollReleaseTests.swift:59:9: Expectation failed: completed == [1]
+↳ only the unit submitted before the change ran: [1, 2]
+↳ completed == [1] → false
+↳   completed → [1, 2]
+✘ Test "Test support: the release poll never lets through a unit submitted after a condition read it outran" with 2 test cases failed after 0.001 seconds with 4 issues.
+↳ /// The race of S3-STAB-01 made deterministic: the condition captures its value, then the product overtakes it, makes
+↳ /// the state change the condition reads and submits its next unit before the round ends. A poll that reads the held
+↳ /// units after the condition releases that unit, which is the one the test means to keep (`listings() → 3` in
+↳ /// `LegacyEdgeTests`, `plan.victims → [o4, o5]` in `EvictionOverlapTests`).
+✘ Suite "Test support: the poll that releases held store units (S3C-1)" failed after 0.001 seconds with 4 issues.
+↳ /// The release poll every WP-C test drives held store units with (`CorePoll.releasing`; Stage 3 ruling S3C-1).
+✘ Test run with 1 test in 1 suite failed after 0.001 seconds with 4 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetStorageTests (Swift Testing)

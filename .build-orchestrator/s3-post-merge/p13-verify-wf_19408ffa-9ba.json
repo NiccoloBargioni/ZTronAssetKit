@@ -1,0 +1,280 @@
+{
+  "summary": "Independent read-only verification of P-13 judged on its p99 on the merged head (checklist item 4, P4)",
+  "agentCount": 3,
+  "logs": [],
+  "result": [
+    {
+      "lens": "fidelity",
+      "verdict": "PASS_WITH_NOTES",
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "title": "The records, and what the owner was told before ruling, overstate how robust the p99 pass is. Every run on the merged head passed with no spare tolerance, and the orchestrator's own quiet-load logs include runs the ruled statistic would fail.",
+          "evidence": "Paths are relative to /Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check unless given in full. (1) A nearest-rank p99 tolerates n - ceil(0.99n) units over 5 ms, which is 5 at 509-528 units (Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:591-598). All four runs on e840b0e had exactly 5 units over 5 ms: .verify-logs/benchmarks.log:160 (525 units) and /Users/admin/Documents/ZTronAssetKit/.build-orch/merge-P13-quiet.log:12, :30 and :48 (528, 509 and 519 units). So in each run the p99 sample is itself a stalled unit, at 4.31-4.89 ms. For comparison, p95 is about 0.99 ms and the on-CPU maximum about 1.0 ms. When option A was recommended, the p99 was quoted as about 1 ms: docs/DECISIONS.md:349 says 'measured p99 ≈ 1 ms', and the chat table at /Users/admin/.claude/projects/-Users-admin-Documents-ZTronAssetKit/eaf5a17f-3bdc-4079-a3a3-92d480a65b26.jsonl:1207 says 'p99 (approx.) ~1 ms'. (2) The reclaim() body is identical at s3-base and d97e4e7^ (I diffed the function), and Sources/ZTronAssetStorage/Blobs/ is unchanged from s3-base to e840b0e. On that same code, quiet-load runs on wp/s3f printed over-budget lists that fail p99 <= 5 ms: (a) /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c15/reqs/logs/bench.log:153 has 524 units with 7 over, so the p99 would be 6.66 ms, at a 1-minute load window of 1.96-6.47 (bench-load.txt). (b) /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c15/bench.log:125 has 539 units with 6 over, p99 5.40 ms, window 2.58-6.46. (c) /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c20/reqs/logs/gates/bench.log:141 has 494 units with 7 over, p99 5.93 ms, window 2.33-10.11; its verifier called it 'a quiet load of about 3 to 4' (s3f-c20-issues.json). Ten recorded runs had a sampled load window that stayed at 10.11 or below. Of those, 3 would fail, 4 pass with exactly the tolerated number of slow units (s3f c19 reqs, and the three quiet runs on the merged head), and 3 pass with room to spare. (3) ADR-050's amendment cites S3-PERF-03/S3B-12 as its evidence. That evidence rates the option '(A, marginal) ... p99 passes only when fewer than half of the stalls exceed the 4 ms headroom. p98 would be robust' (/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-hunt-result.json:384; s3-findings-s3b.json:276; docs/adr-drafts/s3b.md:378). docs/DECISIONS.md:368 leaves that rating out and blames failures on 'heavy load'. /Users/admin/Documents/ZTronAssetKit/docs/ORCHESTRATION.md:524-528 reports 'all passing' and gives only a 2-14 % margin in milliseconds. Before the ruling, the owner was told 'The performance hunter's new evidence supports option A' (transcript :712).",
+          "recommendation": "Put these facts in ADR-057, RESIDUAL-RISKS.md and VERIFICATION.md (the ADR-057 docs workflow is already running, per commit e912253). Give them to the owner as information about the ruling's premise: on a quiet host P-13 passes right at its tolerance and should be expected to fail some runs, possibly including Stage 5's --full. Any change to the statistic or the number stays the owner's decision (see the consequence in DECISIONS.md:368). Do not re-judge it."
+        },
+        {
+          "title": "ADR-050 quotes the ruling as 'P99', but the owner's words were 'List P99', which the orchestrator read as option A",
+          "evidence": "docs/DECISIONS.md:368 says 'The owner ruled \"P99\"'. The owner's message was 'Do not set any budget stop. List P99' (transcript :1006, 2026-10-29T14:25:36Z). It answered the question 'How should P-13 ... be ruled?', whose option A included 'update SPEC §6 and BenchStorage.swift accordingly' (transcript :273). /Users/admin/Documents/ZTronAssetKit/docs/ORCHESTRATION.md:800 and :803 record this correctly: '\"List P99\" read as the ruling; the owner can correct it'. The orchestrator told the owner how it read the message at :1207 (14:30:23Z). I searched every project transcript after 14:26Z, and no later owner message mentions P-13 or p99.",
+          "recommendation": "In ADR-057, or in an amendment to ADR-050, quote the owner's exact words and state that they were read as option A. Note that the owner was told at 14:30 and has not corrected it. Consider adding the confirmation to the Stage 5 owner items."
+        },
+        {
+          "title": "ARCHITECTURE §12 still says P-13 asserts the maximum",
+          "evidence": "docs/ARCHITECTURE.md:836 (row S2-27) says 'P-13 asserts the maximum unit duration (ADR-050; the owner rules on the proposal there)'. That contradicts BenchStorage.swift:253 and SPEC.md:308. §12 (ARCHITECTURE.md:702-704) presents its rows as what the documents now prescribe. ARCHITECTURE.md was last changed on 24 Oct (2d73083), and the plan for d97e4e7 does not cover it.",
+          "recommendation": "The ADR-057 docs writer, who owns ARCHITECTURE, updates row S2-27 to the p99 and adds the ruling's date."
+        },
+        {
+          "title": "DECISIONS.md:349 still carries a NEEDS-HUMAN-REVIEW tag and its pre-ruling wording",
+          "evidence": "docs/DECISIONS.md:349 still reads 'P-13 proposal to the owner · NEEDS-HUMAN-REVIEW ... BenchStorage.swift keeps asserting the maximum and fails until the owner rules'. Meanwhile the heading at :342 says 'P-13 ruled by the owner on 2026-10-29', and the owner review list at :5, described as 'kept in step with the tags', no longer names P-13. CLAUDE.md does not require this tag for a benchmark statistic.",
+          "recommendation": "Optional, following the ADR amendment convention: add a pointer such as '(superseded by the 2026-10-29 amendment)', or have ADR-057 say so."
+        },
+        {
+          "title": "The doc comment credits S3-PERF-03 with '5–11 ms' stalls, but the stalls under 5 ms are the ones that set the p99",
+          "evidence": "BenchStorage.swift:20-21. S3-PERF-03 measured 7-13 stalls over 2 ms per 10,000 unlinks, with maxima of 4.4-6.6 ms (docs/adr-drafts/s3b.md:363-366). The 5.2-10.8 ms range comes from ADR-050's Stage 2 runs (DECISIONS.md:348). The p99 units on the merged head contain stalls of 4.09-4.86 ms (benchmarks.log:160). The failure message at :253 gives the p99 and the maximum, but not the over-budget count against the tolerance, which is what actually decides pass or fail.",
+          "recommendation": "Optional: change the wording to '2–11 ms', and add units.count and the over-budget count to the failure message. Do this as a later recorded change, verified by someone who did not write it."
+        },
+        {
+          "title": "'Judged in the idle --perf' rests on runs of P-13 alone, and the --full run does not print P-13's load",
+          "evidence": "The plan (/Users/admin/Documents/ZTronAssetKit/docs/ORCHESTRATION.md:811) asks for the idle --perf. The record at :523-524 says the --full's benchmark stage covers it. That stage runs serially (/Users/admin/Documents/ZTronAssetKit/.build-orch/merge-full.log:103), but P-13 prints no load. The first load printed after P-13, about 1.5-2 minutes later, is 3.35 6.95 8.74 (benchmarks.log:252), and the end of the stage ran at loads of 10-20 (benchmarks.log:379-404). The three quiet runs use the --perf command filtered to P-13, at loads 4.14→4.05, 4.05→3.88 and 3.88→3.65 (merge-P13-quiet.log:1, 18, 19, 36, 37, 54). The quiet log does not name its commit or scratch path.",
+          "recommendation": "This is acceptable and accurately recorded. P-13 is a SPEC §6 budget, not a C2 case, so I applied three rules: the plan's idle rule (1-minute load of 10 or less at both readings, ORCHESTRATION.md:522), BenchStorage.swift:24-25 (the orchestrator's quiet-machine run is the reference), and ADR-050's per-run consequence (DECISIONS.md:368). I did not apply S3-R23 (s3-rulings-s3f.md:295-310) or 'How a C2 figure is read' (:756-764): they govern C2 cases, and a best-of-3 rule does not fit a statistic computed within one run. Under these rules all three quiet runs pass. Future P-13 logs could print the commit and the loads."
+        }
+      ],
+      "checked": [
+        "Scope of the change: git show --stat d97e4e7 shows that only Tests/ZTronAssetKitBenchmarks/BenchStorage.swift changed (+9/-5), in two hunks: the doc comment (old lines 16-27) and reclaim() (old lines 237-253). The commit is dated 2026-10-30 09:38:07 +0100.",
+        "No later edits: git log d97e4e7..e840b0e on BenchStorage.swift, SPEC.md and Scripts/quality-gates.json returns nothing. The blobs of BenchStorage.swift (aac3782), SPEC.md (ad62969), quality-gates.json (a4536d8) and DECISIONS.md (140468f) are identical at d97e4e7 and e840b0e. git log e840b0e..feature/asset-kit (51c1f90) on these files and Scripts/ also returns nothing.",
+        "The assertion matches the plan text in ORCHESTRATION.md:811 exactly: BenchStorage.swift:243 computes `let p99 = StorageBench.percentile(units, 0.99)` and :253 asserts `#expect(p99 <= batchBudget, \"... p99 \\(p99) ms, the longest deletion unit \\(longest) ms\")`.",
+        "The maximum is still printed: BenchStorage.swift:242 and :249 ('unit p99 ..., max ... (p50 ..., p95 ...)'), and it appears in the failure message at :253. Nothing was dropped from the print.",
+        "Doc comment: BenchStorage.swift:19-24 names the p99, 'the owner's ruling of 2026-10-29, ADR-050 option A', and 'The p99 is asserted against batch_ms_max'. The old sentence asserting the maximum was replaced.",
+        "The nearest-rank percentile in BenchStorage.swift:590-598 matches what ADR-050 says (DECISIONS.md:368). The population is the TimingExecutor units recorded between timer.reset() and the end of runDueWork (:235-240, :601-638), unchanged by d97e4e7.",
+        "No other P-13 assertion was dropped or loosened: :232 (missingBlobs), :233, :251 (reaped key and byte counts), :252 (total <= gc_total_s_max) and :254 (unit count) are untouched.",
+        "Companion test: reapScaling (:257-302) is untouched by d97e4e7. It last changed in a5edd1e, which is recorded in docs/adr-drafts/s3b.md:163-166 (S3B-5).",
+        "reclaim() is identical at s3-base and d97e4e7^ (I diffed the function), and Sources/ZTronAssetStorage/Blobs/ is unchanged from s3-base to e840b0e. So the wp/s3f runs are comparable.",
+        "G1: harness-frozen is a lightweight tag on 7f24d4c (2026-10-04) and an ancestor of d97e4e7, 939 commits earlier. git diff harness-frozen e840b0e -- Scripts/ is empty. The sha256 of quality-gates.json is 2725907c…, the same as at harness-frozen and as pinned in PROMPT.md:96. quality-gates.json:112-116 holds blobs 10000, gc_total_s_max 2.0, batch_ms_max 5. merge-full.log:5-6 prints GATES-CONFIG with that sha and 'HARNESS: unchanged since harness-frozen'.",
+        "G3: BenchStorage.swift was added in this repo by 0a16e5e (2026-10-08, WP-B). It is not a pre-existing ZTronCarouselCore CDN test, and docs/MIGRATION.md covers only the R-CAR-6 shims, so no MIGRATION entry is needed. The loosening from max to p99 rests on the owner's answer (transcript :273 offers option A; :1006 is the owner's reply).",
+        "SPEC: SPEC.md:308 was changed by 73ae692 at 2026-10-29 15:29:47 +0100, four minutes after the owner's message at 15:25:36 CET. The row carries '(owner ruling 2026-10-29, ADR-050 option A)'. The heading at DECISIONS.md:342 and the amendment at :368 agree. The owner list at :5 no longer names P-13. CLAUDE.md's NEEDS-HUMAN-REVIEW categories do not include a benchmark statistic.",
+        "Code, SPEC and ADR agree: 'p99 of the batch durations' (SPEC.md:308), 'p99 of the deletion-unit durations, nearest rank' (DECISIONS.md:368), and the p99 of the units (BenchStorage.swift:243, :253). They match P-1 and P-9's p99 form (SPEC.md:296, :304).",
+        "Ordering: d97e4e7's parent is d59bcc4, which comes after the s3b merge 48b662d, as the plan requires ('after merging wp/s3b'; ORCHESTRATION.md:834).",
+        "Full run: benchmarks.log:160 shows 525 units, p99 4.803125, max 8.094875, total 0.578 s and 5 over budget, and the test passed at :161 (StorageBenchmarks passed at :171). The 7 issues are the six purge cases and R-SYN-11 (benchmarks.log:350-427). merge-full.log:126 ends 'VERIFY: FAIL (1 failed: benchmarks)'.",
+        "Quiet runs: merge-P13-quiet.log:12, :30 and :48 show p99 4.889792, 4.812542 and 4.306208 ms, max 10.51, 9.70 and 8.00 ms, 5 over in each run, all passing (exit 0), at loads 4.14→3.65.",
+        "The records match the logs: ORCHESTRATION.md:504 and :524-528 give p99 4.80, 4.89, 4.81 and 4.31 ms, totals 0.58 and 0.57 s, and a margin of 2.2-13.9 %. ORCHESTRATION.md:522 cites BenchStorage.swift:253 correctly.",
+        "The ruling's provenance: the owner's exact words are at transcript :1006. The orchestrator's reading was told to the owner at :1207. No later owner message about P-13 exists in any project transcript.",
+        "The earlier verifier findings (s3f-c20 through c23 issues files) concern wp/s3f's maximum assertion at :249. All are non-blocking and routed to WP-B. They do not bear on d97e4e7's fidelity."
+      ],
+      "notVerified": [
+        "Whether the owner meant option A by 'List P99'. Only the owner can confirm it. The reading is recorded at ORCHESTRATION.md:803 and was told to the owner at transcript :1207, with no correction found.",
+        "P-13's 1-minute load during the --full run: the benchmark does not print it.",
+        "That the quiet runs ran on e840b0e. The log names no commit or scratch path. Its output format proves the source is from after d97e4e7, and the merge-check worktree is at e840b0e.",
+        "The 'measured p99 ≈ 1 ms' claim in DECISIONS.md:349. The Stage 2 logs (.build-orch/bench2.log and bench3.log) print no p99.",
+        "I ran no build, test or benchmark, as the constraints required. Every figure comes from existing logs. The p99 verdicts for the wp/s3f runs are computed from their printed over-budget lists, which is exact for a nearest-rank p99; they were not re-measured.",
+        "How P-13 behaves on a real iOS device."
+      ]
+    },
+    {
+      "lens": "measurement",
+      "verdict": "PASS_WITH_NOTES",
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "title": "No spare units: every e840b0e run had exactly the 5 over-budget units the p99 tolerates",
+          "evidence": "Nearest rank (Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:590-598): for 500 <= n <= 599 the p99 is the sixth-longest unit (0-based index n-6), so at most 5 units may exceed 5 ms and a sixth fails. The tolerance is 4 for n = 400-499 and 6 at n = 600. Full run (/Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check/.verify-logs/benchmarks.log:160): 525 units, p99 4.803125 ms, max 8.094875 ms, 5 units over 5 ms (5.33/6.38/5.50/6.89/8.09 ms), 8 unlinks over 4 ms. Quiet re-runs (/Users/admin/Documents/ZTronAssetKit/.build-orch/merge-P13-quiet.log runs 1-3): 528/509/519 units, p99 4.889792/4.812542/4.306208 ms, max 10.51/9.70/8.00 ms, exactly 5 units over 5 ms in each, 7/8/6 unlinks over 4 ms. Margins below 5 ms: 0.197/0.110/0.187/0.694 ms (3.9/2.2/3.7/13.9 %). The p95 is about 1.0 ms in all four runs, so the p99 unit is itself a stalled unit. In each run about 1-3 units held a 4-5 ms stall and stayed just under budget.",
+          "recommendation": "Record P-13 on e840b0e as passing at the edge (5 of the 5 tolerated over-budget units in each of the 4 runs, p99 4.31-4.89 ms), not as a plain pass."
+        },
+        {
+          "title": "Expected failure rate at a quiet load is about 30% per run, not only under the heavy load the ruling expects",
+          "evidence": "I found 53 distinct recorded P-13 runs that print the over-budget list. All use the same deletion unit: BlobUnits.swift last changed in de7e6a5, an ancestor of 8e1fb24, d5b2ab9 and d88bdb1. The reaper's change from 8e1fb24 to e840b0e only touches its actor-side queue (git diff of AssetStore+Reaper.swift). Of the 53, 17 exceed the p99 tolerance (32%, Wilson 95% 0.21-0.45). At typical n = 478-559 it is 11 of 36 (31%, 0.18-0.47); the mean is 4.56 over-budget units per run and a Poisson fit gives P(>=6) = 0.31. Three runs that would fail the p99 were checked at a quiet 1-minute load: (1) /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c20/reqs/logs/gates/bench.log:141, 494 units, 7 over; P-13 ran about 05:14:21, bench-load.txt:60 reads { 3.61 5.33 72.95 }. (2) /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c19/final/bench.log:140, 507 units, 9 over; about 20:58:00 at a 1-minute load of 5.24-5.26, minutes after a peak of 266. (3) /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c22/gates/bench.log:141, 478 units, 5 over against a tolerance of 4; 1-minute load 2.6-5.6. The ruling's consequence (docs/DECISIONS.md:368) expects failing runs only under 'heavy load'. A --full PASS needs P-13's p99 to pass (/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c22-analysis/end-sooner-options.md:109).",
+          "recommendation": "Carry this as a residual risk: a later idle --perf or --full on this same head may fail P-13 with no code change, roughly one run in three at typical n. Report any such run with its figures, as the ruling requires. Tell the owner this as information, not as a re-judgment: S3B-12 (docs/adr-drafts/s3b.md:381-382) called a p98 robust and the owner ruled p99. Only the owner can change the percentile."
+        },
+        {
+          "title": "ADR-050's P-13 amendment states evidence the data contradicts",
+          "evidence": "docs/DECISIONS.md:368 says 'every quiet run had 2-4 units over 5 ms out of 490-562'. On e840b0e the quiet runs had 5, 5 and 5, and the cycle-20 run at a load of 3.6 had 7. The same line says 'At about 560 units ... a run passes with up to five stalled units', which holds only for 500 <= n <= 599. At n < 500, which covers 8 of the 36 typical runs (down to n = 478), only four are tolerated; at n >= 600, six. Option A's original premise, 'measured p99 ≈ 1 ms' (docs/DECISIONS.md:349), no longer matches: the p99 is now 4.3-4.9 ms, inside the stall tail.",
+          "recommendation": "Correct the amendment in the next records pass (ADR-057): give the tolerance by n, the observed over-budget counts, and the expected per-run failure rate."
+        },
+        {
+          "title": "'Judged in the idle --perf' is met in substance but not to the letter",
+          "evidence": "The plan step is in /Users/admin/Documents/ZTronAssetKit/docs/ORCHESTRATION.md:795. Full run: the P-13 line prints no load (BenchStorage.swift:248-250), although S3-R23 item 1 asks for loads beside every benchmark figure (/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md:296). P-13 started 131.6 s into the 630.8 s test run, about 132 s after a 233.86 s release build. The nearest load reading came about 118 s after P-13 ended (benchmarks.log:252: 3.35 6.95 8.74). Loads of 10-23 appear only from about 213 s after P-13 (benchmarks.log:363 onward), so the brief's '10-16 near the stage's end' does not describe P-13's moment; its own load is unknown. Quiet re-runs: loads were recorded per run (4.14->4.05, 4.05->3.88, 3.88->3.65), which is quiet under the project's only threshold (s3-rulings-s3f.md:759). But each was a filtered single test ('Test run with 1 test in 2 suites'), not --perf (Scripts/verify.sh:115, 88 tests), and the log records no commit, scratch path or command.",
+          "recommendation": "Either record the quiet reference as it is ('three standalone filtered P-13 re-runs at 1-minute loads 3.65-4.14 on e840b0e, plus the full run's pass at an unrecorded load'), or run --perf on an idle host once the simulator suite ends and judge P-13 there; a fail in that run is reported per the ruling. Put the command, commit and scratch path in the header of future quiet logs."
+        },
+        {
+          "title": "The P-13 benchmark prints no load averages",
+          "evidence": "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:248-250 prints no loadavg, while BenchSync cases print 'load a b c -> d e f' (benchmarks.log:252, 283-467). S3-R23 item 1 (s3-rulings-s3f.md:296) asks for loads beside every benchmark figure.",
+          "recommendation": "Have WP-B add vm.loadavg read before and after to the P-13 print, so the figure from a --full or --perf run can be classified as quiet or not."
+        },
+        {
+          "title": "Three stale P-13 statements in comments",
+          "evidence": "Sources/ZTronAssetStorage/Blobs/BlobUnits.swift:155-156 still says 'P-13 bounds **every** batch between suspension points by batch_ms_max', but SPEC.md:308 now judges the p99. BlobUnits.swift:160 says stalls come 'about every 150 ms of sustained unlinking', but S3B-12 found they recur by count, not on a timer (docs/adr-drafts/s3b.md:366-367). BenchStorage.swift:20-21 says 'one unlink in about every 850-1,060 stalls ... for 5-11 ms'; S3B-12 measured 7-13 stalls over 2 ms per 10,000 unlinks, max 4.4-6.6 ms, in its isolated probe (s3b.md:362-363). If every such stall lasted 5 ms or more, each run would have 9-12 over-budget units and the p99 would fail every time; e840b0e shows only 3-5 unlinks over 5 ms per run.",
+          "recommendation": "Fix these in WP-B's next documentation pass. They are outside d97e4e7's plan text, which names only BenchStorage.swift's statistics doc comment (which it did update)."
+        }
+      ],
+      "checked": [
+        "Tree: merge-check worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check is at e840b0e (committed 22:32:49 on 6 Nov; .verify-logs start 22:33 with toolchain.log). Only docs/TRACEABILITY.md is modified, and BenchStorage.swift matches HEAD.",
+        "d97e4e7 changes only Tests/ZTronAssetKitBenchmarks/BenchStorage.swift (+9 -5). It adds p99 = StorageBench.percentile(units, 0.99) at :243 and #expect(p99 <= batchBudget, ...) with the longest unit in the message at :253. The maximum, p50, p95, over-budget units and stalled unlinks are still printed at :248-250. The doc comment at :19-24 names the p99, the owner's ruling of 2026-10-29 and ADR-050 option A. This matches ORCHESTRATION.md:795 and DECISIONS.md:368.",
+        "No later commit touched these lines. git log e840b0e: BenchStorage.swift last changed in d97e4e7; SPEC.md in 73ae692 (before d97e4e7); Scripts/quality-gates.json in 7f24d4c. git diff d97e4e7 e840b0e on BenchStorage.swift is empty.",
+        "Budgets unchanged: Scripts/quality-gates.json:112-116 has blobs 10000, gc_total_s_max 2.0, batch_ms_max 5. SPEC.md:308 carries the p99 ruling.",
+        "StorageBench.percentile (BenchStorage.swift:590-598) is nearest rank: index = ceil(fraction*n) - 1, clamped to [0, n-1], taken over values.sorted(), which is a copy (the parameter is an immutable value). For n = 509/519/520/525/528 the index is 503/513/514/519/522, i.e. n-6, the sixth-longest unit. Tolerance: 5 units over 5 ms for 500 <= n <= 599, 4 for 400-499, 6 at n = 600. 0.99*n was checked in IEEE double; there is no rounding hazard for n in 400-699.",
+        "Empty input returns 0, which would be a vacuous pass. But reclaim() also asserts units.count >= 10000/64 = 156 (:254; StoreTypes.swift:46 deletionBatchSize 64) and reapedKeys == count (:251), so an empty or partial population fails the test.",
+        "Population: TimingExecutor (BenchStorage.swift:604-637) records the ContinuousClock wall time and thread CPU of each work() on the wrapped serial queue, which runs at utility QoS (Sources/ZTronAssetModel/Environment/BlockingExecutor.swift:41). The P-13 store's metadata executor is that timer (:226-232). It is reset at :235 after apply(empty) and read at :239 before close(). Every deletion unit runs through runUnit(on: metadataExecutor) (Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift:183-185); runUnit only adds a drain counter (AssetStore+Lifecycle.swift:57-63). BlobDeletionUnit.run (BlobUnits.swift:162-182) is exactly the unit: at most 64 keys and a 1 ms predicted budget.",
+        "Nothing else is mixed into the population. runDueWork's only other metadata-executor call is the coalesced commit (AssetStore+Reaper.swift:118-131 calling AssetStore+Commit.swift:125), and it runs only when a soon commit is pending. apply commits its own writes, startGrace marks nothing dirty (AssetStore+Snapshot.swift:85-94), and the reaper marks changes .lazy (AssetStore+Reaper.swift:216). The snapshot install goes to the sink, not the executor (AssetStore+Lifecycle.swift:66-73). unlinkProfile runs after :239, on its own LiveFileSystem in another directory (:482-497). Every over-budget unit in the four e840b0e runs has 0.22-1.02 ms on CPU, i.e. a stalled deletion unit, not a commit.",
+        "Nothing is excluded: work.reapedKeys == 10,000 (:251) puts every deletion inside the timed window, and the timed interval wraps exactly work(); the lock append happens after elapsed is computed.",
+        "Measurements read: benchmarks.log:160-161 (P-13 passed) and merge-P13-quiet.log runs 1-3 (each passed, exit 0). The full run's 7 benchmark issues are the six R-CLN-6 purge shapes and one R-SYN-11 re-route case (benchmarks.log:350-427), not P-13. /Users/admin/Documents/ZTronAssetKit/.build-orch/merge-full.log ends 'VERIFY: FAIL (1 failed: benchmarks)'.",
+        "Load timing of the full run's P-13, from sums of the overall 'passed/failed after' lines (total 630.7 s against the run's 630.778 s): 131.6 s of tests before P-13; 117.7 s from its end to the first printed load (benchmarks.log:252); 212.5 s to the first 1-minute load of 10 or more (benchmarks.log:363, 23.01); 496.8 s to the end of the run.",
+        "Load rule applied. P-13 is a SPEC §6 budget judged per run on its p99: a run beyond the tolerance fails and is reported, never re-judged (DECISIONS.md:368). So no best-of-3. I apply S3-R23 item 1 (loads beside every benchmark figure, s3-rulings-s3f.md:296) and the benchmark's own reference rule (BenchStorage.swift:25-26: the quiet-machine run is the reference). For the number I borrow the project's only quiet threshold, from C2 (s3-rulings-s3f.md:759; S3-R23 item 3: 1-minute load <= 10 just before and just after). Under it the re-runs at <= 4.14 are quiet and the full run's P-13 is unclassified. S3-R23 item 2's above-50 exemption does not arise because nothing missed.",
+        "Base-rate inputs: 76 files hold 'P-13 reclaim of' lines. De-duplicated by (total, n, max), 53 runs print the over-budget list. Over-budget count histogram: 0:1, 1:2, 2:3, 3:6, 4:9, 5:14, 6:5, 7:5, 8:4, 9:1, 13:1, 62:1, 69:1; the 13, 62 and 69 runs were heavy-load runs with n = 901-1274.",
+        "For three of the earlier runs, P-13's start time was derived from build time plus the tests before it, against each run's 5-second load samples: c20 /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-probes-c20/reqs/logs/gates/times.txt and bench-load.txt; c19 /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c19/final/times.txt (prebuild took 3 s, so the 144.68 s build was inside the bench command); c22 /Users/admin/Documents/ZTronAssetKit/.worktrees/s3f/.build-s3f/c22/gates/times.txt.",
+        "Host: 8 logical CPUs (4 performance and 4 efficiency, from hw.perflevel0/1), so a 1-minute load of about 4 means roughly half the cores busy. The data volume is 95% full (46 GiB free) at the time of this check.",
+        "Process disclosure: I created p13files.txt, p13offset.py and an initial p13scan.py in the session scratchpad (/private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/scratchpad), which the read-only instruction did not allow. My first write of p13scan.py may have overwritten an earlier same-named file of another agent; that agent later rewrote it. I then appended to their file by mistake and removed exactly the appended bytes. No repository or worktree file was edited, staged or committed."
+      ],
+      "notVerified": [
+        "I ran no timing myself, because builds and benchmarks were forbidden while the iOS Simulator suite runs. Every figure comes from the logs cited.",
+        "The full run's load at P-13's own moment (about 23:55:40 on 6 Nov, counted back from the log's 00:04 end): not recorded anywhere I found.",
+        "That the quiet re-runs built and ran e840b0e's tree. The log names no commit, scratch path or command. The merge-check worktree is at e840b0e and its .build-orch-merge-perf scratch was written in that window, which is consistent but not proof.",
+        "Whether runDueWork ran a coalesced commit on the timed executor in these runs; the benchmark does not print work.committed. Code reading says no, and no over-budget unit shows commit-like CPU time. If one ran, it would add one unit to n.",
+        "The loads of most historical runs in the 31% base rate. Only the three failing runs cited were checked, so the figure may mix in some runs above the quiet threshold.",
+        "Whether the stall rate depends on the volume's fill level (95% now), or has drifted since the L2-era runs that had 2-3 over-budget units at about 490.",
+        "Whether the stalls recur every ~150 ms (BlobUnits.swift:160) or by count (S3B-12), and what an iPhone's APFS volume does. The benchmark measures only this Mac."
+      ]
+    },
+    {
+      "lens": "refuter",
+      "verdict": "PASS_WITH_NOTES",
+      "blocking": [],
+      "nonBlocking": [
+        {
+          "title": "Every run on e840b0e passed with no spare slow units: each had exactly the 5 units over 5 ms that the p99 allows",
+          "evidence": "The nearest-rank p99 (Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:591-598, rank ceil(0.99n)-1) is the 6th-longest unit when n is 500-599. Full run (/Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check/.verify-logs/benchmarks.log:160): n 525, five units over 5 ms (5.33, 6.38, 5.50, 6.89, 8.09 ms), p99 4.803 ms. Quiet runs (/Users/admin/Documents/ZTronAssetKit/.build-orch/merge-P13-quiet.log:12,30,48): n 528/509/519, five units over 5 ms in each, p99 4.890/4.813/4.306 ms. In all four runs p95 is 0.99-1.00 ms, so the p99 unit itself contains a stalled unlink: each run had 6-8 unlinks over 4 ms, several of them at 4.1-4.9 ms. One more stalled unit over 5 ms in any run would have failed P-13. Below 500 units only 4 are allowed, and all four runs would have failed; run 2 had 509 units. e912253:docs/ORCHESTRATION.md:524 calls this a 'p99 margin 2-14 %'. That understates the risk: the margin in units over budget is zero.",
+          "recommendation": "Record it in RESIDUAL-RISKS.md and ADR-057 as a count: 5 slow units allowed, 5 seen, and 4 allowed below 500 units. Plan for a real chance that P-13 misses in Stage 5's --full. Under ADR-050:368, such a run is reported with its figures and not re-judged."
+        },
+        {
+          "title": "About 28 % of the recorded P-13 runs would fail the p99 rule, some of them at a quiet load",
+          "evidence": "The deletion unit has not changed since de7e6a5 on 9 Oct (git log Sources/ZTronAssetStorage/Blobs/BlobUnits.swift). I parsed every 'P-13 reclaim of' line on disk and kept 50 distinct runs that were not heavily loaded (total under 1 s and p95 under 1.2 ms). In 14 of them more units went over 5 ms than the nearest-rank p99 allows, and 14 more sat exactly at the limit. Two failures were at a quiet load. /Users/admin/Documents/ZTronAssetKit/.build-orch/l3-bench.log:116 (10 Oct, loads {1.95 1.82 2.65} -> {2.56 2.48 2.75} per .build-orch/l3-final.txt) had 8 of 494 units over 5 ms, with 4 allowed. .build-orchestrator/s3f-probes-c20/reqs/logs/gates/bench.log (1-minute load 2.3-3.7 per bench-load.txt) had 7 of 494. Caveats: most of the failing runs predate s3b's reaper-queue change and have no recorded load. Of 9 runs after s3b (s3b, s3b probes, e840b0e), none would fail, but 5 sit exactly at the limit.",
+          "recommendation": "Tell the owner that the p99 now passes or fails on how many times APFS stalls an unlink, not on the store's 1 ms unit bound. The parser is /private/tmp/claude-501/-Users-admin-Documents-ZTronAssetKit/c4407fcb-53ee-44ae-8d93-02e7220ac38a/scratchpad/p13scan.py."
+        },
+        {
+          "title": "The evidence ADR-050 gave the owner does not match the merged head",
+          "evidence": "e840b0e:docs/DECISIONS.md:349 recommended option A with 'measured p99 ≈ 1 ms'. On e840b0e the p99 is 4.31-4.89 ms. DECISIONS.md:368 says 'every quiet run had 2–4 units over 5 ms out of 490–562'. The four e840b0e runs had 5 each, l3-bench had 8 at a load of about 2, and the s3f cycle-20 run had 7 at a 1-minute load of 2.3-3.7. The amendment also does not say that below 500 units only 4 slow units are allowed, not 5.",
+          "recommendation": "In ADR-057, correct the amendment's evidence, not the ruling. Tell the owner the ruling was made when the p99 was about 1 ms and it is now 4.3-4.9 ms. Option B (keep the maximum, raise it to 15 ms) stays the owner's call."
+        },
+        {
+          "title": "The ruling rests on a provisional reading of 'List P99', and ADR-050 quotes it as 'P99'",
+          "evidence": "e840b0e:docs/ORCHESTRATION.md:754 records the owner's message: 'Do not set any budget stop. List P99'. Line 757 adds: '\"List P99\" read as the ruling; the owner can correct it'. e840b0e:docs/DECISIONS.md:368 says 'The owner ruled \"P99\"', dropping both 'List' and that caveat. Swapping the maximum assertion for the p99 loosens the test under G3, and that reading is its only authority. I found no later owner confirmation in ORCHESTRATION.md.",
+          "recommendation": "Quote the owner's words exactly in ADR-050 and ADR-057, and get an explicit confirmation of option A at the NEEDS-HUMAN-REVIEW pass."
+        },
+        {
+          "title": "Two documents still state the old maximum rule",
+          "evidence": "Sources/ZTronAssetStorage/Blobs/BlobUnits.swift:155-156 still says 'P-13 bounds **every** batch between suspension points by `batch_ms_max` (5 ms; orchestrator ruling on ADR draft B-9, L2 close-out)'. docs/ARCHITECTURE.md:836 still says 'P-13 asserts the maximum unit duration (ADR-050; the owner rules on the proposal there)'. d97e4e7 changed only BenchStorage.swift.",
+          "recommendation": "Send ARCHITECTURE.md:836 to the ADR-057 docs pass, and BlobUnits.swift:155-156 to a comment-only WP-B edit."
+        },
+        {
+          "title": "The full run's P-13 line has no load, and the prompt's '10-16' was not the load at P-13",
+          "evidence": "The P-13 print (BenchStorage.swift:249) carries no load averages. S3-R23 item 1 asks for them beside every benchmark figure (.build-orchestrator/s3-rulings-s3f.md:296). In benchmarks.log, P-13 is at line 160. The first load reading after it is line 252, about 2 minutes later: 3.35 6.95 8.74. Loads of 10-31 appear only from line 356 (R-CLN-6) through about line 435, and the last readings are 9.77 -> 7.50 (lines 438-467). So the load during the full run's P-13 is unknown. The figure does not show a pass at load 10-16. The quiet runs record the load before and after each run and are the reference (BenchStorage.swift:24-25).",
+          "recommendation": "Print the three load averages beside the P-13 figure in a later WP-B change, or always pair a P-13 figure with before-and-after load readings, as the quiet log does."
+        },
+        {
+          "title": "The quiet re-run log does not record its command, directory or HEAD",
+          "evidence": "/Users/admin/Documents/ZTronAssetKit/.build-orch/merge-P13-quiet.log contains only load readings and test output. I inferred where it ran. .worktrees/merge-check/.build-orch-merge-perf was touched at 00:23 (release symlink, .buildSystem_release). Each run's build was a 0.41-0.47 s no-op on top of the bundle built at 23:51:17 from e840b0e. That binary contains the p99 message and not the old 'the longest deletion unit took' message.",
+          "recommendation": "Start such logs with the output of git rev-parse HEAD and pwd, and with the exact swift test command."
+        }
+      ],
+      "checked": [
+        "The change d97e4e7 (git show --stat) touches only BenchStorage.swift (+9/-5): the doc comment at :19-25, the p99 at :243, the print at :249 (p99 and max), and the assertion at :253 `#expect(p99 <= batchBudget, ...)`. The other expects at :251, :252 and :254 are unchanged. The old maximum assertion was replaced outright, not kept behind a known-issue marker.",
+        "No later commit touches these lines. d97e4e7 is an ancestor of e840b0e. `git diff d97e4e7 e840b0e` is empty for BenchStorage.swift, Scripts/quality-gates.json, SPEC.md, Sources/ZTronAssetStorage, Sources/ZTronAssetModel, Sources/ZTronAssetTestSupport and QualityBudgets.swift. `git log e840b0e --` on the three named files lists d97e4e7 as the newest.",
+        "The percentile is a real p99. StorageBench.percentile (BenchStorage.swift:590-598) uses nearest rank: index ceil(f*n)-1, clamped. With 0.99 that is sorted[519] of 525, the 6th-longest unit. I checked the floating-point products at n=500 and n=600 (495, 594). This is not an interpolated or lower statistic, and it is what ADR-050:368 specifies.",
+        "The units are the bounded batches. timer.reset() is at :235, runDueWork at :237, and the units are read before close() at :239-241. reap runs each BlobDeletionUnit on the metadata executor (Sources/ZTronAssetStorage/Store/AssetStore+Reaper.swift:183-185), which TimingExecutor wraps (BenchStorage.swift:223, :601-638). apply commits before it returns (AssetStore+Apply.swift:460, :492, :504). startGrace marks nothing dirty and installSnapshot runs no executor unit (AssetStore+Snapshot.swift:43-63, :85-94). So no non-deletion unit inflates n. 10,000/525 is about 19 keys per unit, and p50 0.96 ms fits the 1 ms unit budget (BlobUnits.swift:161, :163-184).",
+        "The assertion can fail (G4). Six or more units over 5 ms at 500-599 units fails it. If there were no units, the p99 would be 0, but :254 (at least 156 units) and :251 (all 10,000 reaped) would fail. A unit-bound regression such as count-only units of 64 unlinks (about 157 units, 1 slow unit allowed) would also fail it.",
+        "The budget comes from the right key. QualityBudgets reads Scripts/quality-gates.json -> budgets (Tests/ZTronAssetKitBenchmarks/QualityBudgets.swift:12-46). \"P-13\" is {blobs 10000, gc_total_s_max 2.0, batch_ms_max 5} (Scripts/quality-gates.json:112-116). The log prints 'budgets 2.0 s, 5.0 ms per batch'. Scripts/ is unchanged since harness-frozen (empty diff; .verify-logs/harness.log 'unchanged').",
+        "The ruling text matches the code. SPEC.md:308: judged on the p99 of the batch durations, owner ruling 2026-10-29, ADR-050 option A. e840b0e:docs/DECISIONS.md:368: nearest rank via StorageBench.percentile, against batch_ms_max, still printing max, p50, p95, over-budget units and stalled unlinks. All of these are at BenchStorage.swift:243-253.",
+        "The change follows the plan. e840b0e:docs/ORCHESTRATION.md:765 asked for `StorageBench.percentile(units, 0.99) <= batchBudget`, the maximum still printed, and the doc comment moved to the p99 with the ruling's date. All three are done (doc comment at :19-23). d97e4e7's parent is d59bcc4, which comes after the s3b merge 48b662d.",
+        "The full run was on e840b0e in release. The merge-check reflog has a single entry, e840b0e at 22:33:14. .build-orch/merge-full.log was created at 22:33:39. No file under Sources, Tests, Scripts, Package.swift or SPEC.md is newer than 22:34, and git status is clean there. The benchmarks stage is Scripts/verify.sh:115 (`swift test -c release ... -Xswiftc -enable-testing --filter Benchmarks`), and benchmarks.log begins 'Building for production...'. The bundle built at 23:51:17 contains the p99 assertion message. merge-full.log ends 'VERIFY: FAIL (1 failed: benchmarks)', caused by the 7 Sync issues at benchmarks.log:350-427, not by P-13.",
+        "I re-read the prompt's figures. benchmarks.log:160-161: 0.577616959 s, 525 units, p99 4.803125, max 8.094875, passed. merge-P13-quiet.log:1-54: p99 4.889792/4.812542/4.306208, max 10.510083/9.695833/8.0025, 528/509/519 units, 1-minute load 4.14 -> 3.65, each 'passed' with 'exit 0'. Every P-13 figure matches. Only the load description is off (note 6).",
+        "The rule I applied, and why. ADR-050:368 governs P-13 specifically: each run is judged on its own p99, and a failing run is reported and never re-judged. Item 4 of the orchestration plan defines 'idle' as a 1-minute load of 10 or less (e912253:docs/ORCHESTRATION.md:518), and BenchStorage.swift:24-25 makes the quiet run the reference. I did not use S3-R23 or 'How a C2 figure is read' (s3-rulings-s3f.md:295-308, :756-766). Those are C2 rules, and their best-of-3 would be a re-judging that ADR-050 forbids. I did adopt their stricter 'a passing run does not cancel a miss'. None of the four e840b0e runs misses.",
+        "Timing of the quiet runs. They ran after the tools-6.4 check ended (.build-orch/t64b/status.txt, 00:23:12) and before the simulator suite took sim.lock at 00:24:11 (e912253:docs/ORCHESTRATION.md, item 3b).",
+        "The other benchmark labelled P-13 (reap scaling) passed in the full run (benchmarks.log:163-164: ratio 1.9967 against a 2.5 maximum, 1.039 against its control's 1.5 maximum).",
+        "The earlier findings in s3f-c20 to c23-issues.json all concern wp/s3f's old maximum assertion at BenchStorage.swift:249, routed to WP-B. None of them bears on the p99 change. end-sooner-options.md:36 is row 22 ('follows correct #8').",
+        "How I worked: no build, test or benchmark was run. I wrote two temporary files in the session scratchpad, outside the repository: an ANSI-stripped copy of benchmarks.log and p13scan.py. A read-only recursive grep over the repository, build folders included, ran for a few minutes in the background."
+      ],
+      "notVerified": [
+        "Any P-13 run of my own: the task forbade building or running. Every pass or fail statement above comes from the logs I name.",
+        "The 1-minute load during the full run's P-13: the line prints none. The nearest reading, about 2 minutes later, was 3.35 6.95 8.74.",
+        "The exact command and working directory of the quiet re-runs. I inferred them from the scratch folder's timestamps and the no-op builds (note 7).",
+        "What the owner meant by 'List P99'.",
+        "Whether the roughly 28 % failure rate from older runs applies to e840b0e's reaper. Most of those runs predate s3b's reaper-queue change, and most have no recorded load.",
+        "P-13 on the iOS Simulator or a device: the benchmarks are skipped there.",
+        "Whether the other two lenses, or the ADR-057 docs workflow now running, already correct the stale BlobUnits.swift:155-156 and ARCHITECTURE.md:836 text."
+      ]
+    }
+  ],
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "p13:fidelity",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "aba34dc1910d11aaf",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007488121,
+      "queuedAt": 1794007488103,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "fidelity",
+      "promptPreview": "You are an independent verifier for ZTronAssetKit (CLAUDE.md applies; rule P4: you did not write the code you verify).\n\n## What is being verified\nChecklist item 4's \"independent verifier for P-13, judged on its p99\" on the merged head of branch feature/asset-kit.\n- Merged head: commit e840b0e, checked out detached at /Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check\n  (its docs/TRACEABIL…",
+      "promptFramed": true,
+      "lastProgressAt": 1794008698147,
+      "tokens": 303311,
+      "toolCalls": 97,
+      "durationMs": 1210025,
+      "resultPreview": "{\"lens\":\"fidelity\",\"verdict\":\"PASS_WITH_NOTES\",\"blocking\":[],\"nonBlocking\":[{\"title\":\"The records, and what the owner was told before ruling, overstate how robust the p99 pass is. Every run on the merged head passed with no spare tolerance, and the orchestrator's own quiet-load logs include runs the ruled statistic would fail.\",\"evidence\":\"Paths are relative to /Users/admin/Documents/ZTronAssetKit…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "p13:measurement",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "a549726fe5896505f",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007488121,
+      "queuedAt": 1794007488103,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "measurement",
+      "promptPreview": "You are an independent verifier for ZTronAssetKit (CLAUDE.md applies; rule P4: you did not write the code you verify).\n\n## What is being verified\nChecklist item 4's \"independent verifier for P-13, judged on its p99\" on the merged head of branch feature/asset-kit.\n- Merged head: commit e840b0e, checked out detached at /Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check\n  (its docs/TRACEABIL…",
+      "promptFramed": true,
+      "lastProgressAt": 1794008756680,
+      "tokens": 273450,
+      "toolCalls": 76,
+      "durationMs": 1265331,
+      "resultPreview": "{\"lens\":\"measurement\",\"verdict\":\"PASS_WITH_NOTES\",\"blocking\":[],\"nonBlocking\":[{\"title\":\"No spare units: every e840b0e run had exactly the 5 over-budget units the p99 tolerates\",\"evidence\":\"Nearest rank (Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:590-598): for 500 <= n <= 599 the p99 is the sixth-longest unit (0-based index n-6), so at most 5 units may exceed 5 ms and a sixth fails. The tole…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "p13:refuter",
+      "phaseIndex": 1,
+      "phaseTitle": "Verify",
+      "agentId": "aa00ff981a7fa557b",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007488121,
+      "queuedAt": 1794007488103,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "refuter",
+      "promptPreview": "You are an independent verifier for ZTronAssetKit (CLAUDE.md applies; rule P4: you did not write the code you verify).\n\n## What is being verified\nChecklist item 4's \"independent verifier for P-13, judged on its p99\" on the merged head of branch feature/asset-kit.\n- Merged head: commit e840b0e, checked out detached at /Users/admin/Documents/ZTronAssetKit/.worktrees/merge-check\n  (its docs/TRACEABIL…",
+      "promptFramed": true,
+      "lastProgressAt": 1794008726297,
+      "tokens": 274981,
+      "toolCalls": 80,
+      "durationMs": 1234947,
+      "resultPreview": "{\"lens\":\"refuter\",\"verdict\":\"PASS_WITH_NOTES\",\"blocking\":[],\"nonBlocking\":[{\"title\":\"Every run on e840b0e passed with no spare slow units: each had exactly the 5 units over 5 ms that the p99 allows\",\"evidence\":\"The nearest-rank p99 (Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:591-598, rank ceil(0.99n)-1) is the 6th-longest unit when n is 500-599. Full run (/Users/admin/Documents/ZTronAssetKit…"
+    }
+  ],
+  "totalTokens": 851742,
+  "totalToolCalls": 253
+}

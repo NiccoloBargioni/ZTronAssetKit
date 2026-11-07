@@ -1,0 +1,2496 @@
+    1|       |import Foundation
+    2|       |import ZTronAssetModel
+    3|       |import ZTronAssetStorage
+    4|       |
+    5|       |/// How many bytes deep verification may hash per second of maintenance budget: the byte budget of a slice is derived
+    6|       |/// from the time budget, so a slice stops at its budget even when hashing is faster than the clock moves (R-SYN-16).
+    7|       |enum MaintenanceBudget {
+    8|       |    /// 256 MiB/s (the P-6 floor's order of magnitude).
+    9|       |    static let verificationBytesPerSecond: Double = 256 * 1_024 * 1_024
+   10|       |
+   11|       |    /// The byte budget of a slice of `timeBudget` seconds (at least 1 byte).
+   12|    440|    static func bytes(for timeBudget: TimeInterval) -> Int64 {
+   13|    440|        guard timeBudget.isFinite, timeBudget > 0 else {
+   14|      4|            return timeBudget == .infinity ? Int64.max : 1
+   15|    436|        }
+   16|    436|        let bytes = timeBudget * MaintenanceBudget.verificationBytesPerSecond
+   17|    436|        return bytes >= Double(Int64.max) ? Int64.max : max(1, Int64(bytes))
+   18|    440|    }
+   19|       |}
+   20|       |
+   21|       |extension SyncEngine {
+   22|       |    // MARK: resolve (R-SYN-4, H-3)
+   23|       |
+   24|       |    /// One asset at `lane`: the store's current location, an adopted legacy file, or a joined (or new) job; an unknown
+   25|       |    /// id is point-admitted from a fresh manifest (sync.md §6.5).
+   26|  21.1k|    func performAwaitAsset(_ id: AssetID, lane: AssetPriority) async -> Result<AssetLocation, AssetError> {
+   27|  21.1k|        if Task.isCancelled {
+   28|      8|            return .failure(.cancelled)
+   29|  21.1k|        }
+   30|  21.1k|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+   31|  21.1k|        if let error = await self.ensureStarted() {
+   32|     29|            return .failure(error)
+   33|  21.1k|        }
+   34|  21.1k|        // From the first read to the registration, a binding the engine learns (a commit of this id) is kept, so the
+   35|  21.1k|        // registration below never creates a job for an asset committed meanwhile (L4-R5).
+   36|  21.1k|        self.state.presenceReaders += 1
+   37|  21.1k|        let mark = self.state.copySerial
+   38|  21.1k|        let serial = self.state.ledgerForgets
+   39|  21.1k|        let view: StorePlanningView
+   40|  21.1k|        do {
+   41|  21.1k|            defer {
+   42|  21.1k|                self.state.presenceReaders -= 1
+   43|  21.1k|            }
+   44|  21.1k|            // REENTRANCY: RE-S36 — the lifecycle; a `nil` location falls through to the job path, which re-reads the record.
+   45|  21.1k|            let present = await self.store.location(for: id, extensions: [], recordingAccess: true)
+   46|  21.1k|            guard self.isRunning else {
+   47|      0|                return .failure(.shutDown)
+   48|  21.1k|            }
+   49|  21.1k|            if let present {
+   50|  2.65k|                self.state.metrics.resolveHits += 1
+   51|  2.65k|                return .success(present)
+   52|  18.4k|            }
+   53|  18.4k|            if self.state.migration.pending {
+   54|     42|                do {
+   55|     42|                    // REENTRANCY: RE-S36 — the lifecycle; a `nil` answer falls through to the job path.
+   56|     42|                    if let location = try await self.store.adoptLegacyNow(id) {
+   57|     42|                        return .success(location)
+   58|     42|                    }
+   59|      0|                } catch .cancelled {
+   60|      0|                    return .failure(.cancelled)
+   61|      0|                } catch {
+   62|      0|                    // A legacy file that cannot be adopted is downloaded instead.
+   63|      0|                }
+   64|      0|                guard self.isRunning else {
+   65|      0|                    return .failure(.shutDown)
+   66|      0|                }
+   67|  18.4k|            }
+   68|  18.4k|            do {
+   69|  18.4k|                // REENTRANCY: f-5 (proposed) — the lifecycle; the record decides T2 (quarantined: no job) before the join,
+   70|  18.4k|                // which is synchronous, and a record present at its content (bound since the location read) is answered
+   71|  18.4k|                // from the store.
+   72|  18.4k|                view = try await self.store.planningView()
+   73|  18.4k|            } catch {
+   74|      0|                return .failure(error.assetError)
+   75|  18.4k|            }
+   76|  18.4k|        }
+   77|  18.4k|        guard self.isRunning else {
+   78|      0|            return .failure(.shutDown)
+   79|  18.4k|        }
+   80|  18.4k|        // A store manifest the copy lacks is followed with its announcements, unless the read may predate the copy.
+   81|  18.4k|        self.followStoreView(view, readAt: mark)
+   82|  18.4k|        self.noteBound(from: view, ids: [id], since: serial)
+   83|  18.4k|        if let error = self.heldBackError(view.records[id], entry: view.appliedManifest.entry(for: id)) {
+   84|    332|            return .failure(error)
+   85|  18.0k|        }
+   86|  18.0k|        if let error = self.missingSourceError {
+   87|      1|            return .failure(error)
+   88|  18.0k|        }
+   89|  18.0k|        let token = self.nextToken()
+   90|  18.0k|        // REENTRANCY: RE-S25 — nothing: the body registers synchronously; the result arrives by value.
+   91|  18.0k|        return await withTaskCancellationHandler {
+   92|  18.0k|            // REENTRANCY: RE-S25 — as above.
+   93|  18.0k|            await withCheckedContinuation { (continuation: CheckedContinuation<Result<AssetLocation, AssetError>, Never>) in
+   94|  18.0k|                if Task.isCancelled {
+   95|      1|                    continuation.resume(returning: .failure(.cancelled))
+   96|      1|                    return
+   97|  18.0k|                }
+   98|  18.0k|                guard self.isRunning else {
+   99|      0|                    continuation.resume(returning: .failure(.shutDown))
+  100|      0|                    return
+  101|  18.0k|                }
+  102|  18.0k|                if let entry = self.state.applied.entry(for: id) {
+  103|  16.8k|                    self.state.waiters[token] = Waiter(asset: id, transfer: entry.transferID, continuation: continuation)
+  104|  16.8k|                    if self.isBound(id, to: entry.transferID) {
+  105|      2|                        self.answerWaiterFromStore(token, asset: id, lane: lane, transfer: entry.transferID)
+  106|      2|                        return
+  107|  16.8k|                    }
+  108|  16.8k|                    if self.state.jobs[entry.transferID] != nil {
+  109|  6.50k|                        self.state.metrics.resolveJoins += 1
+  110|  6.50k|                    }
+  111|  16.8k|                    self.addInterest(token, asset: id, entry: entry, lane: lane, kind: .waiter)
+  112|  16.8k|                    self.pump()
+  113|  16.8k|                    return
+  114|  16.8k|                }
+  115|  1.24k|                let now = self.environment.time.monotonicNow()
+  116|  1.24k|                if self.state.newest?.manifest.entry(for: id) != nil {
+  117|    461|                    // A newer manifest than the applied one (a run's fetch not applied yet) lists it: never `.notFound`
+  118|    461|                    // (sync-1 S1-13); the point admission below answers from the newest manifest seen.
+  119|    461|                    self.state.negativeCache.remove(id)
+  120|    786|                } else if self.state.negativeCache.contains(id, at: now) {
+  121|      4|                    continuation.resume(returning: .failure(.notFound))
+  122|      4|                    return
+  123|  1.24k|                }
+  124|  1.24k|                self.state.unknownWaiters[token] = UnknownWaiter(asset: id, lane: lane, continuation: continuation)
+  125|  1.24k|                self.beginManifestFetch()
+  126|  1.24k|                self.notifyObservers()
+  127|  1.24k|            }
+  128|  18.0k|        } onCancel: {
+  129|    403|            Task {
+  130|    403|                // REENTRANCY: RE-S25 — nothing: the hop withdraws only this token (a no-op once it was resumed).
+  131|    403|                await self.withdraw(token)
+  132|    403|            }
+  133|    403|        }
+  134|  21.1k|    }
+  135|       |
+  136|       |    /// The error every fetch answers when `start()` could not build the remote source; `nil` when it exists.
+  137|  32.9k|    var missingSourceError: AssetError? {
+  138|  32.9k|        guard self.state.remote == nil else {
+  139|  32.9k|            return nil
+  140|  32.9k|        }
+  141|      4|        return self.state.remoteError ?? .serverUnavailable(retryAfter: nil)
+  142|  32.9k|    }
+  143|       |
+  144|       |    /// The stored answer for an asset that must not be fetched now (T2, ADR-032): failed until its entry changes, or
+  145|       |    /// quarantined / in integrity backoff for its current content.
+  146|   123k|    private func heldBackError(_ record: AssetRecord?, entry: ManifestEntry?) -> AssetError? {
+  147|   123k|        guard let record, let entry else {
+  148|  1.23k|            return nil
+  149|   122k|        }
+  150|   122k|        let now = self.environment.time.now()
+  151|   122k|        switch record.residency {
+  152|   122k|        case .failed(.notFound):
+  153|    101|            return .notFound
+  154|   122k|        case .failed:
+  155|      7|            return .integrityFailure
+  156|   122k|        case .quarantined(let until) where until > now:
+  157|    524|            return .integrityFailure
+  158|   122k|        default:
+  159|   121k|            break
+  160|   122k|        }
+  161|   121k|        if let next = record.integrity.nextEligibleAt, next > now, record.integrity.failedIdentity == entry.contentIdentity, record.referencedBlob == nil {
+  162|      0|            return .integrityFailure
+  163|   121k|        }
+  164|   121k|        return nil
+  165|   123k|    }
+  166|       |
+  167|       |    /// A caller's cancellation (H-3): withdraws exactly its token. A waiter's one interest is in the job it names
+  168|       |    /// (`Waiter.transfer`, which every reroute moves with it; the model test checks both directions after every
+  169|       |    /// operation), so only that job is touched: a sorted pass over every job held the actor about 6 ms at 10,000 queued
+  170|       |    /// prefetch members (review of close-out cycle 9, PROBE-C9R-1, C2).
+  171|       |    ///
+  172|       |    /// Behind the follow barrier the caller is answered at once (R-SYN-4, R-SYN-10), and only the engine's removal of
+  173|       |    /// the interest waits (`removeInterest`, S3-R14 item 3): the record stays, without its continuation, so it follows
+  174|       |    /// the interest's re-routes and joins until the drain removes both (`replayRemoval`), and no later answer reaches the
+  175|       |    /// caller twice.
+  176|    406|    func withdraw(_ token: InterestToken) {
+  177|    406|        if let waiter = self.state.waiters[token], waiter.continuation != nil {
+  178|    397|            waiter.continuation?.resume(returning: .failure(.cancelled))
+  179|    397|            if self.defersToFollow, !waiter.fromStore {
+  180|     21|                self.state.waiters[token]?.continuation = nil
+  181|     21|                self.deferToFollow(.removal(token, waiter.transfer))
+  182|     21|                self.notifyObservers()
+  183|    376|            } else {
+  184|    376|                self.state.waiters[token] = nil
+  185|    376|                self.removeInterest(token, from: waiter.transfer)
+  186|    376|                self.pump()
+  187|    376|            }
+  188|    397|        } else if let waiter = self.state.unknownWaiters.removeValue(forKey: token) {
+  189|      0|            waiter.continuation.resume(returning: .failure(.cancelled))
+  190|      0|        }
+  191|    406|        self.reconcileIdle()
+  192|    406|    }
+  193|       |
+  194|       |    // MARK: Groups (R-CAR-3, R-CAR-4)
+  195|       |
+  196|       |    /// Registers a prefetch handle's group synchronously; its members join in one owned task that skips assets
+  197|       |    /// already present (sync.md §6.3).
+  198|  5.90k|    func performRegisterGroup(_ ids: [AssetID], lane: AssetPriority) -> Result<InterestToken, AssetError> {
+  199|  5.90k|        guard !self.isShuttingDown else {
+  200|      2|            return .failure(.shutDown)
+  201|  5.90k|        }
+  202|  5.90k|        if case .degraded(let reason) = self.state.lifecycle {
+  203|      2|            return .failure(.storageUnavailable(reason))
+  204|  5.90k|        }
+  205|  5.90k|        let (token, members) = self.recordGroup(ids, lane: lane)
+  206|  5.90k|        self.spawnJoin(token, members: members, lane: lane)
+  207|  5.90k|        self.notifyObservers()
+  208|  5.90k|        return .success(token)
+  209|  5.90k|    }
+  210|       |
+  211|       |    /// The registering turn's bookkeeping: a token, the group, whose members are `ids` de-duplicated and sorted (the
+  212|       |    /// order its join reaches them in), and a pending claim for every member (orchestrator ruling L5-R1): from this turn
+  213|       |    /// until the group's join reaches a member or the group is released, no release, waiter withdrawal or caller
+  214|       |    /// cancellation retires the job of the content the member names (`removeInterest`), whether that job exists yet or
+  215|       |    /// not. A member the engine's copy does not list yet is claimed once the copy lists it (`claimNewlyListed`). One
+  216|       |    /// manifest probe and one counter update per member: at SPEC §6's 10,000 members the turn stays within C2
+  217|       |    /// (`docs/adr-drafts/g.md`, L5-R1 figures). Kept apart from the join's spawn (`spawnJoin`) so a test can hold a
+  218|       |    /// registered group's join before its store read, a synchronous `AssetStore` call no test-target type can hold.
+  219|  5.92k|    func recordGroup(_ ids: [AssetID], lane: AssetPriority) -> (token: InterestToken, members: [AssetID]) {
+  220|  5.92k|        let token = self.nextToken()
+  221|  5.92k|        var group = Group(kind: .prefetch, lane: lane)
+  222|  5.92k|        group.members = Array(Set(ids)).sorted()
+  223|  5.92k|        group.claimed.reserveCapacity(group.members.count)
+  224|  5.92k|        let applied = self.state.applied
+  225|  5.92k|        // The table is taken out of the state while it is counted, so it is updated in place.
+  226|  5.92k|        var claims = self.state.claims
+  227|  5.92k|        self.state.claims = [:]
+  228|  5.92k|        claims.reserveCapacity(claims.count + group.members.count)
+  229|   113k|        for id in group.members {
+  230|   113k|            guard let position = applied.position(of: id) else {
+  231|  2.74k|                group.claimed.append(nil)
+  232|  2.74k|                group.unlistedClaims += 1
+  233|  2.74k|                continue
+  234|   110k|            }
+  235|   110k|            let key = ClaimKey(applied.entries[position])
+  236|   110k|            claims[key, default: 0] += 1
+  237|   110k|            group.claimed.append(key)
+  238|   110k|        }
+  239|  5.92k|        self.state.claims = claims
+  240|  5.92k|        self.state.unlistedClaims += group.unlistedClaims
+  241|  5.92k|        self.state.groups[token] = group
+  242|  5.92k|        return (token, group.members)
+  243|  5.92k|    }
+  244|       |
+  245|       |    /// Spawns the join of the group `recordGroup` registered under `token` (one owned task, RE-S30).
+  246|  5.90k|    func spawnJoin(_ token: InterestToken, members: [AssetID], lane: AssetPriority) {
+  247|  5.90k|        self.spawn(.entry) { engine in
+  248|  5.90k|            // REENTRANCY: RE-S30 — nothing: the owned task hops onto the actor; `joinGroup` re-validates the group and the lifecycle.
+  249|  5.90k|            await engine.joinGroup(token, ids: members, lane: lane)
+  250|  5.90k|        }
+  251|  5.90k|    }
+  252|       |
+  253|       |    /// Adds the group's interests for the members that are not present at their current content, at most
+  254|       |    /// `materializationLimit` members per actor turn, each batch dispatched before the task yields the actor: a
+  255|       |    /// 10,000-member group joined in one turn held the actor about 43 ms (C2; review of close-out cycle 7). After each
+  256|       |    /// yield the batch re-validates what may have changed meanwhile: the lifecycle, the source, the group (a release drops
+  257|       |    /// it), and the engine's manifest copy, whose change makes the view's records stale for the members left, so those
+  258|       |    /// join on a fresh read (this function again). A binding learned meanwhile is checked per member as before (L4-R5).
+  259|       |    ///
+  260|       |    /// The join ends each member's pending claim once it joined or skipped it (`joinMember`), and every claim left when
+  261|       |    /// it gives up early (`endClaims(of:)`), so a claim never outlives the join it waits for (L5-R1).
+  262|  5.91k|    private func joinGroup(_ token: InterestToken, ids: [AssetID], lane: AssetPriority) async {
+  263|  5.91k|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  264|  5.91k|        guard await self.ensureStarted() == nil, self.state.groups[token] != nil else {
+  265|     11|            self.endClaims(of: token)
+  266|     11|            return
+  267|  5.90k|        }
+  268|  5.90k|        let view: StorePlanningView
+  269|  5.90k|        let mark = self.state.copySerial
+  270|  5.90k|        self.state.presenceReaders += 1
+  271|  5.90k|        do {
+  272|  5.90k|            defer {
+  273|  5.90k|                self.state.presenceReaders -= 1
+  274|  5.90k|            }
+  275|  5.90k|            // REENTRANCY: RE-S30 — the lifecycle and the group still registered (a release drops it); a binding learned
+  276|  5.90k|            // while the read is in flight is kept for the joins below (L4-R5); the view's manifest is followed only when
+  277|  5.90k|            // the read cannot predate the copy (`followStoreView`).
+  278|  5.90k|            view = try await self.store.planningView()
+  279|  5.90k|        } catch {
+  280|      0|            self.endClaims(of: token)
+  281|      0|            return
+  282|  5.90k|        }
+  283|  5.90k|        guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
+  284|      2|            self.endClaims(of: token)
+  285|      2|            return
+  286|  5.89k|        }
+  287|  5.89k|        self.followStoreView(view, readAt: mark)
+  288|  5.89k|        let copy = self.state.copySerial
+  289|  5.89k|        let batch = self.materializationLimit
+  290|  5.89k|        var next = 0
+  291|  16.1k|        while next < ids.count {
+  292|  10.2k|            if next > 0 {
+  293|  4.38k|                // REENTRANCY: f-14 (proposed) — the lifecycle, the source, the group still registered and the engine's
+  294|  4.38k|                // copy, re-checked below; a changed copy sends the members left through a fresh read.
+  295|  4.38k|                await Task.yield()
+  296|  4.38k|                guard self.isRunning, self.state.groups[token] != nil, self.missingSourceError == nil else {
+  297|      0|                    self.endClaims(of: token)
+  298|      0|                    return
+  299|  4.38k|                }
+  300|  4.38k|                guard self.state.copySerial == copy else {
+  301|      4|                    // REENTRANCY: f-14 (proposed) — as above: the call re-reads the store and re-validates everything.
+  302|      4|                    await self.joinGroup(token, ids: Array(ids[next...]), lane: lane)
+  303|      4|                    return
+  304|  4.37k|                }
+  305|  10.2k|            }
+  306|  10.2k|            let end = min(next + batch, ids.count)
+  307|   109k|            for id in ids[next..<end] {
+  308|   109k|                self.joinMember(token, id: id, record: view.records[id], lane: lane)
+  309|   109k|            }
+  310|  10.2k|            next = end
+  311|  10.2k|            self.pump()
+  312|  10.2k|        }
+  313|  5.89k|    }
+  314|       |
+  315|       |    /// Joins one prefetch member unless it is gone from the manifest, present at its current content, bound to it since
+  316|       |    /// the view was read (L4-R5), or held back (T2). Its pending claim ends afterwards, once its interest, if any, is
+  317|       |    /// in place (L5-R1).
+  318|       |    ///
+  319|       |    /// Behind the follow barrier the join waits (`EventAfterFollow.join`) and the claim ends now. A job only the claim
+  320|       |    /// kept is then retired before the join, and the drain's join creates it again: a transfer stopped and started
+  321|       |    /// again where a visit-first engine kept it, an order difference with the same answers (the claim's own deferral was
+  322|       |    /// removed in Stage 3 close-out cycle 13 under ruling S3-R16 item 3; recorded in the WP-F draft as a residual risk).
+  323|   108k|    private func joinMember(_ token: InterestToken, id: AssetID, record: AssetRecord?, lane: AssetPriority) {
+  324|   108k|        defer {
+  325|   108k|            self.endClaim(token, member: id)
+  326|   108k|        }
+  327|   108k|        guard let entry = self.state.applied.entry(for: id) else {
+  328|  1.01k|            return
+  329|   107k|        }
+  330|   107k|        if record?.referencedBlob != nil, record?.isStale == false {
+  331|  2.97k|            return
+  332|   105k|        }
+  333|   105k|        if self.isBound(id, to: entry.transferID) {
+  334|      1|            // Committed since the view was read (L4-R5).
+  335|      1|            return
+  336|   105k|        }
+  337|   105k|        if self.heldBackError(record, entry: entry) != nil {
+  338|    300|            return
+  339|   104k|        }
+  340|   104k|        self.state.groups[token]?.pending[id] = entry.transferID
+  341|   104k|        self.state.groups[token]?.joined.append(id)
+  342|   104k|        self.addInterest(token, asset: id, entry: entry, lane: lane, kind: .prefetch)
+  343|   104k|    }
+  344|       |
+  345|       |    /// Releases a group; unknown tokens are ignored (idempotent, sync-1 S1-05). The group leaves `groups` at once, so
+  346|       |    /// nothing joins it again. Its pending claims end with it (L5-R1), before its members' interests leave, so a job only
+  347|       |    /// this group claimed and wanted retires. A group with more pending members and claims than `releasesPerTurn` loses
+  348|       |    /// the interests of its members in flight in this turn, which frees their slots, and the rest at most
+  349|       |    /// `releasesPerTurn` per actor turn, its claims first, then its members in the order they joined
+  350|       |    /// (`continueReleases`); a job only released groups want never starts meanwhile (`gate`). Removing the 10,000
+  351|       |    /// interests of a prefetch handle in one turn, after sorting their transfers, held the engine's actor about 15 ms
+  352|       |    /// (review of close-out cycle 8, C2).
+  353|       |    ///
+  354|       |    /// Behind the follow barrier the release applies now, as before Stage 3 close-out cycle 11: the group's joins that
+  355|       |    /// still wait for the drain then join nothing (`replayJoin`'s `stillWants`). Its deferral (S3-R14 item 3) made only the
+  356|       |    /// order of the release's removals equal to a visit-first engine's, and was removed in cycle 13 under ruling S3-R16
+  357|       |    /// item 3 (recorded in the WP-F draft as a residual risk).
+  358|  5.15k|    func performReleaseGroup(_ token: InterestToken) {
+  359|  5.15k|        guard let group = self.state.groups.removeValue(forKey: token) else {
+  360|     29|            return
+  361|  5.12k|        }
+  362|  5.12k|        group.continuation?.resume(returning: false)
+  363|  5.12k|        let claims = group.claimed[group.claimCursor...]
+  364|  5.12k|        self.state.unlistedClaims -= group.unlistedClaims
+  365|  5.12k|        if group.pending.count + claims.count <= Self.releasesPerTurn {
+  366|  5.03k|            for claim in claims {
+  367|     12|                self.dropClaim(claim)
+  368|  5.03k|            }
+  369|  25.7k|            for transfer in Set(group.pending.values).sorted() {
+  370|  25.7k|                self.removeInterest(token, from: transfer)
+  371|  25.7k|            }
+  372|  5.03k|        } else {
+  373|    204|            for transfer in self.state.inFlight.sorted() where self.state.jobs[transfer]?.interests[token] != nil {
+  374|    204|                self.removeInterest(token, from: transfer)
+  375|    204|            }
+  376|     94|            // Claims a large give-up of the group's join left for later turns (`endClaims(of:)`) are dropped first.
+  377|     94|            let leftover = self.state.releasing[token]?.claims ?? []
+  378|     94|            self.state.releasing[token] = Release(members: group.joined[...], pending: group.pending, claims: leftover + claims)
+  379|     94|            self.continueReleases()
+  380|     94|        }
+  381|  5.12k|        self.pump()
+  382|  5.12k|        self.reconcileIdle()
+  383|  5.12k|    }
+  384|       |
+  385|       |    /// The members of released groups whose interests one actor turn removes at most: a removal costs about 8 to 9 µs in
+  386|       |    /// release (the member's transfer, the job's retirement with its queue entry and indexes), so a turn of 512 stays
+  387|       |    /// near 4 to 5 ms at SPEC §6's 10,000, under C2's 10 ms (re-measured in Stage 3, S3-B-084: `handleReleaseTurns`'s
+  388|       |    /// longest actor wait 4.1 to 4.8 ms; WP-G's probe 4.3 to 4.6 ms per 512-member turn).
+  389|       |    static let releasesPerTurn = 512
+  390|       |
+  391|       |    /// Removes released groups' pending claims and then their interests, in token order and each group's member and
+  392|       |    /// join order, at most `releasesPerTurn` claims and members per turn; a later turn is owed the rest (`releasing`).
+  393|       |    /// `true` when nothing is left to release.
+  394|       |    @discardableResult
+  395|    193|    private func continueReleases() -> Bool {
+  396|    193|        var budget = Self.releasesPerTurn
+  397|    195|        for token in self.state.releasing.keys.sorted() where budget > 0 {
+  398|    195|            guard var release = self.state.releasing[token] else {
+  399|      0|                continue
+  400|    195|            }
+  401|  4.24k|            while budget > 0, let claim = release.claims.popFirst() {
+  402|  4.04k|                budget -= 1
+  403|  4.04k|                self.dropClaim(claim)
+  404|  4.04k|            }
+  405|  65.3k|            while budget > 0, let member = release.members.popFirst() {
+  406|  65.1k|                budget -= 1
+  407|  65.1k|                // A member that shares its content with an earlier one, or whose interest ended meanwhile, is a no-op.
+  408|  65.1k|                if let transfer = release.pending[member] {
+  409|  65.1k|                    self.removeInterest(token, from: transfer)
+  410|  65.1k|                }
+  411|  65.1k|            }
+  412|    195|            self.state.releasing[token] = release.members.isEmpty && release.claims.isEmpty ? nil : release
+  413|    195|        }
+  414|    193|        guard !self.state.releasing.isEmpty else {
+  415|     85|            // No release is left: an entry a scan set aside whose job is still queued (none, unless an interest of a
+  416|     85|            // released group outlived its release) goes back to its queue.
+  417|     85|            var queues = self.state.queues
+  418|     85|            self.state.queues = LaneQueues()
+  419|    234|            queues.restoreAside { self.isValid($0) }
+  420|     85|            self.state.queues = queues
+  421|     85|            return true
+  422|    108|        }
+  423|    108|        guard !self.state.releaseFollowUpScheduled else {
+  424|      2|            return false
+  425|    106|        }
+  426|    106|        self.state.releaseFollowUpScheduled = true
+  427|    106|        let spawned = self.spawn(.entry) { engine in
+  428|    106|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; `continueReleases` re-reads `releasing`.
+  429|    106|            await engine.releaseFollowUp()
+  430|    106|        }
+  431|    106|        if spawned == nil {
+  432|      0|            self.state.releaseFollowUpScheduled = false
+  433|      0|        }
+  434|    106|        return false
+  435|    193|    }
+  436|       |
+  437|       |    /// The scheduled continuation of `continueReleases`. The members it reaches wait in a queue or are parked (those in
+  438|       |    /// flight left in the release's own turn, and no job only released groups want starts), so it frees no slot and
+  439|       |    /// no room: the pump and the idle check follow once the last member left. It continues in any state but shutdown:
+  440|       |    /// a group released before the engine runs leaves claims to drop (L5-R1), and a release left for later would stay
+  441|       |    /// for good.
+  442|    108|    private func releaseFollowUp() {
+  443|    108|        if self.state.releaseFollowUpsHeld {
+  444|      2|            // Test seam: the remaining members keep their interests and the turn stays scheduled until it is resumed.
+  445|      2|            self.state.releaseFollowUpWaiting = true
+  446|      2|            self.notifyObservers()
+  447|      2|            return
+  448|    106|        }
+  449|    106|        self.state.releaseFollowUpScheduled = false
+  450|    106|        guard !self.isShuttingDown else {
+  451|     11|            return
+  452|     95|        }
+  453|     95|        self.resumeReleases()
+  454|     95|    }
+  455|       |
+  456|       |    /// One release turn (`continueReleases`), then the pump and the idle check once the last member left.
+  457|     95|    func resumeReleases() {
+  458|     95|        guard self.continueReleases() else {
+  459|     10|            return
+  460|     85|        }
+  461|     85|        self.pump()
+  462|     85|        self.reconcileIdle()
+  463|     85|    }
+  464|       |
+  465|       |    /// Test seam: the next release follow-up keeps the members it has not reached until `resumeReleaseFollowUps()`, so a
+  466|       |    /// test reads the engine while a release is part-way across other turns (a follow's, a drain's), which no
+  467|       |    /// production path can order (Stage 3 close-out cycle 10: the drain's `.reinstate` replay).
+  468|      2|    func holdReleaseFollowUps() {
+  469|      2|        self.state.releaseFollowUpsHeld = true
+  470|      2|    }
+  471|       |
+  472|       |    /// Test seam: lets a held release follow-up run in this turn, or disarms a hold nothing reached.
+  473|      2|    func resumeReleaseFollowUps() {
+  474|      2|        self.state.releaseFollowUpsHeld = false
+  475|      2|        guard self.state.releaseFollowUpWaiting else {
+  476|      0|            return
+  477|      2|        }
+  478|      2|        self.state.releaseFollowUpWaiting = false
+  479|      2|        self.releaseFollowUp()
+  480|      2|    }
+  481|       |
+  482|       |    // MARK: Pending claims (L5-R1, CCR-G2)
+  483|       |
+  484|       |    /// The group's join reached `id`, its next member in order, and joined or skipped it: the member's claim ends.
+  485|   108k|    func endClaim(_ token: InterestToken, member id: AssetID) {
+  486|   108k|        guard let group = self.state.groups[token], group.claimCursor < group.claimed.count, group.members[group.claimCursor] == id else {
+  487|      0|            return
+  488|   108k|        }
+  489|   108k|        let claim = group.claimed[group.claimCursor]
+  490|   108k|        self.state.groups[token]?.claimCursor += 1
+  491|   108k|        if claim == nil {
+  492|  1.01k|            self.state.groups[token]?.unlistedClaims -= 1
+  493|  1.01k|            self.state.unlistedClaims -= 1
+  494|  1.01k|        }
+  495|   108k|        self.dropClaim(claim)
+  496|   108k|    }
+  497|       |
+  498|       |    /// The group's join gave up before reaching every member (start failed, the store read failed, the source is
+  499|       |    /// missing, shutdown began): every claim it still holds ends, so no claim waits for a join that will not come.
+  500|       |    ///
+  501|       |    /// More than `releasesPerTurn` claims end the way a large release's do (orchestrator ruling L5-R15, C2): at most that
+  502|       |    /// many in this turn and the rest in the release follow-up's turns (`releasing`, `continueReleases`), so a give-up
+  503|       |    /// retires at most `releasesPerTurn` jobs that claims alone kept in one turn, whatever the group's size; a later
+  504|       |    /// release of the group drops what is left first. A degraded engine cannot spawn that follow-up, and its start failed
+  505|       |    /// before any job existed, so no claim drop can retire one there: it drops them all in this turn (one table update
+  506|       |    /// each). Internal so a test can give a registered group's claims up in one turn.
+  507|     16|    func endClaims(of token: InterestToken) {
+  508|     16|        guard let group = self.state.groups[token], group.claimCursor < group.claimed.count else {
+  509|     11|            return
+  510|     11|        }
+  511|      5|        let claims = group.claimed[group.claimCursor...]
+  512|      5|        self.state.groups[token]?.claimCursor = group.claimed.count
+  513|      5|        self.state.groups[token]?.unlistedClaims = 0
+  514|      5|        self.state.unlistedClaims -= group.unlistedClaims
+  515|      5|        var degraded = false
+  516|      5|        if case .degraded = self.state.lifecycle {
+  517|      1|            degraded = true
+  518|      1|        }
+  519|      5|        if claims.count > Self.releasesPerTurn, !degraded {
+  520|      4|            // No release of this registered group exists: `performReleaseGroup` removes the group, and a join gives up once.
+  521|      4|            self.state.releasing[token] = Release(members: [], pending: [:], claims: claims)
+  522|      4|            self.continueReleases()
+  523|      4|        } else {
+  524|      3|            for claim in claims {
+  525|      3|                self.dropClaim(claim)
+  526|      3|            }
+  527|      1|        }
+  528|      5|        if self.isRunning {
+  529|      4|            self.pump()
+  530|      4|            self.reconcileIdle()
+  531|      4|        }
+  532|      5|    }
+  533|       |
+  534|       |    /// Uncounts one claim of a content; a job the claims alone kept (`claimHeld`: no interest, and now no claim left)
+  535|       |    /// retires in this turn. A claim that names no content counts only toward `unlistedClaims`, which its caller adjusts.
+  536|   113k|    private func dropClaim(_ claim: ClaimKey?) {
+  537|   113k|        guard let key = claim, let count = self.state.claims[key] else {
+  538|  2.72k|            return
+  539|   110k|        }
+  540|   110k|        guard count == 1 else {
+  541|  1.52k|            self.state.claims[key] = count - 1
+  542|  1.52k|            return
+  543|   108k|        }
+  544|   108k|        self.state.claims[key] = nil
+  545|   108k|        if let transfer = self.state.claimHeld.removeValue(forKey: key), self.state.jobs[transfer]?.interests.isEmpty == true {
+  546|  1.14k|            self.retire(transfer)
+  547|  1.14k|        }
+  548|   108k|    }
+  549|       |
+  550|       |    /// Claims the content of registered groups' pending members that the engine's copy did not list when they were
+  551|       |    /// claimed and lists now (L5-R1): a group registered before `start()` claims its members' content when the launch
+  552|       |    /// adopts the store's manifest, before any join runs. Called whenever the copy changes (`adoptApplied`); a pass over
+  553|       |    /// those members only, and nothing while there are none.
+  554|  8.64k|    func claimNewlyListed() {
+  555|  8.64k|        guard self.state.unlistedClaims > 0 else {
+  556|  8.30k|            return
+  557|  8.30k|        }
+  558|    343|        let applied = self.state.applied
+  559|    343|        // The table is taken out of the state while it is counted, so it is updated in place.
+  560|    343|        var claims = self.state.claims
+  561|    343|        self.state.claims = [:]
+  562|    344|        for token in self.state.groups.keys.sorted() where (self.state.groups[token]?.unlistedClaims ?? 0) > 0 {
+  563|    344|            guard let group = self.state.groups[token] else {
+  564|      0|                continue
+  565|    344|            }
+  566|    344|            var claimed = group.claimed
+  567|    344|            // Taken out of the group while it is updated, so the array is not copied.
+  568|    344|            self.state.groups[token]?.claimed = []
+  569|    344|            var listed = 0
+  570|    344|            for index in group.claimCursor..<claimed.count where claimed[index] == nil {
+  571|    344|                guard let position = applied.position(of: group.members[index]) else {
+  572|    342|                    continue
+  573|    342|                }
+  574|      2|                let key = ClaimKey(applied.entries[position])
+  575|      2|                claimed[index] = key
+  576|      2|                claims[key, default: 0] += 1
+  577|      2|                listed += 1
+  578|    344|            }
+  579|    344|            self.state.groups[token]?.claimed = claimed
+  580|    344|            self.state.groups[token]?.unlistedClaims -= listed
+  581|    344|            self.state.unlistedClaims -= listed
+  582|    344|        }
+  583|    343|        self.state.claims = claims
+  584|    343|    }
+  585|       |
+  586|       |    // MARK: Availability (R-SYN-10)
+  587|       |
+  588|       |    /// Counts from the store: no network, no I/O.
+  589|     44|    func performAvailability(scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
+  590|     44|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  591|     44|        if let error = await self.ensureStarted() {
+  592|      4|            return .failure(error)
+  593|     40|        }
+  594|     40|        // REENTRANCY: RE-S38 — the lifecycle; the answer is the store's snapshot.
+  595|     40|        let report = await self.store.availability(of: scope)
+  596|     40|        guard self.isRunning else {
+  597|      0|            return .failure(.shutDown)
+  598|     40|        }
+  599|     40|        return .success(report)
+  600|     44|    }
+  601|       |
+  602|       |    /// Fetch-first, then everything missing in scope at user-initiated priority (sync.md §12.2), in an owned task; the
+  603|       |    /// caller's cancellation withdraws the group and throws `.cancelled`.
+  604|     97|    func performEnsureAvailable(scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
+  605|     97|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  606|     97|        if let error = await self.ensureStarted() {
+  607|      3|            return .failure(error)
+  608|     94|        }
+  609|     94|        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+  610|     94|        let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, token in
+  611|     94|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+  612|     94|            .availability(await engine.ensureTask(token, scope: scope))
+  613|     94|        }
+  614|     94|        switch result {
+  615|     94|        case .availability(let report):
+  616|     81|            return report
+  617|     94|        case .done(.failure(let error)), .purge(.failure(let error)), .maintenance(.failure(let error)):
+  618|     13|            return .failure(error)
+  619|     94|        default:
+  620|      0|            return .failure(.cancelled)
+  621|     94|        }
+  622|     94|    }
+  623|       |
+  624|       |    /// The `ensureAvailable` task.
+  625|     94|    private func ensureTask(_ token: InterestToken, scope: AssetScope) async -> Result<AvailabilityReport, AssetError> {
+  626|     94|        if let error = self.missingSourceError {
+  627|      1|            return .failure(error)
+  628|     93|        }
+  629|     93|        // Until its group exists (which then keeps them while it materialises), bindings the engine learns after the
+  630|     93|        // plan's view are kept, so no member is downloaded again (L4-R5).
+  631|     93|        self.state.presenceReaders += 1
+  632|     93|        var reading = true
+  633|     93|        defer {
+  634|     93|            if reading {
+  635|     93|                self.state.presenceReaders -= 1
+  636|     93|            }
+  637|     93|        }
+  638|     93|        // REENTRANCY: RE-S04 — the lifecycle; the outcome is that of the shared fetch.
+  639|     93|        let outcome = await self.fetchManifest(token, deadline: false)
+  640|     93|        guard self.isRunning, !Task.isCancelled else {
+  641|      0|            return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+  642|     93|        }
+  643|     93|        var manifest: ValidatedManifest?
+  644|     93|        var etag = self.state.appliedETag
+  645|     93|        var fresh = false
+  646|     93|        switch outcome {
+  647|     93|        case .fetched(let fetched, let tag, _):
+  648|     44|            manifest = fetched
+  649|     44|            etag = tag
+  650|     44|            fresh = true
+  651|     93|        case .notModified:
+  652|     43|            fresh = true
+  653|     93|        case .failed, .invalid, .circuitOpen, .throttled, .timedOut:
+  654|      6|            // Unreachable: the applied manifest decides; a complete scope is answered, otherwise the mapped error.
+  655|      6|            // REENTRANCY: RE-S20 — the lifecycle; the report is the store's snapshot.
+  656|      6|            let report = await self.store.availability(of: scope)
+  657|      6|            guard self.isRunning else {
+  658|      0|                return .failure(.shutDown)
+  659|      6|            }
+  660|      6|            if report.isComplete {
+  661|      1|                return .success(report)
+  662|      5|            }
+  663|      5|            return .failure(self.unreachableError(outcome))
+  664|     93|        case .cancelled:
+  665|      0|            return .failure(.cancelled)
+  666|     93|        case .shutDown:
+  667|      0|            return .failure(.shutDown)
+  668|     93|        }
+  669|     87|        let space: FreeSpace
+  670|     87|        let measured: FreeSpace
+  671|     87|        let view: StorePlanningView
+  672|     87|        do {
+  673|     87|            // REENTRANCY: RE-S06 — the lifecycle and the caller's cancellation; the measured read became the ledger's
+  674|     87|            // base in the turn it returned (L4-R7, also behind the follow barrier: S3-R11 R1), and parked jobs are
+  675|     87|            // re-evaluated against it there, or, behind the barrier, by the sweep's follow-up once the follow ends (F-28).
+  676|     87|            measured = try await self.readFreeSpace()
+  677|     87|            if self.isRunning {
+  678|     87|                self.reconsiderSpaceBlocked()
+  679|     87|            }
+  680|     87|            // User work plans against the space the OS keeps for important usage (sync-2 S2-23).
+  681|     87|            space = FreeSpace(
+  682|     87|                volumeImportant: measured.volumeImportant,
+  683|     87|                volumeOpportunistic: measured.volumeImportant,
+  684|     87|                usedBytes: measured.usedBytes,
+  685|     87|                pendingReclaim: measured.pendingReclaim,
+  686|     87|                budgetBytes: measured.budgetBytes,
+  687|     87|                reserveBytes: measured.reserveBytes
+  688|     87|            )
+  689|     87|            // REENTRANCY: RE-S37 — the lifecycle; a snapshot `apply` re-validates.
+  690|     87|            view = try await self.store.planningView()
+  691|     87|        } catch {
+  692|      0|            return .failure(error.assetError)
+  693|     87|        }
+  694|     87|        guard self.isRunning, !Task.isCancelled else {
+  695|      0|            return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+  696|     87|        }
+  697|     87|        // The headroom ledger keeps the measured reading (`readFreeSpace`): the important-for-opportunistic copy is this
+  698|     87|        // ensure's own plan and space decision, never the base other lanes are admitted against (S2-23, L4-R6).
+  699|     87|        let target = manifest ?? view.appliedManifest
+  700|     87|        let policy = PlanningPolicy(storage: self.configuration.storage, includeOnDemand: scope.isExplicit, now: self.environment.time.now())
+  701|     87|        // REENTRANCY: RE-S07 — the lifecycle; apply diffs against current state anyway.
+  702|     87|        var plan = await SyncEngine.planOffActor(self.planner, manifest: target, view: view, scope: scope, policy: policy, space: space)
+  703|     87|        var eviction: EvictionPlan?
+  704|     87|        if case .needsEviction(let bytes) = plan.space {
+  705|      3|            // REENTRANCY: RE-S37 — the lifecycle; a dry run `apply` re-validates per victim.
+  706|      3|            eviction = await self.store.evictionPlan(toFree: bytes, protecting: Set(plan.fetches.map(\.id)))
+  707|      3|            if eviction == nil {
+  708|      1|                var fallback = policy
+  709|      1|                fallback.evictionPermitted = false
+  710|      1|                // REENTRANCY: RE-S07 — as above.
+  711|      1|                plan = await SyncEngine.planOffActor(self.planner, manifest: target, view: view, scope: scope, policy: fallback, space: space)
+  712|      1|            }
+  713|      3|        }
+  714|     87|        guard self.isRunning, !Task.isCancelled else {
+  715|      0|            return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+  716|     87|        }
+  717|     87|        if case .insufficient(let required, let available) = plan.space {
+  718|      1|            return .failure(.insufficientSpace(required: required, available: available))
+  719|     86|        }
+  720|     86|        if manifest != nil || eviction != nil {
+  721|     44|            // REENTRANCY: RE-S09 — the lifecycle; the callee has followed a committed apply (removal events, T21, T22)
+  722|     44|            // even when this caller has gone, as after a run's apply.
+  723|     44|            if case .failure(let error) = await self.applyAndFollow(target, etag: etag, eviction: eviction) {
+  724|      7|                return .failure(error.assetError)
+  725|     37|            }
+  726|     37|            guard self.isRunning else {
+  727|      0|                return .failure(.shutDown)
+  728|     37|            }
+  729|     37|            // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced (apply committed).
+  730|     37|            await self.refreshStoreDeadline()
+  731|     37|            guard self.isRunning, !Task.isCancelled else {
+  732|      0|                return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+  733|     37|            }
+  734|     79|        }
+  735|     79|        // The fetches become members (and jobs) a pipeline's worth at a time (S1-15): registering a scope of 100,000
+  736|     79|        // missing entries at once held the actor about 0.4 s (C2).
+  737|     79|        var group = Group(kind: .ensure, lane: .userInitiated)
+  738|     79|        group.fetches = plan.fetches
+  739|     79|        self.state.groups[token] = group
+  740|     79|        self.state.presenceReaders -= 1
+  741|     79|        reading = false
+  742|     79|        self.pump()
+  743|     79|        if !(self.state.groups[token]?.isSettled ?? true) {
+  744|     60|            // REENTRANCY: RE-S20 — the lifecycle and the group still registered; the report is recomputed from the
+  745|     60|            // store afterwards.
+  746|     60|            let completed = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+  747|     60|                if self.state.groups[token]?.isSettled ?? true {
+  748|      0|                    continuation.resume(returning: self.state.groups[token] != nil)
+  749|     60|                } else {
+  750|     60|                    self.state.groups[token]?.continuation = continuation
+  751|     60|                }
+  752|     60|            }
+  753|     60|            guard completed, self.isRunning else {
+  754|      7|                self.performReleaseGroup(token)
+  755|      7|                return .failure(self.isShuttingDown ? .shutDown : .cancelled)
+  756|     53|            }
+  757|     72|        }
+  758|     72|        let spaceFailure = self.state.groups[token]?.spaceFailure
+  759|     72|        self.performReleaseGroup(token)
+  760|     72|        // REENTRANCY: RE-S20 — the lifecycle; the report is recomputed from the store.
+  761|     72|        var report = await self.store.availability(of: scope)
+  762|     72|        guard self.isRunning else {
+  763|      0|            return .failure(.shutDown)
+  764|     72|        }
+  765|     72|        report.manifestFresh = fresh
+  766|     72|        if let spaceFailure, !report.isComplete {
+  767|      4|            // A member failed for lack of space at dispatch (the plan fitted, the headroom beside the bytes in flight did
+  768|      4|            // not) and the scope is still incomplete: the caller gets the typed shortage, as from the plan (R-SYN-11).
+  769|      4|            return .failure(spaceFailure)
+  770|     68|        }
+  771|     68|        return .success(report)
+  772|     94|    }
+  773|       |
+  774|       |    /// The error of an unreachable manifest for `ensureAvailable`. A fetch the origin's throttle refused reports the time
+  775|       |    /// left until the throttle ends, as ARCHITECTURE §7.6 maps a 429 and as the unknown-id `resolve` answers the same
+  776|       |    /// refusal (close-out cycle 17, F-37). The end is read in the answering turn through the origin's
+  777|       |    /// (`throttleEnd(after:)`): the outcome's end was read in the fetch's turn, and a transfer's 429 may have extended the
+  778|       |    /// throttle in the awaits since (close-out cycle 18, F-38).
+  779|      5|    private func unreachableError(_ outcome: ManifestOutcome) -> AssetError {
+  780|      5|        switch outcome {
+  781|      5|        case .failed(let error):
+  782|      1|            return error.assetError(now: self.environment.time.now())
+  783|      5|        case .circuitOpen(let cause):
+  784|      1|            return cause == .authentication ? .authRejected(.confirmed) : .serverUnavailable(retryAfter: nil)
+  785|      5|        case .throttled(let until):
+  786|      3|            return self.throttledError(after: until)
+  787|      5|        default:
+  788|      0|            return .serverUnavailable(retryAfter: nil)
+  789|      5|        }
+  790|      5|    }
+  791|       |
+  792|       |    // MARK: Refresh (R-SYN-9)
+  793|       |
+  794|       |    /// Whether a launch sync is due now.
+  795|     22|    func performIsSyncDue() async -> Result<Bool, AssetError> {
+  796|     22|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  797|     22|        if let error = await self.ensureStarted() {
+  798|      5|            return .failure(error)
+  799|     17|        }
+  800|     17|        do {
+  801|     17|            // REENTRANCY: RE-S38 — the lifecycle; the answer is the store's snapshot.
+  802|     17|            let view = try await self.store.planningView()
+  803|     17|            guard self.isRunning else {
+  804|      0|                return .failure(.shutDown)
+  805|     17|            }
+  806|     17|            return .success(RefreshDecision.isSyncDue(
+  807|     17|                policy: self.configuration.refresh,
+  808|     17|                stamp: view.stamp,
+  809|     17|                syncDueFlag: view.syncDue,
+  810|     17|                appVersion: self.state.launch?.appVersion ?? "",
+  811|     17|                now: self.environment.time.now(),
+  812|     17|                syncedThisLaunch: self.state.syncedThisLaunch
+  813|     17|            ))
+  814|     17|        } catch {
+  815|      0|            return .failure(error.assetError)
+  816|      0|        }
+  817|     17|    }
+  818|       |
+  819|       |    /// The stamp's completion time.
+  820|      9|    func performLastSyncedAt() async -> Result<Date?, AssetError> {
+  821|      9|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  822|      9|        if let error = await self.ensureStarted() {
+  823|      3|            return .failure(error)
+  824|      6|        }
+  825|      6|        do {
+  826|      6|            // REENTRANCY: RE-S38 — the lifecycle; the answer is the store's snapshot.
+  827|      6|            let view = try await self.store.planningView()
+  828|      6|            guard self.isRunning else {
+  829|      0|                return .failure(.shutDown)
+  830|      6|            }
+  831|      6|            return .success(view.stamp?.completedAt)
+  832|      6|        } catch {
+  833|      0|            return .failure(error.assetError)
+  834|      0|        }
+  835|      6|    }
+  836|       |
+  837|       |    // MARK: Scope, pins, leases (ADR-027, ADR-044)
+  838|       |
+  839|       |    /// Replaces the retention scope and pushes it to the store in an owned task (RE-S33); starts no run.
+  840|    105|    func performSetRetentionScope(_ scope: AssetScope) async -> Result<Void, AssetError> {
+  841|    105|        guard !self.isShuttingDown else {
+  842|      1|            return .failure(.shutDown)
+  843|    104|        }
+  844|    104|        self.state.retentionScope = scope
+  845|    104|        self.state.retentionSequence += 1
+  846|    104|        let sequence = self.state.retentionSequence
+  847|    104|        guard self.isRunning else {
+  848|      1|            // `start()` pushes the scope in force after `open()`.
+  849|      1|            return .success(())
+  850|    103|        }
+  851|    103|        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+  852|    103|        let result = await self.joinEntry(stopsWorkOnCancel: false) { engine, _ in
+  853|    103|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+  854|    103|            await engine.pushRetentionScope(sequence)
+  855|    103|            return .done(.success(()))
+  856|    103|        }
+  857|    103|        if case .done(let outcome) = result {
+  858|    103|            return outcome
+  859|    103|        }
+  860|      0|        return .failure(.cancelled)
+  861|    105|    }
+  862|       |
+  863|    103|    private func pushRetentionScope(_ sequence: UInt64) async {
+  864|    103|        guard self.state.retentionSequence == sequence else {
+  865|     92|            return
+  866|     92|        }
+  867|     11|        // REENTRANCY: RE-S33 — the lifecycle; a scope set meanwhile has a newer sequence and pushes itself.
+  868|     11|        await self.store.setRetentionScope(self.state.retentionScope)
+  869|     11|    }
+  870|       |
+  871|       |    /// Pins or unpins through the store in an owned task (ADR-039).
+  872|     10|    func performSetPinned(_ ids: Set<AssetID>, pinned: Bool) async -> Result<Void, AssetError> {
+  873|     10|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  874|     10|        if let error = await self.ensureStarted() {
+  875|      6|            return .failure(error)
+  876|      6|        }
+  877|      4|        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+  878|      4|        let result = await self.joinEntry(stopsWorkOnCancel: false) { engine, _ in
+  879|      4|            do throws(StoreError) {
+  880|      4|                // REENTRANCY: RE-S30 — the lifecycle.
+  881|      4|                try await engine.store.setPinned(ids, pinned: pinned)
+  882|      4|                // REENTRANCY: RE-S40 — the lifecycle.
+  883|      4|                await engine.refreshStoreDeadline()
+  884|      4|                return .done(.success(()))
+  885|      4|            } catch {
+  886|      0|                return .done(.failure(error.assetError))
+  887|      0|            }
+  888|      4|        }
+  889|      4|        if case .done(let outcome) = result {
+  890|      4|            return outcome
+  891|      4|        }
+  892|      0|        return .failure(.cancelled)
+  893|     10|    }
+  894|       |
+  895|       |    /// A lease, resolving first when the asset is absent (R-CAR-8); one acquired after shutdown began is released at
+  896|       |    /// once (RE-S30).
+  897|     11|    func performAcquireLease(_ id: AssetID) async -> Result<AssetLease, AssetError> {
+  898|     11|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  899|     11|        if let error = await self.ensureStarted() {
+  900|      2|            return .failure(error)
+  901|      9|        }
+  902|     12|        for attempt in 0..<2 {
+  903|     12|            do {
+  904|     12|                // REENTRANCY: RE-S36 — the lifecycle; a lease acquired after shutdown began is released at once.
+  905|     12|                let lease = try await self.store.acquireLease(id)
+  906|      7|                guard self.isRunning else {
+  907|      0|                    // REENTRANCY: RE-S30 — terminal.
+  908|      0|                    _ = await self.store.releaseLease(lease)
+  909|      0|                    return .failure(.shutDown)
+  910|      7|                }
+  911|      7|                return .success(lease)
+  912|     12|            } catch .notPresent where attempt == 0 {
+  913|      1|                // REENTRANCY: RE-S36 — the lifecycle; the lease is retried once after the resolve.
+  914|      1|                switch await self.performAwaitAsset(id, lane: .userInitiated) {
+  915|      1|                case .success:
+  916|      1|                    continue
+  917|      1|                case .failure(let error):
+  918|      0|                    return .failure(error)
+  919|      1|                }
+  920|      4|            } catch .unknownAsset(_) where attempt == 0 {
+  921|      4|                // REENTRANCY: RE-S36 — as above.
+  922|      4|                switch await self.performAwaitAsset(id, lane: .userInitiated) {
+  923|      4|                case .success:
+  924|      2|                    continue
+  925|      4|                case .failure(let error):
+  926|      2|                    return .failure(error)
+  927|      4|                }
+  928|      4|            } catch {
+  929|      0|                return .failure(self.isShuttingDown ? .shutDown : error.assetError)
+  930|      0|            }
+  931|     12|        }
+  932|      0|        return .failure(.notFound)
+  933|     11|    }
+  934|       |
+  935|       |    /// Releases a lease and re-arms the alarm with the store's new deadline; a no-op after shutdown.
+  936|      8|    func performReleaseLease(_ lease: AssetLease) {
+  937|      8|        guard self.isRunning else {
+  938|      1|            return
+  939|      7|        }
+  940|      7|        self.spawn(.entry) { engine in
+  941|      7|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle.
+  942|      7|            await engine.releaseLease(lease)
+  943|      7|        }
+  944|      7|    }
+  945|       |
+  946|       |    /// The store's release, whose answer is the store's new deadline, applied against the updates that landed while it
+  947|       |    /// was in flight (`applyStoreDeadline`, orchestrator ruling L5K-R16).
+  948|      7|    private func releaseLease(_ lease: AssetLease) async {
+  949|      7|        let since = self.state.storeDeadlineUpdates
+  950|      7|        // REENTRANCY: RE-S40 — the lifecycle; the heap's store entry is replaced by the newest deadline and a newer one is
+  951|      7|        // never dropped.
+  952|      7|        let deadline = await self.store.releaseLease(lease)
+  953|      7|        guard self.isRunning else {
+  954|      0|            return
+  955|      7|        }
+  956|      7|        self.applyStoreDeadline(deadline, readSince: since)
+  957|      7|    }
+  958|       |
+  959|       |    // MARK: Purge (R-CLN-6, RE-S24)
+  960|       |
+  961|       |    /// C2's limit on one stretch of the cooperative pool, about 10 ms (CLAUDE.md C2): a purge's first turn that holds
+  962|       |    /// the actor longer writes one line (`logLongPurgeTurn`), the field signal for the purge's known misses of the
+  963|       |    /// limit (Stage 3 close-out cycle 23, the owner's close ruling S3-R28 point 5).
+  964|       |    static let turnTimeLimit: TimeInterval = 0.010
+  965|       |
+  966|       |    /// Bumps the purge epoch before any await of the purge, ends the active run with `failed(.cancelled)`, withdraws
+  967|       |    /// non-user interests on purged ids (user waiters keep theirs and re-queue), then purges in an owned task.
+  968|  1.74k|    func performPurge(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
+  969|  1.74k|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+  970|  1.74k|        if let error = await self.ensureStarted() {
+  971|     53|            return .failure(error)
+  972|  1.69k|        }
+  973|  1.69k|        self.state.commitTurnMarksForTests?(false)
+  974|  1.69k|        // The turn's counts as it begins, before the withdrawal removes jobs: both O(1) (C2).
+  975|  1.69k|        let turnBegan = self.environment.time.monotonicNow()
+  976|  1.69k|        let jobsBefore = self.state.jobs.count
+  977|  1.69k|        let groupsBefore = self.state.groups.count
+  978|  1.69k|        self.state.purgeEpoch += 1
+  979|  1.69k|        // The store clears the stamp before its first await of the purge (R-CLN-6).
+  980|  1.69k|        self.state.lastStamp = nil
+  981|  1.69k|        // A purge unbinds what it removes: nothing the engine saw bound before it is assumed present (L4-R5).
+  982|  1.69k|        self.dropBindings()
+  983|  1.69k|        self.settleRun(.cancelled)
+  984|  1.69k|        self.withdrawPurged(request)
+  985|  1.69k|        self.state.commitTurnMarksForTests?(true)
+  986|  1.69k|        self.logLongPurgeTurn(since: turnBegan, jobs: jobsBefore, groups: groupsBefore)
+  987|  1.69k|        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+  988|  1.69k|        let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
+  989|  1.69k|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+  990|  1.69k|            .purge(await engine.purgeTask(request))
+  991|  1.69k|        }
+  992|  1.69k|        if case .purge(let outcome) = result {
+  993|  1.69k|            return outcome
+  994|  18.4E|        }
+  995|  18.4E|        if case .done(.failure(let error)) = result {
+  996|      0|            return .failure(error)
+  997|  18.4E|        }
+  998|  18.4E|        return .failure(.cancelled)
+  999|  1.74k|    }
+ 1000|       |
+ 1001|       |    /// Writes one `.info` line on `.sync` when the purge's first turn, begun at `began` on the injected clock (C4),
+ 1002|       |    /// held the actor longer than C2's limit (`turnTimeLimit`): its milliseconds, and the job and group counts as it
+ 1003|       |    /// began, which tie a long turn to a shape. The line names no id, hash, URL, path or key (R-OBS-1, R-SEC-1); an app
+ 1004|       |    /// that adopts the kit reads it through its own `LogSink` or `OSLogStore`, so its text is a soft contract (the
+ 1005|       |    /// owner's close ruling S3-R28 point 5).
+ 1006|  1.69k|    private func logLongPurgeTurn(since began: MonotonicInstant, jobs: Int, groups: Int) {
+ 1007|  1.69k|        let elapsed = self.environment.time.monotonicNow().seconds(since: began)
+ 1008|  1.69k|        guard elapsed > Self.turnTimeLimit else {
+ 1009|  1.69k|            return
+ 1010|  1.69k|        }
+ 1011|      1|        let milliseconds = String(format: "%.2f", elapsed * 1_000)
+ 1012|      1|        self.log.log(.sync, .info, "long purge turn: \(milliseconds) ms, \(jobs) jobs, \(groups) groups")
+ 1013|      1|    }
+ 1014|       |
+ 1015|       |    /// Withdraws the non-user interests a purge of `request` removes (user waiters keep theirs and re-queue): a group
+ 1016|       |    /// stops waiting for the members it no longer has an interest in, a heal of a purged id is forgotten. Behind the
+ 1017|       |    /// follow barrier the joins of such interests that wait for the follow are withdrawn too (`withdrawPurgedJoins`).
+ 1018|  1.69k|    func withdrawPurged(_ request: PurgeRequest) {
+ 1019|  1.69k|        // The request is read before the copy, so a purge of `.all` looks nothing up; an id the copy does not list is
+ 1020|  1.69k|        // purged (S3-R27 item 12.3, e2-A1.1). The copy is a local: the predicate never reads the state through `self`.
+ 1021|  1.69k|        let applied = self.state.applied
+ 1022|  1.69k|        let isPurged: (AssetID) -> Bool = { asset in
+ 1023|    110|            switch request {
+ 1024|    110|            case .all:
+ 1025|      0|                return true
+ 1026|    110|            case .evictable:
+ 1027|      2|                guard let entry = applied.entry(for: asset) else {
+ 1028|      0|                    return true
+ 1029|      2|                }
+ 1030|      2|                return entry.policy != .essential
+ 1031|    110|            case .scope(let scope):
+ 1032|    108|                guard let entry = applied.entry(for: asset) else {
+ 1033|      0|                    return true
+ 1034|    108|                }
+ 1035|    108|                return scope.contains(entry)
+ 1036|    110|            }
+ 1037|    110|        }
+ 1038|  1.69k|        // A purge of everything takes the jobs' fast path (`Job.withdrawPurged`'s `all`; e2-A1.5).
+ 1039|  1.69k|        let all = request == .all
+ 1040|  1.69k|        self.withdrawPurgedJoins(isPurged)
+ 1041|  1.69k|        // The jobs the walk retires leave their `.retry` deadlines to one pass after it (`removeJob`; e2-A2.5).
+ 1042|  1.69k|        self.state.retiredRetries = []
+ 1043|  1.69k|        for transfer in self.state.jobs.keys.sorted() {
+ 1044|    269|            // One access to the job removes its purged interests, in ascending token order (`Job.withdrawPurged`); the
+ 1045|    269|            // writes they imply follow it (S3-R27 item 12.3, e2-A1.4, with item 1's exclusivity rule).
+ 1046|    269|            guard let off = self.state.jobs[transfer]?.withdrawPurged(isPurged, all: all) else {
+ 1047|      0|                continue
+ 1048|    269|            }
+ 1049|    269|            // A group no longer waits for what it no longer has an interest in (F-1: member ⇒ interest); a heal of a
+ 1050|    269|            // purged id is forgotten. In the set's order: the lane filter never withdraws an `.ensure` interest (always
+ 1051|    269|            // user-initiated), so no drop resumes anything, and the order is unobservable (e2-A1.3).
+ 1052|    269|            for interest in off.withdrawn {
+ 1053|    259|                for asset in interest.assets {
+ 1054|    259|                    switch interest.kind {
+ 1055|    259|                    case .prefetch, .ensure:
+ 1056|    252|                        self.dropGroupMember(interest.token, asset: asset, from: transfer)
+ 1057|    259|                    case .system:
+ 1058|      5|                        self.state.heals[asset] = nil
+ 1059|    259|                    case .run, .waiter:
+ 1060|      2|                        break
+ 1061|    259|                    }
+ 1062|    259|                }
+ 1063|    269|            }
+ 1064|    269|            guard let before = off.laneBeforeFirst, let last = off.laneBeforeLast else {
+ 1065|     34|                continue
+ 1066|    235|            }
+ 1067|    235|            // What `dropInterest` did after each removal, once for them all (`settleRemoval`), as `takeOffMovedBefore`
+ 1068|    235|            // does: only the last removal can leave the job empty, removals never raise a lane, and a non-user lane falls
+ 1069|    235|            // at most once (prefetch to bulk), so one re-lane from the lane before the first removal does what each
+ 1070|    235|            // removal's re-lane did (re-queue, re-prioritise, pause), and observers are notified once, at the job's end
+ 1071|    235|            // (the audit before e2-A1.4: no purge suite waits for a state inside one job's removals).
+ 1072|    235|            if let run = self.state.run?.token, off.removed.contains(run) {
+ 1073|      2|                self.state.run?.held.remove(transfer)
+ 1074|      2|            }
+ 1075|    235|            if off.emptied, before != last {
+ 1076|      2|                // The removals before the last left the job interests and lowered its lane, from `before` to `last`:
+ 1077|      2|                // their re-lane came before the last removal retired the job or a claim kept it at `last`, and one
+ 1078|      2|                // settle alone would skip it (`EnginePurgeWithdrawalTests`).
+ 1079|      2|                self.state.jobs[transfer]?.heldLane = last
+ 1080|      2|                self.relane(transfer, from: before)
+ 1081|      2|            }
+ 1082|    235|            self.settleRemoval(transfer, before: before, last: last)
+ 1083|  1.69k|        }
+ 1084|  1.69k|        // One pass over the heap takes the retired jobs' `.retry` deadlines out, and observers are notified once more:
+ 1085|  1.69k|        // the walk's last notification still counted them (`EngineIntrospection.scheduledDeadlines`).
+ 1086|  1.69k|        let retired = self.state.retiredRetries ?? []
+ 1087|  1.69k|        self.state.retiredRetries = nil
+ 1088|  1.69k|        self.state.heap.removeAll { retired.contains($0) }
+ 1089|  1.69k|        self.notifyObservers()
+ 1090|  1.69k|    }
+ 1091|       |
+ 1092|       |    /// Withdraws the waiting joins (`EventAfterFollow.join`) of the non-user interests a purge removes, as `withdrawPurged`
+ 1093|       |    /// withdraws them from jobs: a visit-first engine had made those joins before the purge arrived, and its purge
+ 1094|       |    /// withdrew them, so the group stopped waiting for the member, a heal was forgotten, and no job was left for the
+ 1095|       |    /// purged id. Applied at once without them (Stage 3 close-out cycle 13, removal 7), the drain made the join after the
+ 1096|       |    /// purge, and the purged id was downloaded and stored again (PROBE-C13-PURGE-JOIN; cycle 14). Each such join leaves
+ 1097|       |    /// `joinsAfterFollow`, so its replay joins nothing (`replayJoin`), and stays in the queue, or behind its verdict,
+ 1098|       |    /// marked withdrawn (`JoinAfterFollow.withdrawn`): the drain's batches, and its end, are those of the events that
+ 1099|       |    /// arrived. One pass over the waiting events, each verdict's joins (`EngineState.joinsBehindVerdicts`) at the
+ 1100|       |    /// verdict's place, newest first, where the queue held them when each was inserted right behind the verdict, so the
+ 1101|       |    /// groups' members are dropped in the queue's order (C2; Stage 3 close-out cycle 21, ruling S3-R26 item 2). An owed
+ 1102|       |    /// re-route of such an interest leaves its batch (`EventAfterFollow.reroutes`), as that engine's purge withdrew the
+ 1103|       |    /// interest from the job the re-route had joined: its group stops waiting for the member and its heal is forgotten,
+ 1104|       |    /// in the order the batch's heap gave them up, unsorted, as `withdrawPurged` drops a job's ids in its set's order:
+ 1105|       |    /// no drop resumes anything, an `.ensure` interest being user-initiated, so the order is unobservable (Stage 3
+ 1106|       |    /// close-out cycle 22, ruling S3-R27 item 12.3, e2-A1.3, which reverses `integrate-rr21.md` R15's sort and S3-R26
+ 1107|       |    /// answer 7's sorted subset); a batch the purge empties stays queued, and its replay
+ 1108|       |    /// counts it done (`continueReroutes`). The walk runs whether or not a join waits: an empty walk costs nothing
+ 1109|       |    /// (ruling S3-R26 item 1; the early return on no waiting join was removed with it).
+ 1110|       |    ///
+ 1111|       |    /// Each event, and each bucket, is changed in place in one access (`EventAfterFollow.withdrawPurged`,
+ 1112|       |    /// `Array.markWithdrawn(where:)`): a join is marked and a batch loses its items inside the access, and the writes
+ 1113|       |    /// they imply (`joinsAfterFollow`, the groups, the heals) follow it, in the same order (Stage 3 close-out cycle 22,
+ 1114|       |    /// ruling S3-R27 item 12.3, e2-A1.2). Made inside the access, those writes would overlap it, and the predicates read
+ 1115|       |    /// only `isPurged`'s locals for the same reason (exclusivity, ruling S3-R27 item 1).
+ 1116|  1.69k|    private func withdrawPurgedJoins(_ isPurged: (AssetID) -> Bool) {
+ 1117|  1.69k|        // A waiting join is withdrawn when its interest is a non-user interest other than a waiter's in a purged id, and
+ 1118|  1.69k|        // no purge withdrew it already; an owed re-route, when its interest is such an interest.
+ 1119|  1.69k|        func withdraws(_ join: JoinAfterFollow) -> Bool {
+ 1120|     16|            !join.withdrawn && join.lane < .userInitiated && join.kind != .waiter && isPurged(join.asset)
+ 1121|     16|        }
+ 1122|  1.69k|        func removes(_ item: RerouteItem) -> Bool {
+ 1123|     26|            item.lane < .userInitiated && item.kind != .waiter && isPurged(item.asset)
+ 1124|     26|        }
+ 1125|  1.69k|        for index in self.state.eventsAfterFollow.indices {
+ 1126|     14|            switch self.state.eventsAfterFollow[index].withdrawPurged(joins: withdraws, reroutes: removes) {
+ 1127|     14|            case .nothing:
+ 1128|      4|                continue
+ 1129|     14|            case .join(let join):
+ 1130|      3|                self.withdrawJoinInterest(join)
+ 1131|     14|            case .reroutes(let from, let removed):
+ 1132|      6|                for item in removed {
+ 1133|      6|                    switch item.kind {
+ 1134|      6|                    case .prefetch, .ensure:
+ 1135|      4|                        self.dropGroupMember(item.token, asset: item.asset, from: from)
+ 1136|      6|                    case .system:
+ 1137|      2|                        self.state.heals[item.asset] = nil
+ 1138|      6|                    case .run, .waiter:
+ 1139|      0|                        break
+ 1140|      6|                    }
+ 1141|      6|                }
+ 1142|     14|            case .verdict(let key):
+ 1143|     10|                for join in self.state.joinsBehindVerdicts[key]?.markWithdrawn(where: withdraws) ?? [] {
+ 1144|     10|                    self.withdrawJoinInterest(join)
+ 1145|     10|                }
+ 1146|     14|            }
+ 1147|  1.69k|        }
+ 1148|  1.69k|    }
+ 1149|       |
+ 1150|       |    /// What follows a waiting join's withdrawal (`withdrawPurgedJoins`), once the access that marked it ended: the join
+ 1151|       |    /// leaves `joinsAfterFollow`, and its group stops waiting for the member or its heal is forgotten. A join no longer
+ 1152|       |    /// listed there is only marked.
+ 1153|     13|    private func withdrawJoinInterest(_ join: WithdrawnJoin) {
+ 1154|     13|        guard let transfer = self.state.joinsAfterFollow[join.token]?.removeValue(forKey: join.asset) else {
+ 1155|      0|            return
+ 1156|     13|        }
+ 1157|     13|        if self.state.joinsAfterFollow[join.token]?.isEmpty == true {
+ 1158|      4|            self.state.joinsAfterFollow[join.token] = nil
+ 1159|      4|        }
+ 1160|     13|        switch join.kind {
+ 1161|     13|        case .prefetch, .ensure:
+ 1162|     11|            self.dropGroupMember(join.token, asset: join.asset, from: transfer)
+ 1163|     13|        case .system:
+ 1164|      2|            self.state.heals[join.asset] = nil
+ 1165|     13|        case .run, .waiter:
+ 1166|      0|            break
+ 1167|     13|        }
+ 1168|     13|    }
+ 1169|       |
+ 1170|  1.69k|    private func purgeTask(_ request: PurgeRequest) async -> Result<PurgeResult, AssetError> {
+ 1171|  1.69k|        do {
+ 1172|  1.69k|            // REENTRANCY: RE-S24 — `purgeEpoch` was bumped before the await; afterwards the snapshot and the store's
+ 1173|  1.69k|            // deadline are refreshed.
+ 1174|  1.69k|            let result = try await self.store.purge(request)
+ 1175|    806|            guard self.isRunning else {
+ 1176|      0|                return .failure(.shutDown)
+ 1177|    806|            }
+ 1178|    806|            // Bindings learned while the purge ran may be purged too (L4-R5).
+ 1179|    806|            self.dropBindings()
+ 1180|    806|            self.broadcast(.snapshotChanged(generation: self.state.generation))
+ 1181|    806|            // The purge's reaper may have reclaimed what jobs parked for space wait for, outside the alarm's work.
+ 1182|    806|            // REENTRANCY: f-4 (proposed) — nothing: the callee re-validates the lifecycle after its read.
+ 1183|    806|            await self.spaceMayHaveBeenReclaimed()
+ 1184|    806|            // REENTRANCY: RE-S40 — the lifecycle.
+ 1185|    806|            await self.refreshStoreDeadline()
+ 1186|    806|            self.pump()
+ 1187|    806|            return .success(result)
+ 1188|  1.69k|        } catch {
+ 1189|    890|            // A purge that threw may have removed records in memory first (ADR-050), bound meanwhile too (L4-R5).
+ 1190|    890|            self.storeMutationFailed()
+ 1191|    890|            // It may also have reaped before it threw (a grace wait cancelled after a round of reaping).
+ 1192|    890|            // REENTRANCY: f-4 (proposed) — nothing: the callee re-validates the lifecycle after its read.
+ 1193|    890|            await self.spaceMayHaveBeenReclaimed()
+ 1194|    890|            // REENTRANCY: RE-S40 — the lifecycle.
+ 1195|    890|            await self.refreshStoreDeadline()
+ 1196|    890|            return .failure(self.isShuttingDown ? .shutDown : error.assetError)
+ 1197|    890|        }
+ 1198|  1.69k|    }
+ 1199|       |
+ 1200|       |    // MARK: Maintenance (R-SYN-16, RE-S23)
+ 1201|       |
+ 1202|       |    /// Staging GC, orphan GC, eviction and deep verification within `timeBudget`, in an owned task whose caller's
+ 1203|       |    /// cancellation stops it between batches.
+ 1204|    464|    func runMaintenance(timeBudget: TimeInterval) async -> Result<MaintenanceReport, AssetError> {
+ 1205|    464|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+ 1206|    464|        if let error = await self.ensureStarted() {
+ 1207|     24|            return .failure(error)
+ 1208|    440|        }
+ 1209|    440|        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+ 1210|    440|        let result = await self.joinEntry(stopsWorkOnCancel: true) { engine, _ in
+ 1211|    440|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+ 1212|    440|            .maintenance(await engine.maintenanceTask(timeBudget: timeBudget))
+ 1213|    440|        }
+ 1214|    440|        if case .maintenance(let outcome) = result {
+ 1215|    439|            return outcome
+ 1216|    439|        }
+ 1217|      1|        if case .done(.failure(let error)) = result {
+ 1218|      1|            return .failure(error)
+ 1219|      1|        }
+ 1220|      0|        return .failure(.cancelled)
+ 1221|    464|    }
+ 1222|       |
+ 1223|    440|    private func maintenanceTask(timeBudget: TimeInterval) async -> Result<MaintenanceReport, AssetError> {
+ 1224|    440|        let deadline = self.environment.time.monotonicNow().adding(seconds: max(0, timeBudget))
+ 1225|    440|        var report = MaintenanceReport(gcBytes: 0, evictedBytes: 0, verifiedBytes: 0, corruptFound: 0, budgetExhausted: false)
+ 1226|  1.31k|        func expired() -> Bool {
+ 1227|  1.31k|            Task.isCancelled || !self.isRunning || self.environment.time.monotonicNow() >= deadline
+ 1228|  1.31k|        }
+ 1229|    440|        // Eviction and deep verification unbind assets the engine is not told about one by one: a binding seen before or
+ 1230|    440|        // during maintenance is not assumed present afterwards (L4-R5).
+ 1231|    440|        self.dropBindings()
+ 1232|    440|        do {
+ 1233|    440|            var claims = Set(self.state.jobs.keys)
+ 1234|    440|            claims.formUnion(self.state.draining.keys)
+ 1235|    440|            claims.formUnion(self.state.launchResumes.keys)
+ 1236|    440|            // REENTRANCY: RE-S23 — the lifecycle, the deadline and cancellation, checked before every step.
+ 1237|    440|            let staging = try await self.store.collectStaging(keeping: claims)
+ 1238|    439|            report.gcBytes = PlanBuilder.adding(report.gcBytes, staging.bytesFreed)
+ 1239|    439|            if expired() {
+ 1240|      2|                report.budgetExhausted = true
+ 1241|      2|                // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
+ 1242|      2|                return await self.finishMaintenance(report)
+ 1243|    437|            }
+ 1244|    437|            // REENTRANCY: RE-S23 — as above.
+ 1245|    437|            let garbage = try await self.store.collectGarbage(until: deadline)
+ 1246|    436|            report.gcBytes = PlanBuilder.adding(report.gcBytes, garbage.bytesFreed)
+ 1247|    436|            if expired() {
+ 1248|      2|                report.budgetExhausted = true
+ 1249|      2|                // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
+ 1250|      2|                return await self.finishMaintenance(report)
+ 1251|    434|            }
+ 1252|    434|            // REENTRANCY: RE-S23 — as above.
+ 1253|    434|            let eviction = try await self.store.evictIfNeeded()
+ 1254|    434|            report.evictedBytes = eviction.bytesFreed
+ 1255|    434|            self.dropBindings()
+ 1256|    434|            if expired() {
+ 1257|      0|                report.budgetExhausted = true
+ 1258|      0|                // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
+ 1259|      0|                return await self.finishMaintenance(report)
+ 1260|    434|            }
+ 1261|    434|            // REENTRANCY: RE-S23 — as above.
+ 1262|    434|            let verification = try await self.store.verifyIntegrity(byteBudget: MaintenanceBudget.bytes(for: timeBudget), until: deadline)
+ 1263|    434|            report.verifiedBytes = verification.bytesVerified
+ 1264|    434|            report.corruptFound = verification.corrupt.count
+ 1265|    434|            report.budgetExhausted = !verification.completedPass
+ 1266|    434|            if !verification.corrupt.isEmpty {
+ 1267|      2|                // REENTRANCY: RE-S30 — the lifecycle; the quarantined assets are announced and their re-downloads
+ 1268|      2|                // scheduled from the records read as a snapshot (as after `reportUnreadable`).
+ 1269|      2|                await self.quarantined(verification.corrupt, sharing: nil)
+ 1270|      2|            }
+ 1271|    434|            if self.state.migration.deferred, self.state.migration.pending, !expired() {
+ 1272|      1|                self.startMigration()
+ 1273|      1|            }
+ 1274|    434|        } catch .cancelled {
+ 1275|      1|            // The step that threw may have evicted or quarantined in memory first (ADR-050): no binding learned during
+ 1276|      1|            // maintenance is trusted (L4-R5).
+ 1277|      1|            self.storeMutationFailed()
+ 1278|      1|            report.budgetExhausted = true
+ 1279|      1|        } catch {
+ 1280|      1|            // As above.
+ 1281|      1|            self.storeMutationFailed()
+ 1282|      1|            // That step may also have doomed blobs, which leaves a snapshot install due and a reap to schedule
+ 1283|      1|            // (orchestrator ruling L5K-R16).
+ 1284|      1|            // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+ 1285|      1|            await self.refreshStoreDeadline()
+ 1286|      1|            return .failure(self.isShuttingDown ? .shutDown : error.assetError)
+ 1287|    435|        }
+ 1288|    435|        // REENTRANCY: RE-S40 — nothing: the callee re-reads the store deadline and the lifecycle.
+ 1289|    435|        return await self.finishMaintenance(report)
+ 1290|    440|    }
+ 1291|       |
+ 1292|    439|    private func finishMaintenance(_ report: MaintenanceReport) async -> Result<MaintenanceReport, AssetError> {
+ 1293|    439|        // REENTRANCY: RE-S40 — the lifecycle.
+ 1294|    439|        await self.refreshStoreDeadline()
+ 1295|    439|        guard self.isRunning else {
+ 1296|      1|            return .failure(.shutDown)
+ 1297|    438|        }
+ 1298|    438|        self.broadcast(.maintenanceFinished(report))
+ 1299|    438|        return .success(report)
+ 1300|    439|    }
+ 1301|       |
+ 1302|       |    // MARK: Quarantine (R-CLN-8)
+ 1303|       |
+ 1304|       |    /// Quarantines through the store, then schedules the re-download at the end of the quarantine.
+ 1305|     29|    func performReportUnreadable(_ id: AssetID) async -> Result<Void, AssetError> {
+ 1306|     29|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+ 1307|     29|        if let error = await self.ensureStarted() {
+ 1308|      3|            return .failure(error)
+ 1309|     26|        }
+ 1310|     26|        // REENTRANCY: RE-S25 — nothing: the join registers synchronously; the result arrives by value.
+ 1311|     26|        let result = await self.joinEntry(stopsWorkOnCancel: false) { engine, _ in
+ 1312|     26|            // REENTRANCY: f-12 (proposed) — nothing: a snapshot of who holds the blob now; each holder is re-read from the
+ 1313|     26|            // store's records after the quarantine before it is announced or healed.
+ 1314|     26|            let holders = await engine.blobHolders(of: id)
+ 1315|     26|            do throws(StoreError) {
+ 1316|     26|                // REENTRANCY: RE-S30 — the lifecycle.
+ 1317|     26|                try await engine.store.reportUnreadable(id)
+ 1318|     25|            } catch {
+ 1319|      1|                // The store may have quarantined the blob, and with it every holder, in memory before its commit threw
+ 1320|      1|                // (ADR-050): no binding is trusted (L4-R5).
+ 1321|      1|                // REENTRANCY: RE-S21 — nothing: a synchronous drop on the actor.
+ 1322|      1|                await engine.storeMutationFailed()
+ 1323|      1|                // The quarantine dooms the blob, whose snapshot install and reap the alarm runs (L5K-R16).
+ 1324|      1|                // REENTRANCY: RE-S40 — the lifecycle (inside); the heap's store entry is replaced by the newest deadline.
+ 1325|      1|                await engine.refreshStoreDeadline()
+ 1326|      1|                return .done(.failure(error.assetError))
+ 1327|     25|            }
+ 1328|     25|            // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+ 1329|     25|            await engine.quarantined([id], sharing: holders)
+ 1330|     25|            return .done(.success(()))
+ 1331|     26|        }
+ 1332|     26|        if case .done(let outcome) = result {
+ 1333|     26|            return outcome
+ 1334|     26|        }
+ 1335|      0|        return .failure(.cancelled)
+ 1336|     29|    }
+ 1337|       |
+ 1338|       |    /// Announces quarantined assets and schedules their re-downloads. `ids` are the assets the store reported: every
+ 1339|       |    /// holder of a corrupt blob, for deep verification (`holders` is `nil`). `reportUnreadable` reports only its id, yet
+ 1340|       |    /// the store quarantines every holder of the blob (R-CLN-8): `holders` are the other assets that referenced it in a
+ 1341|       |    /// snapshot taken before the quarantine, and each one the store's records show quarantined or failed afterwards is
+ 1342|       |    /// announced and healed too.
+ 1343|     27|    private func quarantined(_ ids: [AssetID], sharing holders: [AssetID]?) async {
+ 1344|     27|        if holders == nil {
+ 1345|      2|            self.forgetBound(ids)
+ 1346|     25|        } else {
+ 1347|     25|            // The store quarantined holders of the blob the engine knows only from a snapshot (one gained between the
+ 1348|     25|            // snapshot and the quarantine, or every one when the snapshot could not be read, is in no list): no binding
+ 1349|     25|            // is trusted; an attempt asks the store first (L4-R5).
+ 1350|     25|            self.dropBindings()
+ 1351|     25|        }
+ 1352|     27|        for id in ids {
+ 1353|     27|            self.broadcast(.assetRemoved(id, .quarantined))
+ 1354|     27|        }
+ 1355|     27|        // REENTRANCY: RE-S30 — the lifecycle.
+ 1356|     27|        await self.scheduleHeals(ids, sharing: holders ?? [])
+ 1357|     27|        // REENTRANCY: RE-S40 — the lifecycle.
+ 1358|     27|        await self.refreshStoreDeadline()
+ 1359|     27|    }
+ 1360|       |
+ 1361|       |    /// The other ids whose records reference `id`'s blob in a store snapshot, found off the actor (C2: the scan visits
+ 1362|       |    /// every record). Empty when the store cannot answer or `id` holds no blob.
+ 1363|     26|    private func blobHolders(of id: AssetID) async -> [AssetID] {
+ 1364|     26|        let view: StorePlanningView
+ 1365|     26|        do {
+ 1366|     26|            // REENTRANCY: f-12 (proposed) — nothing: the records are a snapshot, re-read after the quarantine; the caller's
+ 1367|     26|            // next step re-validates the lifecycle.
+ 1368|     26|            view = try await self.store.planningView()
+ 1369|     26|        } catch {
+ 1370|      0|            return []
+ 1371|     26|        }
+ 1372|     26|        guard let key = view.records[id]?.referencedBlob else {
+ 1373|     10|            return []
+ 1374|     16|        }
+ 1375|     16|        // REENTRANCY: f-12 (proposed) — nothing: a pure scan of the snapshot off the actor (C2).
+ 1376|     16|        return await SyncEngine.holdersOffActor(of: key, besides: id, in: view.records)
+ 1377|     26|    }
+ 1378|       |
+ 1379|       |    /// The ids of `records` other than `id` that reference blob `key`, sorted: a pure scan, off the actor (C2).
+ 1380|       |    @concurrent
+ 1381|     16|    nonisolated static func holdersOffActor(of key: BlobKey, besides id: AssetID, in records: [AssetID: AssetRecord]) async -> [AssetID] {
+ 1382|    162|        records.compactMap { $0.key != id && $0.value.referencedBlob == key ? $0.key : nil }.sorted()
+ 1383|     16|    }
+ 1384|       |
+ 1385|       |    /// Schedules a re-download at the end of each asset's quarantine (read from the store's records); a holder of a
+ 1386|       |    /// reported blob that the records show quarantined or failed is announced first.
+ 1387|     27|    private func scheduleHeals(_ ids: [AssetID], sharing holders: [AssetID] = []) async {
+ 1388|     27|        let view: StorePlanningView
+ 1389|     27|        do {
+ 1390|     27|            // REENTRANCY: RE-S30 — the lifecycle; the records are a snapshot.
+ 1391|     27|            view = try await self.store.planningView()
+ 1392|     27|        } catch {
+ 1393|      0|            return
+ 1394|     27|        }
+ 1395|     27|        guard self.isRunning else {
+ 1396|      0|            return
+ 1397|     27|        }
+ 1398|     27|        var healed = ids
+ 1399|     27|        for holder in holders where !ids.contains(holder) {
+ 1400|      5|            switch view.records[holder]?.residency {
+ 1401|      5|            case .quarantined?, .failed(.unreadable)?:
+ 1402|      5|                self.broadcast(.assetRemoved(holder, .quarantined))
+ 1403|      5|                healed.append(holder)
+ 1404|      5|            default:
+ 1405|      0|                continue
+ 1406|      5|            }
+ 1407|     27|        }
+ 1408|     27|        let wall = self.environment.time.now()
+ 1409|     27|        let now = self.environment.time.monotonicNow()
+ 1410|     32|        for id in healed {
+ 1411|     32|            guard case .quarantined(let until)? = view.records[id]?.residency else {
+ 1412|      0|                continue
+ 1413|     32|            }
+ 1414|     32|            self.scheduleHeal(id, at: now.adding(seconds: max(0, until.timeIntervalSince(wall))))
+ 1415|     32|        }
+ 1416|     27|    }
+ 1417|       |
+ 1418|       |    // MARK: Reports (R-CLN-9, R-OBS-2, R-OBS-3)
+ 1419|       |
+ 1420|       |    /// The store's report plus the source's copies (RE-S32).
+ 1421|     26|    func performStorageReport() async -> Result<StorageReport, AssetError> {
+ 1422|     26|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+ 1423|     26|        if let error = await self.ensureStarted() {
+ 1424|      4|            return .failure(error)
+ 1425|     22|        }
+ 1426|     22|        // REENTRANCY: RE-S32 — the lifecycle; the two figures are independent snapshots.
+ 1427|     22|        var report = await self.store.storageReport()
+ 1428|     22|        guard self.isRunning else {
+ 1429|      0|            return .failure(.shutDown)
+ 1430|     22|        }
+ 1431|     22|        if let remote = self.state.remote {
+ 1432|     22|            // REENTRANCY: RE-S32 — the lifecycle.
+ 1433|     22|            report.sourceCopyBytes = await remote.sourceCopyBytes()
+ 1434|     22|        }
+ 1435|     22|        guard self.isRunning else {
+ 1436|      0|            return .failure(.shutDown)
+ 1437|     22|        }
+ 1438|     22|        return .success(report)
+ 1439|     26|    }
+ 1440|       |
+ 1441|       |    /// Engine counters plus the store's.
+ 1442|     47|    func performMetrics() async -> Result<MetricsSnapshot, AssetError> {
+ 1443|     47|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+ 1444|     47|        if let error = await self.ensureStarted() {
+ 1445|      5|            return .failure(error)
+ 1446|     42|        }
+ 1447|     42|        // REENTRANCY: RE-S38 — the lifecycle; the store's counters are a snapshot.
+ 1448|     42|        let stored = await self.store.metrics()
+ 1449|     42|        guard self.isRunning else {
+ 1450|      0|            return .failure(.shutDown)
+ 1451|     42|        }
+ 1452|     42|        var metrics = self.state.metrics
+ 1453|     42|        metrics.evictions = stored.evictions
+ 1454|     42|        metrics.evictedBytes = stored.evictedBytes
+ 1455|     42|        metrics.gcBytes = stored.gcBytes
+ 1456|     42|        metrics.integrityFailures += stored.integrityFailures
+ 1457|     42|        return .success(metrics)
+ 1458|     47|    }
+ 1459|       |
+ 1460|       |    /// Counters, recent errors, launch facts and the store's generation and stamp. A degraded engine, or a store that
+ 1461|       |    /// cannot answer, still answers, because that is when support needs the error ring most (R-OBS-3, L4-R9): with the
+ 1462|       |    /// last-known generation (0 if never read) and stamp (`nil` if never read). After shutdown it fails `.shutDown`
+ 1463|       |    /// (ADR-042); a caller cancelled while start runs gets `.cancelled`.
+ 1464|     30|    func performDiagnostics() async -> Result<EngineDiagnostics, AssetError> {
+ 1465|     30|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+ 1466|     30|        if let error = await self.ensureStarted() {
+ 1467|      6|            guard case .storageUnavailable = error else {
+ 1468|      4|                return .failure(error)
+ 1469|      4|            }
+ 1470|      2|            return .success(self.makeDiagnostics())
+ 1471|     24|        }
+ 1472|     24|        do {
+ 1473|     24|            // REENTRANCY: RE-S38 — the lifecycle; a snapshot, kept as the last-known figures.
+ 1474|     24|            let view = try await self.store.planningView()
+ 1475|     23|            self.state.lastIndexGeneration = view.generation
+ 1476|     23|            self.state.lastStamp = view.stamp
+ 1477|     23|        } catch {
+ 1478|      1|            // The store cannot answer now: the last-known figures stand in.
+ 1479|     24|        }
+ 1480|     24|        guard !self.isShuttingDown else {
+ 1481|      0|            return .failure(.shutDown)
+ 1482|     24|        }
+ 1483|     24|        return .success(self.makeDiagnostics())
+ 1484|     30|    }
+ 1485|       |
+ 1486|       |    /// The diagnostics from the engine's own state and the last-known index figures. The generation is never older
+ 1487|       |    /// than one the engine already announced (`snapshotChanged` after an apply or a catch-up), even when the store
+ 1488|       |    /// last answered before those applies.
+ 1489|     26|    private func makeDiagnostics() -> EngineDiagnostics {
+ 1490|     26|        var errors = self.state.recentErrors
+ 1491|     26|        for field in self.state.clampedFields {
+ 1492|      1|            errors.append(DiagnosticError(at: self.environment.time.now(), id: nil, failureClass: .rejected, detail: "clamped \(field)"))
+ 1493|     26|        }
+ 1494|     26|        return EngineDiagnostics(
+ 1495|     26|            introspection: self.currentIntrospection(),
+ 1496|     26|            recentErrors: Array(errors.suffix(EngineDiagnostics.recentErrorCapacity)),
+ 1497|     26|            appVersion: self.state.launch?.appVersion,
+ 1498|     26|            launchEpoch: self.state.launch?.report.launchEpoch,
+ 1499|     26|            indexGeneration: max(self.state.lastIndexGeneration, self.state.generation),
+ 1500|     26|            stamp: self.state.lastStamp,
+ 1501|     26|            retentionScope: self.state.retentionScope
+ 1502|     26|        )
+ 1503|     26|    }
+ 1504|       |
+ 1505|       |    // MARK: Memory pressure (R-CLN-11, ADR-044)
+ 1506|       |
+ 1507|       |    /// Starts or stops the one observer; only the newest epoch applies.
+ 1508|     20|    func performObserveMemoryPressure(epoch: UInt64, handler: (@Sendable (MemoryPressureLevel) async -> Void)?) -> Result<Void, AssetError> {
+ 1509|     20|        guard !self.isShuttingDown else {
+ 1510|      1|            return .failure(.shutDown)
+ 1511|     19|        }
+ 1512|     19|        guard epoch > self.state.pressure.epoch else {
+ 1513|      1|            return .success(())
+ 1514|     18|        }
+ 1515|     18|        self.state.pressure.epoch = epoch
+ 1516|     18|        self.state.pressure.handler = handler
+ 1517|     18|        if handler == nil {
+ 1518|      5|            let task = self.state.pressure.task
+ 1519|      5|            self.state.pressure.task = nil
+ 1520|      5|            self.cancelTask(task)
+ 1521|     13|        } else if self.state.pressure.task == nil, self.environment.memoryPressure != nil {
+ 1522|     13|            self.state.pressure.token += 1
+ 1523|     13|            let token = self.state.pressure.token
+ 1524|     13|            let task = self.spawn(.pressure) { engine in
+ 1525|     13|                // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+ 1526|     13|                await engine.observePressure(token: token)
+ 1527|     13|            }
+ 1528|     13|            self.state.pressure.task = task
+ 1529|     13|        }
+ 1530|     18|        self.notifyObservers()
+ 1531|     18|        return .success(())
+ 1532|     20|    }
+ 1533|       |
+ 1534|     13|    private func observePressure(token: UInt64) async {
+ 1535|     13|        defer {
+ 1536|     13|            if self.state.pressure.token == token {
+ 1537|     13|                self.state.pressure.task = nil
+ 1538|     13|                self.notifyObservers()
+ 1539|     13|            }
+ 1540|     13|        }
+ 1541|     13|        guard let source = self.environment.memoryPressure else {
+ 1542|      0|            return
+ 1543|     13|        }
+ 1544|     13|        // REENTRANCY: RE-S31 — the observer's token is still the applied one, else it exits.
+ 1545|     13|        let stream = await source.pressureEvents()
+ 1546|     13|        // REENTRANCY: RE-S31 — per element: the token, the lifecycle and a handler still set.
+ 1547|     13|        for await level in stream {
+ 1548|      6|            guard self.state.pressure.token == token, !self.isShuttingDown, let handler = self.state.pressure.handler else {
+ 1549|      0|                return
+ 1550|      6|            }
+ 1551|      6|            // REENTRANCY: RE-S31 — a stop requested from inside the handler ends the loop after it returns.
+ 1552|      6|            await handler(level)
+ 1553|      6|            guard self.state.pressure.token == token, self.state.pressure.handler != nil, !self.isShuttingDown else {
+ 1554|      3|                return
+ 1555|      3|            }
+ 1556|     10|        }
+ 1557|     10|    }
+ 1558|       |
+ 1559|       |    // MARK: Background events (R-NET-3, RE-S42)
+ 1560|       |
+ 1561|       |    /// Makes sure the background session exists and returns once the preceding events are staged.
+ 1562|      5|    func performBackgroundEvents(identifier: String) async -> Result<Void, AssetError> {
+ 1563|      5|        guard !self.isShuttingDown else {
+ 1564|      3|            return .failure(.shutDown)
+ 1565|      3|        }
+ 1566|      2|        // REENTRANCY: RE-S26 — the lifecycle: the caller re-reads it (start may have degraded or shutdown begun).
+ 1567|      2|        if let error = await self.ensureStarted() {
+ 1568|      0|            return .failure(error)
+ 1569|      2|        }
+ 1570|      2|        if let remote = self.state.remote {
+ 1571|      2|            // REENTRANCY: RE-S42 — the lifecycle.
+ 1572|      2|            await remote.handleBackgroundEvents(identifier: identifier)
+ 1573|      2|        }
+ 1574|      2|        return self.isRunning ? .success(()) : .failure(.shutDown)
+ 1575|      5|    }
+ 1576|       |
+ 1577|       |    // MARK: Entry joins (ADR-039)
+ 1578|       |
+ 1579|       |    /// Runs `body` in an engine-owned task joined by the caller: the caller's cancellation withdraws its token (and, when
+ 1580|       |    /// the work is the caller's alone, cancels the task).
+ 1581|  2.36k|    func joinEntry(stopsWorkOnCancel: Bool, _ body: @escaping @Sendable (SyncEngine, InterestToken) async -> EntryResult) async -> EntryResult {
+ 1582|  2.36k|        let token = self.nextToken()
+ 1583|  2.36k|        // REENTRANCY: RE-S25 — nothing: the body registers and spawns synchronously; the result arrives by value.
+ 1584|  2.36k|        return await withTaskCancellationHandler {
+ 1585|  2.36k|            // REENTRANCY: RE-S25 — as above.
+ 1586|  2.36k|            await withCheckedContinuation { (continuation: CheckedContinuation<EntryResult, Never>) in
+ 1587|  2.36k|                if Task.isCancelled {
+ 1588|      0|                    continuation.resume(returning: .done(.failure(.cancelled)))
+ 1589|      0|                    return
+ 1590|  2.36k|                }
+ 1591|  2.36k|                self.state.entryJoins[token] = continuation
+ 1592|  2.36k|                guard let task = self.spawn(.entry, { engine in
+ 1593|  2.36k|                    // REENTRANCY: RE-S30 — nothing: the entry task's body re-validates the lifecycle after each of its awaits.
+ 1594|  2.36k|                    let result = await body(engine, token)
+ 1595|  2.36k|                    // REENTRANCY: RE-S21 — nothing: the owned task hops onto the actor; the callee re-validates the lifecycle after each of its awaits.
+ 1596|  2.36k|                    await engine.finishEntry(token, result)
+ 1597|  2.36k|                }) else {
+ 1598|      0|                    self.state.entryJoins.removeValue(forKey: token)?.resume(returning: .done(.failure(.shutDown)))
+ 1599|      0|                    return
+ 1600|  2.36k|                }
+ 1601|  2.36k|                self.state.entryTasks[token] = task
+ 1602|  2.36k|            }
+ 1603|  2.36k|        } onCancel: {
+ 1604|     13|            Task {
+ 1605|     13|                // REENTRANCY: RE-S25 — nothing: the hop withdraws only this token.
+ 1606|     13|                await self.withdrawEntry(token, stopWork: stopsWorkOnCancel)
+ 1607|     13|            }
+ 1608|     13|        }
+ 1609|  2.36k|    }
+ 1610|       |
+ 1611|  2.36k|    private func finishEntry(_ token: InterestToken, _ result: EntryResult) {
+ 1612|  2.36k|        self.state.entryTasks[token] = nil
+ 1613|  2.36k|        self.state.entryJoins.removeValue(forKey: token)?.resume(returning: result)
+ 1614|  2.36k|        self.reconcileIdle()
+ 1615|  2.36k|    }
+ 1616|       |
+ 1617|     13|    private func withdrawEntry(_ token: InterestToken, stopWork: Bool) {
+ 1618|     13|        guard let continuation = self.state.entryJoins.removeValue(forKey: token) else {
+ 1619|      0|            return
+ 1620|     13|        }
+ 1621|     13|        continuation.resume(returning: .done(.failure(.cancelled)))
+ 1622|     13|        if stopWork {
+ 1623|     13|            self.cancelTask(self.state.entryTasks[token])
+ 1624|     13|            self.releaseEntryGroup(token)
+ 1625|     13|        }
+ 1626|     13|        self.reconcileIdle()
+ 1627|     13|    }
+ 1628|       |
+ 1629|       |    /// Removes a withdrawn entry's group (`withdrawEntry`): its claims end and its members' interests leave at once.
+ 1630|     13|    func releaseEntryGroup(_ token: InterestToken) {
+ 1631|     13|        guard let group = self.state.groups.removeValue(forKey: token) else {
+ 1632|      6|            return
+ 1633|      7|        }
+ 1634|      7|        group.continuation?.resume(returning: false)
+ 1635|      7|        // An `ensureAvailable` group holds no claim; every path that removes a group ends its claims (L5-R1).
+ 1636|      7|        self.state.unlistedClaims -= group.unlistedClaims
+ 1637|      7|        for claim in group.claimed[group.claimCursor...] {
+ 1638|      0|            self.dropClaim(claim)
+ 1639|      7|        }
+ 1640|      8|        for transfer in Set(group.pending.values).sorted() {
+ 1641|      8|            self.removeInterest(token, from: transfer)
+ 1642|      8|        }
+ 1643|      7|        self.pump()
+ 1644|      7|    }
+ 1645|       |
+ 1646|       |    // MARK: Introspection (R-SYN-14, P-14)
+ 1647|       |
+ 1648|       |    /// The engine's counters.
+ 1649|  25.5k|    func currentIntrospection() -> EngineIntrospection {
+ 1650|  25.5k|        var byState: [JobStateKind: Int] = [:]
+ 1651|  25.5k|        var queued: [AssetPriority: Int] = [:]
+ 1652|  25.5k|        var running = 0
+ 1653|  25.5k|        var preempting = 0
+ 1654|  25.5k|        var interests = 0
+ 1655|  25.5k|        for job in self.state.jobs.values {
+ 1656|  14.0k|            byState[job.state.kind, default: 0] += 1
+ 1657|  14.0k|            interests += job.interests.count
+ 1658|  14.0k|            switch job.state {
+ 1659|  14.0k|            case .queued:
+ 1660|  8.89k|                queued[job.lane, default: 0] += 1
+ 1661|  14.0k|            case .downloading:
+ 1662|  4.78k|                if job.active?.preempting == true {
+ 1663|      0|                    preempting += 1
+ 1664|  4.78k|                } else {
+ 1665|  4.78k|                    running += 1
+ 1666|  4.78k|                }
+ 1667|  14.0k|            default:
+ 1668|    382|                break
+ 1669|  14.0k|            }
+ 1670|  25.5k|        }
+ 1671|  25.5k|        return EngineIntrospection(
+ 1672|  25.5k|            lifecycle: self.state.lifecycle,
+ 1673|  25.5k|            jobsByState: byState,
+ 1674|  25.5k|            queued: queued,
+ 1675|  25.5k|            running: running,
+ 1676|  25.5k|            preempting: preempting,
+ 1677|  25.5k|            waiters: self.state.waiters.count + self.state.unknownWaiters.count,
+ 1678|  25.5k|            interests: interests,
+ 1679|  25.5k|            groups: self.state.groups.count + (self.state.run == nil ? 0 : 1),
+ 1680|  25.5k|            armedTimers: self.state.alarm == nil ? 0 : 1,
+ 1681|  25.5k|            scheduledDeadlines: self.state.heap.count,
+ 1682|  25.5k|            ownedTasks: self.state.tasks.count,
+ 1683|  25.5k|            watcherActive: self.state.watcher != nil,
+ 1684|  25.5k|            subscribers: self.state.subscribers.count,
+ 1685|  25.5k|            bufferedEvents: self.state.subscribers.values.reduce(0) { $0 + $1.liveCount },
+ 1686|  25.5k|            memoryPressureObserverActive: self.state.pressure.task != nil
+ 1687|  25.5k|        )
+ 1688|  25.5k|    }
+ 1689|       |
+ 1690|       |    /// Suspends until `predicate` holds, re-evaluated after every mutation (never polled), or until the caller is
+ 1691|       |    /// cancelled (the `CensusWaiting` pattern, l2fu-1): the wait then returns with the predicate unmet.
+ 1692|    723|    func performWaitUntil(_ predicate: @escaping @Sendable (EngineIntrospection) -> Bool) async {
+ 1693|    723|        self.state.lastObserver += 1
+ 1694|    723|        let id = self.state.lastObserver
+ 1695|    723|        // REENTRANCY: RE-S25 — nothing: a terminal wait registered synchronously; resumed once by the mutation that
+ 1696|    723|        // met the predicate, by the caller's cancellation or by shutdown.
+ 1697|    723|        await withTaskCancellationHandler {
+ 1698|    723|            // REENTRANCY: RE-S25 — as above.
+ 1699|    723|            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+ 1700|    723|                if predicate(self.currentIntrospection()) || Task.isCancelled || self.state.lifecycle == .shutDown {
+ 1701|    322|                    continuation.resume()
+ 1702|    401|                } else {
+ 1703|    401|                    self.state.observers[id] = Observer(predicate: predicate, continuation: continuation)
+ 1704|    401|                    self.notifyConditions()
+ 1705|    401|                }
+ 1706|    723|            }
+ 1707|    723|        } onCancel: {
+ 1708|    114|            Task {
+ 1709|    114|                // REENTRANCY: RE-S25 — nothing: the hop removes only this wait (a no-op once it was resumed).
+ 1710|    114|                await self.cancelObserver(id)
+ 1711|    114|            }
+ 1712|    112|        }
+ 1713|    723|    }
+ 1714|       |
+ 1715|    114|    private func cancelObserver(_ id: UInt64) {
+ 1716|    114|        self.state.observers.removeValue(forKey: id)?.continuation.resume()
+ 1717|    114|    }
+ 1718|       |
+ 1719|       |    /// Test seam: registered `waitUntil` calls.
+ 1720|      2|    func observerCount() -> Int {
+ 1721|      2|        self.state.observers.count
+ 1722|      2|    }
+ 1723|       |
+ 1724|       |    /// Test seam: suspends until at least `count` `waitUntil` calls are registered; ends on the caller's cancellation.
+ 1725|      1|    func waitUntilObservers(_ count: Int) async {
+ 1726|      1|        // REENTRANCY: f-8 (proposed) — nothing: a terminal test wait.
+ 1727|      4|        await self.awaitCondition { engine in
+ 1728|      4|            engine.state.observers.count >= count
+ 1729|      4|        }
+ 1730|      1|    }
+ 1731|       |
+ 1732|       |    /// Test seams' wait: suspends until `condition` holds on the actor, re-evaluated after every mutation, or until the
+ 1733|       |    /// caller is cancelled or shutdown ends (the `CensusWaiting` pattern).
+ 1734|  39.6k|    func awaitCondition(_ condition: @escaping @Sendable (isolated SyncEngine) -> Bool) async {
+ 1735|  39.6k|        self.state.lastObserver += 1
+ 1736|  39.6k|        let id = self.state.lastObserver
+ 1737|  39.6k|        // REENTRANCY: f-8 (proposed) — nothing: a terminal test wait registered synchronously and resumed once.
+ 1738|  39.6k|        await withTaskCancellationHandler {
+ 1739|  39.6k|            // REENTRANCY: f-8 (proposed) — as above.
+ 1740|  39.6k|            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+ 1741|  39.6k|                if condition(self) || Task.isCancelled || self.state.lifecycle == .shutDown {
+ 1742|  20.0k|                    continuation.resume()
+ 1743|  20.0k|                } else {
+ 1744|  19.6k|                    self.state.conditionObservers[id] = ConditionObserver(condition: condition, continuation: continuation)
+ 1745|  19.6k|                }
+ 1746|  39.6k|            }
+ 1747|  39.6k|        } onCancel: {
+ 1748|  2.26k|            Task {
+ 1749|  2.26k|                // REENTRANCY: f-8 (proposed) — nothing: the hop removes only this wait.
+ 1750|  2.26k|                await self.cancelCondition(id)
+ 1751|  2.26k|            }
+ 1752|  2.26k|        }
+ 1753|  39.6k|    }
+ 1754|       |
+ 1755|  2.26k|    private func cancelCondition(_ id: UInt64) {
+ 1756|  2.26k|        self.state.conditionObservers.removeValue(forKey: id)?.continuation.resume()
+ 1757|  2.26k|    }
+ 1758|       |
+ 1759|       |    /// Re-evaluates the test seams' conditions.
+ 1760|   962k|    private func notifyConditions() {
+ 1761|   962k|        guard !self.state.conditionObservers.isEmpty else {
+ 1762|   540k|            return
+ 1763|   540k|        }
+ 1764|   475k|        for id in self.state.conditionObservers.keys.sorted() {
+ 1765|   475k|            guard let observer = self.state.conditionObservers[id], observer.condition(self) else {
+ 1766|   458k|                continue
+ 1767|   458k|            }
+ 1768|  17.2k|            self.state.conditionObservers[id] = nil
+ 1769|  17.2k|            observer.continuation.resume()
+ 1770|   421k|        }
+ 1771|   421k|    }
+ 1772|       |
+ 1773|       |    /// Re-evaluates every `waitUntil` predicate (after a mutation).
+ 1774|   962k|    func notifyObservers() {
+ 1775|   962k|        self.notifyConditions()
+ 1776|   962k|        guard !self.state.observers.isEmpty else {
+ 1777|   958k|            return
+ 1778|   958k|        }
+ 1779|  3.12k|        let snapshot = self.currentIntrospection()
+ 1780|  3.43k|        for id in self.state.observers.keys.sorted() {
+ 1781|  3.43k|            guard let observer = self.state.observers[id], observer.predicate(snapshot) else {
+ 1782|  3.15k|                continue
+ 1783|  3.15k|            }
+ 1784|    287|            self.state.observers[id] = nil
+ 1785|    287|            observer.continuation.resume()
+ 1786|  3.12k|        }
+ 1787|  3.12k|    }
+ 1788|       |
+ 1789|       |    /// The engine invariants (sync.md §6.2, ARCHITECTURE §7.1), as violations; checked by the model-based test.
+ 1790|       |    ///
+ 1791|       |    /// `storeDeadlineDue` is orchestrator ruling L5K-R16's tripwire: whether the store reported a time-only deadline
+ 1792|       |    /// (`nextDeadline() != nil`) when the caller read it while the engine was settled (`storeDeadlineSettled`). The store
+ 1793|       |    /// reports one whenever a coalesced publication's trailing install is due (`installDue`, ARCHITECTURE §5), so the
+ 1794|       |    /// engine must then hold a store deadline on its heap: settled, nothing else re-reads it, and without the alarm's
+ 1795|       |    /// `runDueWork()` the readers' snapshot would miss what the store holds (and its commit or reap would wait) until some
+ 1796|       |    /// unrelated store call (ADR-022, RE-S40). Callers that do not read the store pass `false`.
+ 1797|  22.6k|    func invariantViolations(storeDeadlineDue: Bool = false) -> [String] {
+ 1798|  22.6k|        var violations: [String] = []
+ 1799|  22.6k|        if storeDeadlineDue, self.storeDeadlineSettled, self.state.heap.deadline(for: .store) == nil {
+ 1800|      0|            violations.append("the store has a deadline due (a trailing install among them) while the engine is settled with no store deadline on its heap: nothing will run it (L5K-R16)")
+ 1801|      0|        }
+ 1802|  22.6k|        // The pairs owed a re-route (`EventAfterFollow.reroutes`), with the job each left: its owner names that job until
+ 1803|  22.6k|        // the drain re-routes it (`continueReroutes`).
+ 1804|  22.6k|        var owed: [MoveItem: TransferID] = [:]
+ 1805|  22.6k|        for event in self.state.eventsAfterFollow {
+ 1806|  2.45k|            if case .reroutes(let batch) = event {
+ 1807|  2.66k|                for item in batch.items.elements {
+ 1808|  2.66k|                    owed[MoveItem(asset: item.asset, token: item.token)] = batch.from
+ 1809|  2.66k|                }
+ 1810|    413|            }
+ 1811|  22.6k|        }
+ 1812|  22.6k|        // A waiter whose join waits for a failure verdict (`joinsAfterFollow`), or whose re-route is owed, holds no interest
+ 1813|  22.6k|        // until the drain.
+ 1814|  22.6k|        for (token, waiter) in self.state.waiters where !waiter.fromStore && self.state.jobs[waiter.transfer]?.interests[token] == nil {
+ 1815|  2.87k|            if self.state.joinsAfterFollow[token]?[waiter.asset] != waiter.transfer, owed[MoveItem(asset: waiter.asset, token: token)] != waiter.transfer {
+ 1816|      4|                violations.append("waiter \(token.rawValue) has no interest in \(waiter.transfer)")
+ 1817|      4|            }
+ 1818|  22.6k|        }
+ 1819|  22.6k|        // A job the owed passes of a follow have not reached follows the copy they replaced (`followScans`).
+ 1820|  22.6k|        let unscanned = self.state.followScans.isEmpty ? [:] : self.unscannedFollowEntries()
+ 1821|  22.6k|        // A token's interests carry the one lane it registered with: its group's (`Group.lane`), its waiter's, a run's
+ 1822|  22.6k|        // bulk lane or a system interest's, which every join and re-route passes on, so a second join of a token's
+ 1823|  22.6k|        // interest in a job never changes its lane (`addInterest`; Stage 3 close-out cycle 19, ruling S3-R19 item 3).
+ 1824|  22.6k|        var tokenLanes: [InterestToken: AssetPriority] = [:]
+ 1825|   247k|        for (transfer, job) in self.state.jobs {
+ 1826|   394k|            for (token, interest) in job.interests {
+ 1827|   394k|                let lane = self.state.groups[token]?.lane ?? tokenLanes[token] ?? interest.lane
+ 1828|   394k|                tokenLanes[token] = lane
+ 1829|   394k|                if lane != interest.lane {
+ 1830|      0|                    violations.append("interest \(token.rawValue) in \(transfer) at \(interest.lane), its token's lane being \(lane)")
+ 1831|      0|                }
+ 1832|   394k|            }
+ 1833|   247k|            // The counts a job's lane is read from are its interests' (`Job.interestCounts`; Stage 3 close-out cycle 20,
+ 1834|   247k|            // ruling S3-R25 item 2).
+ 1835|   247k|            let recount = InterestCounts(job.interests.values)
+ 1836|   247k|            if job.interestCounts != recount {
+ 1837|      1|                violations.append("job \(transfer) counts its interests \(job.interestCounts), which count \(recount)")
+ 1838|      1|            }
+ 1839|   247k|            // The index a move reads its ids' holders from is its interests' (`Job.tokensByID`, I1; Stage 3 close-out
+ 1840|   247k|            // cycle 21, ruling S3-R26 item 3), recounted from the interests directly, never through `IDTokens`.
+ 1841|   247k|            var holders: [AssetID: Set<InterestToken>] = [:]
+ 1842|   394k|            for (token, interest) in job.interests {
+ 1843|   396k|                for asset in interest.assets {
+ 1844|   396k|                    holders[asset, default: []].insert(token)
+ 1845|   396k|                }
+ 1846|   394k|            }
+ 1847|   253k|            let indexed = job.tokensByID.mapValues { $0.others.union([$0.first]) }
+ 1848|   253k|            let misindexed = Set(indexed.keys).union(holders.keys).filter { indexed[$0] != holders[$0] }.count
+ 1849|   253k|            let doubled = job.tokensByID.values.filter { $0.others.contains($0.first) }.count
+ 1850|   247k|            if misindexed > 0 || doubled > 0 {
+ 1851|      1|                violations.append("job \(transfer) indexes the holders of \(misindexed) ids unlike its interests, \(doubled) with its first holder among the others")
+ 1852|      1|            }
+ 1853|   247k|            // Every interest's ids are the job's (I2): a rest that takes an id off its holder puts it back while an
+ 1854|   247k|            // interest that joined meanwhile holds it (`continueMove`).
+ 1855|   253k|            let outside = holders.keys.filter { !job.assets.contains($0) }.count
+ 1856|   247k|            if outside > 0 {
+ 1857|      1|                violations.append("job \(transfer) has interests in \(outside) ids outside its ids")
+ 1858|      1|            }
+ 1859|   247k|            // Every writer removes an interest its last id leaves (I3): a move's per-holder removal relies on it.
+ 1860|   394k|            if let empty = job.interests.filter({ $0.value.assets.isEmpty }).keys.min() {
+ 1861|      1|                violations.append("job \(transfer) holds interest \(empty.rawValue) with no id")
+ 1862|      1|            }
+ 1863|   247k|            if job.interests.isEmpty, job.state != .verifying, job.state != .committing {
+ 1864|     32|                let key = ClaimKey(job: job)
+ 1865|     32|                if self.state.claims[key] == nil {
+ 1866|      1|                    violations.append("job \(transfer) has no interest and no claim in \(job.state.kind.rawValue)")
+ 1867|     31|                } else if self.state.claimHeld[key] != transfer {
+ 1868|      0|                    violations.append("job \(transfer) is kept by a claim that would not retire it")
+ 1869|      0|                }
+ 1870|     32|            }
+ 1871|   247k|            if (job.state == .downloading) != (job.active != nil) {
+ 1872|      7|                violations.append("job \(transfer) in \(job.state.kind.rawValue) with active \(job.active != nil)")
+ 1873|      7|            }
+ 1874|   247k|            // An attempt carries nothing of the one before it (`start`): a visit reads the end and the re-route set as
+ 1875|   247k|            // this attempt's (`rerouteOnVisit`, `recordDeferredVerdict`; Stage 3 close-out cycle 16, ruling S3-R19 item 3).
+ 1876|   247k|            if job.state == .downloading, job.attemptEnd != nil || job.rerouteOnPass != nil {
+ 1877|      0|                violations.append("job \(transfer) downloads with an earlier attempt's end or re-route set")
+ 1878|      0|            }
+ 1879|   247k|            // The indexes the proportional walks read (Stage 3, S3-PERF-02): a job outside `unfollowed` follows the
+ 1880|   247k|            // copy, a system interest's job is in `systemHeld`, and the run's interest's job is in its `held`.
+ 1881|   247k|            // The holder of a visit's rest (`followMoving`) holds the ids it still moves, and is visited already.
+ 1882|   247k|            if !self.state.unfollowed.contains(transfer), self.state.followMoving?.holder != transfer,
+ 1883|   247k|                let asset = job.assets.first(where: { self.state.applied.entry(for: $0)?.transferID != transfer && unscanned[$0]?.contains(transfer) != true })
+ 1884|   247k|            {
+ 1885|      0|                violations.append("job \(transfer) holds \(asset), which the copy maps elsewhere, and is not in unfollowed")
+ 1886|      0|            }
+ 1887|   388k|            if job.interests.values.contains(where: { $0.kind == .system }), !self.state.systemHeld.contains(transfer) {
+ 1888|      0|                violations.append("job \(transfer) holds a system interest and is not in systemHeld")
+ 1889|      0|            }
+ 1890|   247k|            if let run = self.state.run, job.interests[run.token] != nil, !run.held.contains(transfer) {
+ 1891|      0|                violations.append("job \(transfer) holds the run's interest and is not in its held set")
+ 1892|      0|            }
+ 1893|   247k|            for token in job.interests.keys where job.interests[token]?.kind == .waiter {
+ 1894|  9.08k|                if let waiter = self.state.waiters[token] {
+ 1895|  9.08k|                    // A waiter's interest is only ever in the job it names (`withdraw` touches that job only).
+ 1896|  9.08k|                    if waiter.transfer != transfer {
+ 1897|      1|                        violations.append("waiter \(token.rawValue) names \(waiter.transfer) but holds an interest in \(transfer)")
+ 1898|      1|                    }
+ 1899|  9.08k|                } else {
+ 1900|      0|                    violations.append("waiter interest \(token.rawValue) without a waiter")
+ 1901|      0|                }
+ 1902|   247k|            }
+ 1903|   247k|        }
+ 1904|  22.6k|        if self.runningCount > self.tuning.maxConcurrentTransfers {
+ 1905|      0|            violations.append("\(self.runningCount) running > \(self.tuning.maxConcurrentTransfers)")
+ 1906|      0|        }
+ 1907|  1.22M|        for (token, group) in self.state.groups {
+ 1908|  1.22M|            for (asset, transfer) in group.pending where self.state.jobs[transfer]?.interests[token] == nil {
+ 1909|  3.00k|                if self.state.joinsAfterFollow[token]?[asset] != transfer, owed[MoveItem(asset: asset, token: token)] != transfer {
+ 1910|      2|                    violations.append("group \(token.rawValue) member \(asset) without an interest")
+ 1911|      2|                }
+ 1912|  1.22M|            }
+ 1913|  1.22M|        }
+ 1914|  22.6k|        violations.append(contentsOf: self.claimViolations())
+ 1915|  22.6k|        if self.state.queues.storedCount > 2 * self.state.jobs.count + 16 {
+ 1916|      0|            violations.append("lane queues hold \(self.state.queues.storedCount) entries for \(self.state.jobs.count) jobs")
+ 1917|      0|        }
+ 1918|  22.6k|        if self.state.metrics.illegalTransitions > 0 {
+ 1919|      1|            violations.append("\(self.state.metrics.illegalTransitions) illegal transitions")
+ 1920|      1|        }
+ 1921|  22.6k|        for (key, queue) in self.state.subscribers where queue.storedOrderCount > 2 * queue.liveCount + 16 {
+ 1922|      0|            violations.append("subscriber \(key) order \(queue.storedOrderCount) > 2 × \(queue.liveCount) + 16")
+ 1923|  22.6k|        }
+ 1924|  22.6k|        violations.append(contentsOf: self.progressGateViolations())
+ 1925|  22.6k|        violations.append(contentsOf: self.answerViolations())
+ 1926|  22.6k|        if let unfired = self.unfiredDeadline() {
+ 1927|     23|            violations.append(unfired)
+ 1928|     23|        }
+ 1929|  22.6k|        if let stranded = self.strandedPendingRun() {
+ 1930|      4|            violations.append(stranded)
+ 1931|      4|        }
+ 1932|  22.6k|        if let stranded = self.strandedBreakerParks() {
+ 1933|      0|            violations.append(stranded)
+ 1934|      0|        }
+ 1935|  22.6k|        if let unwakeable = self.unwakeableBreakerParks() {
+ 1936|      2|            violations.append(unwakeable)
+ 1937|      2|        }
+ 1938|  22.6k|        if let unwakeable = self.unwakeableThrottleParks() {
+ 1939|      1|            violations.append(unwakeable)
+ 1940|      1|        }
+ 1941|  22.6k|        for (transfer, drain) in self.state.draining where self.isRunning && self.state.tasks[drain.driver] == nil {
+ 1942|      0|            violations.append("\(transfer) drains an attempt whose driver ended")
+ 1943|  22.6k|        }
+ 1944|  22.6k|        if let run = self.state.run, run.transferring, run.settlement == nil {
+ 1945|  3.28k|            let waitingJoins = Set(self.state.joinsAfterFollow[run.token].map { Array($0.values) } ?? [])
+ 1946|  3.28k|            for transfer in run.outstanding.keys where self.state.jobs[transfer]?.interests[run.token] == nil && !waitingJoins.contains(transfer) {
+ 1947|      4|                violations.append("the run claims \(transfer), whose job does not hold its interest")
+ 1948|  3.28k|            }
+ 1949|  3.28k|        }
+ 1950|  22.6k|        if self.isRunning, self.state.manifestCatchUps == 0, !self.followOwed, !self.state.heldForManifest.isEmpty {
+ 1951|      0|            violations.append("\(self.state.heldForManifest.count) jobs held for a manifest catch-up nothing performs")
+ 1952|      0|        }
+ 1953|  22.6k|        if self.isRunning, let origin = self.state.remote?.originID, self.state.breakers[origin]?.probe == .manifest,
+ 1954|  22.6k|           self.state.manifestFetch == nil, self.state.run == nil {
+ 1955|      0|            // A probe held for a manifest fetch is that fetch's, in flight, or the starting run's, whose first turn begins
+ 1956|      0|            // it; every fetch records its outcome on the breaker before it ends, and one that asks for nothing lets the
+ 1957|      0|            // probe go (`releaseManifestProbe`, F-42).
+ 1958|      0|            violations.append("the breaker's probe is held for a manifest fetch that is neither in flight nor about to begin")
+ 1959|      0|        }
+ 1960|  22.6k|        var inFlight = InFlightBytes()
+ 1961|  22.6k|        var flying: Set<TransferID> = []
+ 1962|  22.6k|        var parkedForSpace: Set<TransferID> = []
+ 1963|   247k|        for job in self.state.jobs.values {
+ 1964|   247k|            if let bytes = job.ledgerBytes {
+ 1965|  9.03k|                inFlight.add(bytes)
+ 1966|  9.03k|                flying.insert(job.transfer)
+ 1967|  9.03k|            }
+ 1968|   247k|            if job.state.isSpaceParked {
+ 1969|  5.05k|                parkedForSpace.insert(job.transfer)
+ 1970|  5.05k|            }
+ 1971|   247k|        }
+ 1972|  22.6k|        if parkedForSpace != self.state.spaceParked {
+ 1973|      0|            violations.append("the ledger's \(self.state.spaceParked.count) jobs parked for space differ from the table's \(parkedForSpace.count)")
+ 1974|      0|        }
+ 1975|  22.6k|        violations.append(contentsOf: self.indexViolations())
+ 1976|  22.6k|        if inFlight != self.state.inFlightBytes || flying != self.state.inFlight {
+ 1977|      0|            violations.append("the ledger's \(self.state.inFlight.count) jobs in flight (\(self.state.inFlightBytes.clamped) bytes) differ from the table's \(flying.count) (\(inFlight.clamped) bytes)")
+ 1978|      0|        }
+ 1979|  22.6k|        return violations
+ 1980|  22.6k|    }
+ 1981|       |
+ 1982|       |    /// Whether no engine work is under way that could still re-read the store's deadline, for L5K-R16's tripwire
+ 1983|       |    /// (`invariantViolations(storeDeadlineDue:)`): the engine runs, no job, run or migration loop exists, no alarm's store
+ 1984|       |    /// work, deadline re-read, settling read, presence read, `apply` or catch-up is in flight, and no owned task runs but
+ 1985|       |    /// the alarm, the conditions watcher and the memory-pressure observer, none of which re-reads the deadline outside
+ 1986|       |    /// the alarm's own `runDueWork()` turn.
+ 1987|  15.8k|    var storeDeadlineSettled: Bool {
+ 1988|  15.8k|        guard self.isRunning, self.state.jobs.isEmpty, self.state.run == nil, !self.state.migration.running,
+ 1989|  15.8k|              self.state.storeWorkRuns == 0, !self.state.spaceDeadlineReread, !self.state.spaceSettleRead,
+ 1990|  15.8k|              self.state.presenceReaders == 0, self.state.appliesInFlight == 0, self.state.manifestCatchUps == 0
+ 1991|  15.8k|        else {
+ 1992|  3.83k|            return false
+ 1993|  11.9k|        }
+ 1994|  35.9k|        let timers = Set([self.state.alarm?.task, self.state.watcher?.task, self.state.pressure.task].compactMap { $0 })
+ 1995|  11.9k|        return self.state.tasks.keys.allSatisfy { timers.contains($0) }
+ 1996|  15.8k|    }
+ 1997|       |
+ 1998|       |    /// The progress gate's clauses (Stage 3 close-out cycle 21, step C9): every key with a trailing emission (P1), with
+ 1999|       |    /// a trailing flush in the heap (P2), or with a live `.transfer` slot in a subscriber's queue (P3) has a
+ 2000|       |    /// `lastEmitted` entry. `offerProgress` sets the entry before any of them and `retireProgress` removes them with
+ 2001|       |    /// it, so `removeJob` retires only the keys that have one (step C4) and leaves nothing behind.
+ 2002|  22.6k|    private func progressGateViolations() -> [String] {
+ 2003|  22.6k|        var violations: [String] = []
+ 2004|  22.6k|        let lastEmitted = self.state.progress.lastEmitted
+ 2005|  22.6k|        for slot in self.state.progress.trailing.keys where lastEmitted[slot] == nil {
+ 2006|      1|            violations.append("progress trailing \(slot) without lastEmitted")
+ 2007|  22.6k|        }
+ 2008|  22.6k|        for deadline in self.state.heap.entries {
+ 2009|  16.7k|            if case .progress(let slot) = deadline.reason, lastEmitted[slot] == nil {
+ 2010|      1|                violations.append("progress deadline \(slot) without lastEmitted")
+ 2011|      1|            }
+ 2012|  22.6k|        }
+ 2013|  22.6k|        for (key, queue) in self.state.subscribers {
+ 2014|    328|            for slot in queue.liveSlots where lastEmitted[slot] == nil {
+ 2015|    160|                if case .transfer = slot {
+ 2016|      1|                    violations.append("subscriber \(key) holds \(slot) without lastEmitted")
+ 2017|      1|                }
+ 2018|    328|            }
+ 2019|  22.6k|        }
+ 2020|  22.6k|        return violations
+ 2021|  22.6k|    }
+ 2022|       |
+ 2023|       |    /// The owed answers' clause (Stage 3 close-out cycle 21, ruling S3-R26 item 4's Phase 2, `integrate-c21.md` C12): the
+ 2024|       |    /// head lies within the table, a running engine with answers owed has an answer follow-up scheduled (`spawn` refuses
+ 2025|       |    /// one only once shutdown began, whose drain resumes them), and no owed waiter is registered, so no withdrawal or
+ 2026|       |    /// shutdown answers it a second time.
+ 2027|  22.6k|    private func answerViolations() -> [String] {
+ 2028|  22.6k|        var violations: [String] = []
+ 2029|  22.6k|        let head = self.state.owedAnswersHead
+ 2030|  22.6k|        let count = self.state.owedAnswers.count
+ 2031|  22.6k|        if head > count {
+ 2032|      2|            violations.append("the owed answers' head \(head) is past their \(count)")
+ 2033|      2|        }
+ 2034|  22.6k|        if self.isRunning, count > head, self.state.answerFollowUp == nil {
+ 2035|      2|            violations.append("\(count - head) answers are owed and no answer follow-up is scheduled")
+ 2036|      2|        }
+ 2037|  22.6k|        for answer in self.state.owedAnswers[min(head, count)...] {
+ 2038|  2.48k|            if case .waiter(let token, _, _) = answer, self.state.waiters[token] != nil {
+ 2039|      2|                violations.append("owed answer \(token.rawValue) has a registered waiter")
+ 2040|      2|            }
+ 2041|  22.6k|        }
+ 2042|  22.6k|        return violations
+ 2043|  22.6k|    }
+ 2044|       |
+ 2045|       |    /// The claim counters against the groups' pending claims and the released groups' claims left to drop (L5-R1).
+ 2046|  22.6k|    private func claimViolations() -> [String] {
+ 2047|  22.6k|        var violations: [String] = []
+ 2048|  22.6k|        var tally: [ClaimKey: Int] = [:]
+ 2049|  22.6k|        var unlisted = 0
+ 2050|  1.22M|        for (token, group) in self.state.groups {
+ 2051|  1.22M|            if group.claimed.count != group.members.count {
+ 2052|      0|                violations.append("group \(token.rawValue) claims \(group.claimed.count) contents for \(group.members.count) members")
+ 2053|      0|            }
+ 2054|  1.22M|            let pending = group.claimed[min(group.claimCursor, group.claimed.count)...]
+ 2055|  1.22M|            let groupUnlisted = pending.filter { $0 == nil }.count
+ 2056|  1.22M|            if groupUnlisted != group.unlistedClaims {
+ 2057|      0|                violations.append("group \(token.rawValue) counts \(group.unlistedClaims) unlisted claims for \(groupUnlisted)")
+ 2058|      0|            }
+ 2059|  1.22M|            unlisted += groupUnlisted
+ 2060|  1.22M|            for case let key? in pending {
+ 2061|  3.61k|                tally[key, default: 0] += 1
+ 2062|  1.22M|            }
+ 2063|  1.22M|        }
+ 2064|  22.6k|        for release in self.state.releasing.values {
+ 2065|     54|            for case let key? in release.claims {
+ 2066|     24|                tally[key, default: 0] += 1
+ 2067|     54|            }
+ 2068|  22.6k|        }
+ 2069|  22.6k|        if tally != self.state.claims {
+ 2070|      0|            violations.append("the claim table's \(self.state.claims.count) contents differ from the groups' \(tally.count)")
+ 2071|      0|        }
+ 2072|  22.6k|        if unlisted != self.state.unlistedClaims {
+ 2073|      0|            violations.append("\(self.state.unlistedClaims) unlisted claims counted for \(unlisted)")
+ 2074|      0|        }
+ 2075|  22.6k|        return violations
+ 2076|  22.6k|    }
+ 2077|       |
+ 2078|       |    /// The indexes of jobs parked by a lane-wide gate or by their origin and of failed jobs, against the job table, and
+ 2079|       |    /// the owed re-queues against those indexes (C2).
+ 2080|  22.6k|    private func indexViolations() -> [String] {
+ 2081|  22.6k|        var violations: [String] = []
+ 2082|  22.6k|        var laneParked: Set<TransferID> = []
+ 2083|  22.6k|        var circuitParked: Set<TransferID> = []
+ 2084|  22.6k|        var throttleParked: Set<TransferID> = []
+ 2085|  22.6k|        var failed: Set<TransferID> = []
+ 2086|   247k|        for job in self.state.jobs.values {
+ 2087|   247k|            if job.state.isLaneParked {
+ 2088|  2.37k|                laneParked.insert(job.transfer)
+ 2089|  2.37k|            }
+ 2090|   247k|            if job.state.isCircuitParked {
+ 2091|  2.80k|                circuitParked.insert(job.transfer)
+ 2092|  2.80k|            }
+ 2093|   247k|            if job.state.isThrottleParked {
+ 2094|    707|                throttleParked.insert(job.transfer)
+ 2095|    707|            }
+ 2096|   247k|            if job.state.kind == .failed {
+ 2097|    755|                failed.insert(job.transfer)
+ 2098|    755|            }
+ 2099|   247k|        }
+ 2100|  22.6k|        if laneParked != self.state.laneParked {
+ 2101|      0|            violations.append("the index's \(self.state.laneParked.count) jobs parked by a lane-wide gate differ from the table's \(laneParked.count)")
+ 2102|      0|        }
+ 2103|  22.6k|        if circuitParked != self.state.circuitParked || throttleParked != self.state.throttleParked {
+ 2104|      0|            violations.append("the index's \(self.state.circuitParked.count) and \(self.state.throttleParked.count) jobs parked by the breaker and the throttle differ from the table's \(circuitParked.count) and \(throttleParked.count)")
+ 2105|      0|        }
+ 2106|  22.6k|        // Every job the breaker parked has its place in the breaker's order (S3-B-063).
+ 2107|  22.6k|        if !circuitParked.isEmpty {
+ 2108|  1.27k|            var placed: Set<TransferID> = []
+ 2109|  2.81k|            for entry in self.state.circuitOrder.entries where self.state.jobs[entry.transfer]?.ticket == entry.ticket {
+ 2110|  2.81k|                placed.insert(entry.transfer)
+ 2111|  2.81k|            }
+ 2112|  1.27k|            let unplaced = circuitParked.subtracting(placed).count
+ 2113|  1.27k|            if unplaced > 0 {
+ 2114|      0|                violations.append("\(unplaced) jobs the breaker parked have no place in its order")
+ 2115|      0|            }
+ 2116|  1.27k|        }
+ 2117|  22.6k|        if failed != self.state.failedJobs {
+ 2118|      1|            violations.append("the index's \(self.state.failedJobs.count) failed jobs differ from the table's \(failed.count)")
+ 2119|      1|        }
+ 2120|  22.6k|        if !self.state.edgeOwed.isSubset(of: failed) {
+ 2121|      0|            violations.append("\(self.state.edgeOwed.subtracting(failed).count) jobs owed a re-queue by a network edge are not failed")
+ 2122|      0|        }
+ 2123|  22.6k|        let originParked = circuitParked.union(throttleParked)
+ 2124|  22.6k|        if !self.state.originOwed.isSubset(of: originParked) {
+ 2125|      0|            violations.append("\(self.state.originOwed.subtracting(originParked).count) jobs owed a re-queue by their origin are not parked by it")
+ 2126|      0|        }
+ 2127|  22.6k|        // A re-admission turn that waits for the follow (`EventAfterFollow.readmit`) is the turn the owed re-queues wait for.
+ 2128|  22.6k|        let readmissionWaits = self.state.eventsAfterFollow.contains { if case .readmit = $0 { return true } else { return false } }
+ 2129|  22.6k|        if self.isRunning, !self.state.edgeOwed.isEmpty || !self.state.originOwed.isEmpty, !self.state.readmissionFollowUpScheduled, !readmissionWaits {
+ 2130|      0|            violations.append("re-queues are owed but no turn is scheduled for them")
+ 2131|      0|        }
+ 2132|  22.6k|        if self.isRunning, self.followOwed, !self.state.followFollowUpScheduled {
+ 2133|      0|            violations.append("a follow owes \(self.state.followScans.count) passes and \(self.state.followOrder.count - self.state.followNext) visits but no turn is scheduled for them")
+ 2134|      0|        }
+ 2135|  22.6k|        if self.isRunning, self.state.pumpWaitsForFollow, !self.followBarrier {
+ 2136|      0|            violations.append("a pump waits for a follow that nothing owes")
+ 2137|      0|        }
+ 2138|  22.6k|        violations.append(contentsOf: self.followBarrierViolations())
+ 2139|  22.6k|        if self.followOwed {
+ 2140|  9.45k|            let unmarked = self.state.followOrder[self.state.followNext...].filter { self.state.jobs[$0] != nil && !self.state.unfollowed.contains($0) }.count
+ 2141|    433|            if unmarked > 0 {
+ 2142|      0|                violations.append("\(unmarked) jobs a follow still owes a visit are not in unfollowed")
+ 2143|      0|            }
+ 2144|    433|        }
+ 2145|  22.6k|        if self.isRunning, !self.state.releasing.isEmpty, !self.state.releaseFollowUpScheduled {
+ 2146|      1|            violations.append("\(self.state.releasing.count) released groups keep interests but no turn is scheduled to remove them")
+ 2147|      1|        }
+ 2148|  22.6k|        // A registered group's token is in `releasing` with claims only after a join's large give-up (L5-R15): that is
+ 2149|  22.6k|        // the follow-up's work, not a release of a registered group, which holds members (L5-R22(4); Stage 3, S3-B-082).
+ 2150|  22.6k|        for (token, release) in self.state.releasing where self.state.groups[token] != nil && !release.members.isEmpty {
+ 2151|      1|            violations.append("group \(token.rawValue) is released and registered")
+ 2152|  22.6k|        }
+ 2153|  22.6k|        // A job set aside waits in no queue: it must be one only released groups want.
+ 2154|  22.6k|        let strayAside = self.state.queues.asideEntries.filter { entry in
+ 2155|    917|            guard self.isValid(entry), let job = self.state.jobs[entry.transfer] else {
+ 2156|     75|                return false
+ 2157|    842|            }
+ 2158|    842|            return !self.isReleasedOnly(job)
+ 2159|    917|        }
+ 2160|  22.6k|        if !strayAside.isEmpty {
+ 2161|      1|            violations.append("\(strayAside.count) queued jobs wait set aside for a release, but other interests want them")
+ 2162|      1|        }
+ 2163|  22.6k|        // Every queued job can still be dispatched: a valid entry of it waits in its queue, put back, or aside while only
+ 2164|  22.6k|        // released groups want it (the rule above); a job with none would wait for ever (review of close-out cycle 10).
+ 2165|  22.6k|        // Behind the follow barrier no place waits any more (Stage 3 close-out cycle 12: the `.enqueue` event is gone).
+ 2166|   305k|        let reachable = Set(self.state.queues.storedEntries.lazy.filter { self.isValid($0) }.map(\.transfer))
+ 2167|   247k|        let stranded = self.state.jobs.values.filter { job in
+ 2168|   247k|            job.state == .queued && !reachable.contains(job.transfer)
+ 2169|   247k|        }.count
+ 2170|  22.6k|        if stranded > 0 {
+ 2171|     14|            violations.append("\(stranded) queued jobs wait in no queue")
+ 2172|     14|        }
+ 2173|  22.6k|        return violations
+ 2174|  22.6k|    }
+ 2175|       |
+ 2176|       |    /// What must hold of one owed re-route (`EventAfterFollow.reroutes`) from `transfer`'s job: its owner, if still
+ 2177|       |    /// there, waits for it at that job (a waiter for its id, not from the store; a group's member pending there), the run
+ 2178|       |    /// claims it nowhere (its claim was released when it was owed, `oweReroutes`), no job of that content holds it, and no
+ 2179|       |    /// waiting join carries it too (Stage 3 close-out cycle 21, `integrate-rr21.md` R17, D3).
+ 2180|  2.66k|    private func owedRerouteViolations(_ item: RerouteItem, from transfer: TransferID) -> [String] {
+ 2181|  2.66k|        var violations: [String] = []
+ 2182|  2.66k|        switch item.kind {
+ 2183|  2.66k|        case .waiter:
+ 2184|  2.54k|            if let waiter = self.state.waiters[item.token], waiter.fromStore || waiter.asset != item.asset || waiter.transfer != transfer {
+ 2185|      1|                violations.append("waiter \(item.token.rawValue) owed a re-route of \(item.asset) from \(transfer) waits for \(waiter.asset) in \(waiter.transfer)")
+ 2186|      1|            }
+ 2187|  2.66k|        case .prefetch, .ensure:
+ 2188|     99|            if let group = self.state.groups[item.token], group.pending[item.asset] != transfer {
+ 2189|      1|                violations.append("group \(item.token.rawValue) member \(item.asset) owed a re-route from \(transfer) is pending at \(String(describing: group.pending[item.asset]))")
+ 2190|      1|            }
+ 2191|  2.66k|        case .run:
+ 2192|     21|            if self.state.run?.token == item.token, self.state.run?.outstanding[transfer]?.contains(item.asset) == true {
+ 2193|      4|                violations.append("the run claims \(item.asset) on \(transfer), which a re-route owes")
+ 2194|      4|            }
+ 2195|  2.66k|        case .system:
+ 2196|      5|            break
+ 2197|  2.66k|        }
+ 2198|  2.66k|        if self.state.jobs[transfer]?.interests[item.token]?.assets.contains(item.asset) == true {
+ 2199|      1|            violations.append("interest \(item.token.rawValue) in \(item.asset) owed a re-route from \(transfer) is still held there")
+ 2200|      1|        }
+ 2201|  2.66k|        if let join = self.state.joinsAfterFollow[item.token]?[item.asset] {
+ 2202|      1|            violations.append("interest \(item.token.rawValue) in \(item.asset) owed a re-route from \(transfer) also waits to join \(join)")
+ 2203|      1|        }
+ 2204|  2.66k|        return violations
+ 2205|  2.66k|    }
+ 2206|       |
+ 2207|       |    /// The follow barrier's own rules (F-28): the events wait only while a follow is owed, a drain turn is scheduled or a
+ 2208|       |    /// drain is in progress (none, between turns), so none waits for ever, and none once the engine stops running (cycle
+ 2209|       |    /// 21, ruling S3-R26 item 6); every failure verdict that waits names a failed job with its event (Stage 3 close-out
+ 2210|       |    /// cycle 9, amendment (c) of S3-R11); the joins registered in
+ 2211|       |    /// `joinsAfterFollow` are exactly the waiting `.join` events and the joins behind waiting verdicts (cycle 10; cycle
+ 2212|       |    /// 21, ruling S3-R26 item 2); the carried jobs are gone once the barrier is down (cycle 11); every waiting event has
+ 2213|       |    /// its decision instant in the world history, and once the barrier is down the history and the visits' and the
+ 2214|       |    /// places' decision instants are gone (cycle 12, S3-R15); the joins behind a verdict wait only behind its one waiting
+ 2215|       |    /// event, each with its decision instant in the history (cycle 21); every batch of owed re-routes is counted
+ 2216|       |    /// (`EngineState.reroutesWaiting`), holds a layer per copy adopted since it was owed, and owes each pair once, whose
+ 2217|       |    /// owner still waits for it at the job it left (`owedRerouteViolations`; cycle 21, ruling S3-R26 item 1); every
+ 2218|       |    /// waiting join's chain holds a layer per copy adopted since it deferred (`JoinChain`; cycle 21, rr21-C4); the ends a
+ 2219|       |    /// pin follows (commits, superseded publications and ENOENT re-queues) are kept only while the barrier is up, each an
+ 2220|       |    /// attempt no longer at its end, at a copy adopted by then (`EngineState.reroutePinCommits`; cycle 21,
+ 2221|       |    /// PROBE-RR21-PIN-END; cycle 22, e1-R1 and e1-PS).
+ 2222|  22.6k|    private func followBarrierViolations() -> [String] {
+ 2223|  22.6k|        var violations: [String] = []
+ 2224|  22.6k|        let events = self.state.eventsAfterFollow
+ 2225|  22.6k|        if self.isRunning, !events.isEmpty, !self.followOwed, !self.state.drainFollowUpScheduled, !self.state.drainingAfterFollow {
+ 2226|      0|            violations.append("\(events.count) events wait for a follow, but no follow is owed and no drain is scheduled")
+ 2227|      0|        }
+ 2228|  22.6k|        // Only a running engine follows, so a follow-up turn is never owed when `spawn` refuses its task
+ 2229|  22.6k|        // (`scheduleFollowFollowUp`; Stage 3 close-out cycle 20, ruling S3-R25 item 7).
+ 2230|  22.6k|        if !self.isRunning, self.followOwed {
+ 2231|      1|            violations.append("a follow is owed while the engine is \(self.state.lifecycle)")
+ 2232|      1|        }
+ 2233|  22.6k|        // Only a running engine drains, so no event waits once `spawn` refuses a drain's follow-up turn
+ 2234|  22.6k|        // (`scheduleDrainFollowUp`; Stage 3 close-out cycle 21, ruling S3-R26 item 6).
+ 2235|  22.6k|        if !self.isRunning, !events.isEmpty {
+ 2236|      1|            violations.append("\(events.count) events wait for a follow while the engine is \(self.state.lifecycle)")
+ 2237|      1|        }
+ 2238|  22.6k|        var verdicts: Set<TransferID> = []
+ 2239|  22.6k|        var joins: [InterestToken: [AssetID: TransferID]] = [:]
+ 2240|  22.6k|        var waitingVerdicts: [VerdictKey: Int] = [:]
+ 2241|  22.6k|        var batches = 0
+ 2242|  22.6k|        var owedCounts: [MoveItem: Int] = [:]
+ 2243|  22.6k|        func register(_ join: JoinAfterFollow) {
+ 2244|  3.26k|            // A join a purge withdrew is no longer registered (`withdrawPurgedJoins`).
+ 2245|  3.26k|            if !join.withdrawn {
+ 2246|  3.25k|                joins[join.token, default: [:]][join.asset] = join.entry.transferID
+ 2247|  3.25k|            }
+ 2248|  3.26k|        }
+ 2249|  22.6k|        for event in events {
+ 2250|  2.45k|            switch event {
+ 2251|  2.45k|            case .attemptFailed(let transfer, let epoch, _):
+ 2252|    175|                if self.state.verdictsAfterFollow[transfer]?.epoch == epoch {
+ 2253|    175|                    verdicts.insert(transfer)
+ 2254|    175|                }
+ 2255|  2.45k|            case .join(let join):
+ 2256|  1.79k|                register(join)
+ 2257|  1.79k|                if let chain = join.chain, UInt64(chain.layers.count) != self.state.copySerial &- chain.serial {
+ 2258|      1|                    violations.append("a waiting join of interest \(join.token.rawValue) in \(join.asset) holds \(chain.layers.count) copies for \(self.state.copySerial &- chain.serial) adopted since it deferred")
+ 2259|      1|                }
+ 2260|  2.45k|            case .reroutes(let batch):
+ 2261|    413|                batches += 1
+ 2262|    413|                if UInt64(batch.layers.count) != self.state.copySerial &- batch.serial {
+ 2263|      1|                    violations.append("a re-route batch from \(batch.from) holds \(batch.layers.count) copies for \(self.state.copySerial &- batch.serial) adopted since it was owed")
+ 2264|      1|                }
+ 2265|  2.66k|                for item in batch.items.elements {
+ 2266|  2.66k|                    owedCounts[MoveItem(asset: item.asset, token: item.token), default: 0] += 1
+ 2267|  2.66k|                    violations.append(contentsOf: self.owedRerouteViolations(item, from: batch.from))
+ 2268|  2.66k|                }
+ 2269|  2.45k|            case .spaceFailure, .removal, .conditions, .readmit, .unblock, .retryDue, .throttleAnswers, .spaceSweep:
+ 2270|     69|                break
+ 2271|  2.45k|            }
+ 2272|  2.45k|            // A verdict's joins count at its place, newest first, where the queue held them (`joinsBehindVerdicts`).
+ 2273|  2.45k|            if let key = event.verdictKey {
+ 2274|    187|                waitingVerdicts[key, default: 0] += 1
+ 2275|  1.46k|                for entry in (self.state.joinsBehindVerdicts[key] ?? []).reversed() {
+ 2276|  1.46k|                    register(entry.join)
+ 2277|  1.46k|                }
+ 2278|    187|            }
+ 2279|  22.6k|        }
+ 2280|  22.6k|        if joins != self.state.joinsAfterFollow {
+ 2281|      2|            violations.append("\(self.state.joinsAfterFollow.count) interests' joins wait for the follow, \(joins.count) with their event")
+ 2282|      2|        }
+ 2283|  22.6k|        // Each owed pair is owed once, and every batch not replayed whole is counted: between turns every batch waits in
+ 2284|  22.6k|        // the queue (a drain turn puts back what it did not make, `drainEventsAfterFollow`).
+ 2285|  22.6k|        for (pair, count) in owedCounts.sorted(by: { $0.key < $1.key }) where count > 1 {
+ 2286|      1|            violations.append("interest \(pair.token.rawValue) in \(pair.asset) is owed \(count) re-routes")
+ 2287|  22.6k|        }
+ 2288|  22.6k|        if self.state.reroutesWaiting != batches {
+ 2289|      1|            violations.append("\(self.state.reroutesWaiting) re-route batches counted, \(batches) waiting")
+ 2290|      1|        }
+ 2291|  22.6k|        let pinCommits = self.state.reroutePinCommits
+ 2292|  22.6k|        if !self.followBarrier, !pinCommits.isEmpty {
+ 2293|      1|            violations.append("the follow barrier is down with \(pinCommits.count) pin ends kept for owed re-routes")
+ 2294|      1|        }
+ 2295|  22.6k|        let unended = pinCommits.keys.filter { self.waitingTarget($0.transfer, epoch: $0.epoch) != nil }.count
+ 2296|  22.6k|        if unended > 0 {
+ 2297|      1|            violations.append("\(unended) pin ends kept for owed re-routes name an attempt still at its end")
+ 2298|      1|        }
+ 2299|  22.6k|        let ahead = pinCommits.values.filter { $0.serial > self.state.copySerial }.count
+ 2300|  22.6k|        if ahead > 0 {
+ 2301|      1|            violations.append("\(ahead) pin ends kept for owed re-routes name a copy not yet adopted")
+ 2302|      1|        }
+ 2303|  22.6k|        if events.count != self.state.eventStamps.count || self.state.eventStamps.contains(where: { $0.view >= self.state.worldHistory.count }) {
+ 2304|      0|            violations.append("\(events.count) events wait for a follow with \(self.state.eventStamps.count) decision instants over \(self.state.worldHistory.count) views")
+ 2305|      0|        }
+ 2306|  22.6k|        // A bucket waits only behind its verdict's one waiting event (`deferBehindVerdict`, `drainEventsAfterFollow`), so
+ 2307|  22.6k|        // the barrier holds, the history is kept and a drain is owed while it waits.
+ 2308|  22.6k|        let unplaced = self.state.joinsBehindVerdicts.filter { key, behind in behind.isEmpty || waitingVerdicts[key] != 1 }.count
+ 2309|  22.6k|        if unplaced > 0 {
+ 2310|      3|            violations.append("\(unplaced) verdicts hold joins behind them without exactly one waiting event")
+ 2311|      3|        }
+ 2312|  22.6k|        let unstamped = self.state.joinsBehindVerdicts.values.reduce(0) { count, behind in
+ 2313|  1.46k|            count + behind.filter { $0.stamp.view >= self.state.worldHistory.count }.count
+ 2314|     33|        }
+ 2315|  22.6k|        if unstamped > 0 {
+ 2316|      1|            violations.append("\(unstamped) joins wait behind verdicts with decision instants over \(self.state.worldHistory.count) views")
+ 2317|      1|        }
+ 2318|  22.6k|        if !self.followBarrier, !self.state.followCarried.isEmpty {
+ 2319|      0|            violations.append("the follow barrier is down with \(self.state.followCarried.count) carried jobs left")
+ 2320|      0|        }
+ 2321|  22.6k|        if !self.followBarrier, !self.state.worldHistory.isEmpty || !self.state.followStamps.isEmpty {
+ 2322|      0|            violations.append("the follow barrier is down with \(self.state.worldHistory.count) views and \(self.state.followStamps.count) visits' decision instants left")
+ 2323|      0|        }
+ 2324|  22.6k|        if verdicts != Set(self.state.verdictsAfterFollow.keys) {
+ 2325|      0|            violations.append("\(self.state.verdictsAfterFollow.count) failure verdicts wait for a follow, \(verdicts.count) of them with their event")
+ 2326|      0|        }
+ 2327|  22.6k|        let unfailed = self.state.verdictsAfterFollow.keys.filter { transfer in
+ 2328|    174|            guard case .failed? = self.state.jobs[transfer]?.state else {
+ 2329|      1|                return true
+ 2330|    173|            }
+ 2331|    173|            return false
+ 2332|    174|        }
+ 2333|  22.6k|        if !unfailed.isEmpty {
+ 2334|      1|            violations.append("\(unfailed.count) jobs whose failure verdict waits for a follow are not failed")
+ 2335|      1|        }
+ 2336|  22.6k|        let elsewhere = self.state.verdictsAfterFollow.filter { self.state.jobs[$0.key]?.epoch != $0.value.epoch }
+ 2337|  22.6k|        if !elsewhere.isEmpty {
+ 2338|      1|            violations.append("\(elsewhere.count) jobs whose failure verdict waits for a follow are at another epoch")
+ 2339|      1|        }
+ 2340|  22.6k|        // The owed moves onto each job are counted once (`inboundOnto`), and a publication waits only while a move onto or
+ 2341|  22.6k|        // off its job, or its visit's rest, is owed: one that nothing owes is never resumed (Stage 3 close-out cycle 19).
+ 2342|  22.6k|        var onto: [TransferID: Int] = [:]
+ 2343|  22.6k|        for move in self.state.inboundMoves[min(self.state.inboundNext, self.state.inboundMoves.count)...] {
+ 2344|      5|            onto[move.target, default: 0] += 1
+ 2345|  22.6k|        }
+ 2346|  22.6k|        if onto != self.state.inboundOnto {
+ 2347|      0|            violations.append("\(self.state.inboundOnto.count) jobs count owed moves onto them, \(onto.count) with moves owed")
+ 2348|      0|        }
+ 2349|  22.6k|        let stranded = self.state.inboundWaits.keys.filter { self.state.jobs[$0]?.state != .verifying || !self.inboundBlocks($0) }
+ 2350|  22.6k|        if self.isRunning, !stranded.isEmpty {
+ 2351|      0|            violations.append("\(stranded.count) publications wait for owed moves that nothing owes")
+ 2352|      0|        }
+ 2353|  22.6k|        return violations
+ 2354|  22.6k|    }
+ 2355|       |
+ 2356|       |    /// Why the heap's earliest deadline may never fire, if so. While running, `rearm` keeps one alarm armed at or before
+ 2357|       |    /// it, re-armed in the very turn that schedules a deadline, whose owned task stays alive until it fires or is
+ 2358|       |    /// replaced (ADR-022, R-SYN-14). Only an alarm turn's store work leaves the alarm cleared across an await
+ 2359|       |    /// (`storeWorkRuns`), and that turn re-arms before it returns. An alarm that is never moved earlier, or one whose
+ 2360|       |    /// task ended without firing, would leave every deadline after it unfired, a stall the model test could not name
+ 2361|       |    /// (close-out cycle 14, F-34).
+ 2362|  22.6k|    private func unfiredDeadline() -> String? {
+ 2363|  22.6k|        guard self.isRunning, let first = self.state.heap.first, !self.state.storeWorkInFlight else {
+ 2364|  16.5k|            return nil
+ 2365|  16.5k|        }
+ 2366|  6.10k|        guard let alarm = self.state.alarm, self.state.tasks[alarm.task] != nil else {
+ 2367|     21|            return "no live alarm will fire the earliest deadline (\(first.reason))"
+ 2368|  6.08k|        }
+ 2369|  6.08k|        guard alarm.deadline <= first.at else {
+ 2370|      2|            return "the alarm is armed after the earliest deadline (\(first.reason))"
+ 2371|  6.08k|        }
+ 2372|  6.08k|        return nil
+ 2373|  22.6k|    }
+ 2374|       |
+ 2375|       |    /// Why the jobs the breaker parked may never be re-admitted, if so. A breaker that admits only a probe re-admits one
+ 2376|       |    /// parked job for it (`readmitForProbe()`, S3-B-063); the others wait, legitimately, while a queued job will take the
+ 2377|       |    /// probe. With the probe untaken, nothing queued, no re-queue or pump owed and no alarm turn due for the breaker (it
+ 2378|       |    /// re-admits at a cooldown's end or a watchdog), nothing would re-admit them: a half-open breaker without a probe has no
+ 2379|       |    /// deadline.
+ 2380|  22.6k|    private func strandedBreakerParks() -> String? {
+ 2381|  22.6k|        guard self.isRunning, let origin = self.state.remote?.originID, !self.state.circuitParked.isEmpty, self.breakerAdmitsOnlyProbe() else {
+ 2382|  22.5k|            return nil
+ 2383|  22.5k|        }
+ 2384|     54|        if let due = self.state.heap.deadline(for: .breaker(origin)), due <= self.environment.time.monotonicNow() {
+ 2385|      0|            return nil
+ 2386|     54|        }
+ 2387|    155|        if self.state.pumpFollowUpScheduled || !self.state.originOwed.isEmpty || self.state.jobs.values.contains(where: { $0.state == .queued }) {
+ 2388|     54|            return nil
+ 2389|     54|        }
+ 2390|      0|        return "nothing re-admits the \(self.state.circuitParked.count) jobs the breaker parked for the probe it admits"
+ 2391|  22.6k|    }
+ 2392|       |
+ 2393|       |    /// Why the jobs the breaker parked may never be re-admitted while the live breaker is closed, if so. A breaker that
+ 2394|       |    /// closes re-admits every job it parked (`unblockOrigin(.circuitOpen)`; behind the follow barrier at that event's
+ 2395|       |    /// replay, `EventAfterFollow.unblock`; the jobs one turn cannot re-queue are owed a follow-up, `originOwed`), and with
+ 2396|       |    /// no deadline left (`scheduleBreakerDeadline`) nothing else wakes them. A job parked `circuitOpen` behind a closed
+ 2397|       |    /// breaker, neither owed a re-queue nor behind a waiting re-admission or the breaker's deadline, waits for ever: the
+ 2398|       |    /// state a place refused on the breaker of its decision instant, after the close's re-admission had run in the drain,
+ 2399|       |    /// left (PROBE-C13R-STAMP-BREAKER; Stage 3 close-out cycle 14).
+ 2400|  22.6k|    private func unwakeableBreakerParks() -> String? {
+ 2401|  22.6k|        guard self.isRunning, let origin = self.state.remote?.originID, self.state.heap.deadline(for: .breaker(origin)) == nil else {
+ 2402|  2.21k|            return nil
+ 2403|  20.4k|        }
+ 2404|  20.4k|        if let breaker = self.state.breakers[origin], breaker.state != .closed {
+ 2405|  4.03k|            return nil
+ 2406|  16.3k|        }
+ 2407|  16.3k|        let waiting = self.state.circuitParked.subtracting(self.state.originOwed)
+ 2408|  16.3k|        guard !waiting.isEmpty else {
+ 2409|  16.3k|            return nil
+ 2410|  16.3k|        }
+ 2411|      2|        let readmissionWaits = self.state.eventsAfterFollow.contains { event in
+ 2412|      1|            if case .unblock(.circuitOpen) = event {
+ 2413|      1|                return true
+ 2414|      1|            }
+ 2415|      0|            return false
+ 2416|      1|        }
+ 2417|      2|        guard !readmissionWaits else {
+ 2418|      1|            return nil
+ 2419|      1|        }
+ 2420|      1|        return "nothing will re-admit the \(waiting.count) jobs the breaker parked while it is closed"
+ 2421|  22.6k|    }
+ 2422|       |
+ 2423|       |    /// Why the jobs a throttle parked may never be re-admitted, if so. Only the origin's `.throttle` deadline re-admits
+ 2424|       |    /// them (`unblockOrigin(.throttled)` when it fires at the throttle's end; the jobs that turn cannot re-queue are owed a
+ 2425|       |    /// follow-up, `originOwed`), and the alarm keeps that deadline at the throttle's end while the throttle is in force.
+ 2426|       |    /// A parked job neither owed a re-queue nor behind that deadline waits for ever: the state a manifest 429 left when
+ 2427|       |    /// it moved the deadline before the throttle's end and the alarm dropped it (close-out cycle 15, F-35).
+ 2428|  22.6k|    private func unwakeableThrottleParks() -> String? {
+ 2429|  22.6k|        guard self.isRunning, let origin = self.state.remote?.originID, self.state.heap.deadline(for: .throttle(origin)) == nil else {
+ 2430|    495|            return nil
+ 2431|  22.1k|        }
+ 2432|  22.1k|        let waiting = self.state.throttleParked.subtracting(self.state.originOwed)
+ 2433|  22.1k|        guard !waiting.isEmpty else {
+ 2434|  22.1k|            return nil
+ 2435|  22.1k|        }
+ 2436|      3|        return "nothing will re-admit the \(waiting.count) jobs the throttle parked"
+ 2437|  22.6k|    }
+ 2438|       |
+ 2439|       |    /// Why the pending run can never start, if so: with no run in progress, its gate is open, or nothing (a deadline,
+ 2440|       |    /// the conditions watcher, a probe in flight) will open it (sync-2 S2-03, S2-25). A gate the clock opened is not
+ 2441|       |    /// stranded while the deadline that starts its run is due and an alarm turn will fire it (`startsInAlarmTurn`).
+ 2442|  22.6k|    private func strandedPendingRun() -> String? {
+ 2443|  22.6k|        guard self.isRunning, self.state.run == nil, let pending = self.state.pendingRun else {
+ 2444|  21.5k|            return nil
+ 2445|  21.5k|        }
+ 2446|  1.08k|        switch self.pendingRunGate(pending) {
+ 2447|  1.08k|        case .open:
+ 2448|      8|            if self.startsInAlarmTurn(pending) {
+ 2449|      5|                return nil
+ 2450|      5|            }
+ 2451|      3|            return "the pending run's \(pending.gate) gate is open but no run started"
+ 2452|  1.08k|        case .armed:
+ 2453|  1.07k|            return nil
+ 2454|  1.08k|        case .unarmed:
+ 2455|      1|            return "nothing will open the pending run's \(pending.gate) gate"
+ 2456|  1.08k|        }
+ 2457|  1.08k|    }
+ 2458|       |
+ 2459|       |    /// Whether the run of `pending` starts in an alarm turn still to come: the clock reached the deadline that opens its
+ 2460|       |    /// throttle or breaker gate (`.pendingRun` at the throttle's end, `.breaker` at the cooldown's end), which is still in
+ 2461|       |    /// the heap, and an alarm will fire it. Two windows lie between the clock's move and that turn:
+ 2462|       |    /// - An alarm is armed: the move resumes its sleep, but it fires the deadline only once it has the actor (close-out
+ 2463|       |    ///   cycle 13, F-33). Only an alarm whose owned task is alive and whose deadline is at or before the gate's counts;
+ 2464|       |    ///   `rearm` keeps the alarm at the heap's earliest deadline in the turn that schedules one, so any other alarm
+ 2465|       |    ///   would never fire the gate's deadline in time.
+ 2466|       |    /// - An alarm turn's store work is under way (`storeWorkRuns`): the alarm clears `state.alarm` before it fires what
+ 2467|       |    ///   is due, and a due store deadline suspends its turn in `store.runDueWork()` (and in the free-space read after
+ 2468|       |    ///   reaped bytes). The turn re-arms at the heap's earliest deadline before it returns, and that alarm starts the
+ 2469|       |    ///   run; a run the turn still leaves pending is reported at the next check (close-out cycle 14, F-34).
+ 2470|      8|    private func startsInAlarmTurn(_ pending: PendingRun) -> Bool {
+ 2471|      8|        let reason: DeadlineReason
+ 2472|      8|        switch pending.gate {
+ 2473|      8|        case .throttle:
+ 2474|      6|            reason = .pendingRun
+ 2475|      8|        case .breaker:
+ 2476|      2|            guard let origin = self.state.remote?.originID else {
+ 2477|      0|                return false
+ 2478|      2|            }
+ 2479|      2|            reason = .breaker(origin)
+ 2480|      8|        case .conditions:
+ 2481|      0|            // Its gate reads armed while its debounce is in the heap (`pendingRunGate`).
+ 2482|      0|            return false
+ 2483|      8|        }
+ 2484|      8|        guard let at = self.state.heap.deadline(for: reason), at <= self.environment.time.monotonicNow() else {
+ 2485|      1|            return false
+ 2486|      7|        }
+ 2487|      7|        if self.state.storeWorkInFlight {
+ 2488|      2|            return true
+ 2489|      5|        }
+ 2490|      5|        guard let alarm = self.state.alarm, self.state.tasks[alarm.task] != nil else {
+ 2491|      1|            return false
+ 2492|      4|        }
+ 2493|      4|        return alarm.deadline <= at
+ 2494|      8|    }
+ 2495|       |}
+

@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetSync/Engine/EngineFailures.swift b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+index 619bfef..e0904fd 100644
+--- a/Sources/ZTronAssetSync/Engine/EngineFailures.swift
++++ b/Sources/ZTronAssetSync/Engine/EngineFailures.swift
+@@ -371,7 +371,7 @@ extension SyncEngine {
+         }
+         let until = now.adding(seconds: max(delay, seconds ?? 0))
+         let previous = self.state.throttles[origin]
+-        let end = max(previous ?? .zero, until)
++        let end = until
+         self.state.throttles[origin] = end
+         self.state.metrics.retries[.throttled] += 1
+         self.state.jobs[transfer]?.active = nil

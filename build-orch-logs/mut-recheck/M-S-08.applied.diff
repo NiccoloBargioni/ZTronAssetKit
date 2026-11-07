@@ -1,0 +1,13 @@
+diff --git a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+index 91bcc60..4025a36 100644
+--- a/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
++++ b/Sources/ZTronAssetStorage/Eviction/EvictionOrder.swift
+@@ -204,7 +204,7 @@ enum EvictionOrder {
+             order.reserveCapacity(self.tallies.count)
+             for slot in self.tallies.indices where self.tallies[slot].evictable {
+                 let key = self.tallies[slot].key
+-                guard case .live? = blobTable[key], publishing.isEmpty || !publishing.contains(key), leases.isEmpty || leases[key]?.isEmpty ?? true else {
++                guard case .live? = blobTable[key], publishing.isEmpty || !publishing.contains(key) else {
+                     continue
+                 }
+                 order.append(

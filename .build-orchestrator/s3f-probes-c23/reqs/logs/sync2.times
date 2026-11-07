@@ -1,0 +1,2 @@
+start 20:57:24 load { 252.62 182.58 159.68 } head d88bdb1 cmd: swift test --scratch-path .build-verify-s3f-c23-reqs --skip Benchmarks --filter ZTronAssetSyncTests
+end 21:10:09 load { 212.31 193.78 168.49 } rc=0

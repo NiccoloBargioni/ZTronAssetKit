@@ -1,0 +1,13 @@
+xcodebuild exit 0 (00:24:11 to 00:36:26)
+** TEST SUCCEEDED **
+warning lines: 8
+warning lines not from appintentsmetadataprocessor: 0
+      "failedTests" : 0,
+      "passedTests" : 3653,
+      "skippedTests" : 0,
+  "failedTests" : 0,
+  "passedTests" : 1732,
+  "result" : "Passed",
+  "skippedTests" : 0,
+  "totalTestCount" : 1732
+load 1-min: mean 44.87, min 3.02, max 257.43 over 147 samples

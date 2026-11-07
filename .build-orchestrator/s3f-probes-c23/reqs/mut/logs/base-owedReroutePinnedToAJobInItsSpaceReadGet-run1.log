@@ -1,0 +1,18 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+✔ Test "R-SYN-5: an owed re-route replayed onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" with 2 test cases passed after 1.558 seconds.
+◇ Test "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" started.
+✔ Test "R-SYN-5: a user request that arrived just before a publication's ENOSPC, replayed inside its free-space read, gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P1)" with 2 test cases passed after 1.353 seconds.
+◇ Test "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" started.
+✔ Test "R-SYN-5: a user request that arrived inside a publication's ENOSPC free-space read skips that ENOSPC's verdict when replayed there (F-28, T20, e1-P1)" with 2 test cases passed after 1.422 seconds.
+✔ Suite "Engine follow barrier (F-28)" passed after 4.335 seconds.
+✔ Test run with 3 tests in 1 suite passed after 4.335 seconds.

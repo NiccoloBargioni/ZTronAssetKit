@@ -1,0 +1,524 @@
+{
+  "summary": "ZTronAssetKit Stage 3 merge documentation (ADR-057): per-draft ledgers (s3f split by section), one writer, independent verifier, fix rounds",
+  "agentCount": 12,
+  "logs": [
+    "ledgers: s3ah=40 (3 conflicts), s3b=49 (4 conflicts), s3c=81 (2 conflicts), s3d=54 (2 conflicts), s3g=44 (2 conflicts), s3f-items=82 (15 conflicts), s3f-docs=119 (10 conflicts), s3f-close=67 (6 conflicts)",
+    "docs apply 1: 21 files, 4 commits",
+    "docs verify 1: 1 blocking / 6",
+    "docs apply 2: 21 files, 7 commits",
+    "docs verify 2: 0 blocking / 5"
+  ],
+  "result": {
+    "ledger_counts": [
+      {
+        "draft": "s3ah",
+        "items": 40,
+        "conflicts": [
+          "Record label. The rulings file's header says the fixer records each ruling in docs/adr-drafts/s3ah.md as 'Orchestrator ruling (Stage 3)'. The draft records them as 'Orchestrator ruling (close-out) S3-R1...' and 'Orchestrator rulings (close-out) S3AH-1 ... S3AH-6' (s3ah.md:12-36), while noting the rulings file's term. The ruling wins: ADR-057 cites them as 'Orchestrator ruling (Stage 3)'.",
+          "S3-R6 says 'Contract files may change only where this file authorises it, bodies only'. The draft also changed the `///` of `TransferAttempt.init?(token:)` (TransferID.swift:124-125), beyond the authorised body. It says so and asks for ratification (s3ah.md:25-27 and Proposed document changes 3, :237-238). The ruling wins: the orchestrator ratifies the line in its comments-only pass, which S3-R6 leaves to it, or reverts it.",
+          "S3-R6 versus Sources/ZTronAssetTestSupport/ManualTimeSource.swift, a Stage 1 contract file (ARCHITECTURE §1 TestSupport row, 'every file'; present at tag `contracts`). S3AH-3 changed the body of `advance(to:)`; the ruling names that site, so the body is in scope. It also added a four-line `///` paragraph (:144-147). The draft's S3-R6 entry (s3ah.md:25-30) and its 'Authorised edits' section (s3ah.md:221-226) say only TransferID.swift and Time.swift contract files changed. This is a conflict only if TestSupport files count as contract files under S3-R6; ARCHITECTURE §1 says they do. The ruling wins: the orchestrator lists the file among the changed contract files and ratifies or reverts the doc paragraph."
+        ]
+      },
+      {
+        "draft": "s3b",
+        "items": 49,
+        "conflicts": [
+          "S3B-12 against the owner's later P-13 ruling (ADR-050 amendment of 2026-10-29; s3-rulings-s3b.md S3B-12, 'P-13 stays the owner's'). The draft was written before the ruling and treats P-13 as open. It offers three options: (B) batch_ms_max of about 15 ms, (A) a percentile, calling p98 'robust', and (C) judging actor holds instead (s3b.md:375-382). It reports `BenchStorage.swift:249:13 … longest <= batchBudget` as the known owner item (s3b.md:383-388, :546-548), and asks DECISIONS to record 'S3B-12's options for the owner's P-13 decision' (s3b.md:520-521). The owner chose option A at the nearest-rank p99, not p98, and batch_ms_max stays 5 ms. The merged head asserts `p99 <= batchBudget` (BenchStorage.swift:243 and :253; d97e4e7). The ruling wins. ADR-057 records S3B-12 as the evidence behind the ruling, marks the options and the 'longest <= batchBudget' failure as superseded, and keeps S3B-12's p98 view as information only (orchestrator follow-up P3 and P8).",
+          "S3-R4 ('record each [raised hang guard] with the measured durations and load'). The reapScaling benchmark has carried `.timeLimit(.minutes(3))` since its first commit (BenchStorage.swift:270; 8b3fc89). The draft records no measured duration or reason for it; its only figure is the whole 7-benchmark StorageBenchmarks run, 31.091 s in release (s3b.md:546). Benchmarks in other WPs carry guards of .minutes(3) to .minutes(20) (BenchSync, BenchCleanup, BenchSyncCycle21 and 22). The orchestrator should either record this raise in ADR-057 with a measurement, or rule that S3-R4, which is about TSan durations, does not apply to release-only benchmarks.",
+          "S3-R6 ('Contract files may change only where this file authorises it, bodies only'). StoreCoreState.swift is a contract file (ARCHITECTURE §1 row 16). It gained three stored properties, `countedReleases`, `provisionallyRescued` and `lastReap` (StoreCoreState.swift:175-187, +13 lines). These are declarations, not bodies. s3-rulings-s3b.md authorises no contract-file change, and the draft's 'Authorised edits outside WP-B' leaves this out (s3b.md:469-477). The properties are internal and in memory only, with no public or package signature, and §1.1 lets WP-B add fields to its own sub-struct. ADR-057 needs to ratify the change explicitly.",
+          "Scope of S3B-9's authorisation ('count a pruning apply's releases in WP-B's release path'). The fix goes beyond pruning. Cycle 1 also counts admit's releases and the previous blob of a replaced detached record or an adopted record. Cycle 2 lowers WP-C's contract field `releasedBytes` when a counted doom is rescued (AssetStore+References.swift:109), which contradicts that field's contract doc, 'never decreases' (EvictionState.swift:20-21). The draft files all of this under S3B-9's authorisation (s3b.md:326-329 and :471-474), though the ruling names pruning releases only and was not re-issued for cycle 2. No WP-C file changed, and readers take differences, so a lower value frees more, never less. Even so, the wider scope and the non-monotonic contract field need explicit ratification in ADR-057."
+        ]
+      },
+      {
+        "draft": "s3c",
+        "items": 81,
+        "conflicts": [
+          "S3-R2 requires each committed test's display name to start with its requirement ID. The draft's S3C-1 pinning test does not. Its display name is `Test support: the release poll never lets through a unit submitted after a condition read it outran` (Tests/ZTronAssetStorageTests/Cleanup/PollReleaseTests.swift:21-23; suite at :5, also 'Test support:'). The draft (docs/adr-drafts/s3c.md:43-44) justifies the prefix by WP-H's `CancelledWaitTests` precedent, since no requirement ID names a harness. The ruling wins: the orchestrator either ratifies the precedent explicitly in ADR-057 or routes a rename to a later WP-C change.",
+          "S3-R6 says 'Contract files may change only where this file authorises it, bodies only', and S3C-9 authorises only `Integrity/StoreIntegrity.swift:54-79` (the function at s3-base). Commit 100d1c2 also rewrote the doc comment above that function (s3-base lines 51-53, now :51-56). That is a non-body edit outside the authorised range, in a Stage 1 contract file (ARCHITECTURE.md:43 lists StoreIntegrity.swift under 'Files (Stage 1)'). The draft notes 'doc comment updated' (s3c.md:410) but states at s3c.md:9-10 that 'no contract file ... [was] edited'. That statement is inaccurate: the body edit is an authorised contract-file edit, and the doc edit is not authorised. The ruling wins: the orchestrator acknowledges the doc text as a contract doc change at the merge (it accurately describes the guard at :71-75) or restores the old doc (which would then be stale), and ADR-057 corrects the draft's claim."
+        ]
+      },
+      {
+        "draft": "s3d",
+        "items": 54,
+        "conflicts": [
+          "S3-R3 says to re-apply each mutant's diff in a scratch copy. In cycle 1, the M-N-22 mutant (S3D-3) and the S2-19 control-reader mutant (S3D-4) were instead applied in the s3d worktree itself, run, and removed with `git checkout` (docs/adr-drafts/s3d.md:44-47, :305-306, :325-331). The draft records this as 'Deviation, cycle 1'. The ruling wins, so ADR-057 must carry it as a deviation from S3-R3, not as compliance. Mitigation for the record: the cycle-2 requirements verifier re-applied both mutants in its own scratch copy, and both failed (.build-orchestrator/s3d-probes-c2/retry-reqs-mutants.out:37-42: R3-MN22-weak-etag with 3 issues and R4-leaking-control-reader with 1 issue, out of 161 tests). Every cycle-3 mutant and amplifier run used .build-s3d/c3/mutpkg.",
+          "S3-R6 says 'Contract files may change only where this file authorises it, bodies only'. S3D-1 and S3D-2 changed declarations, not only bodies, in the contract file Sources/ZTronAssetTransport/Background/BackgroundSupport.swift.\nAdded:\n- the private `priorityRequests` and `lastPriorityRequest` (:187-188);\n- `Waiter.controls` and `Waiter.end(with:)` (:156-165);\n- the internal `BackgroundTransferHandle.Control` (:732-739);\n- the private `controls` (:751);\n- the internal `controlTask` (:754);\n- the handle's `deinit` (:786-789);\n- the internal init's `controls:` parameter (:756-763).\nRemoved: the handle's private `coordinator`.\nChanged: the relay's private storage, now `[String: [() -> Void]]` (:822), and the public doc text and behaviour of `accept` and `complete` (:812-818, :827-850).\nNo public or package signature changed. The draft's 'Contract file' paragraph (s3d.md:237-241) declares the S3D-1 changes but omits the relay's. The rulings mandate designs that need these declarations: S3D-1 asks for 'one stream per handle drained by one task', and S3D-2 targets `BackgroundSupport.swift:733-750`. They do not, however, explicitly authorise changes beyond bodies. The ruling wins unless ADR-057 explicitly ratifies these declaration changes as required by S3D-1 and S3D-2."
+        ]
+      },
+      {
+        "draft": "s3g",
+        "items": 44,
+        "conflicts": [
+          "S3-R6 ('No public or package signature changes … Contract files may change only where this file authorises it, bodies only') against the draft's S3-R6 and S3G-1 entries (s3g.md:27-30, :38-45). In the contract file Sources/ZTronAssetKit/Prefetch/Prefetch.swift, WP-G added a new internal member, `static func reach(count:current:radius:)` (:116-120), and changed two public doc comments (:88-89, :123-124). The draft calls this 'authorised by S3G-1', but S3G-1 authorises only the clamp of the walk at Prefetch.swift:96. The ruling wins: the orchestrator must ratify the internal member and the doc comments in ADR-057, as ADR-054 did for internal members added to contract files, or have the helper folded into the body. No public or package signature changed (git diff s3-base 8d86acb).",
+          "S3G-5's S3-B-095 entry (s3g.md:165-168) lists `subscribe()`'s registration among the untested two-hop interleavings. The text came from the findings JSON, which copied g.md:183. ADR-054's 'Rulings over the draft' (DECISIONS.md:463) ruled that listing stale: since close-out cycle 2 that path goes through `register(_:)` and is tested by the model, by `R-SYN-12: an events stream cancelled while its first registration waits for a reopen leaves no follower and no subscriber`, and by `R-SYN-12: an events stream whose first pull registers while a reopen is parked after the old engine's shutdown receives the replacement's clientStarted before its later events`. ADR-054's own Not verified list (DECISIONS.md:471) leaves it out. The ruling wins: ADR-057 should record S3-B-095 as only the background-events hand-off, the diagnostic report's three reads, and a stream registration overlapping the client's shutdown."
+        ]
+      },
+      {
+        "draft": "s3f-items",
+        "items": 82,
+        "conflicts": [
+          "S3F-2's table (s3f.md:8804-8809) and its 'Cycles 4 to 8' bullet (:8814-8816) give 3 min for the R-SYN-14 migration-loop wait and for the R-SYN-6 owed re-queue, and leave `stalledSubscriberIsBounded` 'ruling requested'. Not verified, cycles 7-8 (s3f.md:12034-12036, :12046-12047) also say its margin awaits a ruling. S3-R12 item 3 (rulings:45) raised the two tests to 5 min and stalledSubscriberIsBounded from 4 to 6 min. The code follows the ruling: EngineLegacyMigrationTransferTests.swift:753 (5), EngineRegressionCycle16Tests.swift:35 (5), EngineEventsTests.swift:21 (6). The table's 'R-CAR-4 … 1 min (kept)' is also stale: EngineGroupClaimTests.swift:395 is 3 min after cycle 7's raise.",
+          "S3F-14 (s3f.md:9133: S1-15's run test guard is `.minutes(3)`) and the cycle-2 DECISIONS proposal (s3f.md:9298: '3 min; 59.93 s …') contradict S3-R10 (rulings:38), which set 5 min. Not verified, cycles 4-5, says the guard 'awaited the orchestrator's ruling'. The ruling exists and the code has 5 min (EngineSync1LivenessTests.swift:185). Cycle 6's proposal (s3f.md:9363-9366) is the correct record.",
+          "Not verified, cycle 14 (s3f.md:12089-12090) lists 'RR-1's remainder … is not probed' as open. S3-R18 item 2 (rulings:211) makes passed-publication answer differences blocking and says RR-1's remainder is not a residual risk, so it must not go to VERIFICATION.md or RESIDUAL-RISKS.md as an open residual.",
+          "Not verified, cycle 14 (s3f.md:12090-12091): '`failureMoveBehindBarrier` survives as an order-only difference'. S3-R18 item 3 (rulings:217): 'order only' is no reason to keep an unkilled branch; it is moot only if the mover was removed, otherwise kill it or remove the branch.",
+          "Not verified, cycle 13 (s3f.md:12079-12080) records `breakerReadLive` as killed only by a time limit. S3-R16 1(e), S3-R27 item 5 and S3-R28 item 4 (rulings:1478) say a time-limit kill is no kill, so it cannot be recorded as killed. Its final state must come from the close's status list.",
+          "Not verified, cycle 15 (s3f.md:12099-12100): '`laneJobsWalkAlways` and `spaceFailureEpochDropped` survive with the reasons given'. S3-R19 item 2 (rulings:242-244): laneJobsWalkAlways is a cost-only change, equivalent for G4, so record it as equivalent, with followedLane's C2 unmeasured. S3-R19 item 3 (rulings:245-249) allows spaceFailureEpochDropped only removal, an invariantViolations() clause with a test, or 'pre-existing and out of class'; 'survives' is not one of them.",
+          "Not verified, cycle 21 (s3f.md:12156-12157) says the two-subscriber figure is recorded 'for the owner'. S3-R27 12.1 says it is outside the bar by the owner's ruling of 5 Nov (10,000 ids, at most 4 interests per id, one subscriber), so it is not an owner item. The same cycle calls `commitTurns(.waitersStalledSubscriber)` blocking.",
+          "The cycle-2 §14 proposal (s3f.md:9287-9288: 'the follow's unspawnable or empty follow-up') and S3F-10 (s3f.md:8974-8975: 'the follow's follow-up that cannot be spawned (shutting down)') keep the unspawnable branch. S3-R25 item 7 (rulings:372-378) removed it in cycle 20 (EngineFollow.swift:1667-1673). Not verified, cycle 20 (s3f.md:12141): '`scheduleDrainFollowUp`'s unspawnable branch has no test'. S3-R26 item 6 (rulings:559) removed that one in cycle 21 (EngineFollow.swift:427-429). Only the 'finds nothing owed' guard remains (EngineFollow.swift:1697-1699).",
+          "Not verified, cycle 14 (s3f.md:12091-12092) cites `freeSlots()`. S3-R18 item 1 (rulings:205) removed it, and there are 0 hits in Sources.",
+          "Not verified, cycles 4 to 11, says the survivors `noDispatchOwedFlag` and `noFlagPump` still have no test. The §14 (c) proposal (s3f.md:9329-9331) calls noDispatchOwedFlag 'the survivor', and (a)/(c) 'stay' (s3f.md:9470). S3-R15 item 5 (rulings:137) required the killing test, and both mutants were killed: cycle 12 at EngineFollowBarrierSurvivorTests.swift:77, cycle 13 at :22.",
+          "The title (s3f.md:1) says 'cycles 1 to 12'. The rulings route WP-F through cycle 23, closed by S3-R28's close ruling (rulings:1685-1874), and the draft holds cycles 1 to 23 (s3f.md:7943).",
+          "Not verified, cycle 17 (s3f.md:12107-12108): 'RR-14 is an answer difference by analysis, put to the orchestrator'. S3-R21 item 4 (rulings:276): proven by both verifiers, blocking, fix it. It is not an open or residual item.",
+          "Not verified, cycle 19 (s3f.md:12121-12122): 'RR-23 is an answer difference by analysis, put to the orchestrator'. S3-R24 item 5 (rulings:327-329): a timing difference in RR-16's family, recorded with RR-16, not blocking, no probe required.",
+          "Not verified, cycle 11 (s3f.md:12063-12064): 'PROBE-C9-THROTTLE still differs sweep-first (R2's admission wait, ruling requested)'. S3-R14 (rulings:130) and S3-R17 items 1-2 (rulings:187-197) rule that the MUST wins: the engine decides on the live gate, and the difference is a non-blocking residual risk recorded with its probe.",
+          "Not verified, cycles 21-22 (s3f.md:12156-12160, :12165-12166), calls the purge misses (`purgeWhileOwedTurns`, the six purge cases, PROBE-C21-APM and -HOLDERS) 'blocking, reported'. The close ruling, points 2-3 (rulings:1718-1748), makes them known misses, recorded and not routed, with the FAIL accepted. Item 4's shapes (HOLDERS) are recorded as unproven, not as a miss."
+        ]
+      },
+      {
+        "draft": "s3f-docs",
+        "items": 119,
+        "conflicts": [
+          "Hang guard for `stalledSubscriberIsBounded` (EngineEventsTests.swift:22). The cycle-7 and cycle-8 records (s3f.md:9390-9392, :9423-9430) request `.minutes(5)`. Ruling S3-R12 item 3 set `.minutes(4)` → `.minutes(6)` (133.0–133.8 s, 55.7 %). The code has `.minutes(6)`. The ruling wins: record 6 minutes.",
+          "S1-15's run-test guard (`runMaterialisesAPipelineAtATime`, EngineSync1LivenessTests.swift:185). Cycle 2's DECISIONS record (s3f.md:9298) gives 3 minutes (59.93 s at load 11–18). S3-R10 set `.minutes(5)` (101.8–130.1 s paired at load 10–32), and S3-R12 item 3 kept it at 146.3–147.1 s (49 %). Record 5 minutes.",
+          "Cycle 1's S3F-2 hang-guard table (s3f.md:9258) gives 3 minutes to the R-SYN-14 migration-loop wait and to the R-SYN-6 owed re-queue. S3-R12 item 3 raised both to `.minutes(5)` (89.0–90.2 s and 88.9–91.0 s). The code has both at 5 minutes: EngineLegacyMigrationTransferTests.swift:753 and EngineRegressionCycle16Tests.swift:35.",
+          "Cycle 8 asked for a ruling, either (a) or (b), and for an S3-R10 amendment (S1-15 at 166.9–167.1 s paired, 56 %; s3f.md:9423-9430). Cycles 7–9 also say the guards hold 'up to a load of about 30–35'. S3-R12 supersedes both. Item 1: load is the mean of the 1-minute average sampled every 5 s or less, from 60 s after the later bundle's start. Item 2: a margin blocks only on a timeout at a mean of 50 or less, or on exceeding half a guard in a paired run at a mean of 30 or less. Item 4: the 29 one-minute tests at 50.3–55.0 % are not raised.",
+          "Barrier paragraph, place sentence. Cycle 13 says 'A place given there is refused by its view's throttle or breaker' (s3f.md:9573-9600). Cycle 14's interim says 'is refused by its view's throttle (the breaker is read live, S3-R17)' (s3f.md:9613-9614). Both contradict S3-R17, which reads the breaker live, and S3-R18 item 1: there are no place stamps, and places are admitted at the barrier-end pump on the live throttle, breaker, slots and space. Write only cycle 15's sentence (s3f.md:9634-9636).",
+          "Cycle 1's §7.4 and DECISIONS:422 replacement (s3f.md:9242-9244) says 'A re-join is reinstated at its place … whatever lane the interest brings'. That contradicts the scope of the S3F-12 ruling's own record for S3-B-065: only a job only released groups wanted is reinstated, and `relane`'s back-of-queue re-queue stays for jobs that waited in their queue. It also contradicts the code (EngineJobs.swift:188-196). Write the scoped form.",
+          "Cycle 20 (s3f.md:9790-9793) says RR-21 goes into RESIDUAL-RISKS 'only if the orchestrator rules it'. S3-R24 item 2 and S3-R26 item 1 ruled RR-21's misses blocking: commit re-routes at 48.47 ms best and the drain's take-off at 45.51 ms best. Cycle 21 fixed them (owed re-routes), so only RR-21's residuals are recorded.",
+          "RR-21's ruling-3 residual, as first written, says a pin whose job committed, was superseded or was ENOENT-re-queued 'follows the copy at the replay'. S3-R27 item 12.2 (e1-R1, e1-PS, `PinEnd`) narrows it. A commit or supersede hands the copy in force at that commit or supersede. An ENOENT re-queue keeps the pin until the first copy adopted after it. Only a job that leaves its end with no record follows the copy at the replay.",
+          "Cycle 9's F-28 record (s3f.md:9451-9454) says 'every admission and space verdict is decided on the followed state'. That is wider than the rulings allow. S3-R16: the barrier guarantees the answers, MUSTs and invariants of a visit-first engine, not order, place, timing or backoff. S3-R17 and S3-R18: places are admitted on the live gates. S3-R11 R1: free-space reads and freed bytes apply on arrival. Record F-28 with these qualifications.",
+          "Cycle 3's f-4 addition, with `followBeforeActing` (s3f.md:9312-9313), and the case-by-case follow sentences of cycles 3–8 (s3f.md:9302-9308, :9323-9325, :9339-9342, :9355-9359, :9376-9382, :9403-9410) are superseded by S3-R11, the follow barrier of design D3. `followBeforeActing` no longer exists in Sources (0 hits). Only cycle 9's f-4 replacement and the barrier text of cycle 13 onward stand."
+        ]
+      },
+      {
+        "draft": "s3f-close",
+        "items": 67,
+        "conflicts": [
+          "Class wording. Three texts read the class more widely than the ruling: N31 (s3-r28-orchestrator-rulings.md:325: 'N29's T20 definition applies'), N29 (:299: the T20 definition 'covers both causes and the late drain') and docs/ORCHESTRATION.md:451 ('every ENOSPC-window answer difference in N29's T20 class is a known risk. S3-R16 1(b) to 1(f) are not exempt'). They conflict with close point 4 (s3-rulings-s3f.md:1746-1756) and N32 (:336). By the ruling: the class is the owner's words, and T20 is only the test. Where the two differ, the owner's words decide. A late-drain difference is exempt only when its cause is inside the window; otherwise the owner gets a one-line question. 1(b) to 1(d) inside the window go to the owner. 1(e) and 1(f) inside the window, and every finding after it, follow point 8. The draft (s3f.md:8526-8546) follows the ruling, and ADR-057 and RESIDUAL-RISKS must too.",
+          "Scope of the exemption. N29 (s3-r28-orchestrator-rulings.md:297-298: only correct #1 and #2 are exempt, and any other ENOSPC-window difference blocks under S3-R16 1(a); :301: '1(e) and 1(f) still block') and item 1c amended point 1 are superseded by close point 4. Point 4 replaces item 1c amended point 1's lead and bullets (s3-rulings-s3f.md:1745). The whole class is exempt, including a shape a verifier newly finds (:1754). 1(e) and 1(f) follow point 8 (:1756).",
+          "N25's figures and the dossier's other stale facts. docs/REOPEN-WP-F.md gives case 2 at 9-17 ms (:39) and case 3 at 10-20 ms (:43). Close point 6 (s3-rulings-s3f.md:1811) gives f3c's reviewed 12.9-23.3 ms and about 21-34 ms. The dossier also says 'Cycle 23 is to build both routes' (:30), that f3c is 'not written' (:47) and 'Further known misses ... none at version 1' (:50). These conflict with point 1 (route C and item 3b are not taken) and point 2 (APM, item 4's shapes as unproven, N7's five and the §7 variants are now recorded). The draft follows the ruling (s3f.md:8741, :8754). The dossier's final version (checklist item 10) must too.",
+          "Persistence wording. docs/adr-drafts/s3f.md:8628-8630 (the archive's new snapshot 'reaches `origin` only with the owner's word') and docs/REOPEN-WP-F.md:71-72 ('Later snapshots need the owner's word'; the hand-off commits stay local) are stale. The owner's answer 'Archive and feature branch' (N31, s3-r28-orchestrator-rulings.md:326; the owner-push-permission memory) lets the orchestrator push archive/build-orchestrator snapshots and feature/asset-kit as they change, never main and never force. ADR-057 should record the owner's answer, not the draft's wording.",
+          "Known-miss list. docs/ORCHESTRATION.md:456 describes the close ruling's draft as 'the known misses, now including APM, item 4 and f3c's shapes'. The appended ruling differs on two of these. Item 4's k = 2 and k = 4 shapes are recorded with the misses 'as unproven, not as a miss' (s3-rulings-s3f.md:1727). f3c's open shapes 'are not known misses': they are recorded as open, and one of them goes under Not verified (:1729-1733; N32 :340). ADR-057 and RESIDUAL-RISKS must list f3c's shapes as OPEN and item 4 as unproven.",
+          "A tension that needs the orchestrator's explicit ruling. .build-orchestrator/s3-post-merge/docs-followup-items.md:3, :32 and :41 (P3, P5), with docs/ORCHESTRATION.md:530-534, plan to fix ADR-050's records and the stale P-13 comments, including the source doc comment at BlobUnits.swift:155-156 and :160 and the test comment at BenchStorage.swift:20-21. Close point 10 (s3-rulings-s3f.md:1871) applies point 8 to post-merge findings. Point 8 fixes a wrong record only in 'this ruling's own work' (:1841-1843): 'Anything else' is 'recorded as open in the draft, ADR-057 and RESIDUAL-RISKS.md, and not fixed' (:1845). A dated ADR-057 amendment of ADR-050 satisfies both readings, because it is recorded in ADR-057. The BlobUnits.swift and BenchStorage.swift edits go beyond point 10's text and need the orchestrator's explicit ruling. The BenchStorage edit also needs its permission for an edit in Tests/."
+        ]
+      }
+    ],
+    "missing": [],
+    "rounds": [
+      {
+        "round": 1,
+        "apply": {
+          "summary": "Stage 3 merge documentation is done on wp/s3docs: 4 commits on 8d86acb, 21 files changed (378 insertions, 161 deletions), worktree clean, nothing pushed. The worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs.\n\nWHAT WAS DONE\n(a) ADR-057 is appended to docs/DECISIONS.md at line 563, titled as the task gives it. Its ten groups are in order:\n 1. Context\n 2. Ratified contract changes\n 3. Benchmarks\n 4. Ratified decisions\n 5. Known misses, known risks and the accepted FAIL: close points 2-4 in the owner's words; f3c's two shapes OPEN; N33's open items\n 6. Assignments\n 7. REENTRANCY\n 8. Not verified, by reference\n 9. Process\n 10. Open: 9 items, each with a reason\nNEEDS-HUMAN-REVIEW tags:\n- In the heading and the owner review list, re-ratified: S3-B-001, S3-B-002, C-12…C-15, D-10, D-19.2 and startDownload.\n- Owner items: f3c's two open shapes with OS-0, and the uncommitted Package.swift.\n- ADR-049's heading gains its own tag.\nEarlier ADRs are changed only by dated bullets, \"Amendment (Stage 3 merge, 2026-11-07, ADR-057)\", on ADR-013, 020, 021, 022, 032, 036, 037, 039, 046, 049, 050, 052, 053, 054 and 055. Gate figures appear only where a ledger cites them from a log (G2).\n\n(b) The ARCHITECTURE amendments are marked \"(ADR-057)\". Line 978 now says all 11 mutation survivors were KILLED on e840b0e (record c99053f).\n\n(c) 112 `///` lines changed in 18 Sources files. ADR-057's Process group lists each file:line. `git diff 8d86acb -- Sources` contains only `///` lines.\n\n(d) Six rows appended to the §5 table of APPLE-API-VERIFICATION. Everything I could not resolve is in ADR-057 Open.\n\nDEFAULT DISPOSITION BY KIND (applies to every item unless an exception below names it)\n- architecture-amendment: ARCHITECTURE (ADR-057). Applied.\n- reentrancy-row: ARCHITECTURE §10 and ADR-057 REENTRANCY. Applied. RE-S43/44/45/47/48 added; RE-S21/22/24/37 and f-4 widened; RE-S46 recorded as a gap.\n- test-assignment: ARCHITECTURE §11/§12. Applied. Items for another WP, DEVICE-TEST-PLAN or Stage 5 go to ADR-057 Assignments.\n- untested-line: ARCHITECTURE §14 and ADR-057. Applied.\n- decisions-amendment: ADR-057 groups and the dated amendments. Applied.\n- aav-amendment: APPLE-API-VERIFICATION §5. Applied.\n- contract-ack: ADR-057 Ratified contract changes. Applied.\n- contract-doc: the `///` edits. Applied.\n- needs-human-review: the heading and owner list, or ADR-057 Open for owner items with no ruling.\n- not-verified: ADR-057 Not verified and ARCHITECTURE §14. VERIFICATION.md is Stage 5's and does not exist yet.\n- residual-risk: ADR-057 Known misses/risks. RESIDUAL-RISKS.md is Stage 5's.\n- later-stage-note: ADR-057 Assignments, Process or Open.\nLedger conflicts with the rulings: the rulings decide (S3-R28 for the close), and ADR-057 records the result.\n\ns3ah (40 items)\n- Applied by default: arch 0-2; dec 3, 9-13; reent 14; test 15-19; untest 21; notver 24-29; risk 34-39.\n- ack 6-7: the TransferID.swift:124-125 `///` and the ManualTimeSource body are ratified as merged.\n- nhr 22-23: S3-B-001 and S3-B-002 re-ratified; ADR-049 heading tag.\n- cdoc 4 applied: ManifestError.swift:61-62.\n- cdoc 8 applied: Time.swift:20-21.\n- later 20 applied: RequestFactory.swift:61-64 (other-wp:d).\n- later 5 and 32: the declined RemotePathViolation case and the other declined items are recorded as declined for a later contract round, not applied.\n- later 30-31: Stage 5 assignments.\n- later 33: the TRACEABILITY regeneration is already done at 8d86acb and is not my file.\n- 3 conflicts: the rulings decide.\n\ns3b (49 items)\n- Applied by default: arch 0-9; reent 10-11; test 12-20; untest 21-23; nhr 32; notver 33-34; risk 35-44.\n- ack 30-31: StoreCoreState's three stored properties are ratified.\n- dec 24-27: applied. S3B-9 cycle 2, S3B-10 and S3B-11 are recorded as CCRs pending a ruling, not applied.\n- cdoc 28: applied at EvictionState.swift:22-25 and QuotaEviction.swift:53-56. The `//` R13 comment at QuotaEviction.swift:65-69 is not applied (it is `//`, not `///`); it is in Open.\n- cdoc 29 applied: Reports.swift:19.\n- later 45-46: Assignments.\n- later 47 applied:\n  - the ADR-050 amendment (P3/P4, quoting the owner's \"Do not set any budget stop. List P99\" and the orchestrator's reading);\n  - ARCHITECTURE §12 S2-27;\n  - BlobUnits.swift:155-162.\n  Each is marked not independently verified. BenchStorage.swift:20-21 is not applied (Tests/); it is in Open.\n- aav 48 applied: the device unlink-stall row.\n- 4 conflicts: the rulings decide; P-13 is the owner's ruling.\n\ns3c (81 items)\n- Applied by default: arch 0-15; reent 16-17; test 18-27; untest 28-34; dec 35-41; ack 47-49; nhr 50; notver 51-60; risk 61-71.\n- aav 42: no new row needed.\n- cdoc 43-46 applied: EvictionState.swift:11-15, StoreCoreState.swift:131-133, CleanupState.swift:32-33, StoreCleanup.swift:41-43.\n- later 72-77: Assignments (Stage 5 TSan, other-wp:b, the S3-B-026/027 CCRs, the uncommitted hunter pairs, test conventions, WP-C's display name).\n- later 78 applied as `///` at QuotaEviction.swift:8-9 and ApplyPlan.swift:86-87, although the item suggested routing it to the owning WP.\n- later 79 not applied: ORCHESTRATION.md:1117/:1181 is the orchestrator's file; it is in Open.\n- 2 conflicts: the rulings decide.\n\ns3d (54 items)\n- Applied by default: reent 0-2; arch 3-11; test 12-15; untest 17-19; dec 20-27; notver 34-38; risk 39-49.\n- ack 29: the S3D-1/S3D-2 declarations are ratified.\n- test 16: TRACEABILITY was already regenerated at 8d86acb.\n- aav 28 applied: the second-UIKit-handler and last-priority rows.\n- cdoc 30: no contract doc was stale. Its optional precision is applied at BackgroundSupport.swift:813-814.\n- nhr 31-33: D-10 (with cycle 3's nuance), D-19.2 and startDownload are re-ratified.\n- later 51 applied.\n- later 50 and 53: Assignments.\n- later 52 not applied: the archive snapshot is the orchestrator's.\n- 2 conflicts: recorded in Process and in Ratified contract changes.\n\ns3g (44 items)\n- Applied by default: arch 0-8; test 9-12; reent 13; untest 14-15; dec 16-18; ack 22; notver 24-31; risk 32-38.\n- aav 19: no new row needed.\n- cdoc 20-21 applied: FallbackChain.swift:90-91 and :135-138 (K-11). cdoc 20's test-shim part is not applied.\n- nhr 23: the K-11 tag candidate is kept as owner information and an Open item. No tag is added, because the rulings mark none.\n- later 39: Assignments.\n- later 41 applied: Context.\n- later 40 not applied: CDNAssetResolver.swift:75-76 is a test file and README.md:173-175 is WP-I's.\n- later 42 not applied: the archive snapshot is the orchestrator's.\n- later 43 not applied: EventContinuityModelTests.swift:9-12 is a test file.\n- 2 conflicts: the rulings decide.\n\ns3f-items (82 items)\n- Applied by default: arch 0-14; reent 15-23; test 24-30; untest 31-36; dec 37-45; aav 46-48; ack 49; notver 57-65; risk 66-76.\n- cdoc 50 applied: NetworkPolicy.swift:40-41.\n- cdoc 52 applied: EngineOriginGate.swift:88-91 and EngineJobs.swift:581-583.\n- cdoc 51 not applied: the isIdleSilent doc needs the orchestrator's ruling; it is in Open.\n- nhr 53-56 are in the heading and Open, not resolved here: 53 f3c's shapes (OPEN); 54 the strict R-INT-5 path; 55 Package.swift; 56 RR-17.\n- later 77-78 not applied: REOPEN-WP-F and the post-merge list are the orchestrator's.\n- later 79: Stage 5 assignments.\n- later 80 applied: ADR-057 cites s3f.md as cycles 1 to 23. The draft's title stays, as the item says.\n- later 81 applied.\n- 15 conflicts: recorded as the rulings decide.\n\ns3f-docs (119 items)\n- Applied by default: arch 0-37; test 50-58; untest 59-67; dec 68-78; aav 79-80; notver 95-99; risk 100-113.\n- reent 38-49: the rows are applied. The 11 `// REENTRANCY … (proposed)` citations in code are not edited (they are `//`).\n- cdoc 81-83 applied: SyncEngine.swift:80-82, SyncEngine.swift:13-18, JobState.swift:63-64.\n- ack 84-87 applied. ack 86 goes into ARCHITECTURE §4.3.\n- nhr 88: WP-F adds no tag.\n- nhr 89-93 are in Open: RR-17 and Package.swift for the owner; f3c's shapes OPEN; the strict R-INT-5 path and RR-20 for the orchestrator.\n- nhr 94: the ENOSPC-class rule is recorded under Known risks.\n- later 114-116 and 118: Assignments, Known misses and Open.\n- later 117: the re-check result is recorded (all 11 KILLED). The rest of the checklist is the orchestrator's.\n- 10 conflicts: the rulings decide.\n\ns3f-close (67 items)\n- Applied by default: dec 0-8 and 10 (10 cites the merged head's lines); risk 11-27; notver 28-35; arch 40-44; reent 45-46; test 48-51; untest 53-54; ack 55; aav 58.\n- dec 9 applied: the ADR-050 amendment, marked not independently verified.\n- reent 47: the row is applied; the `//` citations are not edited.\n- test 52: nothing to edit, since no display name is new.\n- cdoc 56: BlobUnits is applied; BenchStorage is not.\n- cdoc 57 not applied: the isIdleSilent and originID docs need a ruling, and OS-0 is NEEDS-HUMAN-REVIEW; they are in Open.\n- nhr 36-37: OPEN in the heading.\n- nhr 38: P8 is recorded as information for the owner.\n- nhr 39: recorded only.\n- later 59-60 and 63-64: Assignments.\n- later 61-62 not applied: they are the orchestrator's.\n- later 65: superseded by the final re-check result, which is recorded.\n- later 66: applied except BenchStorage. P1, P2, P6 and P7 are in Known risks and Not verified.\n- 6 conflicts: the rulings decide. On conflict 6, the ADR-050 correction sits in ADR-057. The BlobUnits `///` edit was made under this task's `///`-in-Sources permission and the orchestrator's P5 plan, and is marked not independently verified. The orchestrator may revert it.",
+          "commits": [
+            "f2e372ed5217e0ecd9238fb50a3893db5ec1a3c8 Fold the WP-A/WP-H, WP-B, WP-C and WP-G close-outs into ARCHITECTURE",
+            "b5218eea8e35106df8c17f65052c0b5deb5f534c Fold the WP-D and WP-F close-outs into ARCHITECTURE and the Sync doc comments",
+            "d70463d08c5fee28ed27bf912cf9065a62be3c3b Record ADR-057 for the Stage 3 merge and amend the ADRs it changes",
+            "601c4fb7eb4539f00f9c5e3d80477aa70c33072c Add the Stage 3 device-only API questions and the re-check result"
+          ],
+          "gates_lines": "All on HEAD 601c4fb in /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs, run in this session:\nDOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%\nDOCS: PASS\nUNSAFE escapes found=0 max=3\nUNSAFE: PASS\ngit diff 8d86acb -- Sources: 112 changed lines, 0 that are not `///` comment lines\nswift build --scratch-path .build-s3docs -Xswiftc -warnings-as-errors: exit=0, \"Build complete! (0,25 s)\", 0 warnings (incremental)\nEarlier clean build of 601c4fb in .build-s3docs/clean: exit=0, \"Build complete! (10,61 s)\", 0 warnings\nverify.sh was not run (the task did not ask for it), so there is no VERIFY line to quote.",
+          "not_applied": [
+            "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:20-21, the P-13 stall figures (s3b 47, s3f-close 56/66): a test file, outside the `///`-in-Sources permission. ADR-057 Open.",
+            "Tests/ZTronAssetCompatibilityTests/Shims/CDNAssetResolver.swift:75-76 (s3g 20, 40) and Tests/ZTronAssetKitTests/EventContinuityModelTests.swift:9-12 (s3g 43): test files. ADR-057 Open.",
+            "README.md:173-175 (s3g 40): WP-I's file. ADR-057 Open.",
+            "QuotaEviction.swift:65-69, the R13 comment (s3b 28): a `//` comment, not `///`. ADR-057 Open.",
+            "The 11 `// REENTRANCY: … (proposed)` citations of RE-S43/44/45/47/48 in code (s3f-docs 38-49, s3f-close 47): `//` comments. The ARCHITECTURE §10 rows are applied. ADR-057 Open.",
+            "The isIdleSilent doc at EngineSupport.swift:106-109 and the originID doc at RemoteSource.swift:90-91 (s3f-items 51, s3f-close 57): they need the orchestrator's ruling, and OS-0 is NEEDS-HUMAN-REVIEW. ADR-057 Open.",
+            "ORCHESTRATION.md:1117/:1181 (s3c 79), REOPEN-WP-F's final version (s3f-items 77, s3f-close 62), the post-merge checklist, persistence and the final archive snapshots (s3d 52, s3g 42, s3f-items 78, s3f-close 61, s3f-docs 117 remainder): the orchestrator's files. ADR-057 Assignments/Open.",
+            "The Stage 5 documents VERIFICATION, RESIDUAL-RISKS, DEVICE-TEST-PLAN and MUTATION-PROBES (s3f-items 79, s3f-close 60 and the notver/risk/later routing): they do not exist yet, so ADR-057 carries their entries.",
+            "The TRACEABILITY regenerations (s3ah 33, s3d 16): already done at 8d86acb, and not my file.",
+            "The CCRs pending a ruling, S3B-9 cycle 2, S3B-10 and S3B-11 (s3b 24-27): recorded in ADR-057, with no contract change.",
+            "The declined RemotePathViolation case and the other declined items (s3ah 5, 32): left for a later contract round and recorded as declined.",
+            "Owner and orchestrator items, recorded but not resolved: f3c's two shapes with OS-0 (s3f-close 36, s3f-docs 90, s3f-items 53), Package.swift (s3f-close 37, s3f-items 55, s3f-docs 93), RR-17 (s3f-docs 89, s3f-items 56), RR-20 (s3f-docs 92), the strict R-INT-5 path (s3f-docs 91, s3f-items 54), the K-11 tag candidate (s3g 23), and P8 as information (s3f-close 38).",
+            "The draft title of docs/adr-drafts/s3f.md, 'cycles 1 to 12' (s3f-items 80): kept, since the item says the draft cannot be edited after the merge. ADR-057 cites cycles 1 to 23.",
+            "No edit needed: s3f-close 52 (the tests' display names are unchanged) and the AssetStore.publish `///` (s3f-docs 86, recorded in ARCHITECTURE §4.3 as the item asks)."
+          ]
+        },
+        "status": "1 blocking issue, 5 non-blocking. I checked the Stage 3 merge documentation on wp/s3docs (601c4fb over 8d86acb) against every ruling and ledger item. It is faithful on each item checked:\n- the owner quotes, verbatim;\n- N25 and N28-N33;\n- the ENOSPC known-risk class, kept exempt;\n- the accepted `VERIFY: FAIL (1 failed: benchmarks)`, attributed to the six `purgeTurns` shapes and P-13 on the nearest-rank p99;\n- the known misses, with their figures;\n- f3c, OPEN with NEEDS-HUMAN-REVIEW;\n- the hang guards and the RR classifications;\n- S3B-12, marked superseded;\n- the process deviations.\n\nNo owner classification is changed. NEEDS-HUMAN-REVIEW tags are exactly as ruled: ADR-049's heading and review list are added, the ADR-050, ADR-052 and ADR-055 tags are unchanged, there is no new tag, K-11 is recorded as owner information, and S1 is tagged only if S2-S4 are chosen. No requirement is weakened. SPEC, Scripts, ORCHESTRATION, TRACEABILITY, REOPEN-WP-F, Package.swift and the other protected files are untouched. The Sources diff is `///` only. Every other changed doc comment I spot-checked is true of the merged code. The ARCHITECTURE §10 provenance note (:502) holds. All 145 test names added to ARCHITECTURE exist.\n\nThe blocking defect is a false contract doc comment at SyncEngine.swift:13-18, repeated at DECISIONS.md:690. It says every continuation is resumed after it leaves its table through `removeValue`. It also names the follow-barrier withdrawal as a path that resumes later than it leaves. In the code, `withdraw` resumes first, and behind the barrier the record stays in `waiters` until the drain's `replayRemoval`.\n\nThe non-blocking items should be fixed in the same round: stale line citations at ARCHITECTURE.md:978 and DECISIONS.md:694, a closed item still listed as assigned at DECISIONS.md:655, an over-broad \\\"reset at open\\\" at DECISIONS.md:578, and optional wording at DECISIONS.md:613/:659. git status stayed clean throughout.",
+        "issues": [
+          {
+            "blocking": true,
+            "area": "doc-truth (contract `///`)",
+            "location": "Sources/ZTronAssetSync/Engine/SyncEngine.swift:13-18; the description of this edit at docs/DECISIONS.md:690 (\"the three paths that resume a continuation after it leaves its table\")",
+            "problem": "The rewritten invariant says every continuation \"is resumed exactly once, after it leaves its table through `removeValue`\". It then names the follow-barrier withdrawal as one of the \"Three paths [that] resume it later than it leaves\". The merged code does the opposite. `withdraw` (EngineCommands.swift:176-186) resumes the waiter's continuation first (:178). Off the barrier it then sets `self.state.waiters[token] = nil` in the same turn (:184), which is an assignment, not `removeValue`. Behind the barrier it sets only `continuation = nil` (:180) and defers `.removal(token, …)` to the drain (:181). The record stays in `waiters` until `replayRemoval` removes it (EngineFollow.swift:1024-1031: `if let waiter = self.state.waiters[token], waiter.continuation == nil { self.state.waiters[token] = nil …`). So on the barrier path the caller is resumed turns BEFORE its record leaves the table. Shutdown also takes the table out by whole assignment (EngineShutdown.swift:61-62), not by `removeValue`. The base text (8d86acb: \"resumed only through `removeValue` on its table\") was stale, and the replacement is still false of the merged code. DECISIONS.md:690 states the same inverted framing; it is recorded honestly as not independently verified.",
+            "fix": "Reword lines 13-18 to match the code. Suggested text: \"Every continuation (waiters, groups, runs, `start`/`sync` joiners, `waitUntil`) is resumed exactly once and leaves its table in the same turn (through `removeValue` or a nil assignment, or with the whole table at shutdown), and every table is settled at registration, on each transition, on withdrawal, on purge and on shutdown (sync-1 S1-02). Two paths resume a continuation in a later turn than the one it leaves in (Stage 3): shutdown's bounded slices, and the answer follow-ups (`owedAnswers`) for a resolution of more than `answersPerTurn` interests. Behind the follow barrier the order is reversed: a withdrawing caller is resumed at once, and its record stays in `waiters` without its continuation until the drain removes it with its interest (`replayRemoval`).\" Change DECISIONS.md:690's parenthetical to match, e.g. \"(the two paths that resume a continuation after it leaves its table, and the barrier withdrawal that resumes it before)\"."
+          },
+          {
+            "blocking": false,
+            "area": "citation accuracy (§14)",
+            "location": "docs/ARCHITECTURE.md:978 (the level-4 \"Added at the level-4 merge\" clause)",
+            "problem": "The writer moved this sentence's first citations to \"the merged Stage 3 head's lines\": `:135-137`…`:154-156`, and `:188`→`:212` (correct; `:212` is `originOwed.formUnion(parked)`). Two citations in the same sentence were left at level-4 lines. At the merged head (EngineReadmission.swift is identical at e840b0e and 601c4fb), `:199-201` is `unblockOrigin`'s defer branch and `:216-219` is a blank line, a doc comment and `laneAdmitsAfterConditions`'s signature.",
+            "fix": "Cite the Apple-tier refusal in `laneAdmitsAfterConditions` as `:223-225` (function at :219-227). Cite the follow-up that cannot be spawned as `:240-243` (`if spawned == nil`) and the stopped-engine return as `:273-275` (`guard self.isRunning, !owed.isEmpty`). These are the merged Stage 3 head's lines (ADR-057)."
+          },
+          {
+            "blocking": false,
+            "area": "citation accuracy (Open)",
+            "location": "docs/DECISIONS.md:694",
+            "problem": "The citation for the WP-C TSan backlog item (`phaseFourStopsListing`) is `docs/ORCHESTRATION.md:1117` and `:1181`. In this tree :1117 is \"3. Fold `i.md` into DECISIONS as ADR-056…\" and :1181 is a run-dir path. The item is at :1090 (\"…the WP-C TSan flake…\") and :1154 (L5K-R27: \"a pre-existing WP-C TSan flake to settle before Stage 5's `--full`\").",
+            "fix": "Cite `docs/ORCHESTRATION.md:1090` and `:1154`. Alternatively, identify them by content (the Stage 3 scope line and L5K-R27) so later ORCHESTRATION edits cannot stale them."
+          },
+          {
+            "blocking": false,
+            "area": "stale claim (Assignments)",
+            "location": "docs/DECISIONS.md:655 (other-wp:g)",
+            "problem": "The entry \"`withAsset`'s 'root vanished after every reopen' (`AssetClient.swift:146-151` is already in §14)\" is stale. §14 (ARCHITECTURE.md:978) now records `AssetClient.swift:148-149` and `:151` as \"run since Stage 3\" in `FacadeReopenLimitTests`' `withAsset` and purge cases (S3G-3; ADR-057). DECISIONS.md:603 and :504 say S3G-3 closed the reopen limit (S3-B-096). An item already closed is therefore listed as an assignment to WP-G.",
+            "fix": "Mark the `withAsset` part closed by S3G-3, citing `FacadeReopenLimitTests` and §14's \"run since Stage 3\" with `AssetClient.swift:148-149`/`:151`. Keep only what genuinely remains assigned to WP-G."
+          },
+          {
+            "blocking": false,
+            "area": "accuracy (contract-file ratification)",
+            "location": "docs/DECISIONS.md:578 (WP-B, StoreCoreState's three properties)",
+            "problem": "The entry says all three properties are \"reset at open (`AssetStore+Open.swift:161-163`)\". Those lines reset only `countedReleases` and `provisionallyRescued` (:162-163). `lastReap` (declared at StoreCoreState.swift:189) has no reset anywhere in Sources; its only write is `reap`'s, at AssetStore+Reaper.swift:216.",
+            "fix": "Say the two S3B-9 counters are reset at open (`AssetStore+Open.swift:162-163`). Say `lastReap` holds the latest reap's statistics, written by `reap` (`AssetStore+Reaper.swift:216`) and not reset at open."
+          },
+          {
+            "blocking": false,
+            "area": "ruling fidelity (wording, optional)",
+            "location": "docs/DECISIONS.md:613 and :659",
+            "problem": "S3-R17 item 1 (docs/adr-drafts/s3f.md:235-238) says the visit-first difference \"is non-blocking and recorded as a residual risk (S3-R16 item 2) with its probe\". :613 keeps the classification (\"PROBE-C9-THROTTLE: the MUST wins, non-blocking\"). It does not say the difference is recorded as a residual risk with its probe: RR-7 (with R-B and the suspected offline join) and `barrierAdmitsTheFollowsNewContentAsAtTheApply`. :659's Stage 5 RESIDUAL-RISKS list does not name RR-7 or the draft's other RR proposals, so Stage 5 could drop them. The classification is unchanged, so this is not blocking.",
+            "fix": "At :613 append \"recorded as a residual risk with its probe (RR-7, `barrierAdmitsTheFollowsNewContentAsAtTheApply`; S3-R17 item 1)\". At :659 add \"the draft's other RR proposals (RR-7 among them)\" to the RESIDUAL-RISKS.md list."
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "apply": {
+          "summary": "Fix round on wp/s3docs. Worktree: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs. Base 8d86acb, head 2a3a2eb, tree clean, nothing pushed. The verifier raised 1 blocking and 5 non-blocking issues, and all 6 are applied.\n\nBLOCKING. Sources/ZTronAssetSync/Engine/SyncEngine.swift:13-21 was rewritten, `///` lines only, so that the rule matches the code:\n- Each continuation is resumed exactly once.\n- That happens either at registration, before it enters its table (EngineCommands.swift:94-96), or in the turn that takes it out of its table: through removeValue, a nil assignment, or with the whole table.\n- Two Stage 3 paths can resume it in a later turn:\n  - Shutdown: drainEverything takes the waiters, the groups and the owed answers out whole (EngineShutdown.swift:53-85), and settle resumes them over bounded turns.\n  - The answer follow-ups: a job of more than answersPerTurn interests owes all its waiters' and settled ensure groups' resumes to them (EngineJobs.swift:737, :794-801).\n- Behind the follow barrier, a withdrawing caller on the job path is resumed at once (EngineCommands.swift:178-181). Its record, without its continuation, is left in `waiters` for the drain (replayRemoval, EngineFollow.swift:1023-1030).\n\nWhere this departs from the verifier's suggested text, each change was checked in the code:\n- \"With the whole table at shutdown\" became \"with the whole table\". Whole-table takes also happen outside shutdown, each resumed in the same turn: EngineLifecycle.swift:206-209 and :535-549; EngineConditions.swift:90-93; EngineRuns.swift:830-833; EngineCatchUp.swift:103-106; EngineTimers.swift:85-88 and :418-422; EngineManifest.swift:62-67; EngineFollow.swift:848-851 and :1641-1644.\n- \"Resume in a later turn\" became \"can resume\". settle's first slice runs in the drain's own turn: `await self.settle(self.drainEverything(...))` at EngineLifecycle.swift:498/:506, with the first Task.yield after 512 steps.\n- The barrier note was limited to waiters on the job path. A waiter answered from the store leaves its table at once even behind the barrier (EngineCommands.swift:179-186).\n\nDECISIONS.md:690 now describes the edit correctly and has new citations: :13-18 became :13-21, and shutdown()'s doc moved from :80-82 to :83-85. Every other range in that bullet was re-checked against `git diff -U0 8d86acb -- Sources` and matches. The same stale claim, \"resumed only through removeValue\", is also corrected in ARCHITECTURE.md:236 (§7.2). The verifier had not flagged that line.\n\nNB1, ARCHITECTURE.md:978. The citations now read:\n- laneAdmitsAfterConditions' Apple-tier refusal: :223-225 (was :199-201).\n- The follow-up that cannot be spawned: :240-243.\n- The stopped engine: :273-275.\n\nEngineReadmission.swift is identical at e840b0e and 8d86acb, so these are the merged Stage 3 head's lines.\n\nNB2, DECISIONS.md:694. The ORCHESTRATION citations :1117/:1181 became :1090/:1154, and the bullet now also names them by content (the Stage 3 scope line and L5K-R27). The flake is named as LegacyEdgeTests.phaseFourStopsListing, as ADR-055 (DECISIONS.md:524) does.\n\nNB3, DECISIONS.md:655. withAsset's \"root vanished after every reopen\" is marked closed by S3G-3 (FacadeReopenLimitTests; §14 lists AssetClient.swift:148-149 and :151 as run since Stage 3). Only Kit's follower and group-registration races stay with WP-G.\n\nNB4, DECISIONS.md:578:\n- Only countedReleases and provisionallyRescued are reset at open (AssetStore+Open.swift:162-163).\n- lastReap is written only by reap (AssetStore+Reaper.swift:216) and is not reset at open.\n- StoreCoreState.swift:177-189 is now named explicitly; the old bare \":177-189\" read as if it pointed into AssetStore+Open.swift.\n\nNB5, DECISIONS.md:613 and :659:\n- :613 now says PROBE-C9-THROTTLE's difference is recorded as a residual risk with its probe (RR-7, barrierAdmitsTheFollowsNewContentAsAtTheApply; S3-R17 item 1). I checked this against s3f.md:230-247 and :2962-2963, and EngineFollowBarrierWorldTests.swift:222.\n- :659's Stage 5 RESIDUAL-RISKS list now names the other RRs the draft records, RR-7 among them.\n\nLEDGERS. There are 536 items (s3ah 40, s3b 49, s3c 81, s3d 54, s3g 44, s3f-items 82, s3f-docs 119, s3f-close 67), plus 44 conflicts_with_rulings. The earlier commits f2e372e, b5218ee, d70463d and 601c4fb processed all of them, according to the writer's progress notes. This round re-checked only what the verifier raised.\n\nWhere each kind of item went:\n- architecture-amendment: ARCHITECTURE, marked ADR-057.\n- reentrancy-row: §10.2 and ADR-057's REENTRANCY rows.\n- test-assignment and later-stage-note: §11 and §12, and ADR-057's Assignments.\n- untested-line: §14.\n- decisions-amendment: dated amendments to ADR-013, 020, 021, 022, 032, 036, 037, 039, 046, 049, 050, 052, 053, 054 and 055, plus ADR-057.\n- contract-ack: ADR-057's \"Ratified contract changes\".\n- contract-doc: 22 `///` ranges in 18 Sources files (cited at DECISIONS.md:690), except isIdleSilent and originID.\n- needs-human-review: the ADR-057 and ADR-049 heading tags and the owner review list.\n- not-verified and residual-risk: ADR-057's \"Not verified\" and \"Known misses, known risks\" groups, because the Stage 5 files do not exist yet.\n- aav-amendment: six UNVERIFIED rows in APPLE-API-VERIFICATION §5.\n- conflicts_with_rulings: recorded in ADR-057 according to the rulings (the writer's record, not re-checked item by item this round).\n\nThe items deliberately not applied are listed in not_applied, which matches ADR-057's Open list (DECISIONS.md:691-699).\n\nNOT RUN: Scripts/verify.sh (--quick or --full) and the test suites. They were not among this step's checks, and the diff is docs and comments only.",
+          "commits": [
+            "f2e372e Fold the WP-A/WP-H, WP-B, WP-C and WP-G close-outs into ARCHITECTURE",
+            "b5218ee Fold the WP-D and WP-F close-outs into ARCHITECTURE and the Sync doc comments",
+            "d70463d Record ADR-057 for the Stage 3 merge and amend the ADRs it changes",
+            "601c4fb Add the Stage 3 device-only API questions and the re-check result",
+            "8d1bffb Make SyncEngine's continuation rule true of the code",
+            "11c018f Correct stale citations and claims in ADR-057 and ARCHITECTURE 14",
+            "2a3a2eb Limit the barrier withdrawal note to waiters on the job path"
+          ],
+          "gates_lines": "Run on the final content, which is identical to head 2a3a2eb:\npython3 Scripts/gates.py docs --sources \"$PWD/Sources\"\nDOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%\nDOCS: PASS\npython3 Scripts/gates.py unsafe --sources \"$PWD/Sources\" --audit docs/UNSAFE-AUDIT.md\nUNSAFE escapes found=0 max=3\nUNSAFE: PASS\nswift build --scratch-path .build-s3docs -Xswiftc -warnings-as-errors (TMPDIR and module cache under .build-s3docs/tmp), exit 0, recompiled ZTronAssetSync:\nBuild complete! (1,12 s)\ngit diff 8d86acb -- Sources: 0 added or removed lines that are not `//` or `///` comments (18 files, 73 insertions(+), 42 deletions(-) before the last 2-line rewrap, which kept the count at 9 lines)\nNot run: Scripts/verify.sh, so there is no VERIFY line to quote; no tests were run.",
+          "not_applied": [
+            "Comment fixes in test files and the README, which are outside this pass's editable files (owners: WP-K, WP-G and the docs owner): Tests/ZTronAssetCompatibilityTests/Shims/CDNAssetResolver.swift:75-76 should cite K-11/ADR-055 instead of ADR-037; EventContinuityModelTests.swift:9-12 should say that (a') and (a'') are recorded in DECISIONS; README.md:173-175 should name K-11 beside ADR-037's three deviations.",
+            "Tests/ZTronAssetKitBenchmarks/BenchStorage.swift:20-21 still gives Stage 2's stall figures (P5). It is a test file, which this pass may not edit.",
+            "The `//` R13 comment at QuotaEviction.swift:65-69 still lists the releasers without apply's and admit's own. It is a `//` comment, not `///`, and belongs to WP-C.",
+            "docs/ORCHESTRATION.md:1090 and :1154 still list the WP-C TSan flake (LegacyEdgeTests.phaseFourStopsListing), which S3C-1's fix (a) resolved. It is the orchestrator's file.",
+            "The 11 `// REENTRANCY: ... (proposed)` citations of RE-S43, RE-S44, RE-S45, RE-S47 and RE-S48 are `//` comments, outside this pass's `///`-only edits (WP-F's).",
+            "Two `///` candidates wait for the orchestrator's ruling c57 (NEEDS-HUMAN-REVIEW): isIdleSilent's doc (EngineSupport.swift:106-109, a contract file; c23 #7), and RemoteSource.originID's doc (RemoteSource.swift:90-91), which does not say the id is constant, as OS-0 would need.",
+            "docs/REOPEN-WP-F.md's final version and ORCHESTRATION's post-merge checklist are the orchestrator's files.",
+            "The Stage 5 documents (VERIFICATION.md, RESIDUAL-RISKS.md, DEVICE-TEST-PLAN.md, MUTATION-PROBES.md) do not exist yet. ADR-057 carries their entries until Stage 5 writes them.",
+            "Owner items: f3c's two open shapes (OPEN, no ruling), the uncommitted Package.swift, RR-17, and P8 (information only). Orchestrator items: RR-20's fix, the strict R-INT-5 engine path, the CCRs pending a ruling (S3B-9 cycle 2, S3B-10, S3B-11), and the K-11 tag candidate (S3G-4)."
+          ]
+        },
+        "status": "PASS: 0 blocking issues and 5 non-blocking ones. The previous verification's blocking finding is fixed: the continuation rule in SyncEngine.swift:13-21 now matches the code, and so do ARCHITECTURE.md:236 and DECISIONS.md:690. All five earlier non-blocking findings are fixed too: ARCHITECTURE.md:978's EngineReadmission citations, and DECISIONS.md :694, :655, :578, :613 and :659. The ADR-057 sections I checked reflect the rulings and ledgers faithfully. The owner's close ruling S3-R28, points 2-4, is carried with verbatim quotes: \"(e) Short close\", \"Accept the FAIL\", \"Yes, the whole class\", \"Agreed let's document it as known risk\", N25's full message and the set-aside of the /goal's Done. f3c's two open shapes are marked OPEN, not known misses, with OS-0. N33's c23 #4 and #7 are recorded. The accepted FAIL is limited to the six purge shapes plus P-13. The ENOSPC class is recorded as a known residual correctness risk, with broken MUSTs, hangs and flakes still blocking. No wording changes an owner classification. The NEEDS-HUMAN-REVIEW tags match the rulings and ledgers: ADR-049 now carries its tag in its heading and on the owner review list, and ADR-057's heading and list entry agree. All 134 newly cited test names and the 11 \"(proposed)\" REENTRANCY citations exist. Every ADR-057 figure I spot-checked traces to a ledger. The Sources diff is comments only, the forbidden paths are untouched, and the gates and the warnings-as-errors build pass.",
+        "issues": [
+          {
+            "blocking": false,
+            "area": "citation accuracy (§14, WP-F structural lines)",
+            "location": "docs/ARCHITECTURE.md:978, the WP-F clause \"structural lines llvm-cov counts that no behaviour reaches (`EngineMoves.swift:54`, `:87`; `EngineCommands.swift:1131`, `:1142`; ...)\"",
+            "problem": "Some line numbers in this sentence come from older trees, while the rest of the paragraph cites the merged head (`EngineCommands.swift:1256-1260`, `:1025`/`:1028`/`:1033`). (1) `EngineCommands.swift:1131` and `:1142` are 9aa337c's lines. S1 inserted 24 lines above them (`git diff --stat 9aa337c e840b0e -- Sources/ZTronAssetSync` shows only EngineCommands.swift, +24). At HEAD, :1131 is `case .reroutes(let from, let removed):` and :1142 is `case .verdict(let key):`. The structural `return` and `break` are now at :1155 and :1166. (2) `EngineMoves.swift:54` and `:87` are cycle 20's numbering. EngineMoves.swift changed on 4-5 Nov (cycles 21-22), and at both 9aa337c and HEAD line :87 is blank. The writer copied these numbers from ledger s3f-docs#65 without saying which tree they belong to.",
+            "fix": "Cite `EngineCommands.swift:1155` and `:1166`. For EngineMoves, either find the lines again at HEAD or mark them as \"cycle 20's lines (draft)\"."
+          },
+          {
+            "blocking": false,
+            "area": "doc precision (internal `///`)",
+            "location": "Sources/ZTronAssetStorage/Store/ApplyPlan.swift:85-87 (ApplyEvictionChunks.chunks)",
+            "problem": "\"so a blob of more records than a chunk is one chunk\" is not exact. `init(cutting:records:)` (:127-136) adds each blob's records to `current` and cuts a chunk only once `current.count >= limit`. A large blob can therefore share its chunk with smaller blobs placed before it. It is never split across chunks, but it is not always alone in its chunk. The comparison with quota eviction is still true: there, a blob larger than a chunk starts a chunk of its own (`QuotaEviction.swift:117-121`) and is taken across turns.",
+            "fix": "Reword to \"so a blob of more records than a chunk lies whole in one chunk (after any smaller blobs that chunk already holds), unlike quota eviction, ...\"."
+          },
+          {
+            "blocking": false,
+            "area": "accuracy of copied record (P-13 tolerance)",
+            "location": "docs/DECISIONS.md:383 (ADR-050 amendment) and :635 (ADR-057 'P-13, inside the FAIL')",
+            "problem": "Both bullets say \"4 for n < 500, 5 for 500-599, 6 for n ≥ 600\". The formula they quote, n − ceil(0.99 n), gives 3 for 300 < n < 400 and 7 for 700 ≤ n < 800, so the ranges hold only for 400 ≤ n ≤ 699. The text is copied faithfully from P-13's verifier (`.build-orchestrator/s3-post-merge/docs-followup-items.md:16`), and every recorded run (478-562 units) falls in the exact range. Separately, :383 calls ADR-050's \"a run passes with up to five stalled units\" wrong. The original sentence (:380) limits it to \"about 560 units\", where it holds. P3, the source, says only that it \"holds only for 500 ≤ n ≤ 599\".",
+            "fix": "Write \"(4 for 400-499 units, 5 for 500-599, 6 for 600-699)\". At :383, say the sentence \"holds only for 500-599 units, while the runs span 478-562\" instead of calling it wrong. Leave the rest as recorded."
+          },
+          {
+            "blocking": false,
+            "area": "consistency (K-11 tag candidate)",
+            "location": "docs/DECISIONS.md:246 (ADR-037 amendment), :603 (ADR-057 WP-G), :699 (Open)",
+            "problem": "Three places disagree on who decides the K-11 tag. :246 says that whether K-11 joins the tag \"is the owner's information item in ADR-057\". :603 calls it \"Owner information, a candidate for a tag the orchestrator did not add\". :699 lists \"the K-11 tag candidate (S3G-4)\" as the orchestrator's item. Ledger s3g#23 leaves the decision to the orchestrator, and ruling S3G-4 says nothing about a tag.",
+            "fix": "Use one wording everywhere: the orchestrator decides whether K-11 joins ADR-037's tag, and until then it is owner information."
+          },
+          {
+            "blocking": false,
+            "area": "citation accuracy (pre-existing, optional)",
+            "location": "docs/ARCHITECTURE.md:978, the level-4 clause (the same sentence whose EngineReadmission citations this pass corrected)",
+            "problem": "Three level-5 citations kept in this sentence are stale at the merged head. The invariant message \"waiter interest … without a waiter\" is at `EngineCommands.swift:1900`, not `:1624`; `:1624` is now `releaseEntryGroup`. `EngineJobs.swift:654-657` is now the owed-answers branch, not the space settlement's `continue`. `EngineCommands.swift:287-291` is now `followStoreView`'s batch loop. No ledger lists them. But the writer marked the corrected neighbours as \"the merged Stage 3 head's lines\", so readers will take these as current too.",
+            "fix": "Update these three to the merged head's lines, or mark them as the level-5 tree's lines."
+          }
+        ]
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Ledger"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Docs"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 3,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "ledger:s3ah",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "a340df118cbc4d2ee",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007714073,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794009345819,
+      "tokens": 366917,
+      "toolCalls": 131,
+      "durationMs": 1631745,
+      "resultPreview": "{\"items\":[{\"kind\":\"architecture-amendment\",\"target\":\"docs/ARCHITECTURE.md §2 'Concurrency model and environment', bullet **Time** (H-8), line 91\",\"source\":\"s3ah.md:239-240 (Proposed document changes 4); S3AH-3 (s3ah.md:118-146); ruling S3AH-3 (S3-B-104, L4-R24(2), ADR-053 assignment)\",\"text\":\"Current text (part of line 91): 'Tests use `ManualTimeSource`, and the deterministic suites never sleep fo…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "ledger:s3b",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "ad25adf15168f643c",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007714073,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794009783215,
+      "tokens": 172768,
+      "toolCalls": 151,
+      "durationMs": 2066129,
+      "resultPreview": "{\"items\":[{\"kind\":\"architecture-amendment\",\"target\":\"docs/ARCHITECTURE.md §1.1 file table, Store/ row for StoreCoreState.swift (line 36); §1.2 L2 row (line 62)\",\"source\":\"docs/adr-drafts/s3b.md:481-483 (Proposed document changes, 'ARCHITECTURE §1.1 / §1.2')\",\"text\":\"Draft: \\\"WP-B's new files: `Sources/ZTronAssetStorage/Store/ReapQueue.swift` (S3-PERF-04) and `Tests/ZTronAssetStorageTests/Core/Stor…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "ledger:s3c",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "a09f87207eaad7d52",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007714073,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794010076168,
+      "tokens": 243838,
+      "toolCalls": 209,
+      "durationMs": 2359082,
+      "resultPreview": "{\"items\":[{\"kind\":\"architecture-amendment\",\"target\":\"docs/ARCHITECTURE.md §10.1 `AssetStore` ledger table (append after row c-8, line 425)\",\"source\":\"docs/adr-drafts/s3c.md:507-514 (Proposed REENTRANCY rows), :525-526\",\"text\":\"Add rows s3c-1 and s3c-2 verbatim under their proposed identifiers (exact text in the two reentrancy-row items). Optional precision for s3c-1, which the draft's §4.6 text an…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "ledger:s3d",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "ab1663b3d0c51ee63",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007714073,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794010658118,
+      "tokens": 270147,
+      "toolCalls": 205,
+      "durationMs": 2941031,
+      "resultPreview": "{\"items\":[{\"kind\":\"reentrancy-row\",\"target\":\"docs/ARCHITECTURE.md §10.4, row D-9 (line 529 at 8d86acb)\",\"source\":\"docs/adr-drafts/s3d.md:242-251 (S3D-1 'Proposed ledger amendment'); :478-479 (Proposed document changes, item 1); ruling S3D-1 ('propose the D-9 ledger row amendment')\",\"text\":\"Replace the third column of D-9. Current: \\\"the token is checked before the first await **and again after the…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "ledger:s3g",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "a356edcfd8e33bb4d",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007714073,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794009334978,
+      "tokens": 351479,
+      "toolCalls": 141,
+      "durationMs": 1617891,
+      "resultPreview": "{\"items\":[{\"kind\":\"architecture-amendment\",\"target\":\"docs/ARCHITECTURE.md §1.2, paragraph 'Files WP-G added at L5 (ADR-054)' (line 73), the Tests sentence\",\"source\":\"docs/adr-drafts/s3g.md:184 ('§1.2, WP-G's test files: add FacadeReopenLimitTests (with VanishingRootVolume)'). The count updates are not in the draft.\",\"text\":\"Current text: 'Tests: `Tests/ZTronAssetKitTests/` `CompositionTests`, `Eve…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "ledger:s3f-items",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "ae1d3a16fd20bdd23",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794007714073,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794010201818,
+      "tokens": 276318,
+      "toolCalls": 191,
+      "durationMs": 2484731,
+      "resultPreview": "{\"items\":[{\"kind\":\"architecture-amendment\",\"target\":\"docs/ARCHITECTURE.md §7.6, the `offline(reason)` row (line 260), beside PROBE-C9C-3's rule; and §7.1's `downloading → queued` row\",\"source\":\"s3f.md:8766-8786 (S3F-1, S3-CONC-04); text s3f.md:9230-9233; the ruling's ask at s3f.md:8768-8769\",\"text\":\"The current §7.6 text reads: '`failed(.whenOnline)`; re-queued on a satisfied-path edge (R-SYN-13),…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "ledger:s3f-docs",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "ada44cdc270c15860",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794009337188,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794013053972,
+      "tokens": 341168,
+      "toolCalls": 339,
+      "durationMs": 3716783,
+      "resultPreview": "{\"items\":[{\"kind\":\"architecture-amendment\",\"target\":\"docs/ARCHITECTURE.md §7.6 table, `offline(reason)` row (ARCH:260)\",\"source\":\"s3f.md:9230-9233 (cycle 1; S3F-1, S3-CONC-04)\",\"text\":\"Append to the row, after its F-30 at-once clause. The row currently ends: “…(the attempt records `networkEdgeSerial` when it starts, so this happens at most once per edge; F-30, ADR-053); counts as blocked for run s…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "ledger:s3f-close",
+      "phaseIndex": 1,
+      "phaseTitle": "Ledger",
+      "agentId": "a4da7a53e350bcf0e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794009348001,
+      "queuedAt": 1794007714054,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "TASK (read-only): compile part of the orchestrator ledger for the Stage 3 merge documentation (ADR-057). Work in /Users/admin/Documents/ZTronAssetKit (the main checkout at 8d86acb, which contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). Do not modify, create or commit any file, and run no builds. The main checkout's uncommitt…",
+      "promptFramed": true,
+      "lastProgressAt": 1794012230918,
+      "tokens": 232227,
+      "toolCalls": 170,
+      "durationMs": 2882916,
+      "resultPreview": "{\"items\":[{\"kind\":\"decisions-amendment\",\"target\":\"docs/DECISIONS.md, ADR-057 (Stage 3 merge): WP-F's close by the owner's ruling, option (e)\",\"source\":\".build-orchestrator/s3-rulings-s3f.md:1685-1713 (S3-R28 'the owner's close ruling', header and point 1), :1847-1859 (point 9); .build-orchestrator/s3f-c22-analysis/s3-r28-orchestrator-rulings.md:320-340 (N31, N32); docs/adr-drafts/s3f.md:7951-8025;…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 9,
+      "label": "docs:apply:1",
+      "phaseIndex": 2,
+      "phaseTitle": "Docs",
+      "agentId": "a1e9ba40da569166f",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794013057967,
+      "queuedAt": 1794013057945,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Stage 3 merge documentation is done on wp/s3docs: 4 commits…",
+      "promptPreview": "TASK: Stage 3 merge documentation on branch wp/s3docs.\nRepository /Users/admin/Documents/ZTronAssetKit; your worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs (branch wp/s3docs, based on 8d86acb, the feature/asset-kit head that contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). cd into the worktree for EVERY comm…",
+      "promptFramed": true,
+      "lastProgressAt": 1794018642478,
+      "tokens": 124585,
+      "toolCalls": 304,
+      "durationMs": 5584510,
+      "resultPreview": "{\"summary\":\"Stage 3 merge documentation is done on wp/s3docs: 4 commits on 8d86acb, 21 files changed (378 insertions, 161 deletions), worktree clean, nothing pushed. The worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs.\\n\\nWHAT WAS DONE\\n(a) ADR-057 is appended to docs/DECISIONS.md at line 563, titled as the task gives it. Its ten groups are in order:\\n 1. Context\\n 2. Ratified c…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 10,
+      "label": "docs:verify:1",
+      "phaseIndex": 3,
+      "phaseTitle": "Verify",
+      "agentId": "a99f95dc54314719d",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794018647521,
+      "queuedAt": 1794018647499,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "1 blocking issue, 5 non-blocking. I checked the Stage 3 mer…",
+      "promptPreview": "TASK: Independent verification of the Stage 3 merge documentation on branch wp/s3docs. You did NOT write it (CLAUDE.md P4). Do NOT modify or commit anything; scratch only under your scratch path; leave git status unchanged.\nRepository /Users/admin/Documents/ZTronAssetKit; your worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs (branch wp/s3docs, based on 8d86acb, the feature/asset-kit…",
+      "promptFramed": true,
+      "lastProgressAt": 1794020544378,
+      "tokens": 111267,
+      "toolCalls": 190,
+      "durationMs": 1896856,
+      "resultPreview": "{\"issues\":[{\"blocking\":true,\"area\":\"doc-truth (contract `///`)\",\"location\":\"Sources/ZTronAssetSync/Engine/SyncEngine.swift:13-18; the description of this edit at docs/DECISIONS.md:690 (\\\"the three paths that resume a continuation after it leaves its table\\\")\",\"problem\":\"The rewritten invariant says every continuation \\\"is resumed exactly once, after it leaves its table through `removeValue`\\\". It …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 11,
+      "label": "docs:apply:2",
+      "phaseIndex": 2,
+      "phaseTitle": "Docs",
+      "agentId": "a3f3288f15c985ba0",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794020547215,
+      "queuedAt": 1794020547211,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Fix round on wp/s3docs. Worktree: /Users/admin/Documents/ZT…",
+      "promptPreview": "TASK: Stage 3 merge documentation on branch wp/s3docs.\nRepository /Users/admin/Documents/ZTronAssetKit; your worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs (branch wp/s3docs, based on 8d86acb, the feature/asset-kit head that contains all six Stage 3 close-out merges: s3ah f68eb1b, s3b 48b662d, s3c e92e456, s3d 768e9c0, s3g d59bcc4, s3f e840b0e). cd into the worktree for EVERY comm…",
+      "promptFramed": true,
+      "lastProgressAt": 1794021410576,
+      "tokens": 184374,
+      "toolCalls": 86,
+      "durationMs": 863361,
+      "resultPreview": "{\"summary\":\"Fix round on wp/s3docs. Worktree: /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs. Base 8d86acb, head 2a3a2eb, tree clean, nothing pushed. The verifier raised 1 blocking and 5 non-blocking issues, and all 6 are applied.\\n\\nBLOCKING. Sources/ZTronAssetSync/Engine/SyncEngine.swift:13-21 was rewritten, `///` lines only, so that the rule matches the code:\\n- Each continuation is res…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 12,
+      "label": "docs:verify:2",
+      "phaseIndex": 3,
+      "phaseTitle": "Verify",
+      "agentId": "a45dd785364b47070",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794021412831,
+      "queuedAt": 1794021412826,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "PASS: 0 blocking issues and 5 non-blocking ones. The previo…",
+      "promptPreview": "TASK: Independent verification of the Stage 3 merge documentation on branch wp/s3docs. You did NOT write it (CLAUDE.md P4). Do NOT modify or commit anything; scratch only under your scratch path; leave git status unchanged.\nRepository /Users/admin/Documents/ZTronAssetKit; your worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s3docs (branch wp/s3docs, based on 8d86acb, the feature/asset-kit…",
+      "promptFramed": true,
+      "lastProgressAt": 1794022598158,
+      "tokens": 356195,
+      "toolCalls": 128,
+      "durationMs": 1185326,
+      "resultPreview": "{\"issues\":[{\"blocking\":false,\"area\":\"citation accuracy (§14, WP-F structural lines)\",\"location\":\"docs/ARCHITECTURE.md:978, the WP-F clause \\\"structural lines llvm-cov counts that no behaviour reaches (`EngineMoves.swift:54`, `:87`; `EngineCommands.swift:1131`, `:1142`; ...)\\\"\",\"problem\":\"Some line numbers in this sentence come from older trees, while the rest of the paragraph cites the merged head…"
+    }
+  ],
+  "totalTokens": 3031283,
+  "totalToolCalls": 2245
+}

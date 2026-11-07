@@ -1,0 +1,2 @@
+start 20:36:14 load { 18.75 41.22 47.48 } head d88bdb1 cmd: xcodebuild -scheme ZTronAssetKit -destination generic/platform=iOS -derivedDataPath .build-verify-s3f-c23-reqs/xcode build OTHER_SWIFT_FLAGS=-warnings-as-errors -quiet
+end 20:36:51 load { 44.82 44.51 48.36 } rc=0

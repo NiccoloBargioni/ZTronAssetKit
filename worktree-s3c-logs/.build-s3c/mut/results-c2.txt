@@ -1,0 +1,7 @@
+oracle-baseline exit=0 :: ✔ Test run with 1 test in 1 suite passed after 0.883 seconds. 
+oracle-Z exit=1 :: ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran 
+ZTronAssetStorage/BlobUnits.swift:169: Fatal error: S3MUT Z: a blob deletion unit ran
+oracle-G exit=1 :: ✘ Test run with 1 test in 1 suite failed after 0.756 seconds with 333 issues. 
+↳ seed 1, lifetime crash Optional(65) powerLossDropUnsynced, unacknowledged: after ["add m1", "reopen", "publish m1", "evict m1", "reap"]: ["I-3: op 59 unlinked 629df4591cb15095e5acf5b15b378a5e07f7a447af3ca653316a535ed5188fc8.png before a snapshot without it was acknowledged"]
+↳   violations → ["I-3: op 59 unlinked 629df4591cb15095e5acf5b15b378a5e07f7a447af3ca653316a535ed5188fc8.png before a snapshot without it was acknowledged"]
+DONE

@@ -1,0 +1,24 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" started.
+◇ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+◇ Test case passing 2 arguments mode → .processKill, purge → blobs to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 processKill, purge blobs: 80 crash points, 7 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .processKill, purge → root to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 processKill, purge root: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .processKill, purge → half to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 processKill, purge half: 80 crash points, 7 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .processKill, purge → staging to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 processKill, purge staging: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → blobs to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 powerLossDropUnsynced, purge blobs: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → root to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 powerLossDropUnsynced, purge root: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → half to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 powerLossDropUnsynced, purge half: 80 crash points, 0 stamped then lost a blob
+◇ Test case passing 2 arguments mode → .powerLossDropUnsynced, purge → staging to "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" started.
+R-CLN-7 powerLossDropUnsynced, purge staging: 80 crash points, 0 stamped then lost a blob
+✔ Test "R-CLN-7: a crash at every boundary of a stamped first sync, then an OS purge between launches, heals without a stale synced claim" with 8 test cases passed after 3.086 seconds.
+✔ Suite "Cleanup: a crash, then a power loss or an OS purge, before the next launch (R-STO-11, R-CLN-7)" passed after 3.087 seconds.
+✔ Test run with 1 test in 1 suite passed after 3.087 seconds.

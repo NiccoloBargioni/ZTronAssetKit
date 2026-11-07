@@ -1,0 +1,31 @@
+{
+ "bar": "strict",
+ "base": "s3-base",
+ "maxCycle": 23,
+ "simSlots": [
+  {
+   "correct": "5B940E6E-490F-4E9E-A917-A6456A18225E",
+   "fix": "897F9D8D-B10D-4D91-8E22-417A2B9D70AA",
+   "reqs": "6BE15CAF-7E02-4060-9338-9DAC025EDF0B"
+  }
+ ],
+ "wps": [
+  {
+   "coverageMin": 90,
+   "findingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c22-issues.json",
+   "focus": "Stage 3 hardening, cycle 23, the close. Read the end of the rulings file named above before anything else: 'S3-R28, the owner's close ruling', appended last, is this run's ruling. It decides wherever S3-R28, item 1c, its amendment or run 12's order differ from it. The owner chose option (e), a short close: WP-F does no more fix work, except the close ruling's point 5 (S1, the long-purge log line, with its test), point 6's mutant runs for run 12's five kill tests, and point 8's corrections. The order is point 9's: S1, then the mutant runs and the records (point 6), then the close (point 7). Then the two verifiers run once (point 8). Known misses of the 10 ms limit (N25 and point 2) and the ENOSPC class's known risks (point 4) are recorded, not routed; f3c's two open shapes are recorded as open, not as known misses (point 2). The six red purge benchmarks stay as written and red: the owner accepts `VERIFY: FAIL (1 failed: benchmarks)` as WP-F's end state when its only causes are those six and P-13 (point 3). Never change a test to turn them green. Do not change metInItsAttempt, relane's guard, Job.transferSpaceEnd, AttemptEnd.stamped, or how any join, visit or replay is dated (item 1c's freeze). Cycles 1-22 are committed on wp/s3f. Runs 11 and 12 of cycle 23 committed up to 9e9a500. Run 12 was stopped at 16:41, with a clean worktree, part-way through S3-R27 step 7's kills, which the close ruling cuts. Read the draft's cycle-23 status list (docs/adr-drafts/s3f.md, cycle-23 section) and continue from HEAD without redoing committed steps. Read narrowly, to save context: the close ruling, item 1c and its amendment, run 12's order, the draft's cycle-23 section, and, for S1, section 4 of /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3f-c22-analysis/end-sooner-options.md. Open earlier rulings or sections only where these cite them. Cycle 22's findings, which the records map (point 6), are in the findings file named above, cited as 'reqs #n' and 'correct #n'. Commit each step on its own, with S1's test red first; each commit message names every case red at that commit (the six, P-13 and, on S1's red-first commit, S1's test). At the start of every step, re-read the end of the rulings file for items appended since, such as a ruling on a PUT-BACK. Fail fast (S3-R28 item 8): on a stop, commit the evidence, then a status-list commit whose subject starts 'PUT-BACK: item <n>: '. Go on only with work that does not depend on the stop, and return if none is left. Keep the cycle-23 section current step by step: which step is committed, which is in progress, and its next action. Keep command output short: send build, test and benchmark output to a log file under .build-s3f/c23/ and read back only the summary lines. Reuse .build-s3f/c23/tools/gates23.sh where it fits. S3-R22 item 3 serialises simulator and coverage runs across agents with a lock directory (mkdir .build-orchestrator/sim.lock, removed afterwards). S3-R12 and S3-R13 apply unchanged; never edit Package.swift. S3-R23: the host is shared with other projects' simulator runs, so record the load with every timing figure. The verifiers judge by S3-R16 to S3-R28, with the close ruling. They run lens 3's heavy checks first (Sync x3, TSan, the iOS build and Simulator suite, the benchmarks and the mutants). Then they check what the close ruling's point 8 lists: row 3's fix for correct #3, run 12's commits, S1, every record, and reqs #7's re-measures. They do not re-open the known misses, the known risks, or the work the close ruling does not take. They report every finding with its evidence; point 8 says what happens to it. The weekly usage limit may cut this cycle off: commit every finished step as you go. Do not delete .build-s3f/c21/, c22/ or c23/.",
+   "fromCycle": 23,
+   "maxCycle": 23,
+   "name": "Stage 3 WP-F (sync engine)",
+   "rulingsFile": "/Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-rulings-s3f.md",
+   "sections": "sections 1.2, 2, 7 (by subsection), 10.2, 11, 12.3, 12.4, 14",
+   "target": "ZTronAssetSync",
+   "testTarget": "ZTronAssetSyncTests",
+   "wp": "s3f",
+   "models": {
+    "fix": "opus",
+    "verify": "opus"
+   }
+  }
+ ]
+}

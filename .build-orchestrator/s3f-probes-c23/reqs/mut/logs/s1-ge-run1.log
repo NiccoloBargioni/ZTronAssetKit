@@ -1,0 +1,22 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine long purge turn log (S3-R28 point 5)" started.
+◇ Test "R-OBS-1: a purge's first turn longer than C2's 10 ms writes one info line on sync with its milliseconds and its job and group counts" started.
+◇ Test "R-OBS-1: a purge's first turn of exactly C2's 10 ms writes no long-turn line" started.
+✔ Test "R-OBS-1: a purge's first turn longer than C2's 10 ms writes one info line on sync with its milliseconds and its job and group counts" passed after 0.010 seconds.
+✘ Test "R-OBS-1: a purge's first turn of exactly C2's 10 ms writes no long-turn line" recorded an issue at EngineLongPurgeTurnLogTests.swift:26:9: Expectation failed: lines.isEmpty
+↳ [ZTronAssetModel.LogLine(subsystem: "com.ztron.assetkit", category: ZTronAssetModel.LogCategory.sync, level: ZTronAssetModel.LogLevel.info, message: "long purge turn: 10.00 ms, 3 jobs, 2 groups")]
+↳ lines.isEmpty → false
+↳   lines → [ZTronAssetModel.LogLine(subsystem: "com.ztron.assetkit", category: ZTronAssetModel.LogCategory.sync, level: ZTronAssetModel.LogLevel.info, message: "long purge turn: 10.00 ms, 3 jobs, 2 groups")]
+↳   isEmpty → false
+✘ Test "R-OBS-1: a purge's first turn of exactly C2's 10 ms writes no long-turn line" failed after 0.011 seconds with 1 issue.
+✘ Suite "Engine long purge turn log (S3-R28 point 5)" failed after 0.011 seconds with 1 issue.
+↳ /// S1, the long-purge log line (Stage 3 close-out cycle 23, the owner's close ruling S3-R28 point 5): a purge's first
+↳ /// turn that holds the engine's actor longer than C2's 10 ms writes one `.info` line on `.sync`, so an app that adopts
+↳ /// the kit can count, through its own `LogSink` or `OSLogStore`, how often the purge's known misses of the limit happen
+↳ /// in the field. The turn is the interval the purge benchmarks record (`EngineState.commitTurnMarksForTests`); the
+↳ /// tests lengthen it on the injected clock (`ManualTimeSource`) through that seam, so nothing waits on the wall clock.
+✘ Test run with 2 tests in 1 suite failed after 0.011 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

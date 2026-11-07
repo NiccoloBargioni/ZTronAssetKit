@@ -1,0 +1,74 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Cleanup: a blob more records share than a chunk holds (C2, R-CLN-4, R-CLN-6)" started.
+◇ Test "R-CLN-4: quota eviction takes a blob that more records share than a chunk holds one chunk of its records per actor turn" started.
+◇ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" started.
+◇ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" started.
+◇ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test case passing 1 argument change → accessed to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test case passing 1 argument change → leased to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+◇ Test case passing 1 argument change → pinned to "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" started.
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:133:13: Expectation failed: await harness.store.location(for: changed, extensions: [], recordingAccess: true) != nil
+↳ await harness.store.location(for: changed, extensions: [], recordingAccess: true) != nil → <not evaluated>
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → leased at LargeBlobTests.swift:106:6: Caught error: .notPresent(w3)
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:148:9: Expectation failed: first == 2
+↳ premise: one chunk was evicted before the change: 5
+↳ first == 2 → false
+↳   first → 5
+✘ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" recorded an issue at LargeBlobTests.swift:180:9: Expectation failed: first == (2, 3)
+↳ one chunk of records per turn, the blob live with the rest: (5, nil)
+↳ first == (2, 3) → false
+↳   first → (5, nil)
+↳     .0 → 5
+↳     .1 → nil
+↳     .0 → 2
+↳     .1 → 3
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:149:9: Expectation failed: result == CleanupResult()
+↳ the blob stays live: nothing is released to the reaper
+↳ result == CleanupResult() → false
+↳   result → CleanupResult(bytesFreed: 100, filesRemoved: 1, bytesDeferred: 0)
+↳     bytesFreed → 100
+↳     filesRemoved → 1
+↳     bytesDeferred → 0
+↳   CleanupResult() → CleanupResult(bytesFreed: 0, filesRemoved: 0, bytesDeferred: 0)
+↳     bytesFreed → 0
+↳     filesRemoved → 0
+↳     bytesDeferred → 0
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:150:9: Expectation failed: await LargeBlobTests.count(harness, shared, .absent(.evicted)) == 2
+↳ the chunk evicted before the change stays evicted
+↳ await LargeBlobTests.count(harness, shared, .absent(.evicted)) == 2 → <not evaluated>
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:152:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+↳ w2 keeps the blob
+↳ await harness.isPresent(asset.id, at: key) → <not evaluated>
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:152:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+↳ w3 keeps the blob
+↳ await harness.isPresent(asset.id, at: key) → <not evaluated>
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:152:13: Expectation failed: await harness.isPresent(asset.id, at: key)
+↳ w4 keeps the blob
+↳ await harness.isPresent(asset.id, at: key) → <not evaluated>
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → accessed at LargeBlobTests.swift:154:9: Expectation failed: await LargeBlobTests.references(harness, key) == 3
+↳ await LargeBlobTests.references(harness, key) == 3 → <not evaluated>
+✘ Test "R-CLN-6: a purge takes a blob that more records share than a chunk holds one chunk of its records per actor turn" failed after 0.006 seconds with 1 issue.
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" recorded an issue at LargeBlobTests.swift:188:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-4: quota eviction takes a blob that more records share than a chunk holds one chunk of its records per actor turn" recorded an issue at LargeBlobTests.swift:57:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → pinned at LargeBlobTests.swift:106:6: Time limit was exceeded: 60.000 seconds
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" recorded an issue at CleanupHarness.swift:237:52: Issue recorded
+↳ Cancelled while waiting for the driven operation finished
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" recorded an issue with 1 argument change → pinned at CleanupHarness.swift:237:52: Issue recorded
+↳ Cancelled while waiting for the driven operation finished
+✘ Test "R-CLN-4: quota eviction takes a blob that more records share than a chunk holds one chunk of its records per actor turn" failed after 63.993 seconds with 1 issue.
+✘ Test "R-CLN-6: an evictable purge of a blob more records share than a chunk holds stops at a holder pinned between its chunks, the rest keeping the blob" failed after 63.993 seconds with 2 issues.
+↳ /// The evictable selection re-reads every current holder in each chunk's turn: one pinned between two chunks stops the
+↳ /// blob there. The records purged before stay purged (each made a sync due, R-CLN-6); the rest keep the blob.
+✘ Test "R-CLN-4: quota eviction stops taking a blob more records share than a chunk holds when a later record is accessed, leased or pinned between its chunks, and frees nothing" with 3 test cases failed after 63.993 seconds with 11 issues.
+↳ /// Each chunk is re-validated in its turn (REENTRANCY R8): a later record that became unevictable stops the blob's
+↳ /// eviction. The records already evicted stay so on the still-live blob, as when an in-flight publication keeps a blob
+↳ /// (C-3's `stillReferenced`): nothing is freed, and the next run takes the rest once they are evictable again.
+✘ Suite "Cleanup: a blob more records share than a chunk holds (C2, R-CLN-4, R-CLN-6)" failed after 63.993 seconds with 15 issues.
+↳ /// A blob that more records share than a chunk holds (C2 at the reference scale; Stage 3 ruling S3C-2, S3-B-025): quota
+↳ /// eviction and purge take its records a chunk per actor turn instead of all in one, re-validating each chunk in its turn.
+↳ /// One blob that 10,000 ids share held the actor 15.4–16.6 ms in one turn (`BenchCleanup`'s shared-blob benchmark).
+✘ Test run with 4 tests in 1 suite failed after 63.993 seconds with 15 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetStorageTests (Swift Testing)

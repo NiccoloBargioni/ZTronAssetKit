@@ -1,0 +1,31 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" started.
+✔ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job inside its publication's ENOSPC free-space read gets that ENOSPC's verdict at the attempt cap (F-28, T20, e1-P2)" with 2 test cases passed after 1.492 seconds.
+◇ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" started.
+✘ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAfterVerdictSpaceTests.swift:171:9: Expectation failed: Self.sizes([run.vx, run.vy]) == [18, 18]
+↳ Vx and Vy get X's fresh attempt's bytes (visit-first): X at the drain's end failed(ZTronAssetModel.RetryDisposition.nextRun) holding ["zz-x", "zz-y"]; Vx failure(ZTronAssetModel.AssetError.insufficientSpace(required: 18, available: 31318666)), Vy failure(ZTronAssetModel.AssetError.insufficientSpace(required: 18, available: 31318666)); X started 1 times, Y 1
+↳ Self.sizes([run.vx, run.vy]) == [18, 18] → false
+↳   Self.sizes([run.vx, run.vy]) → [-1, -1]
+✘ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierAfterVerdictSpaceTests.swift:172:9: Expectation failed: run.xStarts == 2
+↳ X starts twice (visit-first): X at the drain's end failed(ZTronAssetModel.RetryDisposition.nextRun) holding ["zz-x", "zz-y"]; Vx failure(ZTronAssetModel.AssetError.insufficientSpace(required: 18, available: 31318666)), Vy failure(ZTronAssetModel.AssetError.insufficientSpace(required: 18, available: 31318666)); X started 1 times, Y 1
+↳ run.xStarts == 2 → false
+↳   run.xStarts → 1
+✘ Test "R-SYN-5: an id the drain's visit after a verdict moves onto a job for an apply inside its publication's ENOSPC free-space read skips that ENOSPC's verdict (F-28, T20, e1-P2)" with 2 test cases failed after 1.465 seconds with 2 issues.
+↳ /// e1-P2's other side: K comes inside X's free-space read. Swept first, the drain's visit after Y's verdict, for an
+↳ /// apply made since X's end, joins zz-y to X; visited first, K's visit met X failed with its verdict to come and
+↳ /// re-queued it (T20): the ENOSPC's verdict was skipped, and X's fresh attempt served Vx and Vy its 18 bytes.
+✘ Suite "Engine follow barrier (F-28)" failed after 2.958 seconds with 2 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 2 tests in 1 suite failed after 2.958 seconds with 2 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

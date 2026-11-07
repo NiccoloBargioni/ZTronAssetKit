@@ -1,0 +1,34 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Engine follow barrier (F-28)" started.
+◇ Test "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" started.
+◇ Test case passing 1 argument visit → .followVisitedFirst to "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" started.
+◇ Test case passing 1 argument visit → .sweepFollowsFirst to "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" started.
+✘ Test "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveHoldersTests.swift:371:13: Expectation failed: onT
+↳ H's publication made the owed move: zz-h3 joined T, whose verdict waits (visit-first: v3's visit moved it there)
+↳ onT → <not evaluated>
+✘ Test "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveHoldersTests.swift:384:29: Issue recorded
+↳ W3 gets T's 429's answer (visit-first): success(ZTronAssetModel.AssetLocation(id: zz-h3, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/9d/9dd8a427f1a91ed599591a08a82e52645048451ea23233bd9ae01d197a8a0f8d.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)); [Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h0, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/92/923651769e9c0c991d7fad0b916efa55f6df1db3b2ff6f46be782cef3b6072d0.png, fileExtension: png, byteSize: 16, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(7200.0))), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(7200.0))), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.success(ZTronAssetModel.AssetLocation(id: zz-h3, url: file:///fake-volume/Library/Application%20Support/ZTronAssetKit/v1/blobs/9d/9dd8a427f1a91ed599591a08a82e52645048451ea23233bd9ae01d197a8a0f8d.png, fileExtension: png, byteSize: 20, integrity: ZTronAssetModel.AssetIntegrity.verified, isStale: false)), Swift.Result<ZTronAssetModel.AssetLocation, ZTronAssetModel.AssetError>.failure(ZTronAssetModel.AssetError.serverUnavailable(retryAfter: Optional(7200.0)))]
+✘ Test "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" recorded an issue with 1 argument visit → .sweepFollowsFirst at EngineFollowBarrierMoveHoldersTests.swift:387:9: Expectation failed: starts == 1
+↳ T starts once (visit-first): 2
+↳ starts == 1 → false
+↳   starts → 2
+✘ Test "R-SYN-6: an owed move continued inside its holder's publication moves every id left onto a job whose verdict waits (F-28, d4 §3.9)" with 2 test cases failed after 1.224 seconds with 3 issues.
+↳ /// H (16 bytes) holds zz-h0…zz-h3 for the user waiters W0…W3, and T (20 bytes) zz-t for WT; both download (held). v3
+↳ /// moves zz-h1…zz-h3 to T's content and keeps zz-h0 on H's, so H is not superseded. T then gets a 429 with
+↳ /// Retry-After 7,200 s, above both lanes' caps (`.exhausted`). Swept first its verdict waits, and `bringInbound(T)`
+↳ /// finds the move off H and makes `inboundIDsNow` (two) of its ids, owing zz-h3; the follow's follow-up turns stay
+↳ /// held from the 429 until H's release, since a follow turn would make that move while H still downloads. H's
+↳ /// publication then continues the owed move, and zz-h3 joins T, failed with its verdict to come. Visited first, v3's
+↳ /// visit moved zz-h1…zz-h3 onto T downloading before its 429 (the owed move is swept first only: S3-R26 answer 1's
+↳ /// citation, `bringInbound` returns unless the follow is owed): T's 429 answered WT, W1, W2 and W3
+↳ /// `serverUnavailable`, T started once, and H's bytes served W0.
+✘ Suite "Engine follow barrier (F-28)" failed after 1.224 seconds with 3 issues.
+↳ /// The follow barrier's tests, one at a time (`.serialized`; Stage 3 close-out cycle 10, the cycle-9 reqs lens's issue 4):
+↳ /// each does two forced syncs over 2,100 changed entries and 32 MB volumes, 139 to 165 s per test under TSan when all of
+↳ /// them started with the rest of the Sync bundle, and the one-minute tests beside them timed out (43 of them at a rule-1
+↳ /// mean load of 40.45, S3-R12). Run one at a time, they leave the bundle's start to the others.
+✘ Test run with 1 test in 1 suite failed after 1.224 seconds with 3 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetSyncTests (Swift Testing)

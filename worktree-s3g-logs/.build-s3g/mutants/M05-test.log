@@ -1,0 +1,26 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Facade races" started.
+◇ Test "R-SYN-12: an events stream stopped while its first registration waits for a reopen subscribes nothing of its own to the replacement" started.
+◇ Test "R-SYN-12: an events stream cancelled while its first registration waits for a reopen leaves no follower and no subscriber" started.
+✘ Test "R-SYN-12: an events stream stopped while its first registration waits for a reopen subscribes nothing of its own to the replacement" recorded an issue at FacadeRaceTests.swift:437:9: Expectation failed: registrations == 1
+↳ the replacement registered only the hand-over's subscription: 2
+↳ registrations == 1 → false
+↳   registrations → 2
+✔ Test "R-SYN-12: an events stream cancelled while its first registration waits for a reopen leaves no follower and no subscriber" passed after 0.285 seconds.
+✘ Test "R-SYN-12: an events stream stopped while its first registration waits for a reopen subscribes nothing of its own to the replacement" failed after 0.285 seconds with 1 issue.
+↳ /// Stage 3 ruling S3G-2 (L5-R22 (1), S3-B-090): the exit `next()` takes when its consumer stopped during the `events`
+↳ /// registration (`EventForwarder.swift`, the `finished` check after `registerEvents`). The registration returns to a
+↳ /// stopped forwarder as above; the exit gives the follower entry back and starts no pump. Without it the forwarder would
+↳ /// start a pump that subscribes to the replacement by itself, and the replacement's replay of its launch snapshot and
+↳ /// conditions would end that pump soon enough for the test above to pass. So this test takes a census of the
+↳ /// replacement's registrations: exactly one ever, the subscription its reopen's hand-over made for the follower (and
+↳ /// dropped at once, because the forwarder had finished).
+✘ Suite "Facade races" failed after 0.285 seconds with 1 issue.
+↳ /// Interleavings of the facade's lifecycle placed deterministically through its test seam: a registration that lands
+↳ /// during shutdown, two reopens in a row, a memory-pressure stop during a reopen, and retention-scope changes racing
+↳ /// each other and a reopen.
+✘ Test run with 2 tests in 1 suite failed after 0.285 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitTests (Swift Testing)

@@ -1,0 +1,116 @@
+DIAG 120 begin
+DIAG 106 begin
+DIAG 112 begin
+DIAG 122 begin
+DIAG 102 begin
+DIAG 104 begin
+DIAG 128 begin
+DIAG 116 begin
+DIAG 112 ending: drive 1
+DIAG 112 drive first: idle
+DIAG 112 SNAP after the drive: applyTurnHeld true applyQueue 50 running true sleepers 1 next 413586999991ns now 413336999991ns
+DIAG 112 idle check
+DIAG 112 shutdown begin
+DIAG 112 shutdown: done without advancing the clock
+DIAG 112 SNAP after the shutdown: applyTurnHeld true applyQueue 0 running false sleepers 1 next 413586999991ns now 413336999991ns
+DIAG 112 awaiting 1506 callers
+DIAG 112 awaiting 40 runs
+DIAG 112 awaiting 40 reports
+DIAG 112 awaiting 400 applies
+DIAG 104 ending: drive 1
+DIAG 104 drive first: idle
+DIAG 104 SNAP after the drive: applyTurnHeld false applyQueue 0 running true sleepers 0 next nil now 395677999992ns
+DIAG 104 idle check
+DIAG 104 shutdown begin
+DIAG 104 shutdown: done without advancing the clock
+DIAG 104 SNAP after the shutdown: applyTurnHeld false applyQueue 0 running false sleepers 0 next nil now 395677999992ns
+DIAG 104 awaiting 1529 callers
+DIAG 104 awaiting 40 runs
+DIAG 104 awaiting 40 reports
+DIAG 104 awaiting 400 applies
+DIAG 104 applies: done without advancing the clock
+DIAG 104 all awaited
+DIAG 106 ending: drive 1
+DIAG 106 drive first: idle
+DIAG 106 SNAP after the drive: applyTurnHeld false applyQueue 0 running true sleepers 0 next nil now 374818999997ns
+DIAG 106 idle check
+DIAG 106 shutdown begin
+DIAG 106 shutdown: done without advancing the clock
+DIAG 106 SNAP after the shutdown: applyTurnHeld false applyQueue 0 running false sleepers 0 next nil now 374818999997ns
+DIAG 106 awaiting 1525 callers
+DIAG 106 awaiting 40 runs
+DIAG 106 awaiting 40 reports
+DIAG 106 awaiting 400 applies
+DIAG 106 applies: done without advancing the clock
+DIAG 106 all awaited
+DIAG 128 ending: drive 1
+DIAG 120 ending: drive 1
+DIAG 128 drive first: idle
+DIAG 128 SNAP after the drive: applyTurnHeld false applyQueue 0 running true sleepers 0 next nil now 381918999991ns
+DIAG 128 idle check
+DIAG 128 shutdown begin
+DIAG 120 drive first: idle
+DIAG 120 SNAP after the drive: applyTurnHeld false applyQueue 0 running true sleepers 0 next nil now 430954999996ns
+DIAG 120 idle check
+DIAG 120 shutdown begin
+DIAG 102 ending: drive 1
+DIAG 102 drive first: idle
+DIAG 102 SNAP after the drive: applyTurnHeld true applyQueue 29 running true sleepers 1 next 457786999997ns now 457536999997ns
+DIAG 102 idle check
+DIAG 102 shutdown begin
+DIAG 128 shutdown: done without advancing the clock
+DIAG 128 SNAP after the shutdown: applyTurnHeld false applyQueue 0 running false sleepers 0 next nil now 381918999991ns
+DIAG 128 awaiting 1537 callers
+DIAG 128 awaiting 40 runs
+DIAG 128 awaiting 40 reports
+DIAG 128 awaiting 400 applies
+DIAG 120 shutdown: done without advancing the clock
+DIAG 120 SNAP after the shutdown: applyTurnHeld false applyQueue 0 running false sleepers 0 next nil now 430954999996ns
+DIAG 120 awaiting 1481 callers
+DIAG 120 awaiting 40 runs
+DIAG 120 awaiting 40 reports
+DIAG 120 awaiting 400 applies
+DIAG 102 shutdown: done without advancing the clock
+DIAG 102 SNAP after the shutdown: applyTurnHeld true applyQueue 0 running false sleepers 1 next 457786999997ns now 457536999997ns
+DIAG 102 awaiting 1451 callers
+DIAG 102 awaiting 40 runs
+DIAG 102 awaiting 40 reports
+DIAG 102 awaiting 400 applies
+DIAG 128 applies: done without advancing the clock
+DIAG 128 all awaited
+DIAG 120 applies: done without advancing the clock
+DIAG 120 all awaited
+DIAG 122 ending: drive 1
+DIAG 122 drive first: idle
+DIAG 122 SNAP after the drive: applyTurnHeld false applyQueue 0 running true sleepers 0 next nil now 435857999993ns
+DIAG 122 idle check
+DIAG 122 shutdown begin
+DIAG 122 shutdown: done without advancing the clock
+DIAG 122 SNAP after the shutdown: applyTurnHeld false applyQueue 0 running false sleepers 0 next nil now 435857999993ns
+DIAG 122 awaiting 1476 callers
+DIAG 122 awaiting 40 runs
+DIAG 122 awaiting 40 reports
+DIAG 122 awaiting 400 applies
+DIAG 122 applies: done without advancing the clock
+DIAG 122 all awaited
+DIAG 116 ending: drive 1
+DIAG 116 drive first: idle
+DIAG 116 SNAP after the drive: applyTurnHeld true applyQueue 52 running true sleepers 1 next 406291999993ns now 406041999993ns
+DIAG 116 idle check
+DIAG 116 shutdown begin
+DIAG 116 shutdown: done without advancing the clock
+DIAG 116 SNAP after the shutdown: applyTurnHeld true applyQueue 0 running false sleepers 1 next 406291999993ns now 406041999993ns
+DIAG 116 awaiting 1516 callers
+DIAG 116 awaiting 40 runs
+DIAG 116 awaiting 40 reports
+DIAG 116 awaiting 400 applies
+DIAG 112 SNAP applies stuck before any advance: applyTurnHeld true applyQueue 0 running false sleepers 1 next 413586999991ns now 413336999991ns
+DIAG 112 applies: done after 1 clock advance(s) of 1 s
+DIAG 112 all awaited
+DIAG 102 SNAP applies stuck before any advance: applyTurnHeld true applyQueue 0 running false sleepers 1 next 457786999997ns now 457536999997ns
+DIAG 102 applies: done after 1 clock advance(s) of 1 s
+DIAG 102 all awaited
+DIAG 116 SNAP applies stuck before any advance: applyTurnHeld true applyQueue 0 running false sleepers 1 next 406291999993ns now 406041999993ns
+DIAG 116 applies: done after 1 clock advance(s) of 1 s
+DIAG 116 all awaited
+✔ Test run with 1 test in 1 suite passed after 76.333 seconds.
