@@ -10,9 +10,15 @@ import ZTronAssetStorage
 ///   claim names its content (orchestrator ruling L5-R1: a claim lasts from `registerGroup` until the group's join
 ///   reaches the member, the group's release or the join's give-up drops it, at most `releasesPerTurn` a turn, or the
 ///   engine shuts down; ADR-054).
-/// - Every continuation (waiters, groups, runs, `start`/`sync` joiners, `waitUntil`) is resumed only through
-///   `removeValue` on its table, and every table is settled at registration, on each transition, on withdrawal,
-///   on purge and on shutdown (sync-1 S1-02).
+/// - Every continuation (waiters, groups, runs, `start`/`sync` joiners, `waitUntil`) is resumed exactly once: at
+///   registration, before it enters its table, or in the turn that takes it out of its table (through `removeValue`, a
+///   nil assignment, or with the whole table), except on two Stage 3 paths; and every table is settled at
+///   registration, on each transition, on withdrawal, on purge and on shutdown (sync-1 S1-02). Those two can resume it
+///   in a later turn: shutdown takes the waiters, the groups and the owed answers out whole (`drainEverything`) and
+///   resumes them over bounded turns (`settle`); and a job of more than `answersPerTurn` interests owes its waiters'
+///   and settled ensure groups' resumes to the answer follow-ups (`owedAnswers`), at most `answersPerTurn` a turn.
+///   Behind the follow barrier a withdrawing caller on the job path is resumed at once, and its record, without its
+///   continuation, is left in `waiters` for the follow's drain to remove with its interest (`replayRemoval`).
 /// - Every store-touching entry point runs as an **engine-owned task** joined through the waiter pattern, so
 ///   shutdown cancels and joins it before `store.close()` (ADR-039, sync-1 S1-04, S1-08). Owned tasks are keyed by
 ///   a unique spawn id (sync-1 S1-09).
@@ -74,8 +80,9 @@ package actor SyncEngine {
         await self.performStart()
     }
 
-    /// Cancels and joins every owned task, resumes every continuation with `.shutDown`, invalidates the remote
-    /// source (foreground: after its last delegate callback; background: without waiting for the OS, ADR-028),
+    /// Cancels every owned task and running transfer, answers every continuation (`.shutDown`, except answers a
+    /// resolution already owed, which keep their values) over bounded turns, joins every owned task, invalidates the
+    /// remote source (foreground: after its last delegate callback; background: without waiting for the OS, ADR-028),
     /// closes the store, publishes `clientShutDown` last (R-SYN-15). Idempotent.
     package func shutdown() async {
         // REENTRANCY: RE-S26 — nothing here: the implementation re-validates the lifecycle after each of its awaits.

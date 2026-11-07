@@ -578,8 +578,9 @@ extension SyncEngine {
     }
 
     /// Queues a job again at the place its entry had (`Job.queuePlace`), with a fresh ticket: its old entry, set aside by
-    /// a scan or still in place, goes stale. For a job only released groups wanted that an interest at its own lane
-    /// wants again (`addInterest`): pushed to the front, the jobs re-joined in one turn were dispatched in reverse order
+    /// a scan or still in place, goes stale. For a job only released groups wanted that an interest wants again
+    /// (`addInterest`), whether the interest keeps the job's lane, changes it or comes from user work (Stage 3,
+    /// S3-B-065): pushed to the front, the jobs re-joined in one turn were dispatched in reverse order
     /// and ahead of work queued before them (review of close-out cycle 10, PROBE-C10R-3; R-SYN-3). Never behind the
     /// follow barrier: its only caller, `addInterest`, defers every join but the follow's own and the drain's (cycle 11),
     /// so the cycle-9 `.reinstate` event is gone.

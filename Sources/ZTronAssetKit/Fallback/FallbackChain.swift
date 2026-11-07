@@ -87,7 +87,8 @@ final class BundleIndexHolder {
 /// The three-step chain of the prior art (R-CAR-2): bundle → local, both synchronous, then network.
 ///
 /// Deviations recorded in ADR-037 (NEEDS-HUMAN-REVIEW): the extension filter applies at the local step too, and
-/// `lookup` finds local assets only after `start()` installed the first snapshot.
+/// `lookup` finds local assets only after `start()` installed the first snapshot. `fetch` checks the extension after
+/// the download, where the prior art checked the manifest entry first (K-11, accepted by ADR-055).
 public struct AssetFallbackChain: Sendable {
     /// The client.
     public let client: AssetClient
@@ -131,8 +132,10 @@ public struct AssetFallbackChain: Sendable {
         return nil
     }
 
-    /// Step 3, asynchronous, user-initiated: `resolve`; an asset whose extension is not a candidate is
-    /// `notFound` (prior-art `CDNAssetResolver.swift:46`).
+    /// Step 3, asynchronous, user-initiated: `resolve`, then the extension check; an asset whose extension is not a
+    /// candidate is `notFound`. The check runs once `resolve` has returned, so an entry of another kind is downloaded
+    /// at `.userInitiated` before it is refused; the prior art (`CDNAssetResolver.swift:46`) checked before
+    /// downloading (K-11, ADR-055).
     public func fetch(_ id: AssetID, kind: AssetKind) async throws(AssetError) -> URL {
         let url = try await self.client.resolve(id, priority: .userInitiated)
         let candidates = Set(kind.candidateExtensions.map { $0.lowercased() })

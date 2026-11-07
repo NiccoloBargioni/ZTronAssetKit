@@ -38,7 +38,9 @@ extension AssetStore {
     /// caller's (engine-owned) task.
     ///
     /// The selection is computed off the actor and applied in chunks, each record re-validated (C2; ADR draft C-5): one
-    /// that changed blob meanwhile, or for `.evictable` became pinned or leased, is kept. A purge on a store with no stamp
+    /// that changed blob meanwhile, or for `.evictable` became pinned or leased, is kept; a blob of more records than a
+    /// chunk is purged a chunk of its records per turn, and a failed check between its turns stops it, earlier turns'
+    /// records staying purged (Stage 3 Decision S3C-2). A purge on a store with no stamp
     /// that is already due, and that selects nothing, changes nothing but the epoch. The selection's blobs are doomed
     /// `purged` (never re-adopted, ADR-018). `assetsRemoved` counts the records purged, `bytesFreed` the selection's bytes
     /// deleted before the call returned, `bytesDeferred` those still leased; bytes a sink that does not acknowledge holds
