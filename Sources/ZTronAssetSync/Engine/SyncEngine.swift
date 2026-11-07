@@ -17,8 +17,8 @@ import ZTronAssetStorage
 ///   in a later turn: shutdown takes the waiters, the groups and the owed answers out whole (`drainEverything`) and
 ///   resumes them over bounded turns (`settle`); and a job of more than `answersPerTurn` interests owes its waiters'
 ///   and settled ensure groups' resumes to the answer follow-ups (`owedAnswers`), at most `answersPerTurn` a turn.
-///   Behind the follow barrier a withdrawing caller is resumed at once, and its record, without its continuation, is
-///   left in `waiters` for the follow's drain to remove with its interest (`replayRemoval`).
+///   Behind the follow barrier a withdrawing caller on the job path is resumed at once, and its record, without its
+///   continuation, is left in `waiters` for the follow's drain to remove with its interest (`replayRemoval`).
 /// - Every store-touching entry point runs as an **engine-owned task** joined through the waiter pattern, so
 ///   shutdown cancels and joins it before `store.close()` (ADR-039, sync-1 S1-04, S1-08). Owned tasks are keyed by
 ///   a unique spawn id (sync-1 S1-09).
