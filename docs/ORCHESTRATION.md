@@ -589,9 +589,20 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            4. The four Stage 5 documents, then the tools-6.4 (c) `--full` in `.worktrees/t64`.
            5. Item 10.
       9. Stage 5: `--full`, then `VERIFICATION.md`, `DEVICE-TEST-PLAN.md` and `RESIDUAL-RISKS.md` (`PROMPT.md:64-65`).
-         - **Part A RUNNING (launched 04:45):** workflow `wf_c7c92797-46b` (task `w8hf3p47y`), whose script is the persisted `assetkit-s5-docs-a-wf_c7c92797-46b.js`.
+         - **Part A: both rounds ran (04:45-07:29). 1 blocking issue is left, a one-line fix, so part A is not done.** Workflow `wf_c7c92797-46b` (task `w8hf3p47y`), whose script is the persisted `assetkit-s5-docs-a-wf_c7c92797-46b.js`.
            - One writer drafts `docs/MUTATION-PROBES.md`, `docs/DEVICE-TEST-PLAN.md` and `docs/RESIDUAL-RISKS.md` in `.worktrees/s5docs` (`wp/s5docs` at `d002758`), from SPEC §7.4 and §8, ADR-057, the hunt JSON, `s3-post-merge/` and the ADR-057 ledgers' journal.
            - An independent verifier follows, with at most one fix round.
+           - **Round 1:** the writer committed `ec264e4` (MUTATION-PROBES.md: 64 mutants, 27 storage and 37 network, with the 11 survivors, all killed on `e840b0e`), `6d0d00e` (DEVICE-TEST-PLAN.md) and `94eb6c9` (RESIDUAL-RISKS.md). The verifier found 2 blocking issues, both in RESIDUAL-RISKS.md. First, §0.4, RES-34 and RES-35 claimed the log has no per-case Stage 5 loads, but it prints them. Second, RES-02 kept the superseded owner quote. It also found 7 non-blocking issues.
+           - **Round 2:** the writer committed `feffaa4`, `4730848` and `6eab1ba`, which fix all 9. The verifier checked `6eab1ba` in a clean worktree (P4) and found **1 blocking issue**. `MUTATION-PROBES.md` §6.4:237 credits `OracleTests` with killing mutant X, but the oracle never ran against X (`.worktrees/s3c/.build-s3c/mut/run-mutants.sh:33`; `s3c.md:484-485`). The fix splits the bullet in two: Z is killed by `OracleTests` and `CleanupFlowCrashTests`, X by `CleanupFlowCrashTests` alone.
+           - Round 2 also found 7 non-blocking issues:
+             - no flows run against mutant C is on record (`MUTATION-PROBES.md:239`, `:267`, RES-60);
+             - `MUTATION-PROBES.md:198` should cite `s3f.md:9096-9102`;
+             - RES-15's "the one RR that changes an answer" is unsupported;
+             - RES-02 derives a lower bound where the log gives the exact figure: 7 units over (`benchmarks.log:128`);
+             - RES-54 lacks the citation `s3c.md:231-234`;
+             - RES-71 omits ADR-057's "known miss";
+             - S3-B-110 (L5K-R24's lag) is in neither doc.
+           - The verifier's exact fix text for every issue is in `.build-orchestrator/s3-post-merge/s5docs-partA-wf_c7c92797-46b.json` (`rounds[1].issues`). The journal is next to it (`s5docs-partA-journal.jsonl`). Both go into snapshot 5.
          - **Stage 5's `--full`: DONE (04:38-06:02, `45df2e1`, clean worktree, loads 4.11 → 7.77). This is the accepted end state (close point 3).**
            - Result: `VERIFY: FAIL (1 failed: benchmarks)`. `GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f` matches the /goal's prefix.
            - Every other step is OK: gates-selftest, harness, toolchain, build-debug, build-release, build-ios, tests-run 1-3, coverage, TSan, trace (90 requirements, 78 MUST, 1661 tests with ids), unsafe 0 and docs 1281/1281.
@@ -601,8 +612,8 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            - The trace gate's `docs/TRACEABILITY.md` is identical to the committed copy, so the regeneration needed no commit.
            - Log: `.build-orch/stage5-full.log`; `.verify-logs` copied to `.build-orch/stage5-verify-logs-45df2e1/`.
          - **Tools-6.4 (c): RUNNING (06:03):** task `ba3t493dh`. `.worktrees/t64` is detached at `45df2e1` with line 1 at 6.4. It runs `--full`, then the `warning:` grep, with logs in `.build-orch/t64c/`. Its benchmarks are expected red with the same accepted causes; "0 warnings" here means the grep finds nothing, and every other step is OK.
-         - **RESUME HERE AFTER THE RESET (Thu 12 Nov 03:00 CET). Weekly: 98 % at 06:05, so part A may be cut and part B will not fit.**
-           1. **Part A:** read `git -C .worktrees/s5docs log --oneline d002758..` and `status`, and the journal of `wf_c7c92797-46b`. In this session, resume with `resumeFromRunId`. From a fresh one, re-run the same script; its writer finds the drafts already there.
+         - **RESUME HERE AFTER THE RESET (Thu 12 Nov 03:00 CET). Weekly: 98 % at 06:05, so part A may be cut and part B will not fit. Weekly 100 % at 07:33: stopped here (usage stop).**
+           1. **Part A:** `wp/s5docs` is at `6eab1ba`, and its worktree is clean. A writer applies round 2's fixes from the persisted JSON: the 1 blocking (§6.4:237) and the 7 non-blocking. Then an independent verifier checks the changed lines against their records; it must be neither round 2's verifier nor the writer (P4). Part A is done at 0 blocking.
            2. **Tools-6.4 (c):** read `.build-orch/t64c/status.txt`. PASS means every step except the benchmarks is OK and `warning lines: 0`. A warning is a defect (it goes to the owner under point 10 only if it is a new cause of the FAIL; otherwise it is recorded).
            3. **Part B:** `docs/VERIFICATION.md`, with an independent verifier: what ran, the thresholds, the results and what was not verified. It is built from this checklist's items 3-9, `.build-orch/stage5-full.log`, `t64b/`, `t64c/`, `sim-merged/`, `mut-recheck/`, the P-13 runs, and ADR-057's Not-verified list. Write it in `.worktrees/s5docs`.
            4. **Then:**
@@ -612,7 +623,7 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
               - write the dossier's final version;
               - write the final message (at most 60 lines, `PROMPT.md:65`);
               - stop `bmt90jpqj` if it is still running.
-         - **Part B, after Stage 5's `--full` (task `bvaplc5ov`):** `docs/VERIFICATION.md`, with its own verifier. Then merge `wp/s5docs`, commit the `--full`'s regenerated `docs/TRACEABILITY.md`, and run the tools-6.4 (c) `--full` in `.worktrees/t64`.
+         - *Superseded by the RESUME list above, since Stage 5's TRACEABILITY needed no commit.* **Part B, after Stage 5's `--full` (task `bvaplc5ov`):** `docs/VERIFICATION.md`, with its own verifier. Then merge `wp/s5docs`, commit the `--full`'s regenerated `docs/TRACEABILITY.md`, and run the tools-6.4 (c) `--full` in `.worktrees/t64`.
          - If the limit cuts in: `wp/s5docs` and its worktree hold the drafts, uncommitted work included. Resume part A with `resumeFromRunId` in this session, or read its journal from a fresh one. The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
           - **Snapshot 4: DONE (04:42), `cd17cdc`, pushed and restore-tested.** It was taken ahead of the limit, so the evidence survives a local wipe.
