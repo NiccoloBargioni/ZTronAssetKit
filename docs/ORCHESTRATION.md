@@ -592,6 +592,15 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
          - **Part A RUNNING (launched 04:45):** workflow `wf_c7c92797-46b` (task `w8hf3p47y`), whose script is the persisted `assetkit-s5-docs-a-wf_c7c92797-46b.js`.
            - One writer drafts `docs/MUTATION-PROBES.md`, `docs/DEVICE-TEST-PLAN.md` and `docs/RESIDUAL-RISKS.md` in `.worktrees/s5docs` (`wp/s5docs` at `d002758`), from SPEC §7.4 and §8, ADR-057, the hunt JSON, `s3-post-merge/` and the ADR-057 ledgers' journal.
            - An independent verifier follows, with at most one fix round.
+         - **Stage 5's `--full`: DONE (04:38-06:02, `45df2e1`, clean worktree, loads 4.11 → 7.77). This is the accepted end state (close point 3).**
+           - Result: `VERIFY: FAIL (1 failed: benchmarks)`. `GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f` matches the /goal's prefix.
+           - Every other step is OK: gates-selftest, harness, toolchain, build-debug, build-release, build-ios, tests-run 1-3, coverage, TSan, trace (90 requirements, 78 MUST, 1661 tests with ids), unsafe 0 and docs 1281/1281.
+           - Coverage: AppleHosted 99.76 %, Kit 97.99 %, Model 99.32 %, Storage 97.52 %, Sync 95.11 %, Transport 99.10 %; overall 96.93 %; device-only excluded 0.58 %.
+           - Benchmarks: 88 tests and 7 issues, all accepted. Six are the R-CLN-6 purge shapes at `BenchSyncCycle22Purge.swift:32`. The seventh is **P-13 red, as P2 forecast**: p99 5.84 ms against 5.0 ms, max 10.72 ms, 525 units, at `BenchStorage.swift:253`.
+           - Nothing goes to the owner.
+           - The trace gate's `docs/TRACEABILITY.md` is identical to the committed copy, so the regeneration needed no commit.
+           - Log: `.build-orch/stage5-full.log`; `.verify-logs` copied to `.build-orch/stage5-verify-logs-45df2e1/`.
+         - **Tools-6.4 (c): RUNNING (06:03):** task `ba3t493dh`. `.worktrees/t64` is detached at `45df2e1` with line 1 at 6.4. It runs `--full`, then the `warning:` grep, with logs in `.build-orch/t64c/`. Its benchmarks are expected red with the same accepted causes; "0 warnings" here means the grep finds nothing, and every other step is OK.
          - **Part B, after Stage 5's `--full` (task `bvaplc5ov`):** `docs/VERIFICATION.md`, with its own verifier. Then merge `wp/s5docs`, commit the `--full`'s regenerated `docs/TRACEABILITY.md`, and run the tools-6.4 (c) `--full` in `.worktrees/t64`.
          - If the limit cuts in: `wp/s5docs` and its worktree hold the drafts, uncommitted work included. Resume part A with `resumeFromRunId` in this session, or read its journal from a fresh one. The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
