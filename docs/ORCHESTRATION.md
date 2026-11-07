@@ -601,6 +601,17 @@ Compact hand-off for whoever orchestrates the next step (a fresh Claude Code ses
            - The trace gate's `docs/TRACEABILITY.md` is identical to the committed copy, so the regeneration needed no commit.
            - Log: `.build-orch/stage5-full.log`; `.verify-logs` copied to `.build-orch/stage5-verify-logs-45df2e1/`.
          - **Tools-6.4 (c): RUNNING (06:03):** task `ba3t493dh`. `.worktrees/t64` is detached at `45df2e1` with line 1 at 6.4. It runs `--full`, then the `warning:` grep, with logs in `.build-orch/t64c/`. Its benchmarks are expected red with the same accepted causes; "0 warnings" here means the grep finds nothing, and every other step is OK.
+         - **RESUME HERE AFTER THE RESET (Thu 12 Nov 03:00 CET). Weekly: 98 % at 06:05, so part A may be cut and part B will not fit.**
+           1. **Part A:** read `git -C .worktrees/s5docs log --oneline d002758..` and `status`, and the journal of `wf_c7c92797-46b`. In this session, resume with `resumeFromRunId`. From a fresh one, re-run the same script; its writer finds the drafts already there.
+           2. **Tools-6.4 (c):** read `.build-orch/t64c/status.txt`. PASS means every step except the benchmarks is OK and `warning lines: 0`. A warning is a defect (it goes to the owner under point 10 only if it is a new cause of the FAIL; otherwise it is recorded).
+           3. **Part B:** `docs/VERIFICATION.md`, with an independent verifier: what ran, the thresholds, the results and what was not verified. It is built from this checklist's items 3-9, `.build-orch/stage5-full.log`, `t64b/`, `t64c/`, `sim-merged/`, `mut-recheck/`, the P-13 runs, and ADR-057's Not-verified list. Write it in `.worktrees/s5docs`.
+           4. **Then:**
+              - merge `wp/s5docs` and push;
+              - take snapshot 5, whose cited-log list also covers `stage5-full.log`, `stage5-verify-logs-45df2e1/` and `t64c/`;
+              - remove the s3 worktrees and branches after a restore test;
+              - write the dossier's final version;
+              - write the final message (at most 60 lines, `PROMPT.md:65`);
+              - stop `bmt90jpqj` if it is still running.
          - **Part B, after Stage 5's `--full` (task `bvaplc5ov`):** `docs/VERIFICATION.md`, with its own verifier. Then merge `wp/s5docs`, commit the `--full`'s regenerated `docs/TRACEABILITY.md`, and run the tools-6.4 (c) `--full` in `.worktrees/t64`.
          - If the limit cuts in: `wp/s5docs` and its worktree hold the drafts, uncommitted work included. Resume part A with `resumeFromRunId` in this session, or read its journal from a fresh one. The benchmarks FAIL from the six is accepted (close point 3), and the report says the owner set the /goal's Done aside.
       10. The dossier's final version (`docs/REOPEN-WP-F.md`), with the list under 16:30 above. Then the final archive snapshot (its README updated) and the pushes of both branches.
