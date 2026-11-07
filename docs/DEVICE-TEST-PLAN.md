@@ -282,15 +282,22 @@ the hook forwarded (§3.2); a catalog of three to five large checksummed files; 
 - **Requirements:** R-NET-10, R-SYN-3.
 - **Why a device:** whether a background `URLSessionTask` applies the last `priority` written, and in which order two
   writes land when each follows its own `allTasks` listing (S3D-1's newest-request serial and rewrite loop; the write
-  at `BackgroundSessionBackend.swift:79-83`, the listing at `:90-92`), is device-only (§5 row :296).
+  at `BackgroundSessionBackend.swift:79-83`, the listing at `:90-92`), is device-only (§5 row :296). So is a
+  rewrite to an old task identifier after the same attempt's name was created anew. Only a reading of the
+  coverage-excluded live driver covers it: the driver looks the identifier up among the session's tasks and writes
+  nothing when it is gone (`:90-92`; the rewrite loop, `BackgroundSupport.swift:477-484`;
+  `docs/adr-drafts/s3d.md:141-142`; `docs/DECISIONS.md:673`).
 - **Steps:** two large background downloads at bulk; promote one with `resolve(_:)` on its id and cancel that task
   within a second, so that the transfer returns to bulk; repeat 10 times, alternating the transfer. The app stays in
   the foreground, so an attached debugger does not change what the test needs.
 - **Observe:** each write, with a breakpoint (log action, automatic continue) at `BackgroundSessionBackend.swift:81`
-  printing the task identifier and the priority; which transfer finishes first (origin log, `background attempt`
-  intervals).
+  printing the task identifier and the priority; each write request, with a second one at `:80` printing
+  `taskIdentifier`; which transfer finishes first (origin log, `background attempt` intervals). A request logged at
+  `:80` with no write at `:81` found no task with that identifier.
 - **Pass:** for each task, the last write matches the newest request in every run. The finish order is evidence only:
-  the OS treats priority as a hint (§5 row :296).
+  the OS treats priority as a hint (§5 row :296). A request that finds no task, if one occurs, writes nothing and
+  nothing fails; it is recorded with its time and identifier. A rewrite after the name was created anew cannot be
+  staged on purpose here (§14).
 
 ### DT-BG-09 · `shutdown()` with background downloads in flight
 
@@ -682,19 +689,33 @@ device figure.
 
 ### DT-PERF-03 · Reclaiming 10,000 blobs on a device's APFS (P-13's stalls)
 
-- **Requirements:** P-13, R-CLN-6.
+- **Requirements:** P-13, R-CLN-6, C2.
 - **Why a device:** whether `unlink(2)` on a device stalls while the volume commits, as the host's APFS does, and how
   often, decides P-13's p99 (host: 7-13 stalls over 2 ms per 10,000 unlinks, maxima 4.4-6.6 ms, about every
-  850-1,060 unlinks with the 256-way fan-out; S3B-12; §5 row :297; S3-B-021; `docs/DECISIONS.md:621`). C-22's actor
-  holds, `apply`'s chunked eviction, a purge waiting for another reaper's deletion and S3C-2's per-turn costs were
-  also measured on the host only, over the fake (S3-B-038; `docs/DECISIONS.md:672`).
+  850-1,060 unlinks with the 256-way fan-out; S3B-12; §5 row :297; S3-B-021; `docs/DECISIONS.md:621`). S3-B-038's
+  four items were measured on macOS over the fake file system only: C-22's actor holds, `apply`'s chunked eviction,
+  a purge's wait for another reaper's deletion (a kernel-blocked unlink delays it) and the holders-scan prefilter's
+  even-spread assumption; so were S3C-2's per-turn costs (`docs/DECISIONS.md:672`).
 - **Steps:** sync the large catalog; `purge(.all)`; wait out the deletion grace (default 10 s,
   `StoragePolicy.swift:86`); `performMaintenance(timeBudget: 60)`; three times. Record with System Trace.
-- **Observe:** total reclaim time (the `gc` and `eviction` intervals in the probe log); `unlink` durations in System
-  Trace, and how many exceed 2 ms and 5 ms per 10,000. P-13's own figure, the deletion units' p99, needs the bundle
-  (DT-PERF-01), as does a device run of S3B-12's probe (§5 row :297).
-- **Pass:** recorded: the total against `gc_total_s_max` (2 s); the stall rate and maxima beside the host's. The
-  per-unit p99 is judged by the owner's ruling only when the bundle runs (`docs/DECISIONS.md:380`).
+- **Observe:**
+  - Total reclaim time (the `gc` and `eviction` intervals in the probe log); `unlink` durations in System Trace, and
+    how many exceed 2 ms and 5 ms per 10,000.
+  - The store's actor during the purge and the maintenance, in the same trace and in a second pass with Time
+    Profiler: the longest interval a thread runs `AssetStore` frames without blocking, and any `unlink` stall inside
+    one. Each `purge(_:)` call's time to return (the probe app times its own calls), and any `unlink` stall on
+    another thread while it waits. The kit times no store turn, so these are estimates, not C2 figures.
+  - Not observable here: the prefilter's spread. It changes only how long a holders scan takes inside a turn,
+    since a clear bit proves a blob is not wanted whatever the spread (`HolderScan.swift:69-70`).
+  - The bench bundle on the device (DT-PERF-01) gives the figures this test cannot: P-13's own, the deletion units'
+    p99, and a device run of S3B-12's probe (§5 row :297); and the C2 figures of C-22's holds, `apply`'s chunked
+    eviction and S3C-2's shared-blob turns, in `CleanupBenchmarks`
+    (`Tests/ZTronAssetKitBenchmarks/BenchCleanup.swift:18`; Stage 5's host figures at
+    `.worktrees/merge-check/.verify-logs/benchmarks.log:28-54`, in the main checkout). Those cases run over the fake
+    file system (`BenchCleanup.swift:12-15`), so they measure the device's CPU, not its APFS.
+- **Pass:** recorded: the total against `gc_total_s_max` (2 s); the stall rate and maxima beside the host's; the
+  longest store interval and the purges' waits as evidence. The per-unit p99 is judged by the owner's ruling only
+  when the bundle runs (`docs/DECISIONS.md:380`).
 
 ### DT-PERF-04 · The main thread, the prefetch window and publications at 10,000
 
@@ -843,7 +864,7 @@ These need the carousel app adopted: Stage 4 was cancelled, and adoption is a fo
 | S3-B-022 (rename, `lstat`/`pread` errors, the undo window) | DT-STO-06 |
 | S3-B-036 (legacy migration on a device) | DT-MIG-01 |
 | S3-B-037 (the incarnation check) | DT-STO-07 |
-| S3-B-038 (C-22's holds and others, on a device) | DT-PERF-03 |
+| S3-B-038 (C-22's holds, `apply`'s chunked eviction, a purge's wait, the prefilter's spread) | DT-PERF-03 (traces; the purge's wait); DT-PERF-01 (the C2 figures); the prefilter's spread is not observable (DT-PERF-03) |
 | S3-B-046 (fresh ranged 206) | DT-BG-05 |
 | S3-B-047 (`taskDescription` across a relaunch) | DT-BG-06 |
 | S3-B-049 (resume data end to end) | DT-BG-04 |
@@ -864,7 +885,7 @@ These need the carousel app adopted: Stage 4 was cancelled, and adoption is a fo
 | S3-B-127 (the Apple-hosting setup) | DT-APL-01 |
 | S3-B-130 (simulator only; the iOS 15 runtime) | DT-FLR-01 |
 | ADR-057's Stage 5 lists (`docs/DECISIONS.md:644`, `:646`, `:652`, `:659`) | the S3-B rows above; UIKit's second handler DT-BG-02; the live write order and the last priority DT-BG-08; C2 on a device DT-PERF-01, DT-PERF-02; `OSLogStore` DT-OBS-01; S3-B-066 DT-STO-02 |
-| ADR-057's Not verified, device items (`docs/DECISIONS.md:669-674`) | thermal and Low Power Mode DT-PWR-01; `NWPathMonitor` DT-NET-02; S3C-2's per-turn costs DT-PERF-03; the barrier's admission wait DT-PERF-05; WP-A/WP-H's changed lines through the flows of §4 to §8 and DT-FLR-01 |
+| ADR-057's Not verified, device items (`docs/DECISIONS.md:669-674`) | thermal and Low Power Mode DT-PWR-01; `NWPathMonitor` DT-NET-02; UIKit's second handler DT-BG-02; the live write order and the last priority DT-BG-08; a rewrite to an old task identifier after its name was created anew DT-BG-08 if it occurs, else §14; S3C-2's per-turn costs and S3-B-038's items DT-PERF-03, DT-PERF-01; the barrier's admission wait DT-PERF-05; WP-A/WP-H's changed lines through the flows of §4 to §8 and DT-FLR-01 |
 | ARCHITECTURE §14's device list (`docs/ARCHITECTURE.md:981`) | §4, §5, DT-STO-05, DT-STO-06, DT-NET-01, DT-NET-04, DT-FLR-01, DT-MIG-01 |
 
 ## 14. Not in this plan
@@ -873,3 +894,9 @@ These need the carousel app adopted: Stage 4 was cancelled, and adoption is a fo
   host (part of S3-B-021), are host tasks for `docs/VERIFICATION.md`.
 - Host-only gaps (the loopback server's LAN refusal, S3-B-108; the model tests' liveness phase, S3-B-079) and the
   accepted risks without a device angle are in `docs/RESIDUAL-RISKS.md`.
+- Staging a priority rewrite to an old task identifier after the same attempt's name was created anew (WP-D,
+  `docs/DECISIONS.md:673`; `docs/adr-drafts/s3d.md:141-142`). The name must be re-created between the coordinator's
+  listing and the live driver's write (`BackgroundSupport.swift:446-484`). Only a seam holds that window open, and
+  the only hold, `holdNextPriority()`, is the fake driver's
+  (`Tests/ZTronAssetTransportTests/FakeBackgroundSessionDriver.swift:264`); a debugger pause stops the whole app.
+  DT-BG-08 records such a write if one occurs; otherwise the item stays as ADR-057 lists it, checked by reading only.
