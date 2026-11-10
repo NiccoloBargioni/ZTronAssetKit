@@ -362,7 +362,8 @@ tests, DT-…, none of them run, `DEVICE-TEST-PLAN.md:5`), `docs/RESIDUAL-RISKS.
 
 - **No device run.** Every result in §4 comes from this Mac or the iOS 27.0 Simulator (RES-86).
 - **Nothing re-run on 10 Nov.** Every run in §2 is from 6-7 Nov. The 10 Nov resume (ORCH:623-627) planned only the
-  documents' workflow, and this file's writer built and ran nothing.
+  documents' workflow, and this file's writer built and tested nothing; its only checks read git objects (§1's `git
+  diff`, §3.1's Q-6 stronger form).
 - **On `e840b0e`, not on `45df2e1`:** runs B, D, F and G, none repeated on `45df2e1`, and C, which I repeats there as
   a `--full`. Only `///` lines differ between the two heads (§1).
 - **The benchmark bundle on the iOS Simulator:** built, never run (`sim/sim.log:2`; `DECISIONS.md:390`, `:394`). It is
@@ -387,7 +388,7 @@ tests, DT-…, none of them run, `DEVICE-TEST-PLAN.md:5`), `docs/RESIDUAL-RISKS.
     rule-1 mean of 30 or less"): the step is one `swift test --sanitize=thread` invocation (`verify.sh:114`); it
     reports the seven bundles one after another (`full5:66-72`; Sync's 713 tests at `:67`), which fits them running in
     sequence within that invocation. The "alone" reading rests on the step's structure. No load was logged during the
-    step, so the paired alternative is not shown; the condition was not measured.
+    step, so the paired alternative is not shown; the condition was not measured. RES-38.
 - **No separate `--perf` run**, as for `e840b0e`: close point 10's "TSan and `--perf` on an idle host" is met through
   stand-ins (`DECISIONS.md:674`). Stage 5's benchmarks step printed loads from 2.45 to 16.27 (§4.4).
 - **Host details** that no Stage 5 log prints: the CPU model and the Xcode version (§1).
@@ -505,7 +506,7 @@ minus the entries ruled, fixed or superseded since they were written, `DECISIONS
 | Item | Where |
 |---|---|
 | The second sentence of `DECISIONS.md:685` (the first is in the WP-F table's point-8 row): ADR-050's amendment for P-13's records (P3, P4) and the P5 corrections ADR-057's pass made (ARCHITECTURE §12 S2-27, `BlobUnits.swift:155-162`) are not independently verified until their verifier checks them; ADR-050 says the same of P3 and P4 (`DECISIONS.md:383`) | not independently verified: ORCH:569-571 records the ADR-057 docs workflow's round-2 verifier at 0 blocking and P3-P5 as fixed, not a check of these claims |
-| The `///` doc comments made true at the merge "are recorded as this pass's, not independently verified" (`DECISIONS.md:690`) | not independently verified |
+| The `///` doc comments made true at the merge "are recorded as this pass's, not independently verified" (`DECISIONS.md:690`) | not independently verified; ORCH:569 records round 1's verifier finding `SyncEngine.swift:13-18`'s continuation rule untrue of the code, and round 2 at 0 blocking; no check of each comment is recorded |
 
 ### 5.5 The earlier merges' Not-verified lists, by reference
 

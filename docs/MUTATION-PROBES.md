@@ -265,7 +265,7 @@ No mutant was assigned to WP-A/WP-H in Stage 3 (`docs/adr-drafts/s3ah.md:20`).
   - M-N-11: the harness counts only the injected file-system seam's calls, so a direct `FileManager` call in `lookup` would not be seen (a design limit the agent recorded).
 - **WP-F:** r2b, b22-no-run-owner, ps-write-always's swept-first side, breakerReadLive, s1-late-start, e1-R1's kill table and `i5-pin-fold` (§6.1); `docs/RESIDUAL-RISKS.md` carries them with the re-open route.
 - **WP-D:** ME survives (device-only, §6.3); MG is caught by the whole suite only, not reliably by its own test.
-- **WP-C:** C is masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record (`.build-s3c/mut/run-mutants.sh:35`). F and S are masked in both (oracle-F/S and flows-F/S passed). Of the runs on record, only WP-B's targeted tests kill C, F and S (`s3c.md:491-497`).
+- **WP-C:** C is masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record (`.build-s3c/mut/run-mutants.sh:35`). F and S are masked in both (oracle-F/S and flows-F/S passed). Of the runs on record, only WP-B's targeted tests kill C, F and S (`s3c.md:491-497`); in the crash hunter's run C also fails EvictionTests' R-SYN-11 case (`.build-orchestrator/s3-probes/crash/S3-CRAS-05-mutants-run.txt:63-67`).
 - **WP-G:** the mutants were not re-run on the merged head.
 
 ## Appendix A. Discovery diffs
