@@ -195,7 +195,7 @@ Sources: ADR-057's WP-F records (`docs/DECISIONS.md:684`) and `docs/adr-drafts/s
 | p2-after-verdict-never | 2/2, 2 issues each: AfterVerdictSpace `:160`, `:161` | swept first, the only order that reaches it |
 | p2-after-verdict-true | killed 2/2 swept first by the cycle-23 correctness verifier on a snapshot of `d88bdb1` (AfterVerdictSpace `:171`, `:172`; `.build-orchestrator/s3f-probes-c23/correct-mut-summary.txt`); not independently verified, and nobody repeated the run | swept first |
 
-**Earlier cycles** (ADR-057, `docs/DECISIONS.md:684`): noDispatchOwedFlag (cycle 12) and noFlagPump (cycle 13) killed (`EngineFollowBarrierSurvivorTests.swift:76-77`, `:21-22`); spaceFailureEpochDropped killed in cycle 16 (`EngineFollowBarrierSpaceEpochTests.swift:71`); of cycle 21's twelve, b23-no-lane, b23-no-kind and f7 killed in cycle 22 (`4ca9044`) and r7 removed; laneJobsWalkAlways equivalent under S3-R19, alarmAtPark equivalent by reasoning and s1-groups-after equivalent (the purge's first turn removes no group); followSkipsPerTurnUnbounded and applyWalkedDrop cost only. M5 and M6, the R-SYN-15 mutants, are reconstructed and fail the new R-SYN-15 test (`s3f.md:11999-12000`).
+**Earlier cycles** (ADR-057, `docs/DECISIONS.md:684`): noDispatchOwedFlag (cycle 12) and noFlagPump (cycle 13) killed (`EngineFollowBarrierSurvivorTests.swift:76-77`, `:21-22`); spaceFailureEpochDropped killed in cycle 16 (`EngineFollowBarrierSpaceEpochTests.swift:71`); of cycle 21's twelve, b23-no-lane, b23-no-kind and f7 killed in cycle 22 (`4ca9044`) and r7 removed; laneJobsWalkAlways equivalent under S3-R19, alarmAtPark equivalent by reasoning and s1-groups-after equivalent (the purge's first turn removes no group); followSkipsPerTurnUnbounded and applyWalkedDrop cost only. M5 and M6, the R-SYN-15 mutants, are reconstructed (`s3f.md:11999-12000`) and fail the new R-SYN-15 test (`s3f.md:9096-9102`, `:758`).
 
 **WP-F's recorded survivors and unkilled mutants** (ADR-057, `docs/DECISIONS.md:684` and `:640`; `s3f.md:8313-8322`):
 
@@ -234,9 +234,10 @@ Sources: ADR-057's WP-F records (`docs/DECISIONS.md:684`) and `docs/adr-drafts/s
 `docs/adr-drafts/s3c.md` "Mutant evidence (S3-R3)" (`:470-500`), in the scratch copy `.build-s3c/mut/src`:
 
 - M-S-07, M-S-08 and M-S-20 killed (§4).
-- Z (`fatalError` in `BlobDeletionUnit.run`) and X (`fatalError` in `copyBlob`): killed by `OracleTests` and `CleanupFlowCrashTests`.
+- Z (`fatalError` in `BlobDeletionUnit.run`): killed by `OracleTests` (`BlobUnits.swift:169: Fatal error: S3MUT Z`) and by `CleanupFlowCrashTests`.
+- X (`fatalError` in `copyBlob`): killed by `CleanupFlowCrashTests` (`AssetStore+Publish.swift:358: Fatal error: S3MUT X: copyBlob ran`). Every shipped test passed it, and the oracle was not run against X (`s3c.md:484-485`, `.build-s3c/mut/run-mutants.sh:33`).
 - G (`deletionBlocker` answers `.none` for every doomed key): killed by the grace- and acknowledgement-aware audit (235 issues in `OracleTests`, 363 in `CleanupFlowCrashTests`).
-- C (the reaper ignores the commit blocker), F (no acknowledged snapshot needed) and S (no grace): masked in WP-C's oracle and flows by another guard of `deletionBlocker`, and killed by WP-B's targeted tests (`StoreDeletionTests`, `LeaseTests`, `StoreRecoveryTests`; the confirmer's runs). The hunter's suggestion of commit faults inside the oracle's sequences, to reach C, was not made.
+- C (the reaper ignores the commit blocker), F (no acknowledged snapshot needed) and S (no grace): each masked by another guard of `deletionBlocker`, and killed by WP-B's targeted tests (`StoreDeletionTests`, `LeaseTests`, `StoreRecoveryTests`; the confirmer's runs; `s3c.md:491-497`). C: masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record (`run-mutants.sh:35`). F and S: masked in both (oracle-F/S and flows-F/S passed). The hunter's suggestion of commit faults inside the oracle's sequences, to reach C, was not made.
 
 ### 6.5 WP-B
 
@@ -264,7 +265,7 @@ No mutant was assigned to WP-A/WP-H in Stage 3 (`docs/adr-drafts/s3ah.md:20`).
   - M-N-11: the harness counts only the injected file-system seam's calls, so a direct `FileManager` call in `lookup` would not be seen (a design limit the agent recorded).
 - **WP-F:** r2b, b22-no-run-owner, ps-write-always's swept-first side, breakerReadLive, s1-late-start, e1-R1's kill table and `i5-pin-fold` (§6.1); `docs/RESIDUAL-RISKS.md` carries them with the re-open route.
 - **WP-D:** ME survives (device-only, §6.3); MG is caught by the whole suite only, not reliably by its own test.
-- **WP-C:** C, F and S are masked in WP-C's oracle and flows, killed only by WP-B's targeted tests.
+- **WP-C:** C is masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record (`.build-s3c/mut/run-mutants.sh:35`). F and S are masked in both (oracle-F/S and flows-F/S passed). All three are killed only by WP-B's targeted tests.
 - **WP-G:** the mutants were not re-run on the merged head.
 
 ## Appendix A. Discovery diffs
