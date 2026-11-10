@@ -1,0 +1,126 @@
+::: STEP gates-selftest
+SELFTEST: PASS
+::: OK   gates-selftest
+::: STEP harness
+GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f
+HARNESS: unchanged since harness-frozen
+::: OK   harness
+::: STEP toolchain
+swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)
+toolchain OK: Swift 6.4 >= 6.3
+::: OK   toolchain
+::: STEP build-debug
+Build complete! (7,08 s)
+::: OK   build-debug
+::: STEP build-release
+Build complete! (32,91 s)
+::: OK   build-release
+::: STEP build-ios
+::: OK   build-ios
+::: STEP tests-run-1-of-3
+Build complete! (9,61 s)
+✔ Test run with 165 tests in 17 suites passed after 0.597 seconds.
+✔ Test run with 713 tests in 58 suites passed after 365.785 seconds.
+✔ Test run with 500 tests in 65 suites passed after 176.586 seconds.
+✔ Test run with 89 tests in 18 suites passed after 61.434 seconds.
+✔ Test run with 90 tests in 12 suites passed after 2.101 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.341 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.390 seconds.
+::: OK   tests-run-1-of-3
+::: STEP tests-run-2-of-3
+Build complete! (0,46 s)
+✔ Test run with 165 tests in 17 suites passed after 0.577 seconds.
+✔ Test run with 713 tests in 58 suites passed after 366.566 seconds.
+✔ Test run with 500 tests in 65 suites passed after 175.644 seconds.
+✔ Test run with 89 tests in 18 suites passed after 61.442 seconds.
+✔ Test run with 90 tests in 12 suites passed after 2.167 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.356 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.393 seconds.
+::: OK   tests-run-2-of-3
+::: STEP tests-run-3-of-3
+Build complete! (0,62 s)
+✔ Test run with 165 tests in 17 suites passed after 0.579 seconds.
+✔ Test run with 713 tests in 58 suites passed after 367.277 seconds.
+✔ Test run with 500 tests in 65 suites passed after 176.712 seconds.
+✔ Test run with 89 tests in 18 suites passed after 61.454 seconds.
+✔ Test run with 90 tests in 12 suites passed after 2.107 seconds.
+✔ Test run with 71 tests in 10 suites passed after 0.349 seconds.
+✔ Test run with 104 tests in 14 suites passed after 0.386 seconds.
+::: OK   tests-run-3-of-3
+::: STEP coverage
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.68% (1247/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.99% (1464/1494) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.32% (3383/3406) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.58% (8415/8624) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 95.10% (12374/13011) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.10% (2427/2449) min=70.0 OK
+COVERAGE overall lines=96.94% (29310/30235) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.58% max=3.0% OK
+COVERAGE: PASS
+::: OK   coverage
+::: STEP tsan
+Build complete! (74,50 s)
+✔ Test run with 165 tests in 17 suites passed after 4.046 seconds.
+✔ Test run with 713 tests in 58 suites passed after 1739.354 seconds.
+✔ Test run with 500 tests in 65 suites passed after 638.178 seconds.
+✔ Test run with 89 tests in 18 suites passed after 65.473 seconds.
+✔ Test run with 90 tests in 12 suites passed after 10.671 seconds.
+✔ Test run with 71 tests in 10 suites passed after 1.594 seconds.
+✔ Test run with 104 tests in 14 suites passed after 1.430 seconds.
+::: OK   tsan
+::: STEP benchmarks
+R-SYN-11 purgeWhileOwed, a purge of everything while 10,000 re-routes are owed, at 10,000: heartbeat [5.010625, 4.873625, 4.949125] ms, best 4.873625 ms; longest held turn [0.000833, 0.001084, 0.00075] ms, best 0.00075 ms; the commit's own turn [5.006541, 4.869542, 4.944958] ms; while owed [3.082, 3.053125, 3.055792] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 5.01 ms, while owed 3.08 ms, drain 0.00 ms; commit turn 5.01 ms; 1 held turns, longest 0.00 ms; made at the commit 0, owed 10000 ids, 10000 pairs in 1 batches, 0 at the drain; made per turn []; re-routed 0; committed true, served true, answered 0, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 4.87 ms, while owed 3.05 ms, drain 0.01 ms; commit turn 4.87 ms; 1 held turns, longest 0.00 ms; made at the commit 0, owed 10000 ids, 10000 pairs in 1 batches, 0 at the drain; made per turn []; re-routed 0; committed true, served true, answered 0, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 4.95 ms, while owed 3.06 ms, drain 0.00 ms; commit turn 4.94 ms; 1 held turns, longest 0.00 ms; made at the commit 0, owed 10000 ids, 10000 pairs in 1 batches, 0 at the drain; made per turn []; re-routed 0; committed true, served true, answered 0, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19]
+✔ Test "R-SYN-11: a purge while 10,000 re-routes are owed holds the engine's actor at most C2's 10 ms" passed after 0.945 seconds.
+◇ Test "R-SYN-11: a commit at the fit edge re-routes at once or owes, holding the engine's actor at most C2's 10 ms per turn" started.
+R-SYN-11 commitFitBoundaryTurns at once: heartbeat [1.329959, 1.335833, 1.339375] ms, best 1.329959 ms; longest held turn [0.0, 0.0, 0.0] ms, best 0.0 ms; the commit's own turn [1.326959, 1.332125, 1.336125] ms (budget 10.0 ms best); runs [heartbeat commit 1.33 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 1.33 ms; 0 held turns, longest 0.00 ms; made at the commit 255, owed 0 ids, 0 pairs in 0 batches, 0 at the drain; made per turn []; re-routed 255; committed true, served true, answered 0, notFound 0, groups answered false, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 1.34 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 1.33 ms; 0 held turns, longest 0.00 ms; made at the commit 255, owed 0 ids, 0 pairs in 0 batches, 0 at the drain; made per turn []; re-routed 255; committed true, served true, answered 0, notFound 0, groups answered false, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 1.34 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 1.34 ms; 0 held turns, longest 0.00 ms; made at the commit 255, owed 0 ids, 0 pairs in 0 batches, 0 at the drain; made per turn []; re-routed 255; committed true, served true, answered 0, notFound 0, groups answered false, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19]
+R-SYN-11 commitFitBoundaryTurns owed: heartbeat [1.17675, 1.149667, 1.139083] ms, best 1.139083 ms; longest held turn [1.176625, 1.150125, 1.13975] ms, best 1.13975 ms; the commit's own turn [0.147, 0.145792, 0.144875] ms (budget 10.0 ms best); runs [heartbeat commit 0.15 ms, while owed 0.00 ms, drain 1.18 ms; commit turn 0.15 ms; 1 held turns, longest 1.18 ms; made at the commit 0, owed 256 ids, 256 pairs in 1 batches, 256 at the drain; made per turn [256]; re-routed 256; committed true, served true, answered 0, notFound 0, groups answered false, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 0.15 ms, while owed 0.00 ms, drain 1.15 ms; commit turn 0.15 ms; 1 held turns, longest 1.15 ms; made at the commit 0, owed 256 ids, 256 pairs in 1 batches, 256 at the drain; made per turn [256]; re-routed 256; committed true, served true, answered 0, notFound 0, groups answered false, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 0.15 ms, while owed 0.00 ms, drain 1.14 ms; commit turn 0.14 ms; 1 held turns, longest 1.14 ms; made at the commit 0, owed 256 ids, 256 pairs in 1 batches, 256 at the drain; made per turn [256]; re-routed 256; committed true, served true, answered 0, notFound 0, groups answered false, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19]
+✔ Test "R-SYN-11: a commit at the fit edge re-routes at once or owes, holding the engine's actor at most C2's 10 ms per turn" passed after 0.092 seconds.
+◇ Test "R-SYN-11: a commit that binds 10,000 user waiters after an apply owes nothing and holds the engine's actor at most C2's 10 ms" started.
+R-SYN-11 waitersBound, 10,000 user waiters all bound, at 10,000: heartbeat [6.105042, 6.031375, 5.980291] ms, best 5.980291 ms; longest held turn [0.0, 0.0, 0.0] ms, best 0.0 ms; the commit's own turn [6.099917, 6.026708, 5.975833] ms; while owed [0.0, 0.0, 0.0] ms; followedLane [] ms (budget 10.0 ms best); runs [heartbeat commit 6.11 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 6.10 ms; 0 held turns, longest 0.00 ms; made at the commit 0, owed 0 ids, 0 pairs in 0 batches, 0 at the drain; made per turn []; re-routed 0; committed true, served true, answered 10000, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 10.34 9.18 9.19, heartbeat commit 6.03 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 6.03 ms; 0 held turns, longest 0.00 ms; made at the commit 0, owed 0 ids, 0 pairs in 0 batches, 0 at the drain; made per turn []; re-routed 0; committed true, served true, answered 10000, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 10.34 9.18 9.19 -> 9.91 9.11 9.16, heartbeat commit 5.98 ms, while owed 0.00 ms, drain 0.00 ms; commit turn 5.98 ms; 0 held turns, longest 0.00 ms; made at the commit 0, owed 0 ids, 0 pairs in 0 batches, 0 at the drain; made per turn []; re-routed 0; committed true, served true, answered 10000, notFound 0, groups answered true, D's job false, joins behind 0, run claims on H none, on D 0, fetched 0, layers [], publishing false, followedLane - ms, throttled false; violations []; load 9.91 9.11 9.16 -> 9.91 9.11 9.16]
+✔ Test "R-SYN-11: a commit that binds 10,000 user waiters after an apply owes nothing and holds the engine's actor at most C2's 10 ms" passed after 2.504 seconds.
+✘ Suite "SyncBenchmarks" failed after 465.267 seconds with 6 issues.
+↳ /// P-4, P-7, P-11 and P-14 (WP-F), release configuration. Every threshold comes from `QualityBudgets`.
+↳ ///
+↳ /// P-4 is the median of 21 plans after 3 warm-ups at 10,000 and 20,000 entries. P-7 syncs a synthetic catalog
+↳ /// streamed by `FakeTransferStep.stageGenerated` into real files in a directory inside this repository and samples
+↳ /// the resident size (`MemoryProbe`) at every transfer start and after the run; it runs a quarter catalog first, so
+↳ /// "does not grow with catalog size" compares the two deltas. P-11 times a sync of the real HTTP source against the
+↳ /// loopback server with real latency at concurrency 1 and at the configured concurrency (benchmarks are exempt from
+↳ /// the no-sleep rule, sync-2 S2-14). P-14 drives a sync to quiescence on `ManualTimeSource` and reads the engine's
+↳ /// census plus the environment's.
+◇ Suite "TransportBenchmarks" started.
+◇ Test "P-10: 500 small assets over a loopback server use at most connections_max TCP connections" started.
+P-10 500 assets: 8 TCP connections (max 8), 500 requests, 0.042326041 seconds
+✔ Test "P-10: 500 small assets over a loopback server use at most connections_max TCP connections" passed after 0.044 seconds.
+✔ Suite "TransportBenchmarks" passed after 0.044 seconds.
+◇ Suite "BudgetsBenchmarks" started.
+◇ Test "every budget in quality-gates.json is present with numeric thresholds the benchmarks can read" started.
+✔ Test "every budget in quality-gates.json is present with numeric thresholds the benchmarks can read" passed after 0.001 seconds.
+✔ Suite "BudgetsBenchmarks" passed after 0.001 seconds.
+✘ Suite ZTronAssetKitBenchmarks failed after 626.399 seconds with 6 issues.
+↳ /// The one parent suite of every benchmark (SPEC §6, sync-2 S2-14, ADR-010 as amended by ADR-046).
+↳ ///
+↳ /// `.serialized` applies to every suite nested in it, so no two benchmarks run at once: independent top-level
+↳ /// suites would run concurrently and contaminate the timing and memory budgets (P-1, P-6, P-7, P-9, P-12). The name
+↳ /// contains "Benchmarks", so `--skip Benchmarks` / `--filter Benchmarks` select exactly this tree. Each work package
+↳ /// adds its benchmarks as a nested suite in an `extension ZTronAssetKitBenchmarks` in its own file
+↳ /// (ARCHITECTURE §11: `BenchModel.swift` WP-A, `BenchStorage.swift` WP-B, `BenchTransport.swift` WP-D,
+↳ /// `BenchSync.swift` WP-F, `BenchKit.swift` WP-G), never as a new top-level suite.
+✘ Test run with 88 tests in 8 suites failed after 626.400 seconds with 6 issues.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)
+::: FAIL benchmarks (full log: .verify-logs/benchmarks.log)
+::: STEP trace
+TRACE requirements=90 (MUST=78) budgets=14 tests-with-ids=1661
+TRACE: PASS
+::: OK   trace
+::: STEP unsafe
+UNSAFE escapes found=0 max=3
+UNSAFE: PASS
+::: OK   unsafe
+::: STEP docs
+DOCS public declarations=1281 documented=1281 exempt=0 fraction=100.0%
+DOCS: PASS
+::: OK   docs
+::: SUMMARY mode=--full steps-failed=1
+VERIFY: FAIL (1 failed: benchmarks)

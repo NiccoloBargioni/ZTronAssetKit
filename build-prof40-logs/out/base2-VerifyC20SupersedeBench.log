@@ -1,0 +1,29 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "VerifyC20SupersedeBench" started.
+◇ Test "PROBE-C20C-SUPERSEDE-C2" started.
+PROBE-C20C-SUPERSEDE-C2 warm-up 1,000: supersede window 4.36975 ms (O gone true); D holds 1000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 1.899083 ms
+PROBE-C20C-SUPERSEDE-C2 10,000 run 0: supersede window 42.148666 ms (O gone true); D holds 10000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 3.759791 ms; load { 311.92 765.97 452.69 }
+PROBE-C20C-SUPERSEDE-C2 10,000 run 1: supersede window 41.900875 ms (O gone true); D holds 10000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 4.332709 ms; load { 287.66 753.40 450.09 }
+PROBE-C20C-SUPERSEDE-C2 10,000 run 2: supersede window 41.067042 ms (O gone true); D holds 10000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 3.856208 ms; load { 287.66 753.40 450.09 }
+PROBE-C20C-SUPERSEDE-C2 10,000 members: supersede windows [42.148666, 41.900875, 41.067042] ms, best 41.067042 ms; runs [supersede window 42.148666 ms (O gone true); D holds 10000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 3.759791 ms, supersede window 41.900875 ms (O gone true); D holds 10000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 4.332709 ms, supersede window 41.067042 ms (O gone true); D holds 10000, E holds 1; o's waiter failure(ZTronAssetModel.AssetError.shutDown); follow turns longest 3.856208 ms]
+✘ Test "PROBE-C20C-SUPERSEDE-C2" recorded an issue at VerifyC20SupersedeBench.swift:193:9: Expectation failed: (windows.min() ?? .infinity) <= ZTronAssetKitBenchmarks.SyncBenchmarks.c2Budget
+↳ PROBE-C20C-SUPERSEDE-C2: the superseded publication's turn at most C2's 10 ms: [42.148666, 41.900875, 41.067042]
+↳ (windows.min() ?? .infinity) <= ZTronAssetKitBenchmarks.SyncBenchmarks.c2Budget → false
+↳   (windows.min() ?? .infinity) → 41.067042
+↳   ZTronAssetKitBenchmarks.SyncBenchmarks.c2Budget → 10.0
+✘ Test "PROBE-C20C-SUPERSEDE-C2" failed after 4.307 seconds with 1 issue.
+✘ Suite "VerifyC20SupersedeBench" failed after 4.307 seconds with 1 issue.
+↳ /// Scratch release probe (s3f close-out verification, cycle 20, correctness lens). Never committed.
+↳ ///
+↳ /// PROBE-C20C-SUPERSEDE-C2: `SyncBench.concentration(.publication)`'s shape (10,000 members converge on O's content
+↳ /// during an owed follow, O's publication held at its first store unit), then, as `timeCommit(.movedAway)` does, v4 maps
+↳ /// every member to D (one job, held) while the publication waits at the store, but v4 also gives O's own id a content of
+↳ /// its own (E), so no id wants O's content any more: the store refuses the publication (`.superseded`), and the
+↳ /// engine's `publicationFailed` re-routes every interest of O's job in one turn (`supersede`). The heartbeat's longest
+↳ /// wait from the publication's release until O's job is gone, best of three. The draft's C2 inventory row "`supersede`
+↳ /// of a superseded publication | O(N) re-routes in one turn | no figure".
+✘ Test run with 1 test in 1 suite failed after 4.307 seconds with 1 issue.
+Note: Some test targets reported failures:
+  - ZTronAssetKitBenchmarks (Swift Testing)

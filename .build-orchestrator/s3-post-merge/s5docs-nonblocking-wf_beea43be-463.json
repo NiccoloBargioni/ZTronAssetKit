@@ -1,0 +1,117 @@
+{
+  "summary": "ZTronAssetKit Stage 5 documents: one fix round for the 10 non-blocking items left by the converged part A and part B verifiers, with an independent verifier",
+  "agentCount": 2,
+  "logs": [
+    "Fix round write 1: 2 commits; **DEVICE-TEST-PLAN.md DT-PERF-06:**\n- The lag was observed only in host probes on macOS 27, which count the ids missing at return and time nothing (\"the observed bound\", docs/adr-drafts/k.md:1409; K4-COMMITPROMO: unseenAtReturn=1 in 5 of 5; :1726-1727).\n- Pass: figures are recorded beside \"the 0.2 s design bound and the host probes' unseenAtReturn=1\".\n\n**DT-PERF-01:** \"DT-PERF-06 needs no bundle\".\n\n**MUTATION-PROBES.md:268 and RES-60:** \"Of the runs on record, only WP-B's targeted tests kill C, F and S (s3c.md:491-497)\".\n\n**VERIFICATION.md §5.2, new bullet:**\n- S3B-13: 10k/5k ratio 2.71-2.86, about 0.5-1 ms each at 10,000, with the owner's P-8 run.\n- The chunked startGrace for S3-B-011 at maxEntries: grace start 37.31 ms.\n- Both are assigned to Stage 5 (DECISIONS.md:647; figures at :621) and not done. RES-44 and RES-45 carry them.\n\n**VERIFICATION.md §5.2, new TSan sub-bullet:**\n- DECISIONS.md:659's condition is quoted.\n- The step is one swift test --sanitize=thread invocation (verify.sh:114), which reports seven bundles (full5:66-72; Sync's 713 tests at :67).\n- No load was logged during the step, and the condition was not measured.\n\n**VERIFICATION.md §5.4, new Process block:**\n- DECISIONS.md:685's second sentence and :690, with ADR-050 at DECISIONS.md:383. Both are not independently verified.\n- ORCH:569-571 records round 2's verifier at 0 blocking and P3-P5 as fixed.\n\n**VERIFICATION.md §3.1:**\n- Q-6: the threshold is now the gate's \"carries its ID\" (gates.py:107, :111, :121), with SPEC.md:324's \"start with it\" noted. Measured: 90 requirements (78 MUST), 14 budgets, 1661 ID citations, and the stronger form holds for all 78 MUSTs and 14 budgets at 45df2e1.\n- New Q-3 Swift 6 mode row: Package.swift:94 and :10; full5:15-22.\n\n**VERIFICATION.md, smaller changes:**\n- §6.3 filter: --filter 'StorageBenchmarks/reclaim\\(\\)' (pm/docs-followup-items.md:50).\n- §5.1: DEVICE-TEST-PLAN.md:28-31.\n- §0: ORCH is read with git show 0f909f2:docs/ORCHESTRATION.md.\n\n**Diff d6cfd01..c609073 (33 insertions, 16 deletions):**\n- DEVICE-TEST-PLAN.md: 8 insertions, 8 deletions; still 925 lines.\n- MUTATION-PROBES.md: 1/1; still 1384 lines.\n- RESIDUAL-RISKS.md: 1/1; still 1627 lines.\n- VERIFICATION.md: 23/6; now 615 lines, was 598.",
+    "Fix round verify 1: 0 blocking / 4"
+  ],
+  "result": {
+    "fix": {
+      "rounds": [
+        {
+          "round": 1,
+          "write": {
+            "summary": "I applied all 10 non-blocking items and the optional DT-PERF-01 note on wp/s5docs in /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs. HEAD is c609073, `git status --porcelain` is empty, and only the four docs changed (`git diff --stat d6cfd01 HEAD`: 4 files, 33 insertions, 16 deletions). I checked each fix against the record it cites before applying it.\n\nWhat I checked:\n- **A1:** the probes use a ManualTimeSource and only print counts of missing ids (.build-orchestrator/l5k-probes-c4/ProbeK4CommitPromotion.swift:17, :37). k.md:1409 is \"The observed bound\" and k.md:1726-1727 is K4-COMMITPROMO 5 of 5.\n- **A2:** results-c2.txt has only the baseline, Z and G. The post-merge mut-recheck covers only the 11 survivors, so no other recorded run kills C, F or S.\n- **B1:** DECISIONS.md:647 and :621 match the figures, and RES-44 (S3B-13) and RES-45 (S3-B-011, the chunked startGrace) are the right entries.\n- **B2:** :685, :690 and :383 (inside ADR-050) match. ORCH:569-571 at 0f909f2 records round 2's verifier at 0 blocking and P3-P5 as fixed, but no check of these claims, so both caveats are written as not independently verified.\n- **B3:** verify.sh:114 is the TSan step's one `swift test --sanitize=thread` call. full5:66-72 lists the seven bundles, with Sync's 713 tests at :67. No load line appears in full5:64-73 or s5/tsan.log.\n- **B4:** gates.py:107, :111 and :121, and SPEC.md:324, are as cited.\n  - I checked the stronger form with a read-only script, /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/.build-s5docs/trace_strong.py, over git objects at 45df2e1.\n  - The script reproduced s5/trace.log:1 exactly (requirements=90, MUST=78, budgets=14, tests-with-ids=1661, no unknown IDs). It matched all 104 rows of docs/TRACEABILITY.md with 0 mismatches.\n  - It found no MUST or budget without a test whose display name starts with its ID, so I added that sentence.\n- **B5:** Package.swift:94 is `swiftLanguageModes: [.v6]` and :10 is `StrictConcurrency=complete`. The file is unchanged since 45df2e1, and full5:15-22 holds the three build steps.\n- **B6:** docs-followup-items.md:50 holds the escaped filter.\n- **B7:** DEVICE-TEST-PLAN.md:28-31 matches, and Tests/ZTronAssetTransportTests/FakeBackgroundSessionDriver.swift exists at HEAD and at 45df2e1.\n- **B8:** the `git show 0f909f2:docs/ORCHESTRATION.md` command works.\n\nWhere I departed from the literal fix text, and why:\n1. **A1:**\n   - I used double quotes for \"the observed bound\", which is DEVICE-TEST-PLAN.md's quote style.\n   - I re-wrapped both items at the file's ~118-column width. The line count did not change.\n2. **A2:**\n   - At MUTATION-PROBES.md:268 I also added (`s3c.md:491-497`). That line had no citation before, and this way both narrowed sentences carry the citation the ruling keeps.\n   - In RES-60 I followed the ruling's words exactly, which drops \"mutants\" (the heading still names them).\n   - Both sentences start with a capital \"Of\".\n3. **Optional DT-PERF-01:** I wrote it as \"; DT-PERF-06 needs no bundle.\" on the same line, which reaches 120 columns. A two-line version shifted lines 889 and 911, which VERIFICATION.md cites. I had first committed that two-line version and then amended my own commit; it was never pushed and has no upstream.\n4. **B1:**\n   - I added a bold lead, **S3B-13 and S3-B-011:**, and put the citations in backticks, to match §5.2's style.\n   - The bullet sits after the bullet on the benchmark bundle on the iOS Simulator.\n5. **B2:**\n   - I added a separate block, **Process** (`:675`, outside the list), with a two-row table after the WP-F table, instead of adding a row to the WP-F table (that table's label is `:674`).\n   - Row 1 paraphrases the second sentence of :685, writing \"ADR-057's pass\" where the ADR says \"this pass\". It notes that the first sentence is already the point-8 row.\n   - Row 1 cites `DECISIONS.md:383` in full, because a bare `:383` would have read as a line of BlobUnits.swift.\n   - Row 2 quotes :690.\n   - The Where column adds what ORCH:569-571 records.\n6. **B3:**\n   - It is a sub-bullet of \"Loads not printed\" in §5.2, beside WP-C's quiet-host TSan item.\n   - I wrote \"in sequence within that invocation\" instead of the ruling's \"inside one process\". The log shows one invocation reporting seven bundle runs, and no record shows they ran in one OS process.\n   - I added \"Sync's 713 tests at `:67`\" so the Sync bundle's line is identified.\n   - It says the condition was not measured.\n7. **B4:** I kept \"no unknown ID\" in the threshold.\n8. **B5:**\n   - The row sits before the Q-3 TSan row.\n   - The key column says \"none: the manifest sets it, and no gate checks it\".\n   - I added \"the committed manifest, unchanged since `45df2e1`\".\n9. **B6:**\n   - The citation is in the sentence after the code block, using §0's short name `pm/`.\n   - I kept \"the exact command lines were not logged\", because the record describes the filter rather than logging a command line.\n   - Row D is unchanged.\n10. **B7:** the fake driver is cited by its path only, with no line number.\n11. **B8:** applied as written.\n\nScratch files are in the git-ignored .build-s5docs/: fix_nb1.py, fix_nb1_dtp.py, fix_nb1_ver.py, trace_strong.py, nb1-msg-1.txt and nb1-msg-2.txt. fix_nb1.py's DEVICE-TEST-PLAN.md output was reverted with `git checkout` and redone by fix_nb1_dtp.py.",
+            "commits": [
+              "116f28f Narrow the C/F/S kill claim and DT-PERF-06's bound to the records (docs/DEVICE-TEST-PLAN.md, docs/MUTATION-PROBES.md, docs/RESIDUAL-RISKS.md)",
+              "c609073 Carry ADR-057's remaining Stage 5 items in VERIFICATION.md (docs/VERIFICATION.md)"
+            ],
+            "counts": "**DEVICE-TEST-PLAN.md DT-PERF-06:**\n- The lag was observed only in host probes on macOS 27, which count the ids missing at return and time nothing (\"the observed bound\", docs/adr-drafts/k.md:1409; K4-COMMITPROMO: unseenAtReturn=1 in 5 of 5; :1726-1727).\n- Pass: figures are recorded beside \"the 0.2 s design bound and the host probes' unseenAtReturn=1\".\n\n**DT-PERF-01:** \"DT-PERF-06 needs no bundle\".\n\n**MUTATION-PROBES.md:268 and RES-60:** \"Of the runs on record, only WP-B's targeted tests kill C, F and S (s3c.md:491-497)\".\n\n**VERIFICATION.md §5.2, new bullet:**\n- S3B-13: 10k/5k ratio 2.71-2.86, about 0.5-1 ms each at 10,000, with the owner's P-8 run.\n- The chunked startGrace for S3-B-011 at maxEntries: grace start 37.31 ms.\n- Both are assigned to Stage 5 (DECISIONS.md:647; figures at :621) and not done. RES-44 and RES-45 carry them.\n\n**VERIFICATION.md §5.2, new TSan sub-bullet:**\n- DECISIONS.md:659's condition is quoted.\n- The step is one swift test --sanitize=thread invocation (verify.sh:114), which reports seven bundles (full5:66-72; Sync's 713 tests at :67).\n- No load was logged during the step, and the condition was not measured.\n\n**VERIFICATION.md §5.4, new Process block:**\n- DECISIONS.md:685's second sentence and :690, with ADR-050 at DECISIONS.md:383. Both are not independently verified.\n- ORCH:569-571 records round 2's verifier at 0 blocking and P3-P5 as fixed.\n\n**VERIFICATION.md §3.1:**\n- Q-6: the threshold is now the gate's \"carries its ID\" (gates.py:107, :111, :121), with SPEC.md:324's \"start with it\" noted. Measured: 90 requirements (78 MUST), 14 budgets, 1661 ID citations, and the stronger form holds for all 78 MUSTs and 14 budgets at 45df2e1.\n- New Q-3 Swift 6 mode row: Package.swift:94 and :10; full5:15-22.\n\n**VERIFICATION.md, smaller changes:**\n- §6.3 filter: --filter 'StorageBenchmarks/reclaim\\(\\)' (pm/docs-followup-items.md:50).\n- §5.1: DEVICE-TEST-PLAN.md:28-31.\n- §0: ORCH is read with git show 0f909f2:docs/ORCHESTRATION.md.\n\n**Diff d6cfd01..c609073 (33 insertions, 16 deletions):**\n- DEVICE-TEST-PLAN.md: 8 insertions, 8 deletions; still 925 lines.\n- MUTATION-PROBES.md: 1/1; still 1384 lines.\n- RESIDUAL-RISKS.md: 1/1; still 1627 lines.\n- VERIFICATION.md: 23/6; now 615 lines, was 598.",
+            "not_done": [
+              "No build, test, gate, verify.sh or simulator run, as the task said. The only thing run was the read-only script .build-s5docs/trace_strong.py over git objects at 45df2e1.",
+              "This round's edits are not independently verified. By P4, a verifier who did not write them must check them.",
+              "B3: I did not write the ruling's \"inside one process\". No record shows the seven TSan bundles ran in one OS process; only one swift test invocation is on record.",
+              "B2: I did not claim that ADR-057's round-2 docs verifier checked the two Process caveats, because ORCH:569-571 at 0f909f2 does not record such a check.",
+              "Nothing outside the 10 items and the optional DT-PERF-01 note was changed. RES-88 and every other entry are untouched, and no sections or entries were renumbered."
+            ]
+          },
+          "status": "The fix round passes with 0 blocking issues and 4 non-blocking notes. I checked wp/s5docs at c609073 (parent 116f28f, base d6cfd01) in /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs against the records each item cites. All 10 items and the optional DT-PERF-01 note are applied as their fix texts and the rulings say.\n\nA1:\n- k.md:1409 is \"The observed bound\", and k.md:1726-1727 is K4-COMMITPROMO, 5 of 5.\n- The probes run on ManualTimeSource and print only unseen counts (ProbeK4CommitPromotion.swift:17, :37; VerifierKC4EngineProbe.swift:198, :221, :274).\n\nA2:\n- The ruled wording is used exactly in both places, and the s3c.md:491-497 citation is kept.\n- MUTATION-PROBES.md:240 already uses the same short citation.\n\nB1: the figures at DECISIONS.md:647 and :621 are exact. RES-44 is S3B-13, and RES-45 is S3-B-011's chunked startGrace.\n\nB2:\n- :685's second sentence, :690's quote and :383 (\"not independently verified\" for P3 and P4) all match.\n- ORCH:569-571 at 0f909f2 records round 2 at 0 blocking and P3-P5 as fixed, but no check of these claims. So \"not independently verified\" is what the ruling requires.\n\nB3:\n- The :659 quote is exact. verify.sh:114 is a single `swift test --sanitize=thread` call. full5:66-72 shows seven runs, and :67's 713 tests are Sync per §4.2.\n- Neither full5:64-73 nor s5/tsan.log has a load line, and the text does not claim a measurement.\n- The writer's \"within that invocation\" is safer than \"inside one process\": `swift test` starts swiftpm-testing-helper with a per-bundle --test-bundle-path (WP-C's results.txt shows one).\n\nB4:\n- I ran my own stdin script over git objects at 45df2e1. It reproduced s5/trace.log:1 exactly (90 requirements, 78 MUST, 14 budgets, 1661 tests with IDs, no unknown ID).\n- Every MUST and budget has an @Test display name that starts with its ID. There are no commented-out @Test lines.\n- TRACEABILITY.md's 104 rows match with 0 differences at both 45df2e1 and HEAD.\n\nB5:\n- Package.swift:94 and :10 are as cited, and the file is unchanged since 45df2e1. full5:15-22 holds the three build steps.\n- The owner's uncommitted edit in the main checkout changes only line 1. §1 records that the run used the committed manifest.\n\nB6:\n- pm/docs-followup-items.md:50 has the escaped filter.\n- The p13q and u2b logs contain no command line, so \"not logged\" stays true. Row D is unchanged.\n\nB7: DEVICE-TEST-PLAN.md:28-31 is cited, and the fake driver exists at HEAD and at 45df2e1.\n\nB8: the `git show 0f909f2:docs/ORCHESTRATION.md` command works.\n\nScope and counts:\n- A word-level diff shows nothing outside the named sentences changed.\n- The line counts of DEVICE-TEST-PLAN.md (925), MUTATION-PROBES.md (1384) and RESIDUAL-RISKS.md (1627) are unchanged, so citations into them still hold. No doc cites VERIFICATION.md by line number; the hits are APPLE-API-VERIFICATION.md.\n- There are still 47 DT headings and 88 RES headings (RES-01 to RES-88). The mentions of 1,732 tests and of \"VERIFY: FAIL (1 failed: benchmarks)\" are unchanged, and no classification changed.\n\nGit state:\n- `git status --porcelain` is empty, and both commits are on wp/s5docs (no upstream).\n- Both subjects are imperative and end with the Co-Authored-By line.\n- The reflog shows the local amend from 7942501 to 116f28f that the writer reported.\n\nWhat I changed: nothing. The scratch path .verify-s5docs-nb is not git-ignored (`git check-ignore` exit 1), so creating it would have changed git status. I wrote no scratch files and ran every check from stdin with `python3 -I -`. I ran no build, test or simulator.",
+          "issues": [
+            {
+              "blocking": false,
+              "doc": "docs/MUTATION-PROBES.md, docs/RESIDUAL-RISKS.md",
+              "location": "MUTATION-PROBES.md:268 (§7, WP-C) and RESIDUAL-RISKS.md:1191 (RES-60 What): \"Of the runs on record, only WP-B's targeted tests kill C, F and S\"",
+              "problem": "This is the ruling's exact wording, so it is not blocking. But \"of the runs on record\" now covers every recorded run, and the writer's check (results-c2.txt, mut/) missed one: the crash hunter's `.build-orchestrator/s3-probes/crash/S3-CRAS-05-mutants-run.txt` ran C, F and S against 98-99 targeted tests. So the writer's report is wrong where it says no other recorded run kills them. In that run, F (:74-77, :116-119) and S (:109-113) fail only cases in StoreDeletionTests and LeaseTests. C (:63-67) also fails `EvictionTests.swift`'s \"R-SYN-11: eviction frees space while every index commit fails with ENOSPC\" (:67), and that file is not one of the three that s3c.md:494-495 calls WP-B's targeted tests. \"WP-B's\" is the records' own loose label: DECISIONS.md:622 says the same \"only\", and the LeaseTests and EvictionTests cases both came in WP-C's Stage 2 merge 38d23f9. The substance still holds: only targeted unit tests kill C, F and S, never WP-C's oracle or flows (S3-CRAS-02-run.txt:20-25).",
+              "fix": "Orchestrator's call. Either keep it as ruled, or add in both places: \"; in the crash hunter's run C also fails EvictionTests' R-SYN-11 case (`.build-orchestrator/s3-probes/crash/S3-CRAS-05-mutants-run.txt:63-67`)\"."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": ":107 (the Q-6 row's new \"checked for this file with the gate's regexes over `Tests/` at `45df2e1`\") against :12-13 (\"Nothing was built, tested or re-run for it\") and :364-365 (\"this file's writer built and ran nothing\")",
+              "problem": "The stronger-form sentence is true; I re-checked it independently. But it rests on a script the writer ran on 10 Nov (.build-s5docs/trace_strong.py, read-only over git objects), so \":364-365\"'s \"ran nothing\" is no longer literally true. Two things mitigate this. §1's \"git diff …, checked for this file\" (:39) already set the precedent. And no item named :12-13 or :364-365, so the writer was right to leave them alone.",
+              "fix": "Orchestrator's call. For example, at :364-365: \"this file's writer built and tested nothing; its only checks read git objects (§1's `git diff`, §3.1's Q-6 stronger form)\"."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": ":386-390, the new sub-bullet \"The TSan Sync bundle alone\" (B3)",
+              "problem": "The sub-bullet names no carrier. §5's intro (:342-344) says each item says where it is carried, and the WP-C sub-bullet beside it ends \"RES-53, RES-42\". RESIDUAL-RISKS.md RES-38 carries this exact condition (:877). It also records Stage 5's 713 Sync tests in 1739.487 s, with \"The log gives no load for the step\" (:879-881).",
+              "fix": "End the sub-bullet with \"RES-38.\""
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": ":508, Process row 2 (the `///` doc comments, DECISIONS.md:690), Where column: \"not independently verified\"",
+              "problem": "The wording is correct per the ruling and :690. But row 1's Where column cites ORCH:569-571, and row 2 leaves out the one verifier check on record for its comments. ORCH:569 at 0f909f2 records that the ADR-057 docs workflow's round-1 verifier found `SyncEngine.swift:13-18`'s continuation rule untrue of the code. That comment is one :690 lists (as `:13-21`). Round 2 ended at 0 blocking, and no check of each comment is recorded.",
+              "fix": "Optional: add to row 2's Where column: \"ORCH:569 records round 1's verifier finding `SyncEngine.swift:13-18`'s continuation rule untrue of the code, and round 2 at 0 blocking; no check of each comment is recorded\"."
+            }
+          ]
+        }
+      ],
+      "converged": true
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Fix round"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "Fix round write:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Fix round",
+      "agentId": "a1edbff2608b178fe",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794309286136,
+      "queuedAt": 1794309286126,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I applied all 10 non-blocking items and the optional DT-PER…",
+      "promptPreview": "TASK: non-blocking fix round 1 on branch wp/s5docs.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, currently at d6cfd01 or later; it is based on d002758, the feature/asset-kit head after the Stage 3 merge, ADR-057 and the post-merge checks). Use absolute paths or cd into the worktree for EVERY command; nev…",
+      "promptFramed": true,
+      "lastProgressAt": 1794310311527,
+      "tokens": 231322,
+      "toolCalls": 79,
+      "durationMs": 1025391,
+      "resultPreview": "{\"summary\":\"I applied all 10 non-blocking items and the optional DT-PERF-01 note on wp/s5docs in /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs. HEAD is c609073, `git status --porcelain` is empty, and only the four docs changed (`git diff --stat d6cfd01 HEAD`: 4 files, 33 insertions, 16 deletions). I checked each fix against the record it cites before applying it.\\n\\nWhat I checked:\\n- **A…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "Fix round verify:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Fix round",
+      "agentId": "a5f8c536ca8024a4e",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794310313509,
+      "queuedAt": 1794310313486,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "The fix round passes with 0 blocking issues and 4 non-block…",
+      "promptPreview": "TASK: independently verify a fix round on branch wp/s5docs (worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs) for docs/MUTATION-PROBES.md, docs/DEVICE-TEST-PLAN.md, docs/RESIDUAL-RISKS.md and docs/VERIFICATION.md. You did NOT write them and you were not their earlier verifier (CLAUDE.md P4). Do not modify or commit anything; leave git status unchanged.\nRepository /Users/admin/Docume…",
+      "promptFramed": true,
+      "lastProgressAt": 1794311438224,
+      "tokens": 246246,
+      "toolCalls": 87,
+      "durationMs": 1124714,
+      "resultPreview": "{\"issues\":[{\"blocking\":false,\"doc\":\"docs/MUTATION-PROBES.md, docs/RESIDUAL-RISKS.md\",\"location\":\"MUTATION-PROBES.md:268 (§7, WP-C) and RESIDUAL-RISKS.md:1191 (RES-60 What): \\\"Of the runs on record, only WP-B's targeted tests kill C, F and S\\\"\",\"problem\":\"This is the ruling's exact wording, so it is not blocking. But \\\"of the runs on record\\\" now covers every recorded run, and the writer's check (r…"
+    }
+  ],
+  "totalTokens": 477568,
+  "totalToolCalls": 166
+}

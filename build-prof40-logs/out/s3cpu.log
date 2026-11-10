@@ -1,0 +1,8 @@
+Starting recording with the CPU Profiler template. Launching process: swiftpm-testing-helper. 
+Ctrl-C to stop the recording
+Stopping recording...
+Run issues were detected (trace is still ready to be viewed):
+* [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+
+Recording completed. Saving output file...
+Output file saved as: s3cpu.trace

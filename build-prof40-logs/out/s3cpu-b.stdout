@@ -1,0 +1,15 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Prof40Shapes" started.
+◇ Test "PROF40-SHAPE3-SUPERSEDE" started.
+PROF40-SHAPE3 run 0: supersede window 43.899708 ms; load { 29.14 162.06 204.20 }
+PROF40-SHAPE3 run 1: supersede window 43.334333 ms; load { 29.14 162.06 204.20 }
+PROF40-SHAPE3 run 2: supersede window 42.19825 ms; load { 27.12 159.44 203.02 }
+PROF40-SHAPE3 run 3: supersede window 41.932667 ms; load { 27.12 159.44 203.02 }
+PROF40-SHAPE3 run 4: supersede window 42.684042 ms; load { 27.12 159.44 203.02 }
+PROF40-SHAPE3 run 5: supersede window 44.504375 ms; load { 25.35 156.87 201.86 }
+PROF40-SHAPE3 windows [43.899708, 43.334333, 42.19825, 41.932667, 42.684042, 44.504375]; best 41.932667 ms
+✔ Test "PROF40-SHAPE3-SUPERSEDE" passed after 8.984 seconds.
+✔ Suite "Prof40Shapes" passed after 8.984 seconds.
+✔ Test run with 1 test in 1 suite passed after 8.985 seconds.

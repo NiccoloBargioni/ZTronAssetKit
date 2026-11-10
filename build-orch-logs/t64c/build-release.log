@@ -1,0 +1,13 @@
+Building for production...
+[1 / 23]
+[8 / 28]
+[9 / 29] ZTronAssetModel
+[11 / 30] ZTronAssetModel
+[18 / 36] ZTronAssetTransport
+[22 / 39] ZTronAssetAppleHosted
+[23 / 38] ZTronAssetTransport
+[25 / 38] ZTronAssetStorage
+[38 / 49] ZTronAssetTestSupport
+[39 / 48] ZTronAssetSync
+[45 / 52] ZTronAssetKit
+Build complete! (32,91 s)

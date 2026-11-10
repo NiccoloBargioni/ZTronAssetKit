@@ -1,0 +1,10 @@
+coverage export over 8 test bundles
+COVERAGE target=ZTronAssetAppleHosted    lines= 99.76% (1248/1251) min=70.0 OK
+COVERAGE target=ZTronAssetKit            lines= 97.99% (1464/1494) min=70.0 OK
+COVERAGE target=ZTronAssetModel          lines= 99.32% (3383/3406) min=70.0 OK
+COVERAGE target=ZTronAssetStorage        lines= 97.52% (8410/8624) min=90.0 OK
+COVERAGE target=ZTronAssetSync           lines= 95.11% (12375/13011) min=90.0 OK
+COVERAGE target=ZTronAssetTransport      lines= 99.10% (2427/2449) min=70.0 OK
+COVERAGE overall lines=96.93% (29307/30235) min=80.0 OK
+COVERAGE device-only-excluded lines=177 share=0.58% max=3.0% OK
+COVERAGE: PASS

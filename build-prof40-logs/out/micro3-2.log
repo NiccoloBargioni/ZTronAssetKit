@@ -1,0 +1,22 @@
+◇ Test run started.
+↳ Testing Library Version: 2084
+↳ Target Platform: arm64e-apple-macos14.0
+◇ Suite "Prof40Shapes" started.
+◇ Test "PROF40-MICRO" started.
+PROF40-MICRO ManifestEntry.transferID (40,000 calls over 10,000 entries): 314.7 ns/call [sink 8100000]
+PROF40-MICRO ManifestEntry.transferID (40,000 calls on one entry): 313.0 ns/call [sink 7920000]
+PROF40-MICRO ContentHash.hex alone (40,000 calls): 250.2 ns/call [sink 7860000]
+PROF40-MICRO Dictionary<TransferID, Job> lookup, 3 jobs, fresh equal key, read one field: 110.9 ns/lookup [sink 120000]
+PROF40-MICRO Dictionary<TransferID, Job> `if let job = jobs[key]` (whole-Job copy), 3 jobs: 114.7 ns/lookup [sink 600180000]
+PROF40-MICRO Dictionary<TransferID, Job> lookup, 10,000 jobs, fresh equal key: 121.6 ns/lookup [sink 120000]
+PROF40-MICRO Dictionary<TransferID, Job> in-place `jobs[key]?.field = v`, 3 jobs: 191.7 ns/access [sink 120000]
+PROF40-MICRO TransferID.hashValue alone: 51.8 ns [sink 0]
+PROF40-MICRO format + lookup (`jobs[entry.transferID]`), 3 jobs: 445.6 ns [sink 120000]
+PROF40-MICRO Set<AssetID>(10,000).sorted(): 3.009 ms [sink 30000]
+PROF40-MICRO [AssetID](10,000, already in order).sorted(): 0.226 ms [sink 30000]
+PROF40-MICRO Set<AssetID> insert, 10,000 into an empty set: 63.6 ns/insert [sink 30000]
+PROF40-MICRO Set<AssetID> insert, 10,000 into a reserved set: 31.6 ns/insert [sink 30000]
+PROF40-MICRO ValidatedManifest.entry(for:) (10,001 entries), 40,000 calls: 77.9 ns/call [sink 120000]
+✔ Test "PROF40-MICRO" passed after 0.339 seconds.
+✔ Suite "Prof40Shapes" passed after 0.339 seconds.
+✔ Test run with 1 test in 1 suite passed after 0.339 seconds.

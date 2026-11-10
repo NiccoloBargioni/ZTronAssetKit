@@ -1,4 +1,17 @@
-# Archive of `.build-orchestrator/` (snapshot 4, 2026-11-07 04:40 CET)
+# Archive of `.build-orchestrator/` (snapshot 5, the last, 2026-11-10 12:55 CET)
+
+## Snapshot 5: what changed since snapshot 4
+
+This is the final snapshot, taken at the close of Stage 5, after the four Stage 5 documents were merged into `feature/asset-kit` (`381e8ee`). The tree starts from snapshot 4's tree (`cd17cdc`), so every file that snapshot 4 held is still here: 3,410 files, 90 added and 2 updated (`build-orch-logs/stage5-full.log`, now complete, and this README). It adds:
+
+- **`.build-orchestrator/s3-post-merge/`**: the Stage 5 documents' workflows, their scripts and results (`assetkit-s5-docs-finish-wf_95570085-a9a.js`, `assetkit-s5-docs-nonblocking-wf_beea43be-463.js`, `s5docs-finish-wf_95570085-a9a.json`, `s5docs-nonblocking-wf_beea43be-463.json`), and the mutation re-check's script, `mut-recheck/mut-recheck.sh`, which snapshot 4 lacked.
+- **`build-orch-logs/`**: Stage 5's `--full` on `45df2e1` in full (`stage5-full.log`, 129 lines, ending `VERIFY: FAIL (1 failed: benchmarks)`) with its step logs (`stage5-verify-logs-45df2e1/`, 16 files, `benchmarks.log` and `coverage.log` among them), and the tools-6.4 check (c) on `45df2e1` (`t64c/`, 21 files).
+- **`build-prof40-logs/`**: the 2-4 Nov profiling run of the three C2 shapes (`out/`, 37 small outputs: tables, logs and scripts; `tools/`, 8 scripts), which `.build-orchestrator/s3f-c20-analysis/profile-40ms.md` and its review cite under `.build-prof40/`.
+- The cited-log method is snapshot 4's, widened: every file of at most 3 MB that a `.build-<wp>/` or `.build-orch/` path in `docs/adr-drafts/s3*.md`, `docs/ORCHESTRATION.md`, `docs/DECISIONS.md`, `docs/REOPEN-WP-F.md`, the four Stage 5 documents or `.build-orchestrator/**/*.md` cites: 439 files in all (268 under `worktree-s3f-logs/`, 18 `worktree-s3c-logs/`, 2 `worktree-s3g-logs/`, 1 `worktree-s3d-logs/`, 105 `build-orch-logs/`, 45 `build-prof40-logs/`), 35.2 MB; nothing that snapshot 4 held is dropped. The `.xcresult` bundle under `sim-merged/` stays out, as before.
+
+The state these files belong to: Stage 3 and Stage 5 are closed. WP-F is merged (`e840b0e`), ADR-057 is merged (`45df2e1`, tag `s3-merged`), Stage 5's `--full` ended in the accepted `VERIFY: FAIL (1 failed: benchmarks)` (the six R-CLN-6 purge shapes and P-13), and the Stage 5 documents are on `feature/asset-kit`. The s3 worktrees and their build folders are removed after this snapshot's restore test, so this archive is the only copy of their cited logs. The re-open dossier is `docs/REOPEN-WP-F.md` on `feature/asset-kit`; it says what to read first.
+
+The rest of this README is snapshot 4's text, then snapshot 3's. Both are still true of the files they describe.
 
 ## Snapshot 4: what changed since snapshot 3
 

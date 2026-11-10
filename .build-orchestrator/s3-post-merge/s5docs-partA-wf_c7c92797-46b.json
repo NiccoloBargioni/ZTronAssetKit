@@ -1,0 +1,287 @@
+{
+  "summary": "ZTronAssetKit Stage 5 documents, part A: MUTATION-PROBES, DEVICE-TEST-PLAN and RESIDUAL-RISKS, one writer and an independent verifier, one fix round",
+  "agentCount": 4,
+  "logs": [
+    "write 1: 3 commits; MUTATION-PROBES.md: 64 mutants (27 storage, 37 network). 53 were killed and 11 survived at discovery; all 11 were killed in the re-check on e840b0e.\n\nTests on e840b0e: Transport 165, Sync 713, Storage 500, Model 89, Kit 90, Compatibility 71, AppleHosted 104 (1,732/1,732 on the simulator).\n\nDEVICE-TEST-PLAN.md: 46 device tests (BG 9, APL 10, STO 7, MEM 3, NET 4, PWR 1, PERF 5, OBS 2, FLR 2, KIT 1, MIG 2).\n\nRESIDUAL-RISKS.md: 87 entries (RES-01 to RES-87), one for each of the 87 residual-risk ledger items, all with six fields and sequential ids. 413 citations were range-checked before the Stage 5 update, and the new Stage 5 log citations were range-checked and checked by hand. No line outside a table is over 120 characters.\n\nStage 5 --full, read from the orchestrator's logs and not run by me:\n- VERIFY: FAIL (1 failed: benchmarks), steps-failed=1.\n- Benchmarks: 88 tests, 7 issues. The six R-CLN-6 shapes have best heartbeats of 18.65-62.29 ms. P-13: p99 5.835917 ms against 5.0 ms, max 10.721417 ms, 525 units.\n- TSan: Sync 713 tests in 1739.487 s, Storage 500 tests in 641.418 s.\n- Coverage: 96.93 % overall.",
+    "verify 1: 2 blocking / 9",
+    "write 2: 3 commits; - Mutants (unchanged; the generator still checks them on every run): 64 discovery mutants, 27 storage and 37 network. 53 killed, 11 survived (4 storage, 7 network), 65 diff blocks.\n- Device tests: 46, unchanged; none run.\n- RESIDUAL-RISKS entries: RES-01 to RES-87, unchanged.\n- Ledger: 87 residual-risk items of 536, in 8 ledgers.\n- Stage 5 benchmarks log: 61 case lines print loads (:242 to :449).\n- The six purge misses ran at 1-minute loads of 2.45-3.12.\n- twoTokens: 8.71 ms at loads 14.22 → 13.56.\n- userToBound: passed at loads 13.56 → 11.75.\n- Diff since 94eb6c9: 3 files, +109/-41.",
+    "verify 2: 1 blocking / 8"
+  ],
+  "result": {
+    "rounds": [
+      {
+        "round": 1,
+        "write": {
+          "summary": "I wrote and committed the three Stage 5 documents on wp/s5docs, the branch's only commits since base d002758. The worktree is clean and nothing was pushed. The worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs, and the files are:\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/MUTATION-PROBES.md\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/DEVICE-TEST-PLAN.md\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/RESIDUAL-RISKS.md\n\nRESIDUAL-RISKS.md has one entry for each of ledger adr057-docs-journal.jsonl's 87 residual-risk items, RES-01 to RES-87, and each entry has all six fields. It covers:\n- the accepted FAIL: the six purge misses and P-13, with P1, P2 and P7;\n- the known misses of C2's 10 ms limit;\n- f3c's two shapes, marked OPEN and NEEDS-HUMAN-REVIEW;\n- the ENOSPC class, under \"Known residual correctness risks (owner ruling 2026-11-06)\";\n- c23 #4 and #7;\n- RR-24, RR-25, RR-7, RR-20, and RR-17 marked for the owner;\n- the margin list and every other ledger item;\n- ADR-057's Open items (section 14) and an index (section 15).\n\nStage 5's --full finished while I was writing, so section 0.4 records its result as read from the logs; I did not run it. It ran in .worktrees/merge-check at 45df2e1.\n- .build-orch/stage5-full.log:129 reads \"VERIFY: FAIL (1 failed: benchmarks)\", and every other step passed.\n- .worktrees/merge-check/.verify-logs/benchmarks.log has 88 tests with 7 issues: the six R-CLN-6 shapes (BenchSyncCycle22Purge.swift:32) and P-13 (BenchStorage.swift:253).\n- That is the accepted end state under DECISIONS.md:633, :635 and :659.\n- git diff shows that between e840b0e and 45df2e1 the only changed lines in Sources/ are /// lines, and Tests/, Scripts/ and Package.swift are unchanged. So the P-13 red comes with no code change and falls inside the accepted FAIL.\n\nStage 5 figures were also added to RES-01, RES-02, RES-33, RES-34, RES-35, RES-38 and RES-53. In that run every margin-list case passed; commitTwoTokensTurns, at 8.71 ms, is still \"at the edge\". userToBound passed at 4.63 ms.\n\nA new convention in section 0.1 points out that .worktrees/merge-check/.verify-logs/ now holds Stage 5's logs. The e840b0e logs that older records cite at that path were moved to .build-orch/merge-verify-logs-e840b0e/ (ORCHESTRATION.md:579).\n\nTwo ledger problems were fixed in the document rather than copied:\n- Some code citations had drifted, for example BlobUnits.swift:161 is now :163. Every code line was checked against this tree.\n- Ledger s3f-close 25 had the wrong P-13 tolerance ranges; DECISIONS.md:635's corrected ranges are used instead.",
+          "commits": [
+            "ec264e4 Add MUTATION-PROBES.md with Stage 3's mutants, survivors and diffs",
+            "6d0d00e Add DEVICE-TEST-PLAN.md with the device-only checks Stage 3 left open",
+            "94eb6c9 Add RESIDUAL-RISKS.md with every risk Stage 3 accepted"
+          ],
+          "counts": "MUTATION-PROBES.md: 64 mutants (27 storage, 37 network). 53 were killed and 11 survived at discovery; all 11 were killed in the re-check on e840b0e.\n\nTests on e840b0e: Transport 165, Sync 713, Storage 500, Model 89, Kit 90, Compatibility 71, AppleHosted 104 (1,732/1,732 on the simulator).\n\nDEVICE-TEST-PLAN.md: 46 device tests (BG 9, APL 10, STO 7, MEM 3, NET 4, PWR 1, PERF 5, OBS 2, FLR 2, KIT 1, MIG 2).\n\nRESIDUAL-RISKS.md: 87 entries (RES-01 to RES-87), one for each of the 87 residual-risk ledger items, all with six fields and sequential ids. 413 citations were range-checked before the Stage 5 update, and the new Stage 5 log citations were range-checked and checked by hand. No line outside a table is over 120 characters.\n\nStage 5 --full, read from the orchestrator's logs and not run by me:\n- VERIFY: FAIL (1 failed: benchmarks), steps-failed=1.\n- Benchmarks: 88 tests, 7 issues. The six R-CLN-6 shapes have best heartbeats of 18.65-62.29 ms. P-13: p99 5.835917 ms against 5.0 ms, max 10.721417 ms, 525 units.\n- TSan: Sync 713 tests in 1739.487 s, Storage 500 tests in 641.418 s.\n- Coverage: 96.93 % overall.",
+          "not_done": [
+            "docs/VERIFICATION.md was not created, by instruction; the orchestrator writes it.",
+            "I ran no builds, tests, verify.sh or iOS Simulator. Stage 5's figures are read from .build-orch/stage5-full.log and from benchmarks.log and tsan.log in .worktrees/merge-check/.verify-logs/.",
+            "None of the three documents has been checked by an independent verifier (P4).",
+            "Stage 5's logs in .worktrees/merge-check/.verify-logs/ are cited by RESIDUAL-RISKS.md but not archived. Any later run in merge-check would overwrite them.",
+            "DEVICE-TEST-PLAN.md has not been run: there is no device and no probe app.",
+            "OSLogStore's retention of .info lines is UNVERIFIED (C7, DT-OBS-01). This matters because the S1 long-purge line, the only field signal, is logged at .info.",
+            "The Apple guidance in the device plan is marked 'confirm'. Deploying an Xcode 27 build to an iOS 15 device was not checked.",
+            "M-S-17's storage test is still missing, as recorded in MUTATION-PROBES.md.",
+            "REOPEN-WP-F.md's final version is the orchestrator's; this branch cites version 1.",
+            "The likelihood and impact fields in RESIDUAL-RISKS.md are my assessment; no field data exists.",
+            "Stage 5's logs record no load for each step or case. So it is not shown whether the TSan step ran on a quiet host, which is the condition for the legacy-pair guard decision at DECISIONS.md:650. That decision is the orchestrator's.",
+            "Nothing was pushed or merged; merging wp/s5docs is the orchestrator's job."
+          ]
+        },
+        "status": "FAIL: 2 blocking issues, both in RESIDUAL-RISKS.md: the Stage 5 per-case load claims (§0.4, RES-34, RES-35) and RES-02's superseded owner quote. There are 7 non-blocking issues. MUTATION-PROBES.md passes on every blocking criterion. I scripted a comparison against `.build-orchestrator/s3-hunt-result.json` (mutate.storage/network.probes) and the 64 diff files, ending \\\"table rows: 64 / storage rows: 27 network rows: 37 / appendix exact matches: 64 / PROBLEMS: 0\\\". Every row's title, requirement, outcome, killing tests and change lines matched, and all 64 Appendix A diffs are byte-identical. That covers all 64 diff blocks and all 53 discovery killing-test cells, well above the 10 + 10 spot-check floor. The counts are 27 + 37 = 64, with 11 survivors (4 + 7). Each survivor has a close-out test and is KILLED in the e840b0e re-check (`.build-orchestrator/s3-post-merge/mut-recheck/summary.txt`, first-issues.txt), at the failing lines the document cites, which I checked by hand: e.g. M-S-07 LeaseTests.swift:387:9, M-S-11 StagingSinkTests.swift:180:15, M-N-22 SizeAndResumeTests.swift:213:9, M-N-39 EngineBoundaryTests.swift:137:9. DEVICE-TEST-PLAN.md has all four SPEC §8 areas (§4 to §7) and 46 tests. All 19 APPLE-API-VERIFICATION §5 rows (:279-:297) and every backlog device-plan item are mapped. Code, gate and DECISIONS citations I spot-checked are correct: QualityBudgets.swift:12-17, BenchSync.swift:129 (c2Budget = 10.0), StoragePolicy.swift:86 (deletionGrace 10), Prefetch.swift:126/:146, AssetClient.swift:191, gc_total_s_max 2.0, row :297's stall figures, DECISIONS :589/:626/:632/:641/:672. Its two gaps are non-blocking. RESIDUAL-RISKS.md carries every RR id and all 87 ledger residual-risk items; I spot-checked s3b 35-44, s3c 61-71, s3d 39-41, s3ah 37-39, s3g 37 and s3f-docs 105. It also carries ADR-057's known misses, the accepted FAIL (the six plus P-13, with P1/P2/P7/P8), ENOSPC, f3c (RES-08/09), N33, the other known risks and Open (:692-699, which match §14), with no owner classification changed. Figures match DECISIONS :584-:586, :602, :605, :619-:623, :654, the ledger, and the Stage 5 logs (stage5-full.log :2/:68/:131, tsan.log :5830, benchmarks.log :128-129 and :339-385, and the RES-34 table's figures). Recomputing Wilson 0.21-0.45 and Poisson P(>=6) = 0.31 agrees. Its two blocking errors are listed above. I ran no builds or tests, as the task directs. I edited nothing. I removed my scratch files and folder `.verify-s5docs` with rm and rmdir, and `git status --short` is empty on wp/s5docs at 94eb6c9.",
+        "issues": [
+          {
+            "blocking": true,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "§0.4 line 75 (\"The benchmarks log prints none per case\"); RES-34 line 771 (Stage 5 column \"with no load printed (§0.4)\"); RES-35 line 790 (\"no load printed\")",
+            "problem": "G2: the record contradicts this claim. `.worktrees/merge-check/.verify-logs/benchmarks.log` has 61 case lines that print each run's 1/5/15-minute loads. Examples: :408 commitTwoTokensTurns \"load 14.22 7.33 6.76 -> 13.56 7.31 6.75\"; :411 userToBound, three runs 13.56 -> 12.80 -> 12.33 -> 11.75, all above 10; :248 concentrationCommitRerouteTurns \"load 2.90 4.27 6.25\". The six purge shapes print loads at :339-376, with 1-minute loads of 2.45-3.12 (e.g. oneGroup 3.12 -> 3.03, retryJobs 2.54 -> 2.45). Only :266 (divergenceTurns) and :281 (userSharedApplyTurns(.keep)) print no load. Because of the false claim, the document leaves out two facts. First, Stage 5 measured all six known misses at quiet loads. RES-01 says three of them were \"not measured at a quiet load\" at the merged head, and the code is the same. Second, commitTwoTokensTurns and userToBound passed in Stage 5 only at loads above 10.",
+            "fix": "§0.4: replace the sentence with: the benchmarks log prints each run's loads for most cases, but none for :266 and :281. RES-34: give twoTokens' Stage 5 load (14.22 -> 13.56, :408) and concentration's (2.90, :248); keep \"no load printed\" only for :266 and :281. RES-35: write \"at loads 13.56 -> 11.75, every run above 10 (:411)\". RES-01: add that Stage 5 ran the six at 1-minute loads of 2.45-3.12 (:339-376)."
+          },
+          {
+            "blocking": true,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-02, Ruling, first bullet (about line 154): \"the owner answered \\\"P99\\\" ... (`docs/DECISIONS.md:380`)\"",
+            "problem": "This repeats the quote that ADR-057 corrected. DECISIONS:383 (P3, P4) states: \"the owner's words (29 Oct, 14:25 UTC) were \\\"Do not set any budget stop. List P99\\\"; the orchestrator read them as option A, recorded the reading and told the owner at 14:30 UTC, and no correction was found\". Follow-up item P4 (`.build-orchestrator/s3-post-merge/docs-followup-items.md:39`) records the same correction. RES-02 gives the orchestrator's reading as the owner's words, cites the superseded line :380, and does not mention P4, although it cites P1, P2, P7 and P8. The current record does not support it, so this is a G2 error in an owner-ruling statement.",
+            "fix": "Quote the exact words, \"Do not set any budget stop. List P99\" (29 Oct, 14:25 UTC). Say the orchestrator read them as option A (nearest-rank p99) and that no correction was found. Cite `docs/DECISIONS.md:383` (P4) next to :380."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/MUTATION-PROBES.md",
+            "location": "§6.2 line 216 (MR4 and MR2)",
+            "problem": "The cited `s3g.md:141-143` shows only `FacadeReopenLimitTests.swift:52:9` and `:106:9`. The failing lines `:53` and `:107` come from `docs/DECISIONS.md:646` (and `.build-orchestrator/s3g-probes-c1/reqs-mutants-summary.txt:44-63`), not from the draft lines cited.",
+            "fix": "Add `docs/DECISIONS.md:646` to the citation."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/MUTATION-PROBES.md",
+            "location": "§2.1 line 30 (\"Neither agent ran TSan or `verify.sh`\")",
+            "problem": "The network agent's status says \"I did not run `verify.sh --quick` or TSan\". The storage agent's status says only \"TSan was not run\" and does not mention verify.sh. Half of the claim has no record.",
+            "fix": "Write: neither agent ran TSan; the network agent states it did not run verify.sh; the storage agent's record does not say."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "§15 line 1537 (\"The number is the item's number in its ledger\")",
+            "problem": "The numbers are 0-based indices into each ledger result's items array. For example, s3b 35 is the P-13 item and s3b 36 the crash test (RES-42). A reader who counts from 1 lands on the wrong item.",
+            "fix": "Say \"0-based index into the `ledger:<draft>` result's items array\"."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-43, Evidence (\"1,961, 2,118 and 350 `.cancelled` issues ... (`s3c.md:84`, `:89-95`)\")",
+            "problem": "The citation is imprecise. s3c.md:84 is about the ruling label. The count 1,961 is at s3c.md:87 and :93; 2,118 and 350 are at :692 and :699, which are outside the cited ranges.",
+            "fix": "Cite `s3c.md:87`, `:93`, `:689-700`."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-30, Evidence (\"Item B's residuals ... under the draft's cycle 21, 'Step 4'\")",
+            "problem": "Item B's residuals appear only as a pointer (the ledger s3f-docs 105 wording). Residuals 1 and 5 and RR-20's half of residual 6 are carried elsewhere: the S3-R16 item 2 entries, RES-33 (PROBE-C21-HOLDERS) and RES-16. Two are recorded nowhere in the file: residual 4, the index's memory, about 0.5 MB per job of 10,000 ids, estimated (`s3f.md:5775`); and residual 6's `retireProgress` gap, where moved ids leave `Job.assets` without it (`s3f.md:5782`).",
+            "fix": "State residuals 4 and 6 (class, condition, test) in RES-30 or in their own entry, or say why they are not risks."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/DEVICE-TEST-PLAN.md",
+            "location": "§4 (DT-BG-08) and the §13 row \"ADR-057's Not verified, device items (`docs/DECISIONS.md:669-674`)\"",
+            "problem": "WP-D's Not-verified item \"a rewrite to an old task identifier after the same name was created anew (by reading the coverage-excluded live driver only)\" (DECISIONS:673; `s3d.md:141-142`) has no test. The plan does not list it under §14 either. Its other :673 items are covered: DT-BG-02 and DT-BG-08.",
+            "fix": "Add a DT-BG-08 step: re-create the same attempt's name while a priority write is in flight, then check that the write reaches no task and nothing fails. Or list the item in §14 with the reason."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/DEVICE-TEST-PLAN.md",
+            "location": "DT-PERF-03, \"Why a device\" and Observe (lines about 688-697); §13 row S3-B-038",
+            "problem": "S3-B-038's title and DECISIONS:672 both name \"the holders-scan prefilter's even-spread assumption\". DT-PERF-03 cites both but leaves that item out. It also measures only total reclaim time and unlink stalls, so nothing observes C-22's actor holds, apply's chunked eviction or a purge's wait for another reaper's kernel-blocked deletion. Even so, §13 maps S3-B-038 to DT-PERF-03 alone.",
+            "fix": "Name the prefilter item, and either add an observation of the store actor's holds (Time Profiler or System Trace during purge and maintenance) or say that these figures need the bench bundle (DT-PERF-01), as P-13's p99 does."
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "write": {
+          "summary": "I fixed both blocking findings and all seven non-blocking ones. The work is in three new commits on wp/s5docs, in the worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs, and the tree is clean. No builds or tests were run, and none were needed.\n\n**Blocking fix 1: Stage 5 loads (docs/RESIDUAL-RISKS.md).**\n- §0.4 now says what `.worktrees/merge-check/.verify-logs/benchmarks.log` actually prints: each run's 1/5/15-minute loads on 61 case lines, from :242 to :449. The verifier's suggested wording was not quite right: more lines than :266 and :281 print no load. No line before :242 or after :449 prints one, and inside that range :260, :263, :266, :269, :279 and :281 print none. §0.4 also says the TSan log prints no load (checked: none in tsan.log).\n- RES-01 now gives the six purge misses' Stage 5 loads, 2.45-3.12 (:339-376). So all six were measured at a quiet load, including the three the merged head left \"not measured at a quiet load\". The passing shapes now carry their loads too (:360, :383, :385).\n- RES-34: the Stage 5 column now shows twoTokens 8.71 at loads 14.22 → 13.56 (:408). Under the load rule (rulings:759, :764) that is not a quiet-load figure, and at the merged head all three runs were at 14.35 (merge log :418). Concentration shows load 2.90 (:248). \"No load printed\" now appears only for :281 and :266. I also added the merged head's loads (:258 shows 3.28; :276 and :291 print none).\n- RES-35: Stage 5's pass came at loads 13.56 → 11.75, every run above 10 (:411).\n- RES-33: added the load, 3.30 (:329).\n\n**Blocking fix 2: RES-02 owner quote.** RES-02 now gives the owner's exact words, \"Do not set any budget stop. List P99\" (29 Oct, 14:25 UTC). It says the orchestrator read them as option A (nearest-rank p99), told the owner at 14:30 UTC, and found no correction. It cites P4 at DECISIONS:383 and docs-followup-items.md:39 beside :380. §0.1 now defines P1-P8 as P-13's follow-up items, and the header's \"P4\" is now marked as CLAUDE.md's rule, so the two are not confused.\n\n**Non-blocking fixes in docs/RESIDUAL-RISKS.md:**\n- §15: the numbers are now described as 0-based indices into each `ledger:<draft>` result's items array (I recounted: 87 of 536 items).\n- RES-43: precise citations, s3c.md:87 and :90-93, :686-692, :695-700. The 350 figure is at :700, not :699.\n- RES-30: item B's six residuals are now listed under Evidence with the draft's class, blocking condition and test.\n  - Residual 4: about 0.5 MB per job of 10,000 ids, estimated, never measured (s3f.md:5775). `indexOwnCosts` figures are 3.51/4.06/0.78 ms on 82ba8a1 and 3.26/3.64/0.71 ms in Stage 5 at load 3.34 (:316).\n  - Residual 6, the retireProgress gap: the draft gives it no test and no blocking condition. I added an effect read from the code (EngineJobs.swift:525-527, EngineDispatch.swift:913-915, EngineEvents.swift:82-96) and marked it as a reading, not a run.\n\n**Non-blocking fixes in docs/MUTATION-PROBES.md.** I edited the generator script in the scratch path and regenerated the file; only the two intended lines changed.\n- §6.2: the summary file (`reqs-mutants-summary.txt:44-63`) shows the mutants fail on different lines, so each is now listed separately: MR4 fails at :52:9, :106:9 and :107:9, and MR2 at those plus :53:9. DECISIONS:646 is cited, and the s3g.md lines are kept for :52 and :106.\n- §2.1: neither agent ran TSan; only the network agent's record says it did not run verify.sh.\n\n**Non-blocking fixes in docs/DEVICE-TEST-PLAN.md:**\n- DT-BG-08: \"Why a device\" now names the rewrite to an old task identifier after the name was created anew. A second breakpoint at BackgroundSessionBackend.swift:80 shows any write request that finds no task.\n- §14: a new entry explains why that rewrite cannot be staged on purpose. Holding the window open needs a seam, and the only hold, `holdNextPriority()`, exists in the fake driver only (FakeBackgroundSessionDriver.swift:264).\n- DT-PERF-03:\n  - It names S3-B-038's four items, including the holders-scan prefilter's even-spread assumption, and now lists C2 among its requirements.\n  - It observes the store's actor and the purge calls' waits with System Trace and Time Profiler.\n  - It says the prefilter's spread cannot be observed on a device (HolderScan.swift:69-70).\n  - It sends the C2 figures and P-13's p99 to the bench bundle: `CleanupBenchmarks` (BenchCleanup.swift:18) runs over the fake file system, so it measures the device's CPU, not its APFS.\n- §13's S3-B-038 and ADR-057 Not-verified rows are updated to match.\n\nAll non-table lines stay within 120 columns.",
+          "commits": [
+            "feffaa4 Correct the Stage 5 loads and the P-13 ruling in RESIDUAL-RISKS.md",
+            "4730848 Cover S3-B-038 and the created-anew rewrite in DEVICE-TEST-PLAN.md",
+            "6eab1ba Cite MR4's and MR2's failing lines and the agents' runs precisely"
+          ],
+          "counts": "- Mutants (unchanged; the generator still checks them on every run): 64 discovery mutants, 27 storage and 37 network. 53 killed, 11 survived (4 storage, 7 network), 65 diff blocks.\n- Device tests: 46, unchanged; none run.\n- RESIDUAL-RISKS entries: RES-01 to RES-87, unchanged.\n- Ledger: 87 residual-risk items of 536, in 8 ledgers.\n- Stage 5 benchmarks log: 61 case lines print loads (:242 to :449).\n- The six purge misses ran at 1-minute loads of 2.45-3.12.\n- twoTokens: 8.71 ms at loads 14.22 → 13.56.\n- userToBound: passed at loads 13.56 → 11.75.\n- Diff since 94eb6c9: 3 files, +109/-41.",
+          "not_done": [
+            "No independent re-verification of these fixes has run (P4). The RESIDUAL-RISKS header still says the document is not independently verified.",
+            "Nothing was built or run (none needed): no verify.sh, no tests, no simulator.",
+            "docs/VERIFICATION.md was not written; it is the orchestrator's.",
+            "Deliberately staging the rewrite after an attempt's name is created anew is not a device test. It is listed in DEVICE-TEST-PLAN §14 with the reason, and DT-BG-08 only records such a write if one happens to occur.",
+            "RES-30's description of what residual 6's retireProgress gap does comes from reading the code, not from a run or a test.",
+            "The MUTATION-PROBES generator and the fix scripts are in the git-ignored scratch path .worktrees/s5docs/.build-s5docs/ and are not committed."
+          ]
+        },
+        "status": "I verified wp/s5docs at 6eab1ba, which I did not write (P4). The worktree is clean (git status empty before and after). I created no files and ran no builds or tests; none were needed. 1 blocking issue and 7 non-blocking ones remain, and the blocking one is a one-line fix. MUTATION-PROBES: the counts are 27 storage + 37 network = 64 and match s3-hunt-result.json \"mutate\". A script compared all 64 table rows (outcome, killing tests, file, requirement) and all 64 Appendix A diff blocks, including the re-made M-N-39 block, with the JSON and the diff files. That covers every row, well past the required 10 + 10. The 11 survivors in §4 match s3-post-merge/mut-recheck/summary.txt and first-issues.txt: all 11 KILLED on e840b0e, each with its first failing assertion. The blocking issue is §6.4:237, which credits OracleTests with killing mutant X. The oracle was never run against X (run-mutants.sh:33; no oracle-X line in results.txt or results-c2.txt). DEVICE-TEST-PLAN: all four SPEC §8 areas are present (background re-attachment §4, Apple-hosted packs through TestFlight §5, low storage §6, memory warnings §7). §13 maps APPLE-API-VERIFICATION §5's UNVERIFIED rows (:279-:297), and the code citations I spot-checked are correct. RESIDUAL-RISKS carries all of ADR-057's lists with their classifications: the known misses, the known risks per WP (:618-641), the accepted FAIL (P-13), the ENOSPC class, f3c's two OPEN shapes (RES-08/09, NEEDS-HUMAN-REVIEW), N33 and Open (:691-699). No owner classification changed. RES-53 to RES-68 were re-checked figure by figure against DECISIONS :586, :622, :623, :648, :651 and :673, the s3c and s3d drafts, ledger s3d items 39-44, stage5-full.log:68 (500 Storage tests in 641.418 s) and merge-check tsan.log:5830 (128 cases in 641.410 s), plus their code citations. All 9 previous issues are fixed: (1) §0.4 and the RES-34/35/01 loads; (2) RES-02's owner quote with P4 and :383; (3) §6.2 cites DECISIONS:646; (4) §2.1's verify.sh/TSan wording; (5) §15's 0-based index wording; (6) RES-43's citations; (7) RES-30's residuals 4 and 6; (8) DT-BG-08 and §14's created-anew rewrite; (9) DT-PERF-03's prefilter, store-actor observation and bench bundle. The 7 non-blocking issues fix citations and wording, plus S3-B-110, which neither doc carries and which is not an ADR-057 item.",
+        "issues": [
+          {
+            "blocking": true,
+            "doc": "docs/MUTATION-PROBES.md",
+            "location": "§6.4 WP-C, line 237 (\"Z (`fatalError` in `BlobDeletionUnit.run`) and X (`fatalError` in `copyBlob`): killed by `OracleTests` and `CleanupFlowCrashTests`.\")",
+            "problem": "Wrong killing test for mutant X. OracleTests was never run against X. In /Users/admin/Documents/ZTronAssetKit/.worktrees/s3c/.build-s3c/mut/run-mutants.sh, line 33 runs the oracle for `Z C F S G` only and line 35 runs the flows for `X Z G S F`. results.txt in the same folder has an oracle-Z line and a flows-X line (exit=1, \"AssetStore+Publish.swift:358: Fatal error: S3MUT X: copyBlob ran\") but no oracle-X line. results-c2.txt has none either. The source draft keeps the two apart: docs/adr-drafts/s3c.md:482-483 says Z was killed by OracleTests and by CleanupFlowCrashTests, and :484-485 says X was killed by CleanupFlowCrashTests only (\"every shipped test passed it\"). Merging Z and X into one bullet credits X's kill to a test that never ran against it. That meets the criterion \"wrong killing test\" and is a claim no record supports (G2).",
+            "fix": "Split the bullet in two. \"Z (`fatalError` in `BlobDeletionUnit.run`): killed by `OracleTests` (`BlobUnits.swift:169: Fatal error: S3MUT Z`) and by `CleanupFlowCrashTests`.\" \"X (`fatalError` in `copyBlob`): killed by `CleanupFlowCrashTests` (`AssetStore+Publish.swift:358: Fatal error: S3MUT X: copyBlob ran`). Every shipped test passed it, and the oracle was not run against X (`s3c.md:484-485`).\""
+          },
+          {
+            "blocking": false,
+            "doc": "docs/MUTATION-PROBES.md and docs/RESIDUAL-RISKS.md",
+            "location": "MUTATION-PROBES.md:239 and :267 (\"C, F and S are masked in WP-C's oracle and flows\"); RESIDUAL-RISKS.md:1188-1191 (RES-60's title and What; it cites s3c.md:493-497)",
+            "problem": "No run backs the flows half of the claim for mutant C. run-mutants.sh:35 runs CleanupFlowCrashTests against `X Z G S F`, with no C. results.txt has oracle-C passing (exit=0), flows-F and flows-S passing, and no flows-C. The claim comes from the draft (s3c.md:491-492: \"still pass the oracle and the flows\"). So a record does state it, but no run record supports it for C. RES-60 also cites :493-497, while the sentence it relies on is at :491-492.",
+            "fix": "Write: \"C: masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record (`run-mutants.sh:35`). F and S: masked in both (oracle-F/S and flows-F/S passed).\" Make the same change in :267 and in RES-60's title and What, and cite s3c.md:491-497."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/MUTATION-PROBES.md",
+            "location": "§6.1 \"Earlier cycles\", line 198 (\"M5 and M6, the R-SYN-15 mutants, are reconstructed and fail the new R-SYN-15 test (`s3f.md:11999-12000`)\")",
+            "problem": "The citation supports only half the sentence. s3f.md:11999-12000 says only that M5 and M6 are not on file and were reconstructed from f.md F-20. The record that they fail is s3f.md:9096-9102: M5 fails at `EngineSync1HalvesTests.swift:216:9` with `[1, 0, 0, 0]`, and M6 fails on the same line with `[3, 2, 1, 0, 0, 0]`. s3f.md:758 holds the cycle table row.",
+            "fix": "Cite `s3f.md:9096-9102` (and `:758`) for the failures. Keep `:11999-12000` for \"reconstructed\"."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-15 (RR-17), Field, line 518 (\"This is the one RR that changes an answer.\")",
+            "problem": "No record makes this claim, and the doc contradicts it twice. In RES-13 (RR-24), visited first answers `ok(20 B)` ×11 and swept first answers `shutDown` ×11 (\"Callers that wait then get `shutDown` rather than the asset\"), so that answer does change with the order. RES-15's own Ruling says \"visit-first gives the same answer\", so by §6's visit-first frame (:457-461) RR-17 does not change an answer between orders. Its answer is wrong in both orders. RES-28 (:666) also records an answer difference when the origin is inconsistent.",
+            "fix": "Write: \"This is the one RR whose answer is wrong in both orders: `notFound` for an asset the store lists. RR-24 (RES-13) changes an answer only between orders, under a shutdown, and that is ruled a non-blocking difference.\""
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-02, Stage 5 P-13 bullet, line 190 (\"At 525 units the p99 tolerates 5 units over 5 ms, so at least 6 were over (derived).\")",
+            "problem": "The doc derives a lower bound where the record it cites gives the exact figure. `.worktrees/merge-check/.verify-logs/benchmarks.log:128` lists the units over the batch budget: exactly 7 (8.330542, 6.201, 6.272417, 6.625041, 5.131208, 5.835917 and 10.721417 ms wall). With 7 over, the nearest-rank p99 is the 520th of 525 units, which is 5.835917 ms, matching the log.",
+            "fix": "Write: \"7 units were over 5 ms (`benchmarks.log:128`), 2 more than the 5 the nearest-rank p99 tolerates at 525 units.\""
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-54, Evidence, line 1125 (\"best 3.559292 ms, load 7.95 → 15.12\", cited to `docs/DECISIONS.md:586`)",
+            "problem": "DECISIONS.md:586 has neither the cycle-1 best (3.559292 ms) nor the load (7.95 → 15.12). Both come from docs/adr-drafts/s3c.md:231-234, the bench2.log run (\"purge(.evictable) of one blob every id shares 3.559292 ms (max of runs 17.91525 ms)\"). The other figures in RES-54 (17.91525, 4.819208, 11.047209 and best 4.733625 ms) do match :586.",
+            "fix": "Add `docs/adr-drafts/s3c.md:231-234` to RES-54's Evidence citation."
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md",
+            "location": "RES-71 (S3-B-093), Ruling, line 1348 (\"S3G-5: optional, not done; deferred since ADR-050 (`docs/DECISIONS.md:603`, `:620`)\")",
+            "problem": "Half of ADR-057's classification is missing. RES-71 cites :620 but gives only :603's \"optional, not done\". ADR-057's list of known misses, known risks and the accepted FAIL says at :620: \"S3-B-093 is a known miss: P-9's sliced release survey at 100,000 entries is unmeasured.\" This is borderline: the risk is carried and the classification is not contradicted, only incomplete.",
+            "fix": "Write: \"S3G-5: optional, not done (`:603`); ADR-057 records it as a known miss (`:620`); deferred since ADR-050.\""
+          },
+          {
+            "blocking": false,
+            "doc": "docs/RESIDUAL-RISKS.md and docs/DEVICE-TEST-PLAN.md",
+            "location": "RESIDUAL-RISKS.md:3 (intro: \"Every risk accepted at the end of Stage 3\"); DEVICE-TEST-PLAN.md has no probe and no §14 line for it",
+            "problem": "S3-B-110 is in neither doc. It is L5K-R24's lag: a user-initiated answer can come up to about two install intervals (0.2 s) before the readers' snapshot holds the asset. It is an accepted deviation, still open in .build-orchestrator/s3-backlog.json (\"would close it if a device test shows it matters\"; probe K4-COMMITPROMO showed unseenAtReturn=1). It is recorded in DECISIONS.md:104 (ADR-055 amendment) and docs/MIGRATION.md:211-217. ADR-057 does not list it, so this is not blocking under the stated criteria. It is a gap against the intro's \"every risk\" claim, and it is a device question.",
+            "fix": "Add a RES entry for S3-B-110: ADR-055 L5K-R24 and L5K-R27(3); evidence K4-COMMITPROMO; re-open if a device test shows the lag matters (the optional `installIfDue()`). Add a device probe or a DEVICE-TEST-PLAN §14 line for it. Alternatively, narrow the intro to ADR-057's lists plus the S3-B rows it names."
+          }
+        ]
+      }
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Write"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Verify"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "write:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Write",
+      "agentId": "af602ffca2b8e6538",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794022947538,
+      "queuedAt": 1794022947527,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I wrote and committed the three Stage 5 documents on wp/s5d…",
+      "promptPreview": "TASK: Stage 5 documents on branch wp/s5docs.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, based on d002758, the feature/asset-kit head after the Stage 3 merge, ADR-057 and the post-merge checks). cd into the worktree for EVERY command and never edit outside it. Your scratch path is /Users/admin/Documents…",
+      "promptFramed": true,
+      "lastProgressAt": 1794028981391,
+      "tokens": 162619,
+      "toolCalls": 404,
+      "durationMs": 6033853,
+      "resultPreview": "{\"summary\":\"I wrote and committed the three Stage 5 documents on wp/s5docs, the branch's only commits since base d002758. The worktree is clean and nothing was pushed. The worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs, and the files are:\\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/MUTATION-PROBES.md\\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/d…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "verify:1",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "aa25dfe4b8a66f7c1",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794028986705,
+      "queuedAt": 1794028986692,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "FAIL: 2 blocking issues, both in RESIDUAL-RISKS.md: the Sta…",
+      "promptPreview": "TASK: independently verify three new Stage 5 documents on branch wp/s5docs: docs/MUTATION-PROBES.md, docs/DEVICE-TEST-PLAN.md and docs/RESIDUAL-RISKS.md. You did NOT write them (CLAUDE.md P4). Do not modify or commit anything; leave git status unchanged.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, based…",
+      "promptFramed": true,
+      "lastProgressAt": 1794030458102,
+      "tokens": 194039,
+      "toolCalls": 208,
+      "durationMs": 1471397,
+      "resultPreview": "{\"issues\":[{\"blocking\":true,\"doc\":\"docs/RESIDUAL-RISKS.md\",\"location\":\"§0.4 line 75 (\\\"The benchmarks log prints none per case\\\"); RES-34 line 771 (Stage 5 column \\\"with no load printed (§0.4)\\\"); RES-35 line 790 (\\\"no load printed\\\")\",\"problem\":\"G2: the record contradicts this claim. `.worktrees/merge-check/.verify-logs/benchmarks.log` has 61 case lines that print each run's 1/5/15-minute loads. …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "write:2",
+      "phaseIndex": 1,
+      "phaseTitle": "Write",
+      "agentId": "a9d6c8d9be282a37f",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794030460416,
+      "queuedAt": 1794030460413,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I fixed both blocking findings and all seven non-blocking o…",
+      "promptPreview": "TASK: Stage 5 documents on branch wp/s5docs.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, based on d002758, the feature/asset-kit head after the Stage 3 merge, ADR-057 and the post-merge checks). cd into the worktree for EVERY command and never edit outside it. Your scratch path is /Users/admin/Documents…",
+      "promptFramed": true,
+      "lastProgressAt": 1794031636958,
+      "tokens": 320976,
+      "toolCalls": 122,
+      "durationMs": 1176542,
+      "resultPreview": "{\"summary\":\"I fixed both blocking findings and all seven non-blocking ones. The work is in three new commits on wp/s5docs, in the worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs, and the tree is clean. No builds or tests were run, and none were needed.\\n\\n**Blocking fix 1: Stage 5 loads (docs/RESIDUAL-RISKS.md).**\\n- §0.4 now says what `.worktrees/merge-check/.verify-logs/benchmark…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "verify:2",
+      "phaseIndex": 2,
+      "phaseTitle": "Verify",
+      "agentId": "ae9c701aa5ae94358",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794031639568,
+      "queuedAt": 1794031639564,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I verified wp/s5docs at 6eab1ba, which I did not write (P4)…",
+      "promptPreview": "TASK: independently verify three new Stage 5 documents on branch wp/s5docs: docs/MUTATION-PROBES.md, docs/DEVICE-TEST-PLAN.md and docs/RESIDUAL-RISKS.md. You did NOT write them (CLAUDE.md P4). Do not modify or commit anything; leave git status unchanged.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, based…",
+      "promptFramed": true,
+      "lastProgressAt": 1794032995888,
+      "tokens": 121495,
+      "toolCalls": 175,
+      "durationMs": 1356320,
+      "resultPreview": "{\"issues\":[{\"blocking\":true,\"doc\":\"docs/MUTATION-PROBES.md\",\"location\":\"§6.4 WP-C, line 237 (\\\"Z (`fatalError` in `BlobDeletionUnit.run`) and X (`fatalError` in `copyBlob`): killed by `OracleTests` and `CleanupFlowCrashTests`.\\\")\",\"problem\":\"Wrong killing test for mutant X. OracleTests was never run against X. In /Users/admin/Documents/ZTronAssetKit/.worktrees/s3c/.build-s3c/mut/run-mutants.sh, li…"
+    }
+  ],
+  "totalTokens": 799129,
+  "totalToolCalls": 909
+}

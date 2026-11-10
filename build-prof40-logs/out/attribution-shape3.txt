@@ -1,0 +1,111 @@
+samples in turn: 1500; baseline 41.09 ms
+| transfer-id formatting | 239 | 15.9 % | 6.5 ms |
+| jobs-table access | 407 | 27.1 % | 11.1 ms |
+| sorting | 116 | 7.7 % | 3.2 ms |
+| other Set/Dictionary inserts, removals, lookups | 247 | 16.5 % | 6.8 ms |
+| manifest lookups + ManifestEntry copies | 135 | 9.0 % | 3.7 ms |
+| retireProgress + removeJob | 21 | 1.4 % | 0.6 ms |
+| EngineState whole copy (decisionNow) | 192 | 12.8 % | 5.3 ms |
+| everything else | 143 | 9.5 % | 3.9 ms |
+--- everything-else items
+   18   1.2% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'bool swift::RefCounts<swift::RefCou < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+   10   0.7% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', '_swift_release_dealloc < bool swift::RefCounts<swift::RefCou < SyncEngine.addInterest(_:asset:entr')
+    8   0.5% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'outlined destroy of RemoteSource? < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    5   0.3% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'outlined destroy of ValidatedManife < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    4   0.3% ('EngineDispatch.swift:1211', 'SyncEngine.publicationFailed(_:epoch:file:error:ca', 'swift_bridgeObjectRelease < outlined destroy of RemoteSource? < SyncEngine.supersede(_:settling:lis')
+    4   0.3% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'outlined init with copy of Validate < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    4   0.3% ('EngineDispatch.swift:1211', 'SyncEngine.publicationFailed(_:epoch:file:error:ca', 'DYLD-STUB$$swift_bridgeObjectRetain')
+    4   0.3% ('EngineDispatch.swift:1263', 'closure #1 in SyncEngine.supersede(_:settling:list', 'specialized protocol witness for It < specialized Sequence.contains(where')
+    4   0.3% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', '_free')
+    3   0.2% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', 'swift_release < outlined destroy of (manifest: Vali < SyncEngine.addInterest(_:asset:entr')
+    3   0.2% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', 'swift_release')
+    3   0.2% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', '_xzm_free_main')
+    3   0.2% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', '___chkstk_darwin < SyncEngine.reroute(_:interest:asset')
+    3   0.2% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', '_xzm_free_main < SyncEngine.addInterest(_:asset:entr')
+    2   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'swift_bridgeObjectRelease < SyncEngine.reroute(_:interest:asset')
+    2   0.1% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', '__StringStorage.__deallocating_dein < bool swift::RefCounts<swift::RefCou < SyncEngine.addInterest(_:asset:entr')
+    2   0.1% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', 'swift_bridgeObjectRelease')
+    2   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'bool swift::RefCounts<swift::RefCou < SyncEngine.reroute(_:interest:asset')
+    2   0.1% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', 'specialized Dictionary.subscript.mo')
+    2   0.1% ('EngineDispatch.swift:1211', 'SyncEngine.publicationFailed(_:epoch:file:error:ca', 'destroy for ClosedRange<>.Index < outlined destroy of RemoteSource? < SyncEngine.supersede(_:settling:lis')
+    2   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'swift_release < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    2   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', '_free < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    2   0.1% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', 'outlined destroy of (manifest: Vali')
+    1   0.1% ('EngineDispatch.swift:1262', 'SyncEngine.supersede(_:settling:listing:)', 'swift_bridgeObjectRelease')
+    1   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', '_platform_memmove < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    1   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'outlined destroy of RemoteSource? < SyncEngine.reroute(_:interest:asset')
+    1   0.1% ('EngineDispatch.swift:1188', 'specialized SyncEngine.reroute(_:interest:asset:fr', '0x1a35280e1 < bool swift::RefCounts<swift::RefCou < SyncEngine.addInterest(_:asset:entr')
+    1   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'outlined init with copy of RemoteSo < specialized SyncEngine.reroute(_:in < SyncEngine.reroute(_:interest:asset')
+    1   0.1% ('EngineDispatch.swift:1211', 'SyncEngine.publicationFailed(_:epoch:file:error:ca', '__swift_instantiateConcreteTypeFrom < SyncEngine.supersede(_:settling:lis')
+    1   0.1% ('EngineDispatch.swift:1271', 'SyncEngine.supersede(_:settling:listing:)', 'swift_getEnumTagSinglePayloadGeneri < SyncEngine.reroute(_:interest:asset')
+--- transfer-id formatting
+      87   5.8% 2.38 ms EngineJobs.swift:109 SyncEngine.addInterest
+      83   5.5% 2.27 ms EngineDispatch.swift:1164 ecialized SyncEngine.reroute
+      69   4.6% 1.89 ms EngineDispatch.swift:1179 ecialized SyncEngine.reroute
+--- jobs-table access
+      66   4.4% 1.81 ms EngineJobs.swift:157 SyncEngine.addInterest
+      54   3.6% 1.48 ms EngineJobs.swift:156 SyncEngine.addInterest
+      43   2.9% 1.18 ms EngineDispatch.swift:1188 ecialized SyncEngine.reroute
+      39   2.6% 1.07 ms EngineJobs.swift:225 SyncEngine.failFastJoiner
+      35   2.3% 0.96 ms EngineJobs.swift:165 SyncEngine.addInterest
+      34   2.3% 0.93 ms EngineJobs.swift:161 SyncEngine.addInterest
+      27   1.8% 0.74 ms EngineJobs.swift:245 SyncEngine.failFastJoiner
+      26   1.7% 0.71 ms EngineJobs.swift:264 SyncEngine.relane
+      26   1.7% 0.71 ms EngineJobs.swift:231 SyncEngine.failFastJoiner
+      25   1.7% 0.68 ms EngineJobs.swift:132 SyncEngine.addInterest
+      13   0.9% 0.36 ms EngineJobs.swift:263 SyncEngine.relane
+      10   0.7% 0.27 ms EngineJobs.swift:246 SyncEngine.failFastJoiner
+       4   0.3% 0.11 ms EngineJobs.swift:177 SyncEngine.addInterest
+       3   0.2% 0.08 ms EngineJobs.swift:179 SyncEngine.addInterest
+--- sorting
+     112   7.5% 3.07 ms EngineDispatch.swift:1270 SyncEngine.supersede
+       3   0.2% 0.08 ms EngineEvents.swift:76 SyncEngine.retireProgress
+--- other Set/Dictionary inserts, removals, lookups
+      92   6.1% 2.52 ms EngineDispatch.swift:1179 ecialized SyncEngine.reroute
+      55   3.7% 1.51 ms EngineJobs.swift:156 SyncEngine.addInterest
+      55   3.7% 1.51 ms EngineState.swift:791 Job.insertAsset
+      43   2.9% 1.18 ms EngineDispatch.swift:1271 SyncEngine.supersede
+--- manifest lookups + ManifestEntry copies
+      55   3.7% 1.51 ms EngineDispatch.swift:1151 ecialized SyncEngine.reroute
+      39   2.6% 1.07 ms EngineDispatch.swift:1263 e #1 in SyncEngine.supersede
+      28   1.9% 0.77 ms EngineJobs.swift:191 SyncEngine.noteJoin
+       5   0.3% 0.14 ms EngineDispatch.swift:1271 SyncEngine.supersede
+       3   0.2% 0.08 ms EngineDispatch.swift:1211 SyncEngine.publicationFailed
+       3   0.2% 0.08 ms EngineJobs.swift:211 atic SyncEngine.sameTransfer
+--- retireProgress + removeJob
+       9   0.6% 0.25 ms EngineJobs.swift:444 SyncEngine.removeJob
+       6   0.4% 0.16 ms EngineEvents.swift:69 SyncEngine.retireProgress
+       4   0.3% 0.11 ms EngineEvents.swift:70 SyncEngine.retireProgress
+--- EngineState whole copy (decisionNow)
+     100   6.7% 2.74 ms EngineFollow.swift:242 SyncEngine.decisionNow
+      92   6.1% 2.52 ms EngineJobs.swift:193 SyncEngine.noteJoin
+--- everything else
+      63   4.2% 1.73 ms EngineDispatch.swift:1271 SyncEngine.supersede
+      53   3.5% 1.45 ms EngineDispatch.swift:1188 ecialized SyncEngine.reroute
+      13   0.9% 0.36 ms EngineDispatch.swift:1211 SyncEngine.publicationFailed
+       5   0.3% 0.14 ms EngineDispatch.swift:1263 e #1 in SyncEngine.supersede
+--- top 15 self
+| swift_release | 108 (7.2 %, 2.96 ms) |
+| swift_retain | 94 (6.3 %, 2.57 ms) |
+| swift_bridgeObjectRelease | 79 (5.3 %, 2.16 ms) |
+| _xzm_free_main | 70 (4.7 %, 1.92 ms) |
+| Hasher.combine(bytes:) | 68 (4.5 %, 1.86 ms) |
+| DYLD-STUB$$swift_bridgeObjectRelease | 53 (3.5 %, 1.45 ms) |
+| protocol witness for Collection.subscript.read in conformance String.UTF8View | 48 (3.2 %, 1.31 ms) |
+| swift_bridgeObjectRetain | 47 (3.1 %, 1.29 ms) |
+| _xzm_xzone_malloc_tiny | 46 (3.1 %, 1.26 ms) |
+| DYLD-STUB$$swift_bridgeObjectRetain | 44 (2.9 %, 1.21 ms) |
+| _platform_memmove | 41 (2.7 %, 1.12 ms) |
+| Hasher._finalize() | 36 (2.4 %, 0.99 ms) |
+| specialized Sequence.lexicographicallyPrecedes<A>(_:by:) | 23 (1.5 %, 0.63 ms) |
+| specialized Sequence.elementsEqual<A>(_:by:) | 23 (1.5 %, 0.63 ms) |
+| ValidatedManifest.entry(for:) | 21 (1.4 %, 0.58 ms) |
+--- formatting call sites total 239 (15.9 %, 6.55 ms)
+| EngineJobs.swift:109 SyncEngine.addInterest(_:asset:entry:lan | 87 (5.8 %, 2.38 ms) |
+| EngineDispatch.swift:1164 specialized SyncEngine.reroute(_:interes | 83 (5.5 %, 2.27 ms) |
+| EngineDispatch.swift:1179 specialized SyncEngine.reroute(_:interes | 69 (4.6 %, 1.89 ms) |
+--- sort call sites total 116 (7.7 %, 3.18 ms)
+| EngineDispatch.swift:1270 SyncEngine.supersede(_:settling:listing: | 112 (7.5 %, 3.07 ms) |
+| EngineEvents.swift:76 SyncEngine.retireProgress(_:) | 3 (0.2 %, 0.08 ms) |
+| EngineDispatch.swift:1266 SyncEngine.supersede(_:settling:listing: | 1 (0.1 %, 0.03 ms) |
+--- inclusive shares

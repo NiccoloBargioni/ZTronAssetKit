@@ -1,0 +1,239 @@
+{
+  "summary": "ZTronAssetKit Stage 5 documents: part A fix round (MUTATION-PROBES, DEVICE-TEST-PLAN, RESIDUAL-RISKS) and part B (VERIFICATION.md), each with an independent verifier",
+  "agentCount": 4,
+  "logs": [
+    "Part A fix write 1: 2 commits; MUTATION-PROBES.md: 5 insertions, 4 deletions (git show --stat 70caec3). RESIDUAL-RISKS.md: 45 insertions, 11 deletions; DEVICE-TEST-PLAN.md: 23 insertions (104be2e). Round 2's issues: 8 in all, 1 blocking and 7 non-blocking; all 8 applied. DEVICE-TEST-PLAN now has 47 tests, 46 plus DT-PERF-06 (a count of '### DT-' headings), and RES-86 says 47. RESIDUAL-RISKS now runs to RES-88. P-13 in Stage 5's --full: 7 units over the 5 ms batch budget at 525 units (benchmarks.log:128). The nearest-rank p99 is the 520th value (ceil(0.99 x 525) = 520), which tolerates 5 units over and gives the logged p99 of 5.835917 ms. Mutant runs (.worktrees/s3c/.build-s3c/mut/results.txt): oracle-Z exit=1 (:11-12), oracle-C/F/S exit=0 (:13-15), flows-X exit=1 (:21-22), flows-Z exit=1 (:23-24), flows-S/F exit=0 (:29-30). There is no oracle-X line and no flows-C line, and results-c2.txt has only the baseline, Z and G. L5K-R24 host probes (k.md:1409-1415, :1726-1727): K4-COMMITPROMO unseenAtReturn=1 in 5 of 5; P21-COMMIT and P21-ENSURE-MIG each 4 of 4 plus TSan. Worktree: git status --porcelain shows 0 lines.",
+    "Part A fix verify 1: 0 blocking / 2",
+    "Part B write 1: 1 commits; Stage 5 --full on 45df2e1 (full5 = .build-orch/stage5-full.log):\n- Verdict: `VERIFY: FAIL (1 failed: benchmarks)`, steps-failed=1 (full5:128-129). This is the accepted end state (ADR-057 close point 3, DECISIONS.md:633, :659). The /goal's Done is not met.\n- GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f; HARNESS unchanged since harness-frozen (7f24d4c); Swift 6.4 >= 6.3.\n- Tests, each of 3 runs and TSan: Transport 165, Sync 713, Storage 500, Model 89, Kit 90, Compatibility 71, AppleHosted 104 = 1,732, all passed. TSan had 0 ThreadSanitizer lines (Sync 1,739.5 s, Storage 641.4 s).\n- Coverage: AppleHosted 99.76 %, Kit 97.99 %, Model 99.32 %, Storage 97.52 % (floor 90), Sync 95.11 % (floor 90), Transport 99.10 %, overall 96.93 % (floor 80). The device-only exclusion is 177 lines, 0.58 % (max 3 %).\n- Gates: TRACE 90 requirements (78 MUST), 14 budgets, 1661 tests-with-ids; UNSAFE 0 of 3; DOCS 1281/1281, 0 exempt; 0 warning: lines.\n\nBenchmarks:\n- 88 tests in 8 suites, 7 issues. P-13 p99 5.836 ms against 5.0 ms: 7 of 525 units over 5 ms, 5 tolerated, max 10.72 ms, total 0.588 s against 2.0 s.\n- The six R-CLN-6 purge shapes, best of 3 against 10 ms at loads 2.45-3.12: oneGroup 35.80, oneMemberGroups 37.23, oneGroupScope 39.45, sharedJobFourGroups 18.65, fourGroups 62.29, retryJobs 36.20 ms.\n- The margin-list cases and userToBound passed (userToBound 4.63 ms).\n- Every other budget passed, e.g. P-1 0.417 µs, P-3 worst 326.71 ms against 817.54 ms, P-9 15.13 ms, P-11 3.46x.\n\nP-13 across runs (units over 5 ms, p99):\n- A: 5, 4.80 ms.\n- D, three quiet runs: 5 each, 4.89 / 4.81 / 4.31 ms.\n- H (Stage 5): 7, 5.84 ms (fail).\n- I: 2, 4.66 ms.\n- About 30 % of runs fail with no code change (17 of 53). The verifier gave PASS_WITH_NOTES with 0 blocking.\n\nOther runs:\n- A (--full on e840b0e): the same FAIL, with the six plus userToBound red only at loads 14.35→10.54; overall coverage 96.92 %.\n- B (userToBound alone): best 4.37 ms at a load of 3.19→3.06, passed.\n- C (tools-6.4 (b)): VERIFY: PASS, 0 warnings.\n- I (tools-6.4 (c)): VERIFY: FAIL from the six purge shapes only, 6 issues, 0 warnings, overall coverage 96.94 %.\n- F (simulator, iPhone 18 Pro, iOS 27.0): TEST SUCCEEDED, 1,732/1,732 tests, 3,653 device test runs, 0 failed.\n- G (mutation re-check): 11/11 survivors killed out of 64 mutants (27 storage, 37 network; 53 killed at discovery).\n- Device test plan: 47 tests, none run.",
+    "Part B verify 1: 0 blocking / 8"
+  ],
+  "result": {
+    "partA": {
+      "rounds": [
+        {
+          "round": 1,
+          "write": {
+            "summary": "I applied all 8 round-2 issues (1 blocking, 7 non-blocking) from result.rounds[1].issues of /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-post-merge/s5docs-partA-wf_c7c92797-46b.json. The work is in two commits on wp/s5docs in /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs. `git status --porcelain` is empty, and the scratch scripts sit in the ignored .build-s5docs/. Before applying each fix I checked it against the record it cites. No builds, tests or simulator were run, as the task directs. I edited nothing outside the three Stage 5 docs.\n\nFiles changed:\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/MUTATION-PROBES.md\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/RESIDUAL-RISKS.md\n- /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/DEVICE-TEST-PLAN.md\n\nBlocking issue (§6.4): the Z/X bullet is now two bullets, using the fix text.\n- Z is killed by OracleTests (results.txt:12, BlobUnits.swift:169) and by CleanupFlowCrashTests.\n- X is killed by CleanupFlowCrashTests alone (results.txt:22, AssetStore+Publish.swift:358).\n- The records confirm this: run-mutants.sh:33 runs the oracle for Z C F S G only, :35 runs the flows for X Z G S F, and results.txt and results-c2.txt have no oracle-X line. s3c.md:482-485 agrees.\n\nNon-blocking issues:\n1. Mutant C now reads: masked in the oracle (results.txt:13 shows oracle-C exit=0), and no flows run against C is on record (run-mutants.sh:35). F and S read: masked in both (results.txt:14-15 and :29-30). This is in MUTATION-PROBES §6.4 and §7 and in RES-60's title and What. RES-60 now cites s3c.md:491-497.\n2. MUTATION-PROBES §6.1 cites s3f.md:9096-9102 and :758 for M5/M6's failures, and keeps :11999-12000 for \"reconstructed\".\n3. RES-15 uses the fix text: RR-17 is the one RR whose answer is wrong in both orders. s3f.md:4441 and DECISIONS:641 say visit-first answers the same.\n4. RES-02 says 7 units were over 5 ms (benchmarks.log:128 lists 7), 2 more than the 5 tolerated at 525 units.\n5. RES-54 adds s3c.md:231-234.\n6. RES-71 now reads: optional, not done (DECISIONS:603); a known miss in ADR-057 (:620); deferred since ADR-050.\n7. S3-B-110 now has an entry, RES-88, and a device probe, DT-PERF-06 (§9), with a §13 index row. Sources: ADR-055's L5K-R24 and L5K-R27 (3) (DECISIONS:104, :509, :511, :524), k.md:671-677, :1397-1419 and :1726-1727 (K4-COMMITPROMO, unseenAtReturn=1 in 5 of 5), MIGRATION.md:211-217 and README.md:131-136. The re-open route is the optional installIfDue(). I also confirmed `Sources/` has no installIfDue, and DECISIONS:563-699 never names L5K-R24, installIfDue or S3-B-110.\n\nWhere I departed from the literal fix text, for G2 or style:\n- The X bullet also cites .build-s3c/mut/run-mutants.sh:33, because s3c.md:484-485 alone does not show the oracle was not run.\n- MUTATION-PROBES:239 also cites s3c.md:491-497.\n- RES-60 and MUTATION-PROBES §7 use the full .build-s3c/mut/run-mutants.sh:35 path.\n- RES-71 cites :374 (ADR-050's Deferred list) for \"deferred since ADR-050\", and writes its first citation as docs/DECISIONS.md:603.\n- RES-54 writes the citation as s3c.md:231-234, following the doc's §0.1 convention.\n- RES-15's sentence before the fix text now ends \"a wrong answer.\", so the notFound clause is not repeated.\n\nTwo edits follow from adding entries:\n- RES-86's count goes from 46 to 47 device tests.\n- §15's list of entries without a ledger item now reads \"RES-81 to RES-88\".",
+            "commits": [
+              "70caec3 Split mutants Z and X and cite the R-SYN-15 failures in MUTATION-PROBES.md",
+              "104be2e Add S3-B-110 and correct five entries in RESIDUAL-RISKS.md"
+            ],
+            "counts": "MUTATION-PROBES.md: 5 insertions, 4 deletions (git show --stat 70caec3). RESIDUAL-RISKS.md: 45 insertions, 11 deletions; DEVICE-TEST-PLAN.md: 23 insertions (104be2e). Round 2's issues: 8 in all, 1 blocking and 7 non-blocking; all 8 applied. DEVICE-TEST-PLAN now has 47 tests, 46 plus DT-PERF-06 (a count of '### DT-' headings), and RES-86 says 47. RESIDUAL-RISKS now runs to RES-88. P-13 in Stage 5's --full: 7 units over the 5 ms batch budget at 525 units (benchmarks.log:128). The nearest-rank p99 is the 520th value (ceil(0.99 x 525) = 520), which tolerates 5 units over and gives the logged p99 of 5.835917 ms. Mutant runs (.worktrees/s3c/.build-s3c/mut/results.txt): oracle-Z exit=1 (:11-12), oracle-C/F/S exit=0 (:13-15), flows-X exit=1 (:21-22), flows-Z exit=1 (:23-24), flows-S/F exit=0 (:29-30). There is no oracle-X line and no flows-C line, and results-c2.txt has only the baseline, Z and G. L5K-R24 host probes (k.md:1409-1415, :1726-1727): K4-COMMITPROMO unseenAtReturn=1 in 5 of 5; P21-COMMIT and P21-ENSURE-MIG each 4 of 4 plus TSan. Worktree: git status --porcelain shows 0 lines.",
+            "not_done": [
+              "No independent verification of this round: the documents now need a verifier who is not their author (CLAUDE.md P4).",
+              "No build, test, simulator or gate run, as the task directs, so there is no VERIFY line to quote.",
+              "DT-PERF-01's sentence 'until then DT-PERF-02 to DT-PERF-05 measure through the probe app' is unchanged. DT-PERF-06 does not depend on the bench bundle, so the sentence is not wrong, but it does not name the new test.",
+              "Some departures from the literal fix text are listed in the summary: extra G2 citations, full relative paths, and the RES-86 and §15 follow-on edits. A re-verifier may want to confirm them.",
+              "Nothing was pushed or merged; merging wp/s5docs is the orchestrator's job."
+            ]
+          },
+          "status": "0 blocking issues, 2 non-blocking. All 8 round-2 issues are applied as their fix text says, and I checked each one against the record it cites. I verified wp/s5docs at 104be2e: two commits on 6eab1ba, 70caec3 and 104be2e, both on wp/s5docs. I did not write these documents and did not verify them before (P4). `git status --porcelain` was empty before and after my checks. I created no files: the scratch path .verify-s5docs-a was never needed and does not exist. I ran no build, test or simulator. `git diff 6eab1ba HEAD` touches only the three docs (73 insertions, 15 deletions) and `--check` finds no whitespace errors.\n\nPer issue:\n(1) The Z/X bullet is split. In .worktrees/s3c/.build-s3c/mut/, run-mutants.sh:33 runs the oracle for Z C F S G only and :35 runs the flows for X Z G S F. results.txt:11-12 has oracle-Z exit=1 (BlobUnits.swift:169) and :21-22 has flows-X exit=1 (AssetStore+Publish.swift:358). Neither results.txt nor results-c2.txt has an oracle-X line, and s3c.md:482-485 agrees.\n(2) oracle-C exit=0 (results.txt:13), and no flows-C run exists (run-mutants.sh:35). Oracle-F/S and flows-F/S passed (:14-15, :29-30). The change is in §6.4, §7 and RES-60, with s3c.md:491-497 cited.\n(3) s3f.md:9096-9102 has M5 [1, 0, 0, 0] and M6 [3, 2, 1, 0, 0, 0] at EngineSync1HalvesTests.swift:216:9, and :758 has the table row. :11999-12000 is kept for \"reconstructed\".\n(4) RES-15: s3f.md:4433 and :4441 and DECISIONS.md:641 record a wrong notFound, and visit-first answers the same. RES-13's ruling is a non-blocking difference. No other RR's answer is called wrong: RR-20's answers agree (s3f.md:4778).\n(5) benchmarks.log:128 lists 7 units over the 5.0 ms budget. The p99 is nearest rank (BenchStorage.swift:590-597), so the 520th of 525 values is 5.835917 ms, as the log prints. The merge-check and stage5-verify-logs-45df2e1 copies of the log are byte-identical.\n(6) s3c.md:231 gives load 7.95 → 15.12, and :234 gives 3.559292 ms with a maximum of 17.91525 ms.\n(7) DECISIONS.md:603 says optional, not done; :620 says known miss; :374 is ADR-050's Deferred list.\n(8) RES-88 and DT-PERF-06 match their sources:\n- DECISIONS.md:104 (inside ADR-016), :509, :511 and :524.\n- k.md:671-677, :1397-1419 and :1726-1727.\n- MIGRATION.md:211-217 and README.md:131-136.\n- Reports.swift:280, with SnapshotMirror.swift:56-58. The shims call client.lookup (CDNLocalStore.swift:191-204).\n- AssetEvent.swift:125 and :139, AssetClient.swift:191, and the §3.3 and §3.4 references.\n- The backlog lists S3-B-110 as accepted-deviation, still-open.\n- Sources/ has no installIfDue, and DECISIONS.md:563-699 names none of installIfDue, L5K-R24 or S3-B-110.\n- The ADR-057 ledger journal has no item for it, so §15's \"RES-81 to RES-88\" is right.\n\nEvery place the writer departed from the literal fix text is supported by a record: the extra run-mutants.sh:33 and :374 citations, the short citation forms, the RES-15 lead-in, and the adapted C/F/S lead (s3c.md:492). Counts are intact. 27 + 37 = 64 in s3-hunt-result.json \"mutate\", and summary.txt has 11 KILLED. MUTATION-PROBES §1 is untouched. There are 47 '### DT-' headings (46 at 6eab1ba), matching RES-86's 47. No classification changed. Nothing unrelated changed: the only edits beyond the eight are RES-86's count, §15's range and the §13 row. I agree that DT-PERF-01's \"DT-PERF-02 to DT-PERF-05\" needs no change, because DT-PERF-06 is not a bundle case.",
+          "issues": [
+            {
+              "blocking": false,
+              "doc": "docs/DEVICE-TEST-PLAN.md",
+              "location": "DT-PERF-06, Why a device, :751-752 (\"The bound comes from host probes on macOS 27 only\"), and Pass, :765 (\"figures recorded beside the host bound\")",
+              "problem": "The sentence follows \"up to about two install intervals (0.2 s by default)\", so \"the bound\" reads as the 0.2 s figure. That figure is the design bound (RE-S40's shortcut; docs/adr-drafts/k.md:1407, docs/DECISIONS.md:104), not a host measurement. The probes time nothing. They run on a ManualTimeSource and print only how many ids the readers' snapshot lacked at return: .build-orchestrator/l5k-probes-c4/ProbeK4CommitPromotion.swift:17 and :37, and VerifierKC4EngineProbe.swift:198, :221, :240 and :269-274. The records call the probes \"the observed bound\" (k.md:1409; DECISIONS.md:511), so the sentence holds only with that qualifier. The Pass line also has no host time figure to set the device figures beside.",
+              "fix": "In Why a device, write: \"The lag was observed only in host probes on macOS 27, which count the ids missing at return and time nothing ('the observed bound', `docs/adr-drafts/k.md:1409`; K4-COMMITPROMO: `unseenAtReturn=1` in 5 of 5; `:1726-1727`).\" In Pass, write: \"figures recorded beside the 0.2 s design bound and the host probes' `unseenAtReturn=1`.\""
+            },
+            {
+              "blocking": false,
+              "doc": "docs/MUTATION-PROBES.md and docs/RESIDUAL-RISKS.md",
+              "location": "MUTATION-PROBES.md:268 (§7, \"All three are killed only by WP-B's targeted tests\"); RESIDUAL-RISKS.md:1191 (RES-60 What, \"Only WP-B's targeted tests kill mutants C, F and S\")",
+              "problem": "This wording predates the round, and no round-2 issue named it, so the writer was right to leave it. A record backs it: ledger s3c item 69 says \"only WP-B's targeted tests kill them, per the confirmer\", so it is not a G2 breach. For C, though, \"only\" rests on the draft's claim that C passes the flows (s3c.md:491-492). This round replaced that claim with \"no flows run against C is on record\" (run-mutants.sh:35), so the same passage now says both. §6.4:240 is fine: it says \"killed by\" without \"only\".",
+              "fix": "Optional, and the orchestrator's call, since it falls outside this round's eight issues. Either attribute the claim (\"per the confirmer; ledger s3c 69\") or narrow it (\"of the runs on record, only WP-B's targeted tests kill C, F and S\") at MUTATION-PROBES.md:268 and RESIDUAL-RISKS.md:1191."
+            }
+          ]
+        }
+      ],
+      "converged": true
+    },
+    "partB": {
+      "rounds": [
+        {
+          "round": 1,
+          "write": {
+            "summary": "Wrote /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/VERIFICATION.md (new, 598 lines) and committed it as d6cfd01 on wp/s5docs. The worktree is clean. Nothing was pushed. No build, test or simulator run was made. The main checkout still shows only the owner's ` M Package.swift`.\n\nThe document follows the required order:\n- §0 Conventions: short names for the evidence paths and the load rule.\n- §1 Scope: head 45df2e1 (tag s3-merged), 7 Nov 04:38:29-06:02:55 CET, the host and toolchain, and the 9 later commits from `git log 45df2e1..HEAD`. All 9 change only docs/ORCHESTRATION.md, and Sources differ from e840b0e only in `///` lines.\n- §2 What ran: the 15 --full steps with their verify.sh commands and lines, and runs A-I (A --full on e840b0e, B userToBound alone, C tools-6.4 (b), D the quiet P-13 runs, E P-13's verifier, F the iOS Simulator suite, G the mutation re-check, H Stage 5's --full, I tools-6.4 (c)).\n- §3 Thresholds: every gate and P-1..P-14 key from quality-gates.json, with its line, beside the measured value, plus the thresholds outside the JSON (c2Budget, the P-13 nearest-rank rule, the 817.54 ms P-3 limit, the scaling ratios).\n- §4 Results: per step, tests per target, coverage, the 7 benchmark issues with their loads and why each is accepted, a table of six P-13 runs, the other runs including the 11-mutant table, and the R-MAN-3 and /goal statements ADR-057 asks for.\n- §5 Not verified: a device-area table mapped to DT tests, RES ids and APPLE-API §5 rows; the gaps in this run; Q-10, Q-4 and Q-8; ADR-057:669-674 per WP; the earlier ADRs by reference.\n- §6 How to reproduce: the verify.sh modes, the worktree procedure, the narrowed --perf re-runs, the simulator command from sim.log, the tools-6.4 steps, the mutation re-check, and the archive snapshots by commit.\n\nI checked every figure against its log or record this session, and the ORCH citations stay within :503-:660 at 0f909f2. I also checked these:\n- All 16 files of the archived Stage 5 logs have the same SHA-256 as .worktrees/merge-check/.verify-logs.\n- The archive's copy of stage5-full.log has only 23 lines.\n- Tests/ has no withKnownIssue and no .disabled trait.\n\nA secret scan found nothing; the only long hex string is the GATES-CONFIG hash.",
+            "commits": [
+              "d6cfd01 Add VERIFICATION.md with Stage 5's runs, thresholds, results and gaps"
+            ],
+            "counts": "Stage 5 --full on 45df2e1 (full5 = .build-orch/stage5-full.log):\n- Verdict: `VERIFY: FAIL (1 failed: benchmarks)`, steps-failed=1 (full5:128-129). This is the accepted end state (ADR-057 close point 3, DECISIONS.md:633, :659). The /goal's Done is not met.\n- GATES-CONFIG sha256=2725907cf8ef6ea610bd0b3436c4d670a29d97f84c4954eac94d7dcc9b4f026f; HARNESS unchanged since harness-frozen (7f24d4c); Swift 6.4 >= 6.3.\n- Tests, each of 3 runs and TSan: Transport 165, Sync 713, Storage 500, Model 89, Kit 90, Compatibility 71, AppleHosted 104 = 1,732, all passed. TSan had 0 ThreadSanitizer lines (Sync 1,739.5 s, Storage 641.4 s).\n- Coverage: AppleHosted 99.76 %, Kit 97.99 %, Model 99.32 %, Storage 97.52 % (floor 90), Sync 95.11 % (floor 90), Transport 99.10 %, overall 96.93 % (floor 80). The device-only exclusion is 177 lines, 0.58 % (max 3 %).\n- Gates: TRACE 90 requirements (78 MUST), 14 budgets, 1661 tests-with-ids; UNSAFE 0 of 3; DOCS 1281/1281, 0 exempt; 0 warning: lines.\n\nBenchmarks:\n- 88 tests in 8 suites, 7 issues. P-13 p99 5.836 ms against 5.0 ms: 7 of 525 units over 5 ms, 5 tolerated, max 10.72 ms, total 0.588 s against 2.0 s.\n- The six R-CLN-6 purge shapes, best of 3 against 10 ms at loads 2.45-3.12: oneGroup 35.80, oneMemberGroups 37.23, oneGroupScope 39.45, sharedJobFourGroups 18.65, fourGroups 62.29, retryJobs 36.20 ms.\n- The margin-list cases and userToBound passed (userToBound 4.63 ms).\n- Every other budget passed, e.g. P-1 0.417 µs, P-3 worst 326.71 ms against 817.54 ms, P-9 15.13 ms, P-11 3.46x.\n\nP-13 across runs (units over 5 ms, p99):\n- A: 5, 4.80 ms.\n- D, three quiet runs: 5 each, 4.89 / 4.81 / 4.31 ms.\n- H (Stage 5): 7, 5.84 ms (fail).\n- I: 2, 4.66 ms.\n- About 30 % of runs fail with no code change (17 of 53). The verifier gave PASS_WITH_NOTES with 0 blocking.\n\nOther runs:\n- A (--full on e840b0e): the same FAIL, with the six plus userToBound red only at loads 14.35→10.54; overall coverage 96.92 %.\n- B (userToBound alone): best 4.37 ms at a load of 3.19→3.06, passed.\n- C (tools-6.4 (b)): VERIFY: PASS, 0 warnings.\n- I (tools-6.4 (c)): VERIFY: FAIL from the six purge shapes only, 6 issues, 0 warnings, overall coverage 96.94 %.\n- F (simulator, iPhone 18 Pro, iOS 27.0): TEST SUCCEEDED, 1,732/1,732 tests, 3,653 device test runs, 0 failed.\n- G (mutation re-check): 11/11 survivors killed out of 64 mutants (27 storage, 37 network; 53 killed at discovery).\n- Device test plan: 47 tests, none run.",
+            "not_done": [
+              "No device run: none of DEVICE-TEST-PLAN's 47 tests ran, so background re-attachment, TestFlight packs, low storage, memory warnings, real networks, power and thermal states and device performance are all unverified.",
+              "The benchmark bundle has never run on the iOS Simulator (built, not run; part of S3-B-100).",
+              "Q-10 and Stage 4 were not done: no ZTronCarouselCore build and no CDN tests through the shims (ADR-006), so that /goal condition is not shown.",
+              "WP-C's quiet-host TSan decision (DECISIONS.md:650: raise the legacy pairs' guard to 3 minutes or raise legacySlices) was not taken, and no log shows the TSan step's load.",
+              "P-5 on a quiet host is not shown: P-5 and P-13 print no load. P-13 on a quiet host is shown only by the three runs alone on e840b0e. The S3B-13 and S3-B-011 runs assigned to Stage 5 (DECISIONS.md:647) were not made.",
+              "Runs B, D, F and G ran only on e840b0e and were not repeated on 45df2e1; the two heads differ only in `///` lines.",
+              "Archive snapshot 5 is not taken: s5/ (stage5-verify-logs-45df2e1), t64c/ and all but the first 23 lines of stage5-full.log are not archived, and mut-recheck.sh is not archived at all.",
+              "No Stage 5 log prints the Xcode version or the CPU model; the document takes them from BASELINE.md:19 and APPLE-API-VERIFICATION.md:8.",
+              "The independent verifier of VERIFICATION.md (the next workflow step), the merge of wp/s5docs and the push have not happened."
+            ]
+          },
+          "status": "PASS: 0 blocking issues, 8 non-blocking. I checked docs/VERIFICATION.md (598 lines) on wp/s5docs at d6cfd01, whose parent is 104be2e; I am not its author (P4). Every figure I spot-checked matches its cited log or record:\n- the 1,732 tests per target in runs 1-3 and TSan (full5:25-31, :35-41, :45-51, :66-72);\n- the coverage numbers (s5/coverage.log:2-9);\n- trace, unsafe, docs and harness;\n- the P-1 to P-14 budget figures;\n- the 7 benchmark issues and their loads;\n- the GATES-CONFIG sha256 2725907c…4f026f, which matches the file;\n- the simulator counts, the warning counts and the mutation re-check;\n- the P-13 runs in A, D, H and I.\n\nEvery threshold matches its key in Scripts/quality-gates.json. All 15 verify.sh --full steps are present, each with the right OK or FAIL. No gate is claimed passed that a log shows failed. The end state is stated plainly as `VERIFY: FAIL (1 failed: benchmarks)`: the accepted FAIL under DECISIONS.md:633 and :659, caused only by the six R-CLN-6 purge shapes (BenchSyncCycle22Purge.swift:15, :32) and P-13 (BenchStorage.swift:253).\n\n\"Not verified\" covers:\n- ADR-057's Not-verified list (DECISIONS.md:668-674), item by item;\n- all 19 rows of APPLE-API-VERIFICATION.md §5 (:279-297);\n- SPEC §8's four device areas.\n\nd6cfd01 changes only docs/VERIFICATION.md (598 insertions). The range d002758..d6cfd01 also adds MUTATION-PROBES.md, DEVICE-TEST-PLAN.md and RESIDUAL-RISKS.md; those come from the workflow's earlier commits (ec264e4..104be2e) and are outside this check. The worktree is clean (empty `git status --porcelain`, HEAD d6cfd01). The main checkout still shows only ` M Package.swift`. I modified and committed nothing. I ran no build, test or simulator, so the scratch path .verify-s5docs-b was never created.\n\nThe non-blocking items, most important first:\n1. Two ADR-057 Stage 5 assignments are absent: S3B-13 with the owner's P-8 run, and the chunked startGrace for S3-B-011.\n2. Two ADR-057 Process caveats are not carried (:685's second sentence and :690).\n3. ADR-057:659's condition on the TSan Sync bundle is never stated.\n4. Q-6's threshold is SPEC's wording, not the gate's.\n5. Q-3 has no \"Swift 6 mode\" row.\n6. §6.3's P-13 filter is not escaped.\n7. One citation range in §5.1 is too narrow.\n8. Optional: a read hint for the ORCH citations.",
+          "issues": [
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§5.2 Gaps in this run and its records (docs/VERIFICATION.md:360-385)",
+              "problem": "DECISIONS.md:647 gives Stage 5 two jobs: \"S3B-13 with the owner's P-8 run, and the chunked `startGrace` (S3-B-011)\". :621 records both items too, under the heading at :618, which says Stage 5's RESIDUAL-RISKS.md and VERIFICATION.md carry them. Stage 5 did neither, and VERIFICATION.md never mentions S3B-13, S3-B-011, RES-44 or RES-45 (grep finds none). Other Stage 5 assignments that were not done are listed in §5.2: the benchmark bundle on the simulator, 'Not done' (:367), and the WP-C decision from :650, 'not taken' (:379). So these two are missing from the doc's account of gaps. This is not blocking: neither item is in ADR-057's Not-verified list (:668-674), the APPLE-API UNVERIFIED rows or SPEC §8.",
+              "fix": "Add a §5.2 bullet: \"S3B-13 (user-initiated publications are quadratic: 10k/5k ratio 2.71-2.86, about 0.5-1 ms each at 10,000) with the owner's P-8 run, and the chunked `startGrace` for S3-B-011 at `maxEntries` (grace start 37.31 ms), both assigned to Stage 5 (DECISIONS.md:647; figures at :621): not done. RESIDUAL-RISKS.md RES-44 and RES-45 carry the risk.\""
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§5.4 ADR-057's Not-verified list (docs/VERIFICATION.md:398-492; the point-8 row at :488)",
+              "problem": "Row :488 carries the first half of ADR-057's Process caveat at DECISIONS.md:685, that run 14's corrections were not verified. It drops the second sentence: \"The ADR-050 amendment for P-13's records (P3, P4) and the P5 corrections this pass made (ARCHITECTURE §12 S2-27, `BlobUnits.swift:155-162`) are likewise not independently verified until their verifier checks them.\" ADR-050 says the same at :383. The doc also drops :690: the `///` doc comments made true at the merge \"are recorded as this pass's, not independently verified\". Both caveats sit under ADR-057's 'Process.' heading (:675), not its Not-verified list (:668), so this is not blocking. ORCH:569-571 records that the ADR-057 docs workflow's round-2 verifier found 0 blocking and that P3-P5 were fixed in it, but not that a verifier checked each of these claims.",
+              "fix": "Add a §5.4 row, or a §5.2 bullet, for the two caveats, citing DECISIONS.md:685, :690 and :383. If the doc relies on ADR-057's round-2 docs verifier having checked them, say so and cite ORCH:569-571 for that verifier's result."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§4.7 What ADR-057 asks this file to state (docs/VERIFICATION.md:312-338), and §5.2 'Loads not printed' (:369-380)",
+              "problem": "DECISIONS.md:659 sets a condition on Stage 5's run: \"The TSan Sync bundle runs alone, or paired only at an S3-R12 rule-1 mean of 30 or less\". The doc covers WP-C's separate quiet-host Storage TSan item (DECISIONS.md:650, at §5.2:375-380), but never says whether the :659 Sync-bundle condition held or was shown. The log has evidence for it. The step is one `swift test --sanitize=thread` invocation (verify.sh:114). full5:66-72 reports the seven bundles one after another, with the Sync bundle's 713 tests at 1739.487 s (full5:67). Their durations sum to about 2,464 s, which fits the bundles running one at a time. That points to the Sync bundle running alone, but this is my inference, not a record.",
+              "fix": "Add one line to §4.7 or §5.2. State the :659 condition and what shows it: one `swift test` process, with the bundles reported in sequence at full5:66-72. Add that no load was logged during the step, so the 'alone' reading rests on the step's structure. Otherwise, mark the condition 'not shown'."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§3.1 Gates, Q-6 row (docs/VERIFICATION.md:106)",
+              "problem": "The Threshold column gives SPEC Q-6's wording, \"a test whose display name starts with its ID\" (SPEC.md:324). The gate checks something weaker: the ID only has to appear somewhere in the `@Test` display name (Scripts/gates.py:107, :111 `ID_IN_NAME`, :121 `findall`). The row's measured claim is still true, because I checked that every one of the 78 MUSTs and 14 budgets has a test whose name starts with its ID. But the row says the gate enforces SPEC's condition, and it does not.",
+              "fix": "Reword the threshold: \"every MUST and every budget has a test whose display name carries its ID (gates.py:107, :111, :121); SPEC.md:324 asks that the name start with it\". Optionally add that the stronger form also holds at 45df2e1."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§3.1 Gates, Q-3 rows (docs/VERIFICATION.md:103-104)",
+              "problem": "SPEC Q-3 (SPEC.md:321) has three parts: Swift 6 mode, a clean unsafe gate, and a clean TSan run. §3.1 has rows for TSan and unsafe only. No gate or JSON key checks 'Swift 6 mode'. Package.swift meets it by construction, at :1 (`swift-tools-version: 6.0`), :94 (`swiftLanguageModes: [.v6]`) and :10 (`StrictConcurrency=complete`), and Package.swift is unchanged between 45df2e1 and d6cfd01.",
+              "fix": "Add a Q-3 'Swift 6 mode' row: no JSON key, met by Package.swift:94 and :10, built in the debug, release and iOS steps (full5:15-22). Or list it in §5.3 as a requirement with no gate behind it."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§6.3 The single-case re-runs (B, D): the P-13 command at docs/VERIFICATION.md:547 (also §2.2 row D, :77)",
+              "problem": "The reproduction command filters with `'StorageBenchmarks/reclaim()'`. The record of the command that was actually run uses the escaped regex `StorageBenchmarks/reclaim\\(\\)` (.build-orchestrator/s3-post-merge/docs-followup-items.md:50, P6). DECISIONS.md:674 uses the unescaped form, but in prose. Both select only `reclaim()` (BenchStorage.swift:198; no other StorageBenchmarks test starts with 'reclaim'), so the result is the same. But a reproduction line should match the command that was run.",
+              "fix": "At :547, use `--filter 'StorageBenchmarks/reclaim\\(\\)'` and cite docs-followup-items.md:50. Row D (:77) can keep quoting DECISIONS.md:674 as it does now."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§5.1 Device-only behaviour, background URLSession row (docs/VERIFICATION.md:349)",
+              "problem": "The row says the host and simulator suites drive the logic through fakes, \"among them `Tests/ZTronAssetTransportTests/FakeBackgroundSessionDriver.swift` (`DEVICE-TEST-PLAN.md:28-30`)\". Lines 28-30 support only the coverage exclusion and 'The host suites drive their logic through fakes'. They name neither the fake driver's file nor the simulator; the simulator appears at :31 ('on macOS and on the iOS Simulator with fakes'). The file does exist.",
+              "fix": "Cite DEVICE-TEST-PLAN.md:28-31, and cite the fake driver by its own path rather than through the plan."
+            },
+            {
+              "blocking": false,
+              "doc": "docs/VERIFICATION.md",
+              "location": "§0 Conventions, the ORCH short name (docs/VERIFICATION.md:26)",
+              "problem": "Optional. Every ORCH:nnn citation points into docs/ORCHESTRATION.md at 0f909f2, and the doc says so. But once this branch merges and ORCHESTRATION.md gets more commits, a reader who opens the file at HEAD will see different line numbers.",
+              "fix": "Add a read command to the ORCH definition, for example `git show 0f909f2:docs/ORCHESTRATION.md`, so the citations stay easy to follow after ORCH moves on."
+            }
+          ]
+        }
+      ],
+      "converged": true
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Part A fix"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Part B"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "Part A fix write:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Part A fix",
+      "agentId": "a2a0943f6862d68b2",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794301292091,
+      "queuedAt": 1794301292074,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "I applied all 8 round-2 issues (1 blocking, 7 non-blocking)…",
+      "promptPreview": "TASK: part A fix round 1 on branch wp/s5docs.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, currently at 6eab1ba or later; it is based on d002758, the feature/asset-kit head after the Stage 3 merge, ADR-057 and the post-merge checks). Use absolute paths or cd into the worktree for EVERY command; never edi…",
+      "promptFramed": true,
+      "lastProgressAt": 1794302326803,
+      "tokens": 250311,
+      "toolCalls": 85,
+      "durationMs": 1034711,
+      "resultPreview": "{\"summary\":\"I applied all 8 round-2 issues (1 blocking, 7 non-blocking) from result.rounds[1].issues of /Users/admin/Documents/ZTronAssetKit/.build-orchestrator/s3-post-merge/s5docs-partA-wf_c7c92797-46b.json. The work is in two commits on wp/s5docs in /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs. `git status --porcelain` is empty, and the scratch scripts sit in the ignored .build-s5docs…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "Part A fix verify:1",
+      "phaseIndex": 1,
+      "phaseTitle": "Part A fix",
+      "agentId": "a8f7ab65f2342282b",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794302329392,
+      "queuedAt": 1794302329369,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "0 blocking issues, 2 non-blocking. All 8 round-2 issues are…",
+      "promptPreview": "TASK: independently verify a fix round on branch wp/s5docs (worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs) for docs/MUTATION-PROBES.md, docs/DEVICE-TEST-PLAN.md and docs/RESIDUAL-RISKS.md. You did NOT write them and you were not their earlier verifier (CLAUDE.md P4). Do not modify or commit anything; leave git status unchanged.\nRepository /Users/admin/Documents/ZTronAssetKit. You…",
+      "promptFramed": true,
+      "lastProgressAt": 1794303158941,
+      "tokens": 213278,
+      "toolCalls": 82,
+      "durationMs": 829548,
+      "resultPreview": "{\"status\":\"0 blocking issues, 2 non-blocking. All 8 round-2 issues are applied as their fix text says, and I checked each one against the record it cites. I verified wp/s5docs at 104be2e: two commits on 6eab1ba, 70caec3 and 104be2e, both on wp/s5docs. I did not write these documents and did not verify them before (P4). `git status --porcelain` was empty before and after my checks. I created no fil…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "Part B write:1",
+      "phaseIndex": 2,
+      "phaseTitle": "Part B",
+      "agentId": "abfc2eeeb9c370128",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794303160838,
+      "queuedAt": 1794303160834,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "Wrote /Users/admin/Documents/ZTronAssetKit/.worktrees/s5doc…",
+      "promptPreview": "TASK: part B, docs/VERIFICATION.md, round 1 on branch wp/s5docs.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, currently at 6eab1ba or later; it is based on d002758, the feature/asset-kit head after the Stage 3 merge, ADR-057 and the post-merge checks). Use absolute paths or cd into the worktree for EVERY…",
+      "promptFramed": true,
+      "lastProgressAt": 1794307335483,
+      "tokens": 359015,
+      "toolCalls": 360,
+      "durationMs": 4174645,
+      "resultPreview": "{\"summary\":\"Wrote /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs/docs/VERIFICATION.md (new, 598 lines) and committed it as d6cfd01 on wp/s5docs. The worktree is clean. Nothing was pushed. No build, test or simulator run was made. The main checkout still shows only the owner's ` M Package.swift`.\\n\\nThe document follows the required order:\\n- §0 Conventions: short names for the evidence pat…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "Part B verify:1",
+      "phaseIndex": 2,
+      "phaseTitle": "Part B",
+      "agentId": "a874910edf6540a27",
+      "model": "claude-opus-5-5",
+      "state": "done",
+      "startedAt": 1794307338759,
+      "queuedAt": 1794307338752,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "PASS: 0 blocking issues, 8 non-blocking. I checked docs/VER…",
+      "promptPreview": "TASK: independently verify docs/VERIFICATION.md on branch wp/s5docs (worktree /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs). You did NOT write it (CLAUDE.md P4). Do not modify or commit anything; leave git status unchanged.\nRepository /Users/admin/Documents/ZTronAssetKit. Your worktree is /Users/admin/Documents/ZTronAssetKit/.worktrees/s5docs (branch wp/s5docs, currently at 6eab1ba or la…",
+      "promptFramed": true,
+      "lastProgressAt": 1794308951082,
+      "tokens": 111706,
+      "toolCalls": 152,
+      "durationMs": 1612322,
+      "resultPreview": "{\"status\":\"PASS: 0 blocking issues, 8 non-blocking. I checked docs/VERIFICATION.md (598 lines) on wp/s5docs at d6cfd01, whose parent is 104be2e; I am not its author (P4). Every figure I spot-checked matches its cited log or record:\\n- the 1,732 tests per target in runs 1-3 and TSan (full5:25-31, :35-41, :45-51, :66-72);\\n- the coverage numbers (s5/coverage.log:2-9);\\n- trace, unsafe, docs and harn…"
+    }
+  ],
+  "totalTokens": 934310,
+  "totalToolCalls": 679
+}

@@ -1,0 +1,6 @@
+full exit 1
+warning lines: 0
+::: OK   gates-selftest ::: OK   harness ::: OK   toolchain ::: OK   build-debug ::: OK   build-release ::: OK   build-ios ::: OK   tests-run-1-of-3 ::: OK   tests-run-2-of-3 ::: OK   tests-run-3-of-3 ::: OK   coverage ::: OK   tsan ::: FAIL benchmarks (full log: .verify-logs/benchmarks.log) ::: OK   trace ::: OK   unsafe ::: OK   docs 
+VERIFY: FAIL (1 failed: benchmarks)
+Sat Nov  7 07:33:20 CET 2026
+{ 9.91 9.11 9.16 }

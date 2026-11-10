@@ -1,0 +1,47 @@
+build start 13:26:30 load { 50.55 84.35 97.79 }
+build exit 0 13:32:37 load { 142.95 92.99 92.88 }
+micro1 start 13:32:47 { 129.46 91.77 92.45 }
+micro1 end rc=0 13:32:54 { 121.58 90.76 92.09 }
+base1-concentrationCommitRerouteTurns start 13:33:22 { 84.51 84.74 89.86 }
+base1-concentrationCommitRerouteTurns end rc=1 13:33:32 { 74.60 82.60 89.04 }
+base1-movedBeforeDrainTurns start 13:33:32 { 74.60 82.60 89.04 }
+base1-movedBeforeDrainTurns end rc=1 13:33:35 { 70.87 81.70 88.69 }
+base1-VerifyC20SupersedeBench start 13:33:35 { 70.87 81.70 88.69 }
+base1-VerifyC20SupersedeBench end rc=1 13:33:45 { 72.72 81.71 88.61 }
+s1cpu start 13:33:54 { 77.15 82.48 88.84 }
+s1cpu end rc=0 13:34:48 { 40.70 71.31 84.28 }
+s2cpu start 13:38:29 { 389.43 166.99 117.66 }
+s2cpu end rc=0 13:39:16 { 272.39 167.46 120.55 }
+s3cpu start 13:39:16 { 272.39 167.46 120.55 }
+s3cpu end rc=54 13:54:46 { 84.25 217.33 226.64 }
+s3cpu-b start 13:56:22 { 31.59 164.78 205.40 }
+s3cpu-b end rc=0 13:56:40 { 24.44 154.50 200.76 }
+quiet-wait start 13:58:08 { 20.74 120.00 183.06 }
+quiet-wait gave up 14:11:17 { 214.30 98.14 122.30 }
+quiet-wait end 14:11:17 { 214.30 98.14 122.30 }
+base2-concentrationCommitRerouteTurns start 14:11:17 { 214.30 98.14 122.30 }
+base2-concentrationCommitRerouteTurns end rc=1 14:16:57 { 338.55 778.80 455.32 }
+base2-movedBeforeDrainTurns start 14:16:57 { 338.55 778.80 455.32 }
+base2-movedBeforeDrainTurns end rc=1 14:17:01 { 311.92 765.97 452.69 }
+base2-VerifyC20SupersedeBench start 14:17:01 { 311.92 765.97 452.69 }
+base2-VerifyC20SupersedeBench end rc=1 14:17:08 { 287.66 753.40 450.09 }
+micro2-1 start 14:17:08 { 287.66 753.40 450.09 }
+micro2-1 end 14:17:08 { 287.66 753.40 450.09 }
+micro2-2 start 14:17:08 { 287.66 753.40 450.09 }
+micro2-2 end 14:17:08 { 287.66 753.40 450.09 }
+micro2-3 start 14:17:08 { 287.66 753.40 450.09 }
+micro2-3 end 14:17:09 { 287.66 753.40 450.09 }
+base3-concentrationCommitRerouteTurns start 14:17:23 { 225.64 716.89 442.36 }
+base3-concentrationCommitRerouteTurns end rc=1 14:17:30 { 207.73 705.02 439.78 }
+base4-concentrationCommitRerouteTurns start 12:54:16 { 4.94 6.51 10.92 }
+base4-concentrationCommitRerouteTurns end rc=1 12:54:24 { 4.95 6.48 10.88 }
+base4-movedBeforeDrainTurns start 12:54:24 { 4.95 6.48 10.88 }
+base4-movedBeforeDrainTurns end rc=1 12:54:26 { 5.11 6.49 10.86 }
+base4-VerifyC20SupersedeBench start 12:54:26 { 5.11 6.49 10.86 }
+base4-VerifyC20SupersedeBench end rc=1 12:54:32 { 5.26 6.50 10.84 }
+micro3-1 start 12:54:54 { 4.75 6.30 10.66 }
+micro3-1 end 12:54:54 { 4.75 6.30 10.66 }
+micro3-2 start 12:54:54 { 4.75 6.30 10.66 }
+micro3-2 end 12:54:55 { 4.75 6.30 10.66 }
+micro3-3 start 12:54:55 { 4.75 6.30 10.66 }
+micro3-3 end 12:54:55 { 4.75 6.30 10.66 }
