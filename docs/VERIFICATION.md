@@ -600,7 +600,7 @@ For each survivor, in a clean worktree at the head: apply its discovery diff (`<
 the way `run_tests` does (`verify.sh:92`); restore the file with `git checkout -- <file>`; and compare `git status`
 before and after (ORCH:554-558). A kill is an assertion failure in a test, never a time-out alone (S3-R3;
 `docs/MUTATION-PROBES.md` §2.2; `DECISIONS.md:684`). G's script, `mut-recheck.sh`, was kept in the 7 Nov session's
-scratchpad (ORCH:555) and is not archived.
+scratchpad (ORCH:555); snapshot 5 archives it as `pm/mut-recheck/mut-recheck.sh` (§6.7).
 
 ### 6.7 Where the logs are
 
@@ -610,7 +610,7 @@ Locally, at the paths of §0. Archived on the branch `archive/build-orchestrator
 |---|---|---|
 | 4 (7 Nov, committed 04:40, done 04:42; pushed and restore-tested, ORCH:649-656) | `cd17cdc` | `build-orch-logs/`: `merge-full.log`, `merge-verify-logs-e840b0e/`, `merge-userToBound-rerun1.log`, `merge-P13-quiet.log`, `t64b/`, `sim-merged/` without `sim.xcresult`, `mut-recheck/`, and the first 23 lines of `stage5-full.log`; `.build-orchestrator/s3-post-merge/` with the P-13 verifier's JSON, `docs-followup-items.md` and `mut-recheck/first-issues.txt` |
 | 1 to 3 (6 Nov 14:39, 15:55, 16:47) | `765102c`, `5ba3601`, `2d87b7c` | earlier Stage 3 evidence; snapshot 3 predates runs 13 and 14 (ORCH:583) |
-| 5 | not taken yet | due after Stage 5, adding `stage5-verify-logs-45df2e1/`, `t64c/` and the whole `stage5-full.log` (ORCH:641) |
+| 5 (10 Nov 12:56, the last; pushed, and restore-tested: all 439 cited logs and the whole `.build-orchestrator/` read back byte-identical) | `b2fd86e` | everything in snapshot 4, plus `s5/` (`stage5-verify-logs-45df2e1/`, 16 files), `t64c/` (21 files), the whole `stage5-full.log`, `pm/`'s Stage 5 workflow scripts and results with `pm/mut-recheck/mut-recheck.sh`, and `build-prof40-logs/` (the 2-4 Nov profiling run): 3,410 files, 439 cited logs of at most 3 MB |
 
 Read an archived file with `git show archive/build-orchestrator:build-orch-logs/<path>`, or
 `git show archive/build-orchestrator:.build-orchestrator/s3-post-merge/<file>` for `pm/`.
