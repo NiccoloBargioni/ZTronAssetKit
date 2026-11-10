@@ -187,9 +187,9 @@ are read from that run's logs (§0.4). It is not independently verified (`CLAUDE
   - In the merged head's `--full` it passed: p99 4.80 ms, maximum 8.09 ms, 525 units (`:634`).
   - In Stage 5's `--full` (§0.4) it was red: p99 5.835917 ms against 5.0 ms, maximum 10.721417 ms, 525 units and
     0.588 s in all; p50 0.964792 ms, p95 0.997292 ms (`.worktrees/merge-check/.verify-logs/benchmarks.log:128-129`).
-    At 525 units the p99 tolerates 5 units over 5 ms, so at least 6 were over (derived). The code is the merged
-    head's, so it is a red with no code change, inside the accepted FAIL (`docs/DECISIONS.md:635`), and one more
-    red run for P2.
+    7 units were over 5 ms (`benchmarks.log:128`), 2 more than the 5 the nearest-rank p99 tolerates at 525 units.
+    The code is the merged head's, so it is a red with no code change, inside the accepted FAIL
+    (`docs/DECISIONS.md:635`), and one more red run for P2.
   - Under the old maximum assertion it was red at the close on `450022b` (13.583 ms longest, 490 units) and on
     `d88bdb1` (9.87 ms, 507 units) (`:634`).
   - On `d66eb2f` (load 8.9 → 5.7): 0.598 s in 562 units; unit maximum 7.869 ms (p50 0.962, p95 0.993); on-CPU
@@ -515,7 +515,8 @@ Common to RES-17 to RES-31, unless the entry says otherwise:
     (`:641`).
 - **Evidence.** PROBE-C17-ADMIT-DURING-APPLY, seed 1_618_202, failed 2/2. Not committed (`docs/DECISIONS.md:641`).
 - **Field.** It needs a request for an id while an older apply that omits the id is applied. The impact is a wrong
-  answer: `notFound` for an asset the store lists. This is the one RR that changes an answer.
+  answer. This is the one RR whose answer is wrong in both orders: `notFound` for an asset the store lists. RR-24
+  (RES-13) changes an answer only between orders, under a shutdown, and that is ruled a non-blocking difference.
 - **Noticed.** `assetFailed` with `notFound` (`AssetEvent.swift:141`; `FailureClass.notFound`). In the field this
   cannot be told from a real 404.
 - **Re-open.** The owner's choice of (a) or (b).
@@ -1123,7 +1124,7 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
   asserted figure is the best of three (`BenchCleanup.swift:121-124`).
 - **Ruling.** S3-R5: a miss caused only by load is not blocking (`docs/DECISIONS.md:622`).
 - **Evidence.** 17.91525 ms in cycle 1 (best 3.559292 ms, load 7.95 → 15.12), 4.819208 ms in cycle 2, and 11.047209
-  ms at the merged head (best 4.733625 ms) (`docs/DECISIONS.md:586`).
+  ms at the merged head (best 4.733625 ms) (`docs/DECISIONS.md:586`; `s3c.md:231-234`).
 - **Field.** The best case holds the actor about 4.7 ms. A loaded device may see the worst case.
 - **Noticed.** No field signal.
 - **Re-open.** A best of three above 10 ms at a quiet load.
@@ -1185,10 +1186,12 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
 - **Noticed.** No field signal.
 - **Re-open.** A measurement at `maxEntries`, or a ruling that extends C2.
 
-### RES-60 · Mutants C, F and S are masked in WP-C's oracle and flows
+### RES-60 · Mutants C, F and S are masked in WP-C's oracle, and F and S in its flows
 
-- **What.** Only WP-B's targeted tests kill mutants C, F and S. WP-C's oracle and flow enumerations miss them
-  (`s3c.md:493-497`).
+- **What.** Only WP-B's targeted tests kill mutants C, F and S (`s3c.md:491-497`).
+  - C: masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record
+    (`.build-s3c/mut/run-mutants.sh:35`).
+  - F and S: masked in both (oracle-F/S and flows-F/S passed).
 - **Ruling.** S3C-6, which requires only Z (`docs/DECISIONS.md:622`).
 - **Evidence.** The confirmer's runs. The oracle's step runner has no commit-fault injection (ledger s3c 69).
 - **Field.** None directly: a regression of that kind would rest on WP-B's tests alone.
@@ -1345,7 +1348,8 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
 
 - **What.** P-9's sliced release survey at 100,000 manifest entries was never written. The only P-9 case is the
   64-resolve heartbeat (`BenchKit.swift:283-284`).
-- **Ruling.** S3G-5: optional, not done; deferred since ADR-050 (`docs/DECISIONS.md:603`, `:620`).
+- **Ruling.** S3G-5: optional, not done (`docs/DECISIONS.md:603`); ADR-057 records it as a known miss (`:620`);
+  deferred since ADR-050 (`:374`).
 - **Evidence.** The measured case: p99 19.667 ms over 870 heartbeat gaps, against a 50 ms budget
   (`docs/DECISIONS.md:584`).
 - **Field.** Unknown at 100,000 entries.
@@ -1534,7 +1538,7 @@ since after the clamp any value is safe. Before the fix, the median was 11.058 m
   floor.
 - **Ruling.** Not verified (`docs/DECISIONS.md:668-674`).
 - **Evidence.** The iOS Simulator suite on `e840b0e` passed 1,732/1,732 (`docs/DECISIONS.md:574`). No device run
-  exists. `docs/DEVICE-TEST-PLAN.md` has 46 tests, none run.
+  exists. `docs/DEVICE-TEST-PLAN.md` has 47 tests, none run.
 - **Field.** Unknown until the plan runs.
 - **Noticed.** `docs/DEVICE-TEST-PLAN.md`.
 - **Re-open.** Any failing device test goes to the owner (`docs/DEVICE-TEST-PLAN.md` §1).
@@ -1552,6 +1556,36 @@ since after the clamp any value is safe. Before the fix, the median was 11.058 m
 - **Field.** None directly: a regression there rests on few tests.
 - **Noticed.** No signal.
 - **Re-open.** A later test round.
+
+### RES-88 · S3-B-110: an answer can come before the readers' snapshot holds the asset (L5K-R24)
+
+- **What.** Four answer sites can answer a user-initiated asker up to about two install intervals (0.2 s by default)
+  before the readers' snapshot holds the asset: the commit path, `ensureAvailable`'s present members, the resolve's
+  fast hit and joins answered from the ledger (`k.md:1402-1408`; `docs/DECISIONS.md:104`, `:511`). The location
+  answered is valid at once. `lookup`, `existingLocalURL` and `hasAsset` see the asset at the next install, which the
+  client has scheduled (`docs/MIGRATION.md:211-217`; `README.md:131-136`).
+- **Ruling.** An accepted deviation under ADR-055 (the backlog's S3-B-110).
+  - L5K-R24 scopes L5K-R21's guarantee (an answer only once the readers' snapshot holds the asset) to the funnel,
+    `answeredFromStore`. The other sites keep ADR-016's lag, ruled non-blocking for Level 5 (`k.md:671-677`,
+    `:1397-1419`; `docs/DECISIONS.md:104`).
+  - L5K-R27 (3) sends it to the Stage 3 backlog: "Stage 3 holds the optional `installIfDue()`"
+    (`docs/DECISIONS.md:509`, `:524`). Stage 3 did not take it: `Sources/` has no `installIfDue`, and ADR-057 does
+    not name it.
+- **Evidence.** Host probes on macOS 27, none pinned by a test (`docs/DECISIONS.md:511`; `k.md:1409-1415`).
+  - K4-COMMITPROMO, WP-K's own cycle-4 probe: `unseenAtReturn=1` in 5 of 5 runs (`k.md:1726-1727`).
+  - The cycle-4 verifiers' P21-COMMIT, outside migration: `result=success storeHasIt=true unseenAtReturn=1`, 4 of 4
+    runs plus TSan.
+  - Their P21-ENSURE-MIG, during migration: `unseenAfterEnsure=1`, and the fast hit's `unseenAfterResolve=1`, 4 of 4
+    plus TSan.
+  - No device run.
+- **Field.** An app that uses the answered location, as README advises (`README.md:135-136`), is unaffected. One that
+  reads `lookup` or the shims' lookups right after such an answer can miss the asset for up to about 0.2 s. A
+  carousel that does would show a missing asset for that moment (this document's reading).
+- **Noticed.** DT-PERF-06. In the field, `metrics()`'s `lookupMisses` counts such a miss with every other
+  (`Reports.swift:280`).
+- **Re-open.** A device test that shows the lag matters (DT-PERF-06). The route is the optional package
+  `AssetStore.installIfDue()` with L5K-R21's answer-site check at those sites; it needs `EngineDispatch.swift`
+  authorised (`docs/DECISIONS.md:524`).
 
 ## 14. ADR-057's Open items, at this writing
 
@@ -1589,5 +1623,5 @@ results labelled `ledger:<draft>`). Of their 536 items (`docs/ORCHESTRATION.md:5
 | s3f-docs | 100 → RES-19 to RES-21 · 101 → RES-17, RES-18, RES-22 to RES-24 · 102 → RES-25 to RES-27, RES-31 · 103 → RES-28 · 104 → RES-15, RES-16, RES-29 · 105 → RES-30 · 106 → RES-13, RES-14 · 107 → §6 (closed RRs, accepted orders) · 108 → RES-33 · 109 → RES-10 · 110 → RES-01 · 111 → RES-03 to RES-07 · 112 → RES-32 · 113 → RES-35 |
 
 Entries without a ledger item: RES-09 (from `docs/DECISIONS.md:632`), RES-37 and RES-39 to RES-41 (`:616`, `:641`,
-`:684`), RES-52 (`:654`), RES-68 (`:673`), RES-81 to RES-87 (`:602`, `:668-674`; the backlog; `docs/MUTATION-PROBES.md`
+`:684`), RES-52 (`:654`), RES-68 (`:673`), RES-81 to RES-88 (`:602`, `:668-674`; the backlog; `docs/MUTATION-PROBES.md`
 §7).
