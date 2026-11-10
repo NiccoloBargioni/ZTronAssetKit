@@ -23,7 +23,7 @@ What ran, against which thresholds, with what result, and what no run could prov
 | `t64b/`, `t64c/` | `.build-orch/t64b/`, `.build-orch/t64c/`: the tools-6.4 checks (b) and (c) |
 | `sim/`, `mut/` | `.build-orch/sim-merged/` (the iOS Simulator suite), `.build-orch/mut-recheck/` (the mutation re-check) |
 | `pm/` | `.build-orchestrator/s3-post-merge/` |
-| `ORCH` | `docs/ORCHESTRATION.md` on `feature/asset-kit` at `0f909f2`; this branch's copy is older and its line numbers differ |
+| `ORCH` | `docs/ORCHESTRATION.md` on `feature/asset-kit` at `0f909f2`, read with `git show 0f909f2:docs/ORCHESTRATION.md`; this branch's copy is older and its line numbers differ |
 
 - `DECISIONS.md`, `quality-gates.json`, `verify.sh` and `gates.py` mean `docs/` and `Scripts/` at this branch's head;
   `Scripts/` is unchanged since the tag `harness-frozen` (`7f24d4c`; `full5:9`).
@@ -100,10 +100,11 @@ and D stand in for it (`DECISIONS.md:674`).
 | Q-2 exclusions | `coverage.exclude_path_regexes` (:22-28) | `/Tests/`, `/\.build`, `/checkouts/`, `/DerivedData/`, `/ZTronAssetTestSupport/` | applied (`gates.py:54-55`) | |
 | Q-2 device-only share | `coverage.device_only_path_regexes` (:29-32), `coverage.device_only_max_lines_fraction` (:33) | `BackgroundSessionBackend.swift` and `LiveAssetPackBackend.swift`, at most 3 % of all lines (`gates.py:91`) | 177 lines, 0.58 % | `s5/coverage.log:9` |
 | Q-5 stability | `tests.full_run_repeats` (:36) | 3 consecutive passing runs | 3 of 3 | `full5:23-52` |
+| Q-3 Swift 6 mode | none: the manifest sets it, and no gate checks it | Swift 6 language mode (`SPEC.md:321`) | met by the committed manifest, unchanged since `45df2e1`: `Package.swift:94` (`swiftLanguageModes: [.v6]`) and `:10` (`StrictConcurrency=complete`); built in the debug, release and iOS steps | `full5:15-22` |
 | Q-3 Thread Sanitizer | `tests.tsan` (:37) | the step runs and passes | passed | `full5:64-73` |
 | Q-3 unsafe (C1) | `unsafe.max_escapes` (:40), `unsafe.patterns` (:41-51, 9 patterns) | at most 3, each marked and audited | 0 | `s5/unsafe.log:1-2` |
 | Q-7 documentation | `docs.min_documented_public_fraction` (:54), `docs.max_exempt` (:55) | 100 %, at most 10 exempt | 1281 of 1281, 0 exempt | `s5/docs.log:1-2` |
-| Q-6 traceability | `trace.require_all_must` (:58), `trace.require_all_budgets` (:59) | every MUST and every budget has a test whose display name starts with its ID; no unknown ID | 90 requirements (78 MUST), 14 budgets, 1661 ID citations in test names (`tests-with-ids`, `gates.py:131`) | `s5/trace.log:1-2` |
+| Q-6 traceability | `trace.require_all_must` (:58), `trace.require_all_budgets` (:59) | every MUST and every budget has a test whose display name carries its ID (`gates.py:107`, `:111`, `:121`); `SPEC.md:324` asks that the name start with it; no unknown ID | 90 requirements (78 MUST), 14 budgets, 1661 ID citations in test names (`tests-with-ids`, `gates.py:131`). The stronger form also holds: each of the 78 MUSTs and 14 budgets has a test whose display name starts with its ID (checked for this file with the gate's regexes over `Tests/` at `45df2e1`; the per-ID counts match `docs/TRACEABILITY.md`) | `s5/trace.log:1-2` |
 | Q-4 determinism, Q-8 mutation, Q-10 compatibility | none: `gates.py` has only the `coverage`, `trace`, `unsafe`, `docs` and `selftest` subcommands (`gates.py:331-335`) | | Q-8 §4.6 (G); Q-4 and Q-10 §5.3 | |
 
 ### 3.2 Budgets (SPEC §6, `SPEC.md:290-311`; `quality-gates.json` → `budgets`, :61-121)
@@ -346,7 +347,7 @@ tests, DT-…, none of them run, `DEVICE-TEST-PLAN.md:5`), `docs/RESIDUAL-RISKS.
 
 | Area | Why no run here proves it | Device tests | Also |
 |---|---|---|---|
-| Background `URLSession` re-attachment: relaunch, UIKit's background-events hook, resume data, a fresh ranged 206, `taskDescription` across a relaunch, the live driver's callback order and priority writes, `shutdown()` with downloads in flight | `BackgroundSessionBackend.swift` is device-only and excluded from coverage (`quality-gates.json:30`); the host and simulator suites drive its logic through fakes, among them `Tests/ZTronAssetTransportTests/FakeBackgroundSessionDriver.swift` (`DEVICE-TEST-PLAN.md:28-30`) | DT-BG-01 to DT-BG-09 | §5 rows `:284-287`, `:295`, `:296`; RES-65, RES-68 |
+| Background `URLSession` re-attachment: relaunch, UIKit's background-events hook, resume data, a fresh ranged 206, `taskDescription` across a relaunch, the live driver's callback order and priority writes, `shutdown()` with downloads in flight | `BackgroundSessionBackend.swift` is device-only and excluded from coverage (`quality-gates.json:30`); the host and simulator suites drive its logic through fakes (`DEVICE-TEST-PLAN.md:28-31`), among them `Tests/ZTronAssetTransportTests/FakeBackgroundSessionDriver.swift` | DT-BG-01 to DT-BG-09 | §5 rows `:284-287`, `:295`, `:296`; RES-65, RES-68 |
 | Apple-hosted packs through TestFlight | needs TestFlight and Apple-hosted packs; `LiveAssetPackBackend.swift` is device-only (`quality-gates.json:31`); R-APL-3 runs over a fake pack backend (`ARCHITECTURE.md:981`) | DT-APL-01 to DT-APL-10 | rows `:279-283`, `:288`, `:289`, `:291` |
 | Low storage | ENOSPC comes from the fakes, which do not model the OS's storage policy (`DEVICE-TEST-PLAN.md:31-34`) | DT-STO-01 to DT-STO-07, DT-APL-09 | row `:293`; RES-10, RES-40 |
 | Memory warnings | `.live()` has no memory-pressure source (S3-B-009); the tests use fake sources, which do not model the OS's memory policy (`DEVICE-TEST-PLAN.md:31-34`) | DT-MEM-01, DT-MEM-02; DT-MEM-03 for R-MAN-3's allocation bound (S3-B-004) | RES-81 |
@@ -366,6 +367,10 @@ tests, DT-…, none of them run, `DEVICE-TEST-PLAN.md:5`), `docs/RESIDUAL-RISKS.
   a `--full`. Only `///` lines differ between the two heads (§1).
 - **The benchmark bundle on the iOS Simulator:** built, never run (`sim/sim.log:2`; `DECISIONS.md:390`, `:394`). It is
   part of S3-B-100, and DEVICE-TEST-PLAN.md §14 leaves it to this file as a host task. Not done.
+- **S3B-13 and S3-B-011:** S3B-13 (user-initiated publications are quadratic: 10k/5k ratio 2.71-2.86, about 0.5-1 ms
+  each at 10,000) with the owner's P-8 run, and the chunked `startGrace` for S3-B-011 at `maxEntries` (grace start
+  37.31 ms), both assigned to Stage 5 (`DECISIONS.md:647`; figures at `:621`): not done. RESIDUAL-RISKS.md RES-44 and
+  RES-45 carry the risk.
 - **Loads not printed.** The TSan step prints none (RESIDUAL-RISKS.md §0.4), nor do P-5 (`s5/benchmarks.log:122`)
   and P-13 (`:128`); the benchmarks log's first load is at `:242`. Hence:
   - *P-5 on a quiet host* (S3-B-021's host part, DEVICE-TEST-PLAN.md §14): not shown. P-5 passed in A, H and I with
@@ -378,6 +383,11 @@ tests, DT-…, none of them run, `DEVICE-TEST-PLAN.md:5`), `docs/RESIDUAL-RISKS.
     logged between the run's start, 4.11 (`full5:2`), and the benchmarks step after TSan, whose first load is 2.61
     (`s5/benchmarks.log:242`). The decision `:650` names (raise the pairs' one-minute guard to three minutes with the
     measured durations, or raise `legacySlices`) was not taken; `Tests/` is unchanged (§1). RES-53, RES-42.
+  - *The TSan Sync bundle alone* (`DECISIONS.md:659`: "The TSan Sync bundle runs alone, or paired only at an S3-R12
+    rule-1 mean of 30 or less"): the step is one `swift test --sanitize=thread` invocation (`verify.sh:114`); it
+    reports the seven bundles one after another (`full5:66-72`; Sync's 713 tests at `:67`), which fits them running in
+    sequence within that invocation. The "alone" reading rests on the step's structure. No load was logged during the
+    step, so the paired alternative is not shown; the condition was not measured.
 - **No separate `--perf` run**, as for `e840b0e`: close point 10's "TSan and `--perf` on an idle host" is met through
   stand-ins (`DECISIONS.md:674`). Stage 5's benchmarks step printed loads from 2.45 to 16.27 (§4.4).
 - **Host details** that no Stage 5 log prints: the CPU model and the Xcode version (§1).
@@ -490,6 +500,13 @@ minus the entries ruled, fixed or superseded since they were written, `DECISIONS
 | *Close point 10's "TSan and `--perf` on an idle host":* met through stand-ins | the same at Stage 5 (§5.2) |
 | *P-13 "judged in the idle `--perf`":* met in substance, not to the letter | §4.5, §5.2 |
 
+**Process** (`:675`, outside the list)
+
+| Item | Where |
+|---|---|
+| The second sentence of `DECISIONS.md:685` (the first is in the WP-F table's point-8 row): ADR-050's amendment for P-13's records (P3, P4) and the P5 corrections ADR-057's pass made (ARCHITECTURE §12 S2-27, `BlobUnits.swift:155-162`) are not independently verified until their verifier checks them; ADR-050 says the same of P3 and P4 (`DECISIONS.md:383`) | not independently verified: ORCH:569-571 records the ADR-057 docs workflow's round-2 verifier at 0 blocking and P3-P5 as fixed, not a check of these claims |
+| The `///` doc comments made true at the merge "are recorded as this pass's, not independently verified" (`DECISIONS.md:690`) | not independently verified |
+
 ### 5.5 The earlier merges' Not-verified lists, by reference
 
 Each merge carried its drafts' "Not verified here" to this file. `docs/ARCHITECTURE.md:981` collects them, and
@@ -544,12 +561,12 @@ The `--perf` command (`verify.sh:115`) with its filter narrowed, as the records 
 were not logged:
 
 ```
-swift test -c release --scratch-path <scratch>-perf -Xswiftc -enable-testing --filter 'StorageBenchmarks/reclaim()'
+swift test -c release --scratch-path <scratch>-perf -Xswiftc -enable-testing --filter 'StorageBenchmarks/reclaim\(\)'
 swift test -c release --scratch-path <scratch>-perf -Xswiftc -enable-testing --filter userMovedToBound
 ```
 
-The first is D's (P-13, `DECISIONS.md:674`), the second B's (`userToBound`, ORCH:508). Record the load before and
-after each run, as `p13q:1`, `:18` and `u2b:2`, `:19` do.
+The first is D's (P-13, `DECISIONS.md:674`; its filter as `pm/docs-followup-items.md:50` records it), the second B's
+(`userToBound`, ORCH:508). Record the load before and after each run, as `p13q:1`, `:18` and `u2b:2`, `:19` do.
 
 ### 6.4 The iOS Simulator suite (F)
 
