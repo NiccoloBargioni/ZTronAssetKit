@@ -2,7 +2,8 @@
 
 Every risk accepted at the end of Stage 3: what it is, the ruling that accepted it, its evidence, its likely field
 impact, what would show it, and what would re-open it. This document fixes nothing and changes no ruling. Where it
-differs from ADR-057 (`docs/DECISIONS.md:563-699`) or from the rulings, they decide. It was written at Stage 5 on
+differs from ADR-057 (`docs/DECISIONS.md:563-699`) or from the rulings, they decide; on state after 7 Nov 04:38 (the
+code at `45df2e1`, the clean-up, the archive) `docs/REOPEN-WP-F.md`'s final version decides. It was written at Stage 5 on
 `wp/s5docs` (base `d002758`), with no device and no build or test run of its own (G2). Stage 5's `--full` figures
 are read from that run's logs (§0.4). It is not independently verified (`CLAUDE.md` P4).
 
@@ -18,8 +19,10 @@ are read from that run's logs (§0.4). It is not independently verified (`CLAUDE
   cites them (`docs/DECISIONS.md:383`).
 - **Heads.** "The merged head" is ADR-057's: s3f's merge, `e840b0e` (`docs/DECISIONS.md:564`). The records cite
   its `--full` logs under `.worktrees/merge-check/.verify-logs/`. They are now in
-  `.build-orch/merge-verify-logs-e840b0e/` (`docs/ORCHESTRATION.md:579`), and `.worktrees/merge-check/.verify-logs/`
-  holds Stage 5's run on `45df2e1`, the ADR-057 merge, tagged `s3-merged` (`docs/ORCHESTRATION.md:577`; §0.4).
+  `.build-orch/merge-verify-logs-e840b0e/` (`docs/ORCHESTRATION.md:580` at `041fc74`), and `.worktrees/merge-check/.verify-logs/`
+  held Stage 5's run on `45df2e1`, the ADR-057 merge, tagged `s3-merged` (`docs/ORCHESTRATION.md:579` at `041fc74`; §0.4). That
+  worktree was removed on 10 Nov; the same 16 files are `.build-orch/stage5-verify-logs-45df2e1/` (byte-identical,
+  `docs/VERIFICATION.md` §0) and, in the archive branch, `build-orch-logs/stage5-verify-logs-45df2e1/`.
 - **Six fields per risk.**
   - **What**: the behaviour, and where it sits.
   - **Ruling**: the classification and the ruling. The owner's words are quoted where ADR-057 quotes them.
@@ -32,7 +35,7 @@ are read from that run's logs (§0.4). It is not independently verified (`CLAUDE
   - **Noticed**: what would show it. That is a kit signal (§0.2), a device test of `docs/DEVICE-TEST-PLAN.md`, or a
     host run.
   - **Re-open**: the trigger, and the route that would close the risk with its hours. All hours are estimates.
-- **C2's decision rule** (`rulings:756-765`; `docs/REOPEN-WP-F.md:131`).
+- **C2's decision rule** (`rulings:756-765`; `docs/REOPEN-WP-F.md:131` at `d88f025`, the final version's §6 step 9).
   - The figure is the case's heartbeat, best of 3, against `c2Budget`, 10 ms (`BenchSync.swift:129`).
   - At or below 8.5 ms closes a case. 8.5 to 10 ms is "at the edge".
   - Above 10 ms at 1-minute loads of 10 or less is a miss.
@@ -65,15 +68,17 @@ are read from that run's logs (§0.4). It is not independently verified (`CLAUDE
 ### 0.3 WP-F's re-open criterion
 
 - The owner's criterion is "how often the misses happen in the field". The owner gave no threshold: "it is the
-  owner's call" (`docs/REOPEN-WP-F.md:53`). There is also no collection plan (`docs/DECISIONS.md:625`).
-- `docs/REOPEN-WP-F.md` is the resume dossier. This branch has version 1, written at `9aa337c` before the close. Its
-  §3 figures are superseded by f3c's (RES-07), and its final version is the orchestrator's (`docs/DECISIONS.md:657`).
+  owner's call" (`docs/REOPEN-WP-F.md:53` at `d88f025`, the final version's §4). There is also no collection plan
+  (`docs/DECISIONS.md:625`).
+- `docs/REOPEN-WP-F.md` is the resume dossier. Its final version (10 Nov) is on `feature/asset-kit`; this file's
+  `docs/REOPEN-WP-F.md:<n>` citations are version 1's (`d88f025`, written at `9aa337c` before the close), whose §3
+  figures f3c's review superseded (RES-07); the final version carries f3c's figures in its §3.1 (`docs/DECISIONS.md:657`).
 - Every WP-F entry below that says "the owner's criterion" means this criterion.
 
 ### 0.4 Stage 5's `--full`
 
 - It ran in `.worktrees/merge-check`, detached at `45df2e1` with the committed manifest, from 04:38 to 06:02 on
-  7 Nov (`docs/ORCHESTRATION.md:578`; `.build-orch/stage5-full.log:1`, `:132`). The run log gives the 1-minute
+  7 Nov (`docs/ORCHESTRATION.md:578` at `d002758`; `.build-orch/stage5-full.log:1`, `:132`). The run log gives the 1-minute
   load at the start, 4.11, and at the end, 7.77 (`:2`, `:131`). The TSan log prints no load.
 - The benchmarks log (`.worktrees/merge-check/.verify-logs/benchmarks.log`) prints each run's 1-, 5- and
   15-minute loads on 61 case lines, from `:242` to `:449`. No other line prints a load: none before `:242` or after
@@ -89,7 +94,7 @@ are read from that run's logs (§0.4). It is not independently verified (`CLAUDE
   (`.worktrees/merge-check/.verify-logs/benchmarks.log:129`, `:340-377`). Those are the accepted FAIL's only
   accepted causes, so the run ends in the accepted end state (`docs/DECISIONS.md:633`, `:635`, `:659`).
 - Its figures are cited below wherever a risk's evidence or re-open names Stage 5. `docs/VERIFICATION.md` is the
-  orchestrator's record of the run, and is not on this branch.
+  orchestrator's record of the run (on this branch since `381e8ee`, 10 Nov).
 
 ## 1. The accepted FAIL
 
@@ -220,13 +225,18 @@ Common fields for RES-03 to RES-07, so the entries do not repeat them:
 - **Field.** As RES-01: each is a single engine turn longer than C2's limit at about 10,000 ids (a purge's first turn,
   or APM's answer turn). None loses data or changes an answer. How often an app meets these shapes is unknown.
 - **Noticed.** S1 shows only a purge's first turn. APM's turn (RES-05) has no signal. No host bench times RES-03,
-  RES-04, RES-06 or RES-07, so `--full` does not see them (`docs/REOPEN-WP-F.md:31`; `docs/DECISIONS.md:631`).
+  RES-04, RES-06 or RES-07, so `--full` does not see them (`docs/REOPEN-WP-F.md:31` at `d88f025`;
+  `docs/DECISIONS.md:631`).
 - **Re-open.** The owner's criterion (§0.3).
 
 ### RES-03 · N7's five, by estimate
 
-- **What.** Five purge shapes. None is a committed case. They were written in the scratch copy `.build-s3f/c23/bench0`
-  and never built or run (`docs/DECISIONS.md:571`, `:627`).
+- **What.** Five purge shapes. None is a committed case. They were written as `.build-s3f/c23/probes/BenchSyncCycle23Purge.swift`
+  and copied into the scratch copy `.build-s3f/c23/bench0` (`docs/adr-drafts/s3f.md:7879-7883` at `be8804a`), never
+  built or run (`docs/DECISIONS.md:571`, `:627`). That copy, a package copy, was never archived and was
+  deleted with the s3f worktree on 10 Nov; the five cases survive only as the archived
+  `worktree-s3f-logs/.build-s3f/c23/probes/BenchSyncCycle23Purge.swift`, not verified identical to bench0's copy
+  (`docs/REOPEN-WP-F.md` §3.3).
 - **Ruling.** Known misses by estimate (close ruling point 2; `end-sooner-options.md` §3.0, R4). Point 1 keeps them
   in scratch (`docs/DECISIONS.md:571`).
 - **Evidence.** All are estimates (`docs/DECISIONS.md:627`).
@@ -296,15 +306,15 @@ Common fields for RES-03 to RES-07, so the entries do not repeat them:
 - **Ruling.** Known misses by the owner's ruling N25 (S3-R28 item 3). The owner's words: "leave these three cases out
   of cycle 23 and record them as known misses of the 10 ms limit. But, in a few months, we might re-open this package,
   depending on how frequently the misses are. So you keep all your analysis results and persist what's needed for a
-  later resume" (`docs/DECISIONS.md:631`; `docs/REOPEN-WP-F.md:14-18`).
+  later resume" (`docs/DECISIONS.md:631`; `docs/REOPEN-WP-F.md:14-18` at `d88f025`).
 - **Evidence.** Estimates after route C and item 3b's merge, brought up to f3c's review (point 6;
   `f3c-open-shapes-review.md`, CORRECTED). None is measured, and no bench builds them (`docs/DECISIONS.md:631`).
   1. About 500 ms if the origin admits a user request. That is derived, and it is today's cost too:
      (571.12 − 36.24) ms / 10,000 ≈ 53 µs per heap scan, because T20's `heap.remove` scans the whole heap
      (`EngineJobs.swift:360-364`). Otherwise 9-18 ms. The refused form (breaker open) costs 11.9-22.5 ms after route C
      and 3b. In production both paths cost 15-60 ms more, from the `originID` builds (RES-09).
-  2. 12.9-23.3 ms (it was 9-17 ms in `docs/REOPEN-WP-F.md:39`).
-  3. About 21-34 ms (it was 10-20 ms in `docs/REOPEN-WP-F.md:43`). Skipping the re-queue breaks R-SYN-3.
+  2. 12.9-23.3 ms (it was 9-17 ms in `docs/REOPEN-WP-F.md:39` at `d88f025`).
+  3. About 21-34 ms (it was 10-20 ms in `docs/REOPEN-WP-F.md:43` at `d88f025`). Skipping the re-queue breaks R-SYN-3.
 - **Field.** As §2. Row 1 is the largest single-turn figure in this document: about half a second (derived), if the
   origin admits the user request. It needs many failed user jobs that wait on `.retry` deadlines when the purge comes.
 - **Noticed.** As §2: S1, for a purge's first turn. This is the one signal that would show row 1's half second.
@@ -786,7 +796,8 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
 - **Field.** It needs an app that puts more than 4 interests on one id, such as several groups that hold the same
   asset, or two event subscribers that both stall. Such turns take about 40 ms on the host.
 - **Noticed.** No field signal. The host benchmarks record the second-subscriber case, not gated.
-- **Re-open.** The owner widening the bar. `docs/REOPEN-WP-F.md` §7 carries these shapes (`:139`).
+- **Re-open.** The owner widening the bar. `docs/REOPEN-WP-F.md` §3.8 carries these shapes (its version 1 asked for
+  them at `:139`, `d88f025`).
 
 ### RES-34 · The margin list
 
@@ -823,7 +834,7 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
   `BenchSyncReroutes.swift:126`) goes red on a loaded host.
 - **Ruling.** A load-only figure under `rulings:763`, not a cause of the FAIL (`docs/DECISIONS.md:593`). A red at a
   load of 10 or less is a new cause, and goes to the owner (`:659`).
-- **Evidence.** In ms (`docs/DECISIONS.md:593`; `docs/ORCHESTRATION.md:505-509`).
+- **Evidence.** In ms (`docs/DECISIONS.md:593`; `docs/ORCHESTRATION.md:505-509` at `d002758`).
   - Merged head's `--full`: [13.84, 15.53, 13.24] at loads 14.35 → 10.54, every reading above 10.
   - Alone at 3.19 → 3.06: [4.37, 4.63, 4.63], longest held turn 1.23 ms (`.build-orch/merge-userToBound-rerun1.log`).
   - On `wp/s3f`: best 4.35 ([4.35, 12.41, 4.80]) at 10.74 → 8.26.
@@ -1335,7 +1346,7 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
   (`FallbackChain.swift:135-144`). The prior art checked the kind before downloading.
 - **Ruling.** S3G-4: S3-CONF-07 refuted as a defect (K-11, accepted by ADR-055). It is owner information: a candidate
   for a tag the orchestrator did not add (`docs/DECISIONS.md:603`, `:699`). The tag's wording disagrees between
-  `docs/DECISIONS.md:246`, `:603` and `:699` (`docs/ORCHESTRATION.md:571`).
+  `docs/DECISIONS.md:246`, `:603` and `:699` (`docs/ORCHESTRATION.md:571` at `d002758`).
 - **Evidence.** The hunter's probe failed 5 of 5 on `s3-base` (an `.mp4` of 300 bytes downloaded at `userInitiated`
   for an image request). The confirmer reproduced it 6 of 6 (ledger s3g 33). `fetch("clip", kind: .image)` downloads
   a whole `.mp4`, stores it and throws `notFound` (`docs/DECISIONS.md:603`).
@@ -1593,22 +1604,22 @@ since after the clamp any value is safe. Before the fix, the median was 11.058 m
 |---|---|---|
 | :692 comment-only edits: `CDNAssetResolver.swift:75-76`, `EventContinuityModelTests.swift:9-12`, `README.md:173-175` | WP-K, WP-G, the docs owner | Open |
 | :693 `BenchStorage.swift:20-21`'s stall figures; `QuotaEviction.swift:65-69`'s R13 comment | the test owner (P5); WP-C | Open |
-| :694 `docs/ORCHESTRATION.md:1090` and `:1154`, the stale WP-C TSan flake | the orchestrator | Open (`docs/ORCHESTRATION.md:576`) |
+| :694 `docs/ORCHESTRATION.md:1090` and `:1154` at `f76e32e` (ADR-057's numbering; `:1161` and `:1225` at `d002758`), the stale WP-C TSan flake | the orchestrator | Open (`docs/ORCHESTRATION.md:576` at `d002758`) |
 | :695 the 11 `// REENTRANCY: … (proposed)` citations | WP-F | Open |
 | :696 the `isIdleSilent` and `originID` `///` candidates | the orchestrator's ruling | Open (RES-12, RES-09) |
-| :697 `docs/REOPEN-WP-F.md`'s final version; the post-merge checklist | the orchestrator | Open: this branch has version 1 |
-| :698 the Stage 5 documents | Stage 5 | `MUTATION-PROBES.md`, `DEVICE-TEST-PLAN.md` and this file exist on `wp/s5docs`. `VERIFICATION.md` does not yet; the orchestrator writes it, now that Stage 5's `--full` has ended (§0.4) |
-| :699 for the owner: f3c's two open shapes, the uncommitted `Package.swift`, RR-17, P8 | the owner | f3c's shapes open (RES-08, RES-09). `Package.swift`: the owner answered "Yes, clean worktree", so Stage 5's `--full` ran in a clean worktree with the committed manifest (§0.4), and the edit is left alone (`docs/ORCHESTRATION.md:584`). RR-17 open (RES-15). P8 is information (RES-02) |
+| :697 `docs/REOPEN-WP-F.md`'s final version; the post-merge checklist | the orchestrator | Done 10 Nov: the final version is on `feature/asset-kit`, and the checklist is in `docs/ORCHESTRATION.md` |
+| :698 the Stage 5 documents | Stage 5 | all four exist and are merged into `feature/asset-kit` (`381e8ee`, 10 Nov) |
+| :699 for the owner: f3c's two open shapes, the uncommitted `Package.swift`, RR-17, P8 | the owner | f3c's shapes open (RES-08, RES-09). `Package.swift`: the owner answered "Yes, clean worktree", so Stage 5's `--full` ran in a clean worktree with the committed manifest (§0.4), and the edit is left alone (`docs/ORCHESTRATION.md:584` at `d002758`). RR-17 open (RES-15). P8 is information (RES-02) |
 | :699 for the orchestrator: RR-20's fix, the strict R-INT-5 path, the CCRs (S3B-9 cycle 2, S3B-10, S3B-11), the K-11 tag candidate | the orchestrator | Open (RES-16, RES-37, RES-46 to RES-48, RES-70) |
 
-The ADR-057 workflow's round-2 notes, kept out of its Open bullet, are recorded at `docs/ORCHESTRATION.md:571`: stale
+The ADR-057 workflow's round-2 notes, kept out of its Open bullet, are recorded at `docs/ORCHESTRATION.md:571` at `d002758`: stale
 line citations in `docs/ARCHITECTURE.md:978`, `ApplyPlan.swift:85-87`'s "one chunk" wording, and the K-11 tag
 wording.
 
 ## 15. Index: the residual-risk ledger items
 
 Source: the ADR-057 docs workflow's ledger readers (`.build-orchestrator/s3-post-merge/adr057-docs-journal.jsonl`,
-results labelled `ledger:<draft>`). Of their 536 items (`docs/ORCHESTRATION.md:568`), these are the 87 of kind
+results labelled `ledger:<draft>`). Of their 536 items (`docs/ORCHESTRATION.md:568` at `d002758`), these are the 87 of kind
 `residual-risk`. The number is the item's 0-based index into its `ledger:<draft>` result's `items` array.
 
 | Ledger | Items → entry |
