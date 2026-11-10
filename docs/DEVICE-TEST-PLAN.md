@@ -671,7 +671,7 @@ device figure.
   repository (`docs/ARCHITECTURE.md:976`): a simulator process shares the host's file system, a device process does
   not. The C2 cases assert the literal `c2Budget` (`Tests/ZTronAssetKitBenchmarks/BenchSync.swift:129`) and may not
   need the file. Running the bundle on a device needs those inputs made reachable there, a change to `Tests/` for the
-  orchestrator to decide; until then DT-PERF-02 to DT-PERF-05 measure through the probe app.
+  orchestrator to decide; until then DT-PERF-02 to DT-PERF-05 measure through the probe app; DT-PERF-06 needs no bundle.
 - **Pass:** once the bundle runs, each case's figure is recorded beside the host's; a red is reported with its
   figures, never re-judged.
 
@@ -748,11 +748,11 @@ device figure.
 - **Requirements:** R-CAR-1, R-STO-13, R-CAR-6 (the shims' lookups).
 - **Why a device:** four answer sites can answer a user-initiated asker up to about two install intervals (0.2 s by
   default) before the readers' snapshot holds the asset; the location answered is valid at once (L5K-R24;
-  `docs/DECISIONS.md:104`, `:511`; `docs/MIGRATION.md:211-217`). The bound comes from host probes on macOS 27 only
-  (K4-COMMITPROMO: `unseenAtReturn=1` in 5 of 5; `docs/adr-drafts/k.md:1409-1415`, `:1726-1727`). The install
-  reaches `lookup` on the main actor (`Sources/ZTronAssetKit/Mirror/SnapshotMirror.swift:12-13`, `:38`), which a
-  real app's UI also uses. The optional `installIfDue()` waits for a device test that shows the lag matters
-  (S3-B-110; `docs/DECISIONS.md:524`).
+  `docs/DECISIONS.md:104`, `:511`; `docs/MIGRATION.md:211-217`). The lag was observed only in host probes on macOS 27,
+  which count the ids missing at return and time nothing ("the observed bound", `docs/adr-drafts/k.md:1409`;
+  K4-COMMITPROMO: `unseenAtReturn=1` in 5 of 5; `:1726-1727`). The install reaches `lookup` on the main actor
+  (`Sources/ZTronAssetKit/Mirror/SnapshotMirror.swift:12-13`, `:38`), which a real app's UI also uses. The optional
+  `installIfDue()` waits for a device test that shows the lag matters (S3-B-110; `docs/DECISIONS.md:524`).
 - **Steps:** with the large files of §3.3, ten times each: `resolve(_:)` a file while its prefetch (`prefetch(_:)`)
   verifies or commits it, as the probe log's `verify` and `commit` intervals show; `resolve(_:)` a file as soon as its
   `assetAvailable` event arrives (`Sources/ZTronAssetModel/Events/AssetEvent.swift:139`);
@@ -762,8 +762,8 @@ device figure.
 - **Observe:** for each answer, whether the first `lookup(_:)` returned `nil`, and the time from the answer to the
   first `lookup(_:)` that returns the location. Once the app is adopted (§12): whether a screen that reads the lookups
   right after such an answer shows a missing asset.
-- **Pass:** figures recorded beside the host bound. Whether the lag matters is the owner's call (S3-B-110 in
-  `docs/RESIDUAL-RISKS.md`); nothing here re-judges L5K-R24.
+- **Pass:** figures recorded beside the 0.2 s design bound and the host probes' `unseenAtReturn=1`. Whether the lag
+  matters is the owner's call (S3-B-110 in `docs/RESIDUAL-RISKS.md`); nothing here re-judges L5K-R24.
 
 ## 10. Observability
 

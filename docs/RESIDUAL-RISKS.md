@@ -1188,7 +1188,7 @@ owed-answer resumes; item 5's order, place and ticket; RR-21's replay in (id, to
 
 ### RES-60 · Mutants C, F and S are masked in WP-C's oracle, and F and S in its flows
 
-- **What.** Only WP-B's targeted tests kill mutants C, F and S (`s3c.md:491-497`).
+- **What.** Of the runs on record, only WP-B's targeted tests kill C, F and S (`s3c.md:491-497`).
   - C: masked in WP-C's oracle (oracle-C passed, `.build-s3c/mut/results.txt`); no flows run against C is on record
     (`.build-s3c/mut/run-mutants.sh:35`).
   - F and S: masked in both (oracle-F/S and flows-F/S passed).
