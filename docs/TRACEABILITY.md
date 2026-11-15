@@ -21,8 +21,8 @@
 | R-APL-3 | SHOULD | 2 |
 | R-APL-4 | MUST | 24 |
 | R-APL-5 | MUST | 7 |
-| R-CAR-1 | MUST | 9 |
-| R-CAR-2 | MUST | 27 |
+| R-CAR-1 | MUST | 10 |
+| R-CAR-2 | MUST | 28 |
 | R-CAR-3 | MUST | 14 |
 | R-CAR-4 | MUST | 19 |
 | R-CAR-5 | MUST | 8 |

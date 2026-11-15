@@ -83,7 +83,8 @@ struct LibraryLifecycleTests {
         #expect(library.lookup("page-1") == nil)
 
         await library.start()
-        #expect(history().suffix(2) == [.starting, .failed(.storageUnavailable(.locked))], "start() asked the client again")
+        let failed = AssetLibrary.Phase.failed(.storageUnavailable(.locked))
+        #expect(history() == [.idle, .starting, failed, .starting, failed], "start() asked the client again")
         stop()
         await library.shutdown()
         #expect(library.phase == .shutDown)
@@ -189,8 +190,60 @@ struct LibraryLifecycleTests {
         #expect(library.phase == .shutDown)
         #expect(history().last == .shutDown)
         #expect(history().filter { $0 == .shutDown }.count == 1, "published once: \(history())")
+        let settled = history()
         await library.start()
-        #expect(history().last == .shutDown, "a start after the shutdown changes nothing: \(history())")
+        #expect(history() == settled, "a start after the shutdown publishes nothing: \(history())")
+        stop()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("a shutdown returns only once the start in flight has ended, so no phase follows shutDown", .timeLimit(.minutes(1)))
+    func shutdownWaitsForTheStartInFlight() async {
+        let bundle = GatedBundleLookup([:])
+        let harness = LibraryHarness.make(bulk: DetachedBlockingExecutor()) { $0.bundle(bundle).bundled(.image) }
+        await harness.serveManifest([])
+        let library = harness.library
+        let (history, stop) = LibraryLifecycleTests.phases(of: library)
+
+        // The start is held at its bundle indexing, which the client's shutdown does not wait for.
+        let starting = Task { @MainActor in
+            await library.start()
+        }
+        await bundle.waitForAnEnumeration()
+        let closing = Task { @MainActor in
+            await library.shutdown()
+        }
+        // The client is shut down under `closing`'s call or under these, whichever it runs first. Once they return
+        // `closing` has nothing left to wait for but the start; a shutdown that did not wait for it would publish
+        // its final phase about now, and the held start would publish another one after it.
+        await library.client.shutdown()
+        await library.client.shutdown()
+        #expect(library.phase == .starting, "the shutdown published its phase before the start in flight ended")
+
+        bundle.open()
+        await starting.value
+        await closing.value
+
+        #expect(library.phase == .shutDown)
+        #expect(history().firstIndex(of: .shutDown) == history().count - 1, "nothing follows shutDown: \(history())")
+        stop()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("a library shut down before it started is final too: a start publishes nothing and opens nothing", .timeLimit(.minutes(1)))
+    func shutdownBeforeStartIsFinal() async {
+        let harness = LibraryHarness.make()
+        let library = harness.library
+        let (history, stop) = LibraryLifecycleTests.phases(of: library)
+
+        await library.shutdown()
+        #expect(history() == [.idle, .shutDown])
+
+        await library.start()
+        #expect(history() == [.idle, .shutDown], "a start after the shutdown publishes nothing: \(history())")
+        #expect(harness.fileSystem.operations.filter { $0.kind == .acquireExclusiveLock }.isEmpty, "the store was never opened")
         stop()
     }
 
@@ -303,8 +356,12 @@ struct LibraryLifecycleTests {
         await wrapper?.start()
         await engine.waitUntil { $0.subscribers == before + 1 }
         #expect(wrapper?.phase == .ready)
+        if let wrapper {
+            // The replay of its subscription has reached the wrapper: its pump is waiting for the next event.
+            #expect(await published(wrapper.$generation) { $0 != nil } != nil)
+        }
 
-        // The client is idle from here on: no event will ever wake the wrapper's pump.
+        // The client is idle, so an event that would wake the pump may never come: only the release ends it.
         wrapper = nil
         await engine.waitUntil { $0.subscribers == before }
         #expect(await engine.introspect().subscribers == before)
@@ -400,5 +457,10 @@ struct LibraryLifecycleTests {
         #expect(wrapper.phase == .ready)
         await harness.library.shutdown()
         #expect(await published(wrapper.$phase) { $0 == .shutDown } == .shutDown, "the shared client's last event reaches it")
+
+        // A facade made around the client after its shutdown starts into the final phase, not into a failure.
+        let late = AssetLibrary(client: harness.library.client)
+        await late.start()
+        #expect(late.phase == .shutDown)
     }
 }

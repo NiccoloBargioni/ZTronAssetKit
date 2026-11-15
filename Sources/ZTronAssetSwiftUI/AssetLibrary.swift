@@ -100,7 +100,6 @@ public final class AssetLibrary: ObservableObject {
     /// of the app bundle). Returns once the published state is final: `phase` is `.shutDown` and a sync that was
     /// running is reported as `.finished(.failed(.shutDown))`. Idempotent.
     public func shutdown() async {
-        self.window.cancelAll()
         // REENTRANCY: ui-2 — `startup` and `pump` are read after the wait, which is when they are final: a start made
         // from here on is answered `.shutDown` by the client, and every stream ends with `clientShutDown`.
         await self.client.shutdown()
@@ -196,7 +195,8 @@ public final class AssetLibrary: ObservableObject {
         case .conditionsChanged(let conditions):
             self.publish(\.conditions, conditions)
         case .syncStarted:
-            self.finishedRun = nil
+            // `finishedRun` stays: an engine numbers its runs upwards, so the run that starts is not the finished
+            // one, and a progress event of the finished one that still arrives stays stale.
             self.publish(\.syncActivity, .running(nil))
         case .syncProgress(let run, let progress):
             guard run != self.finishedRun else {

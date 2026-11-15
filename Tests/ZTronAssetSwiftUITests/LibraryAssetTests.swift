@@ -128,12 +128,26 @@ struct LibraryAssetTests {
         let harness = LibraryHarness.make(bulk: bulk) { $0.bundle(bundle) }
         let library = harness.library
 
-        // The client is never started here: the enumerations are the executor's only units.
-        async let images: Void = library.index([.image])
-        async let vectors: Void = library.index([.svg])
-        // Releases the newest held unit first, whenever one is held, until both calls returned. An indexing that
-        // did not wait for the one before it would have both units held at once, and the narrow index, released
-        // last, would then replace the wide one.
+        // The client is never started here: the enumerations are the executor's only units. The image index is
+        // asked for first, and its enumeration is held before the wider one is asked for.
+        let images = Task { @MainActor in
+            await library.index([.image])
+        }
+        await bulk.waitForHeldUnits(atLeast: 1)
+        let vectors = Task { @MainActor in
+            await library.index([.svg])
+        }
+        // The wider indexing must be waiting for the held one, and nothing announces a wait. An indexing that did
+        // not wait submits its enumeration within a few turns, so the test gives it 64 round trips through the
+        // executor to show up: correct code never fails here, whatever the schedule.
+        var turns = 0
+        while turns < 64, await bulk.heldUnits.count < 2 {
+            await Task.yield()
+            turns += 1
+        }
+        #expect(await bulk.heldUnits == [1], "the wider enumeration was submitted while the first one was held")
+        // Releases the newest held unit first, whenever one is held, until both calls returned: were both held at
+        // once, the narrow index, released last, would replace the wide one.
         let releaser = Task {
             while !Task.isCancelled {
                 await bulk.waitForHeldUnits(atLeast: 1)
@@ -142,7 +156,8 @@ struct LibraryAssetTests {
                 }
             }
         }
-        _ = await (images, vectors)
+        await images.value
+        await vectors.value
         releaser.cancel()
         await releaser.value
 
@@ -151,6 +166,45 @@ struct LibraryAssetTests {
         #expect(library.locate("logo", kind: .image) == .bundle(LibraryAssetTests.bundledLogo))
         #expect(library.locate("mark", kind: .svg) == .bundle(LibraryAssetTests.bundledMark))
         #expect(library.phase == .idle)
+        await library.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-2: ready is published only once the kinds named in the chain are indexed", .timeLimit(.minutes(1)))
+    func readyFollowsTheBundleIndex() async throws {
+        let bundle = GatedBundleLookup([
+            BundleResourceKey(name: "logo", fileExtension: "png"): LibraryAssetTests.bundledLogo,
+        ])
+        let harness = LibraryHarness.make(bulk: DetachedBlockingExecutor()) { $0.bundle(bundle).bundled(.image) }
+        await harness.serveManifest([])
+        let library = harness.library
+        // What `locate` answers for the bundled asset at the moment `ready` is published.
+        final class Answers {
+            var atReady: [ChainHit?] = []
+        }
+        let answers = Answers()
+        let observation = library.$phase.sink { phase in
+            if phase == .ready {
+                answers.atReady.append(library.locate("logo", kind: .image))
+            }
+        }
+
+        let starting = Task { @MainActor in
+            await library.start()
+        }
+        await bundle.waitForAnEnumeration()
+        // The start's own subscription was made before this one, so the client has answered it when this returns:
+        // from here on only the held enumeration keeps the start from ending.
+        _ = try await library.client.subscribe()
+        #expect(library.phase == .starting, "ready was published while the chain's kinds were still being indexed")
+
+        bundle.open()
+        await starting.value
+        observation.cancel()
+
+        #expect(library.phase == .ready)
+        #expect(answers.atReady == [.bundle(LibraryAssetTests.bundledLogo)], "a view that reacts to ready finds the bundled asset")
         await library.shutdown()
     }
 
@@ -274,6 +328,35 @@ struct LibraryAssetTests {
         let starts = await harness.source.starts.filter { $0.id == entry.transferID }
         #expect(starts.count == 1, "the resolve joined the prefetch's transfer")
         #expect(starts.first?.priority == .prefetch)
+        handle.cancel()
+        await library.shutdown()
+    }
+
+    @available(macOS 15.0, iOS 18.0, *)
+    @MainActor
+    @Test("R-CAR-1: resolve and prefetch run at the priority the caller names, not at their defaults", .timeLimit(.minutes(1)))
+    func prioritiesAreForwarded() async throws {
+        let quietBytes = LibraryFixture.bytes(26)
+        let eagerBytes = LibraryFixture.bytes(27)
+        let quiet = LibraryFixture.entry("page-a", quietBytes, policy: .onDemand)
+        let eager = LibraryFixture.entry("page-b", eagerBytes, policy: .onDemand)
+        let harness = LibraryHarness.make()
+        await harness.serveManifest([quiet, eager])
+        await harness.startAndSettle()
+        let library = harness.library
+        await harness.source.script(quiet.transferID, [.stage(quietBytes)])
+        await harness.source.script(eager.transferID, [.hold, .stage(eagerBytes)])
+        let engine = await library.client.currentEngine()
+
+        _ = try await library.resolve("page-a", priority: .prefetch)
+        #expect(await harness.source.starts.first { $0.id == quiet.transferID }?.priority == .prefetch)
+
+        // Held in flight, so its start is read before anything else could ask for the asset.
+        let handle = library.prefetch(["page-b"], priority: .userInitiated)
+        try await handle.awaitRegistration()
+        await engine.awaitCondition { LibraryAssetTests.inFlight(eager.transferID, $0) }
+        #expect(await harness.source.starts.first { $0.id == eager.transferID }?.priority == .userInitiated)
+
         handle.cancel()
         await library.shutdown()
     }

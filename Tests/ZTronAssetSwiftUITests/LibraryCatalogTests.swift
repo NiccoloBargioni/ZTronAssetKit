@@ -111,11 +111,15 @@ struct LibraryCatalogTests {
     func retentionScope() async throws {
         let freeBytes = LibraryFixture.bytes(35)
         let paidBytes = LibraryFixture.bytes(36)
+        let extraBytes = LibraryFixture.bytes(34)
         let free = LibraryFixture.entry("free-1", freeBytes, tags: ["free"])
         let paid = LibraryFixture.entry("paid-1", paidBytes, tags: ["paid"])
+        // Outside both scopes of this test, and scripted: a sync of everything would fetch it.
+        let extra = LibraryFixture.entry("extra-1", extraBytes, tags: ["extra"])
         let harness = LibraryHarness.make { $0.retain(.tags(["free"])) }
-        await harness.serveManifest([free, paid])
+        await harness.serveManifest([free, paid, extra])
         await harness.source.script(free.transferID, [.stage(freeBytes)])
+        await harness.source.script(extra.transferID, [.stage(extraBytes)])
         await harness.startAndSettle()
         let library = harness.library
         #expect(await harness.source.starts.map(\.id) == [free.transferID], "the launch sync fetched only what the chain retains")

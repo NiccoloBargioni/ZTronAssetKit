@@ -124,6 +124,58 @@ final class FakeBundleLookup: BundleLookup {
     }
 }
 
+/// A `BundleLookup` whose enumerations block at a gate until the test opens it and announce their arrival on a
+/// stream: what holds a start at its bundle indexing while the rest of the client runs. The same shape as the engine
+/// tests' `MigrationPlannerGate`.
+///
+/// A held enumeration blocks its thread, so a harness that uses the gate runs its bulk units on
+/// `DetachedBlockingExecutor`: no thread of the cooperative pool is blocked and no other unit waits behind it.
+@available(macOS 15.0, iOS 18.0, *)
+final class GatedBundleLookup: BundleLookup {
+    private let table: [BundleResourceKey: URL]
+    private let semaphore = DispatchSemaphore(value: 0)
+    private let arrivals: AsyncStream<Void>
+    private let arrived: AsyncStream<Void>.Continuation
+
+    init(_ table: [BundleResourceKey: URL]) {
+        let (arrivals, arrived) = AsyncStream<Void>.makeStream()
+        self.table = table
+        self.arrivals = arrivals
+        self.arrived = arrived
+    }
+
+    /// Suspends until an enumeration has reached the gate. One caller at a time.
+    func waitForAnEnumeration() async {
+        for await _ in self.arrivals {
+            return
+        }
+    }
+
+    /// Lets the held enumeration through, and every later one.
+    func open() {
+        self.semaphore.signal()
+    }
+
+    func resources(withExtensions extensions: Set<String>) -> [BundleResourceKey: URL] {
+        self.arrived.yield()
+        self.semaphore.wait()
+        // Hands the opening on, so the gate stays open.
+        self.semaphore.signal()
+        return self.table.filter { extensions.contains($0.key.fileExtension) }
+    }
+}
+
+/// A `BlockingExecutor` that runs each unit on a Dispatch thread of its own, for `GatedBundleLookup`.
+struct DetachedBlockingExecutor: BlockingExecutor {
+    func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { (continuation: CheckedContinuation<T, Never>) in
+            DispatchQueue.global().async {
+                continuation.resume(returning: work())
+            }
+        }
+    }
+}
+
 /// A purgeable cache that reports each purge on a stream, so a test waits for it without polling.
 @MainActor
 final class SignallingCache: PurgeableCache {
