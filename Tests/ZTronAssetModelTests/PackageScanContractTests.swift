@@ -21,28 +21,64 @@ struct PackageScanContractTests {
         "ZTronAssetSync",
         "ZTronAssetKit",
         "ZTronAssetTestSupport",
+        "ZTronAssetSwiftUI",
     ]
 
-    @Test("R-CAR-9: no production source imports UIKit, SwiftUI or Combine")
+    /// The SwiftUI-facing facade (ADR-058): the one target R-CAR-9, as the owner amended it on 2026-11-15, lets
+    /// import Combine, for `ObservableObject`. Every other target keeps the whole ban, and UIKit and SwiftUI stay
+    /// banned here too.
+    private static let facadeTarget = "ZTronAssetSwiftUI"
+
+    @Test("R-CAR-9: no production source imports UIKit or SwiftUI, and only the SwiftUI facade target imports Combine")
     func noUIFrameworkImports() throws {
         let files = try RepositoryScan.sourceFiles(suffix: ".swift")
         try RepositoryScan.requireEveryTarget(Self.productionTargets, in: files)
 
         var seen: Set<String> = []
+        var facadeImports: Set<String> = []
         for file in files {
+            let isFacade = file.path.hasPrefix("Sources/\(Self.facadeTarget)/")
+            let banned: Set<String> = isFacade ? ["UIKit", "SwiftUI"] : ["UIKit", "SwiftUI", "Combine"]
             for (index, line) in file.lines.enumerated() {
                 guard let module = RepositoryScan.importedModule(in: line) else {
                     continue
                 }
                 seen.insert(module)
-                #expect(
-                    !["UIKit", "SwiftUI", "Combine"].contains(module),
-                    "\(file.path):\(index + 1) imports \(module)"
-                )
+                if isFacade {
+                    facadeImports.insert(module)
+                }
+                #expect(!banned.contains(module), "\(file.path):\(index + 1) imports \(module)")
             }
         }
         // The scan really parsed the imports (a parser that saw none would pass vacuously).
         #expect(seen.isSuperset(of: ["Foundation", "ZTronAssetModel", "ZTronAssetStorage", "CryptoKit"]))
+        // The exception is what it is stated to be: the facade does import Combine, and only reaches the package
+        // through its public facade.
+        #expect(facadeImports == ["Combine", "Foundation", "ZTronAssetKit"], "\(facadeImports.sorted())")
+    }
+
+    @Test("R-CAR-9: nothing but its own tests depends on the SwiftUI facade target, so the core never links it")
+    func nothingDependsOnTheFacade() throws {
+        let manifest = try RepositoryScan.packageManifestCode()
+        let declarations = try RepositoryScan.matches(
+            of: #"\.(?:target|testTarget)\(\s*name:\s*"([^"]+)",\s*dependencies:\s*\[([^\]]*)\]"#,
+            in: manifest
+        )
+        var dependents: [String] = []
+        var facadeDependencies: [String]?
+        for declaration in declarations {
+            let dependencies = try RepositoryScan.matches(of: #""([^"]+)""#, in: declaration[2]).map { $0[1] }
+            if declaration[1] == Self.facadeTarget {
+                facadeDependencies = dependencies
+            }
+            if dependencies.contains(Self.facadeTarget) {
+                dependents.append(declaration[1])
+            }
+        }
+        // The scan really parsed the declarations: every target but the Model, which has none, lists dependencies.
+        #expect(declarations.count >= Self.productionTargets.count)
+        #expect(dependents == ["\(Self.facadeTarget)Tests"])
+        #expect(facadeDependencies == ["ZTronAssetKit"])
     }
 
     @Test("R-SEC-3: no file under Sources/ declares NSAllowsArbitraryLoads, an ATS exception or a private API")

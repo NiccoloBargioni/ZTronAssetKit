@@ -103,7 +103,7 @@ S3 behind one CloudFront distribution (EU+US edges). `manifest.json` is served w
 | `ZTronAssetKit` | all of the above | facade `AssetClient`, main-actor snapshot mirror, observability, composition root, public re-exports |
 | `ZTronAssetTestSupport` | Model, Storage | fakes: `FakeFileSystem` (crash points + fault injection), `FakeRemoteSource`, `ManualTimeSource`, `SeededRandom`, `LoopbackHTTPServer` — **not a product** |
 
-No cycles. Only the facade composes concrete types. Two files are reserved for code that can only run on a device: `ZTronAssetTransport/BackgroundSessionBackend.swift` and `ZTronAssetAppleHosted/LiveAssetPackBackend.swift` — each a thin conformer (≤ 250 lines) over a protocol whose logic is fully tested; they are the *only* coverage exclusions (≤ 3 % of lines, enforced).
+No cycles. Only the facade composes concrete types. Two files are reserved for code that can only run on a device: `ZTronAssetTransport/BackgroundSessionBackend.swift` and `ZTronAssetAppleHosted/LiveAssetPackBackend.swift` — each a thin conformer (≤ 250 lines) over a protocol whose logic is fully tested; they are the *only* coverage exclusions (≤ 3 % of lines, enforced). *Since 2026-11-15 (owner instruction, ADR-058) an eighth target, `ZTronAssetSwiftUI`, depends on `ZTronAssetKit`: the SwiftUI-facing facade `AssetLibrary`, in the same library product; nothing depends on it.*
 
 ### 4.2 Concurrency model
 - State lives in actors: `actor AssetStore` (storage), `actor SyncEngine` (scheduling). The facade is a `Sendable` final class with immutable stored properties.
@@ -265,7 +265,7 @@ Every **MUST** needs at least one test whose `@Test("…")` display name begins 
 - **R-CAR-6 [MUST]** Compatibility shims in ZTronCarouselCore keep every pre-existing public CDN symbol compiling (`CDNAsset`, `CDNProviding`, `CDNLocalStore`, `CDNAssetResolver.installed`, `CDNSyncCoordinator`, `CDNRefreshPolicy`, `CDNProviderFactory` / `CDNConfiguration`, `NetworkAvailabilityMonitor`), deprecated where redundant, with the existing CDN tests passing unchanged or ported one-to-one per `MIGRATION.md` (no test silently deleted).
 - **R-CAR-7 [MUST]** Errors are typed, UI-mappable, `Sendable` and `Equatable`: offline, authRejected, notFound, insufficientSpace, integrityFailure, serverUnavailable, cancelled, storageUnavailable.
 - **R-CAR-8 [SHOULD]** A lease API (`withAsset(id) { url in … }`) pins an asset while in use (long video playback) so eviction cannot pull the file away.
-- **R-CAR-9 [MUST]** No production target imports UIKit, SwiftUI or Combine. Bridges (Combine `ObservableObject`, ZTronObservation) live in ZTronCarouselCore.
+- **R-CAR-9 [MUST]** No production target imports UIKit, SwiftUI or Combine. Bridges (Combine `ObservableObject`, ZTronObservation) live in ZTronCarouselCore. *Amended on the owner's instruction of 2026-11-15 (ADR-058):* one target, `ZTronAssetSwiftUI`, the SwiftUI-facing facade, may import Combine for `ObservableObject`; it imports neither UIKit nor SwiftUI, nothing but its own tests depends on it, and every other production target keeps the rule unchanged.
 
 ### 5.9 Observability and security
 
@@ -348,7 +348,7 @@ In Stage 3 an agent that did **not** write the code injects ≥ 12 deliberate de
 
 ## 8. Deliverables
 
-Package `ZTronAssetKit` (targets of §4.1; library product `ZTronAssetKit`), tests per target, `Scripts/` (frozen after Stage 0), and under `docs/`: `RECON.md`, `BASELINE.md`, `ARCHITECTURE.md` (layout, invariants, state machines, the REENTRANCY ledger, the ten hard problems), `DECISIONS.md` (ADRs; **NEEDS-HUMAN-REVIEW** tags), `UNSAFE-AUDIT.md`, `APPLE-API-VERIFICATION.md`, `MUTATION-PROBES.md`, `TRACEABILITY.md` (generated), `DEVICE-TEST-PLAN.md` (what only a physical device can prove: background session re-attachment, Apple-hosted packs through TestFlight, low-storage behaviour, memory warnings), `VERIFICATION.md` (what was run, its output, what was *not* verified), `RESIDUAL-RISKS.md`. In ZTronCarouselCore, on its own branch: the adapters and shims, `MIGRATION.md`, the pre-existing tests passing. A `README.md` with a 20-line quick start.
+Package `ZTronAssetKit` (targets of §4.1; library product `ZTronAssetKit`), tests per target, `Scripts/` (frozen after Stage 0), and under `docs/`: `RECON.md`, `BASELINE.md`, `ARCHITECTURE.md` (layout, invariants, state machines, the REENTRANCY ledger, the ten hard problems), `DECISIONS.md` (ADRs; **NEEDS-HUMAN-REVIEW** tags), `UNSAFE-AUDIT.md`, `APPLE-API-VERIFICATION.md`, `MUTATION-PROBES.md`, `TRACEABILITY.md` (generated), `DEVICE-TEST-PLAN.md` (what only a physical device can prove: background session re-attachment, Apple-hosted packs through TestFlight, low-storage behaviour, memory warnings), `VERIFICATION.md` (what was run, its output, what was *not* verified), `RESIDUAL-RISKS.md`. In ZTronCarouselCore, on its own branch: the adapters and shims, `MIGRATION.md`, the pre-existing tests passing. A `README.md` with a 20-line quick start. *(Since 2026-11-15 that guide is `HANDBOOK.md`, and `README.md` is the black-box page with the SwiftUI quick adoption: ADR-058.)*
 
 ---
 

@@ -17,7 +17,10 @@ let package = Package(
         .macOS(.v12),
     ],
     products: [
-        .library(name: "ZTronAssetKit", targets: ["ZTronAssetKit"]),
+        // One product, two modules (ADR-058): `ZTronAssetKit` is the core and `ZTronAssetSwiftUI` the SwiftUI-facing
+        // facade over it. One product keeps the scheme `ZTronAssetKit` building and testing every target, which the
+        // frozen `Scripts/verify.sh` and the iOS Simulator commands (ADR-051) rely on.
+        .library(name: "ZTronAssetKit", targets: ["ZTronAssetKit", "ZTronAssetSwiftUI"]),
     ],
     targets: [
         .target(name: "ZTronAssetModel", swiftSettings: strictConcurrency),
@@ -36,6 +39,10 @@ let package = Package(
             ],
             swiftSettings: strictConcurrency
         ),
+        // The SwiftUI-facing facade (ADR-058, the owner's instruction of 2026-11-15): an `ObservableObject` over
+        // `AssetClient`. The one production target that imports Combine, and nothing depends on it but its tests, so
+        // the six targets above stay free of UI frameworks (R-CAR-9 as amended).
+        .target(name: "ZTronAssetSwiftUI", dependencies: ["ZTronAssetKit"], swiftSettings: strictConcurrency),
         .target(
             name: "ZTronAssetTestSupport",
             dependencies: ["ZTronAssetModel", "ZTronAssetStorage"],
@@ -74,6 +81,11 @@ let package = Package(
         .testTarget(
             name: "ZTronAssetKitTests",
             dependencies: ["ZTronAssetKit", "ZTronAssetTestSupport"],
+            swiftSettings: strictConcurrency
+        ),
+        .testTarget(
+            name: "ZTronAssetSwiftUITests",
+            dependencies: ["ZTronAssetSwiftUI", "ZTronAssetTestSupport"],
             swiftSettings: strictConcurrency
         ),
         .testTarget(
