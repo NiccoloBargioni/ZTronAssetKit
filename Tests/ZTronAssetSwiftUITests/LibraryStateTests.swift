@@ -87,11 +87,12 @@ struct LibraryStateTests {
 
     @available(macOS 15.0, iOS 18.0, *)
     @MainActor
-    @Test("a progress event of a run whose outcome is published is ignored; the next run's is not", .timeLimit(.minutes(1)))
+    @Test("a progress event of a run whose outcome is published is ignored, also once the next run started; the next run's is not", .timeLimit(.minutes(1)))
     func staleProgressIsIgnored() async {
         let library = LibraryHarness.make().library
         let first = SyncRunID(rawValue: 1)
         let second = SyncRunID(rawValue: 2)
+        let third = SyncRunID(rawValue: 3)
         library.apply(.syncFinished(first, .failed(.offline)))
         let changes = ChangeCounter(library)
 
@@ -99,8 +100,16 @@ struct LibraryStateTests {
         #expect(library.syncActivity == .finished(.failed(.offline)), "the outcome stays")
         #expect(changes.count == 0)
 
-        // Progress is applied whether or not this library saw the run start.
+        // The next run's start does not make the finished run's late progress current.
+        library.apply(.syncStarted(second, .explicit))
+        library.apply(.syncProgress(first, LibraryStateTests.progress))
+        #expect(library.syncActivity == .running(nil), "the finished run's progress was published as the started run's")
         library.apply(.syncProgress(second, LibraryStateTests.progress))
+        #expect(library.syncActivity == .running(LibraryStateTests.progress))
+
+        // Progress is applied whether or not this library saw the run start.
+        library.apply(.syncFinished(second, .failed(.offline)))
+        library.apply(.syncProgress(third, LibraryStateTests.progress))
         #expect(library.syncActivity == .running(LibraryStateTests.progress))
         await library.shutdown()
     }
@@ -117,10 +126,6 @@ struct LibraryStateTests {
         library.apply(.clientStarted(generation: 1))
         library.apply(.syncProgress(run, LibraryStateTests.progress))
         #expect(library.syncActivity == .running(LibraryStateTests.progress))
-
-        library.apply(.syncFinished(run, .failed(.offline)))
-        library.apply(.syncStarted(run, .explicit))
-        #expect(library.syncActivity == .running(nil), "a started run is never mistaken for the finished one")
         await library.shutdown()
     }
 

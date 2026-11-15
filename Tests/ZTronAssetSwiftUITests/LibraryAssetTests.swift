@@ -177,6 +177,10 @@ struct LibraryAssetTests {
             BundleResourceKey(name: "logo", fileExtension: "png"): LibraryAssetTests.bundledLogo,
         ])
         let harness = LibraryHarness.make(bulk: DetachedBlockingExecutor()) { $0.bundle(bundle).bundled(.image) }
+        // Whatever ends the test, no enumeration stays blocked behind the gate.
+        defer {
+            bundle.open()
+        }
         await harness.serveManifest([])
         let library = harness.library
         // What `locate` answers for the bundled asset at the moment `ready` is published.
@@ -194,8 +198,9 @@ struct LibraryAssetTests {
             await library.start()
         }
         await bundle.waitForAnEnumeration()
-        // The start's own subscription was made before this one, so the client has answered it when this returns:
-        // from here on only the held enumeration keeps the start from ending.
+        // Correct code stays `starting` for as long as the enumeration is held, whatever the schedule. A start
+        // that published `ready` without waiting for the index does so once the client answered its subscription,
+        // which was made before this one: on the usual schedule that is before this call returns.
         _ = try await library.client.subscribe()
         #expect(library.phase == .starting, "ready was published while the chain's kinds were still being indexed")
 
