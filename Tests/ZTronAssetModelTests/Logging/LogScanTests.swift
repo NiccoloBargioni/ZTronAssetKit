@@ -59,7 +59,7 @@ extension ModelSuites {
 
             // The repository.
             let lines = try SourceScan.lines()
-            #expect(Set(lines.map { $0.path.split(separator: "/")[1] }).count == 7, "every production target was scanned")
+            #expect(Set(lines.map { $0.path.split(separator: "/")[1] }).count == 8, "every production target was scanned")
             let constructions = lines.filter { $0.code.contains("Logger(") || $0.code.contains("OSSignposter(") }
             #expect(constructions.count == 3, "\(constructions.map { "\($0.path):\($0.number)" })")
             #expect(constructions.allSatisfy { $0.path == Self.logFile })
