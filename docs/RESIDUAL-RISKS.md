@@ -1574,7 +1574,7 @@ since after the clamp any value is safe. Before the fix, the median was 11.058 m
   before the readers' snapshot holds the asset: the commit path, `ensureAvailable`'s present members, the resolve's
   fast hit and joins answered from the ledger (`k.md:1402-1408`; `docs/DECISIONS.md:104`, `:511`). The location
   answered is valid at once. `lookup`, `existingLocalURL` and `hasAsset` see the asset at the next install, which the
-  client has scheduled (`docs/MIGRATION.md:211-217`; `README.md:131-136`).
+  client has scheduled (`docs/MIGRATION.md:211-217`; `HANDBOOK.md:131-136`).
 - **Ruling.** An accepted deviation under ADR-055 (the backlog's S3-B-110).
   - L5K-R24 scopes L5K-R21's guarantee (an answer only once the readers' snapshot holds the asset) to the funnel,
     `answeredFromStore`. The other sites keep ADR-016's lag, ruled non-blocking for Level 5 (`k.md:671-677`,
@@ -1589,7 +1589,7 @@ since after the clamp any value is safe. Before the fix, the median was 11.058 m
   - Their P21-ENSURE-MIG, during migration: `unseenAfterEnsure=1`, and the fast hit's `unseenAfterResolve=1`, 4 of 4
     plus TSan.
   - No device run.
-- **Field.** An app that uses the answered location, as README advises (`README.md:135-136`), is unaffected. One that
+- **Field.** An app that uses the answered location, as HANDBOOK advises (`HANDBOOK.md:135-136`), is unaffected. One that
   reads `lookup` or the shims' lookups right after such an answer can miss the asset for up to about 0.2 s. A
   carousel that does would show a missing asset for that moment (this document's reading).
 - **Noticed.** DT-PERF-06. In the field, `metrics()`'s `lookupMisses` counts such a miss with every other
@@ -1602,7 +1602,7 @@ since after the clamp any value is safe. Before the fix, the median was 11.058 m
 
 | Open item (`docs/DECISIONS.md`) | For | State |
 |---|---|---|
-| :692 comment-only edits: `CDNAssetResolver.swift:75-76`, `EventContinuityModelTests.swift:9-12`, `README.md:173-175` | WP-K, WP-G, the docs owner | Open |
+| :692 comment-only edits: `CDNAssetResolver.swift:75-76`, `EventContinuityModelTests.swift:9-12`, `HANDBOOK.md:173-175` | WP-K, WP-G, the docs owner | Open |
 | :693 `BenchStorage.swift:20-21`'s stall figures; `QuotaEviction.swift:65-69`'s R13 comment | the test owner (P5); WP-C | Open |
 | :694 `docs/ORCHESTRATION.md:1090` and `:1154` at `f76e32e` (ADR-057's numbering; `:1161` and `:1225` at `d002758`), the stale WP-C TSan flake | the orchestrator | Open (`docs/ORCHESTRATION.md:576` at `d002758`) |
 | :695 the 11 `// REENTRANCY: … (proposed)` citations | WP-F | Open |

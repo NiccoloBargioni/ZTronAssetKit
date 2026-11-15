@@ -34,7 +34,7 @@ was changed. Adoption is the owner's follow-up, described here. Decisions and th
 
    Pass `appleHosted` only in a build that ships the Apple-hosting setup (the downloader extension, its Info.plist keys
    and App Group, and the packs): a configured `appleHosted` has no fallback, so on iOS 26 and later the client selects
-   that tier whether or not the setup exists ([README](../README.md) "The Apple-hosted tier";
+   that tier whether or not the setup exists ([HANDBOOK](../HANDBOOK.md) "The Apple-hosted tier";
    [APPLE-API-VERIFICATION](APPLE-API-VERIFICATION.md) §1.7 (c); orchestrator ruling WPI-R7). Without it, leave
    `appleHosted` out and every device uses the CloudFront tier.
 

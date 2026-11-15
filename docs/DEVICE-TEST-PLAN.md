@@ -70,7 +70,7 @@ app, "the probe app", which:
   app; removing the app in the app switcher is a user force-quit, after which the system cancels the session's
   transfers (Apple's guidance on testing background sessions; confirm both in the current documentation);
 - forwards `application(_:handleEventsForBackgroundURLSession:completionHandler:)` to
-  `handleBackgroundEvents(identifier:completionHandler:)` (`:435`) as README.md's snippet does (`README.md:288-293`),
+  `handleBackgroundEvents(identifier:completionHandler:)` (`:435`) as HANDBOOK.md's snippet does (`HANDBOOK.md:288-293`),
   passing a wrapper that logs when the kit calls the handler; logs every hook call (identifier, time, return value)
   and each launch's application state; a build flag turns the forwarding off (DT-BG-03);
 - registers a test cache through `register(_:)` (`:406`) whose `purge(level:)` logs each call, and can supply a
@@ -89,9 +89,9 @@ The probe app is test tooling, not part of the package; where it lives is the or
 - Catalogs with checksummed entries: a small one (20 to 50 entries); a large one (10,000 entries, the C2 reference
   scale) for §9; three to five large files (50 to 200 MB) for §4.
 - The background session takes only bulk transfers of a known size within the cap, never a Range resume, and never a
-  request carrying the app key unless `keyRedirectExposure` is `.acceptedByOwner` (`README.md:297-301`;
+  request carrying the app key unless `keyRedirectExposure` is `.acceptedByOwner` (`HANDBOOK.md:297-301`;
   `Sources/ZTronAssetTransport/HTTPRemoteSource.swift:260-271`). Use a test origin that needs no key.
-- DT-NET-04 alone needs the production CloudFront origin, which requires the key (`README.md:300-301`). The owner
+- DT-NET-04 alone needs the production CloudFront origin, which requires the key (`HANDBOOK.md:300-301`). The owner
   makes that build and supplies the key; it never goes into a log, a recorded result, a screenshot or this repository
   (R-SEC-1).
 
@@ -185,7 +185,7 @@ the hook forwarded (§3.2); a catalog of three to five large checksummed files; 
 - **Observe:** each hook call (identifier, time, return value); when the kit calls each handler, against the
   `background attempt` and `commit` intervals of the same wake; whether two calls overlap for one identifier.
 - **Pass:** the hook returns `true` for `com.ztron.assetkit.bg.probe.v1` and `false` for any other identifier; each
-  handler is called exactly once, after its wake's events are staged (`README.md:295-297`); overlapping handlers are
+  handler is called exactly once, after its wake's events are staged (`HANDBOOK.md:295-297`); overlapping handlers are
   completed oldest first (S3D-2; `BackgroundSupport.swift:811-814`); every asset published.
 
 ### DT-BG-03 · A hook attested but not wired (R-NET-3's run-time half)
@@ -303,7 +303,7 @@ the hook forwarded (§3.2); a catalog of three to five large checksummed files; 
 
 - **Requirements:** R-SYN-15, R-NET-3.
 - **Why a device:** an explicit `shutdown()` cancels background downloads in flight as a best effort, and a killed or
-  suspended app cancels nothing (`README.md:301-304`). D-10 stays NEEDS-HUMAN-REVIEW with a nuance: the engine's
+  suspended app cancels nothing (`HANDBOOK.md:301-304`). D-10 stays NEEDS-HUMAN-REVIEW with a nuance: the engine's
   cancel can queue behind a priority change and reach no OS task (`PROBE shutdownCancelQueuedBehindPriority
   cancellations=[] priorityChanges=[]`; ADR-050's amendment, `docs/DECISIONS.md:384`). What the OS does with a cancel
   that does not land exists only on a device.
@@ -318,14 +318,14 @@ the hook forwarded (§3.2); a catalog of three to five large checksummed files; 
 Common setup: the probe app on iOS 26 or later with `RemoteConfiguration(http:appleHosted:awsOnly:)` naming an
 `AppleTierConfiguration` (`RemoteConfiguration.swift:128`, `:163`); the downloader extension, the Info.plist keys, the
 App Group and the packs (essential, prefetch and on demand) set up as Apple's BackgroundAssets documentation says
-(`README.md:321-329`: this repository names none of the keys, because none was verified); the catalog at
+(`HANDBOOK.md:321-329`: this repository names none of the keys, because none was verified); the catalog at
 `ZTronCatalog/catalog.json` in the essential pack (the defaults, `RemoteConfiguration.swift:139-142`); the build
 uploaded to App Store Connect and installed through TestFlight. The tier's live backend is device-only (§2).
 
 ### DT-APL-01 · The TestFlight build and its setup
 
 - **Requirements:** R-APL-1, R-APL-5.
-- **Why a device:** the Apple-hosting setup that README and MIGRATION step 3 ask of the app is not verified beyond
+- **Why a device:** the Apple-hosting setup that HANDBOOK and MIGRATION step 3 ask of the app is not verified beyond
   APPLE-API-VERIFICATION §1.7, and nothing ran on a device (S3-B-127).
 - **Steps:** install from TestFlight; launch online; read the probe log and `diagnosticReport()`. A second build sets
   `awsOnly`, with `http` naming the test origin.
@@ -357,7 +357,7 @@ uploaded to App Store Connect and installed through TestFlight. The tier's live 
 - **Observe:** `sourceCopyBytes`, against the pack's uncompressed size from its build input; the `apple` line
   `released pack <id>: every catalog entry in it is adopted or excluded` (`AppleHostedRemoteSource.swift:143`).
 - **Pass:** each asset is staged, hashed and adopted (R-INT-2); with `releaseAfterAdoption` the pack is released once
-  every entry it holds is adopted or excluded (`README.md:313-315`), at most once per catalog generation (R-CLN-10);
+  every entry it holds is adopted or excluded (`HANDBOOK.md:313-315`), at most once per catalog generation (R-CLN-10);
   the difference between `sourceCopyBytes` and the pack's size is recorded.
 
 ### DT-APL-04 · Cloning from a pack under the sandbox (optional)

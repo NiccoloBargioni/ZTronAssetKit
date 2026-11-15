@@ -1,10 +1,10 @@
-# ZTronAssetKit
+# ZTronAssetKit handbook
 
 ZTronAssetKit gets ZTronCarousel's remote media (images, SVG, video, audio) onto the device and owns the lifetime of
 every byte it stores there. It covers the whole path from "a manifest exists at an origin" to "a verified file URL
 reaches a page": manifest fetch and validation, downloads, integrity checks, content-addressed storage, sync
 scheduling, cleanup and quota, the Apple-hosted tier, and migration from the prior art's cache. It replaces the `CDN/`
-code of ZTronCarouselCore. It is not a UI library (no UIKit, SwiftUI or Combine in its production targets), holds no
+code of ZTronCarouselCore. Its core is not a UI library (no UIKit, SwiftUI or Combine; only the `ZTronAssetSwiftUI` facade imports Combine, [ADR-058](docs/DECISIONS.md)), holds no
 paywall or filter logic (apps map theirs to the `AssetScope` value), does not include the infrastructure that publishes
 the catalog, and does not set an app up for Apple-hosted packs: the download extension, the Info.plist keys and the
 App Group stay with the app ([SPEC](SPEC.md) §1.3).
@@ -23,7 +23,7 @@ App Group stay with the app ([SPEC](SPEC.md) §1.3).
   [docs/UNSAFE-AUDIT.md](docs/UNSAFE-AUDIT.md).
 - **Dependencies.** No third-party dependency: only modules that ship with Apple's SDKs and the Swift toolchain.
 - **Product.** One library, `ZTronAssetKit`. `import ZTronAssetKit` also exports `ZTronAssetModel` (values, errors,
-  events, environment protocols), so an app imports one module. The other targets (`ZTronAssetStorage`,
+  events, environment protocols), so an app imports one module; a SwiftUI app may import the product's second module, `ZTronAssetSwiftUI`, instead ([README](README.md)). The other targets (`ZTronAssetStorage`,
   `ZTronAssetTransport`, `ZTronAssetAppleHosted`, `ZTronAssetSync`) are internal to the package, and the fakes in
   `ZTronAssetTestSupport` are not a product ([SPEC](SPEC.md) §4.1).
 
@@ -356,7 +356,7 @@ them, in
 [`Tests/ZTronAssetCompatibilityTests/Shims/`](Tests/ZTronAssetCompatibilityTests/Shims/) (R-CAR-6). `CDNRefreshPolicy`,
 `CDNProviderFactory` and `CDNConfiguration`, which SPEC R-CAR-6 names but the prior art on disk lacks, are provided new;
 [docs/MIGRATION.md](docs/MIGRATION.md) §2 maps every symbol. The shims live in a test target, so they never ship in the
-product and Combine stays out of the production targets ([ADR-033](docs/DECISIONS.md)). They use only the public API
+product and Combine stays out of the core production targets ([ADR-033](docs/DECISIONS.md)). They use only the public API
 and run there against a real client, and the carousel's call sites are copied into
 [`PriorArtCallSiteTests.swift`](Tests/ZTronAssetCompatibilityTests/PriorArtCallSiteTests.swift), so a shim change that
 would break them fails this package's build. This package changes nothing in ZTronCarouselCore or ZTronCarousel
@@ -441,11 +441,17 @@ DECISIONS.md.
 | [docs/adr-drafts/f.md](docs/adr-drafts/f.md) | Decision record of WP-F (sync planner and engine). |
 | [docs/adr-drafts/g.md](docs/adr-drafts/g.md) | Decision record of WP-G (the facade). |
 | [docs/adr-drafts/h.md](docs/adr-drafts/h.md) | Decision record of WP-H (test support). |
-| [docs/adr-drafts/i.md](docs/adr-drafts/i.md) | Decision record of WP-I (this README and the documentation pass). |
+| [docs/adr-drafts/i.md](docs/adr-drafts/i.md) | Decision record of WP-I (this handbook, written as `README.md`, and the documentation pass). |
 | [docs/adr-drafts/k.md](docs/adr-drafts/k.md) | Decision record of WP-K (the compatibility shims). |
 | [docs/adr-drafts/ios.md](docs/adr-drafts/ios.md) | Decision record of the iOS Simulator test build (the gating convention and commands of ADR-051). |
 | [docs/adr-drafts/l2close.md](docs/adr-drafts/l2close.md) | Decision record of the Level 2 close pass (code). |
 | [docs/adr-drafts/l2fu.md](docs/adr-drafts/l2fu.md) | Decision record of the Level 2 follow-up. |
+| [README.md](README.md) | The package from the outside: intent, the public API of every module, quick adoption through the SwiftUI facade, known risks and defects. |
+| [docs/VERIFICATION.md](docs/VERIFICATION.md) | What ran, against which thresholds, with what result, and what no run proved. |
+| [docs/RESIDUAL-RISKS.md](docs/RESIDUAL-RISKS.md) | Every accepted risk, with its ruling, evidence, field impact and re-open trigger. |
+| [docs/DEVICE-TEST-PLAN.md](docs/DEVICE-TEST-PLAN.md) | What only a physical device can prove, as tests nobody has run yet. |
+| [docs/MUTATION-PROBES.md](docs/MUTATION-PROBES.md) | The mutation probes of Stage 3 and what survived them. |
+| [docs/REOPEN-WP-F.md](docs/REOPEN-WP-F.md) | The dossier for re-opening the sync engine's known misses. |
 
 The decision records under `docs/adr-drafts/` are numbered into DECISIONS.md, whose ADRs cite them as normative
 detail; where a record and its ADR disagree, the ADR wins. At the repository root, [SPEC.md](SPEC.md) holds the
