@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.3
 // Tools version 6.0 is the lowest that gives Swift 6 language mode, so downstream packages on
 // tools 6.0 (ZTronCarouselCore) can depend on this one. Building and testing here needs Swift 6.3+.
 // Warnings-as-errors is passed by Scripts/verify.sh on the command line, never set here.
